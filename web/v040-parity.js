@@ -30,8 +30,10 @@ const parityState = {
     translations: new Map(),
     valueTranslations: new Map(),
     translationSha: '',
-    translationReady: false
+    translationReady: false,
+    translationStatus: 'idle'
 }
+let translationRequest = null
 
 function norm(value) {
     return String(value ?? '').normalize('NFKC').trim().toLocaleLowerCase()
@@ -181,13 +183,69 @@ function installLibraryParity() {
     }
 }
 
-async function loadEhTranslations() {
-    if (parityState.translationReady) return
+function ehTranslationSelected() {
+    return ['eh', 'exh'].includes($('#search-provider')?.value || '')
+}
+function renderEhTranslationState() {
+    const messages = {
+        idle: ['点击后从 GitHub 加载中文标签翻译；不改变平台标签。', 'Load Chinese tag translations from GitHub only on request; source tags stay unchanged.', '操作した場合のみ GitHub から中国語タグ翻訳を取得します。元のタグは変更しません。'],
+        loading: ['正在检查来源许可并加载翻译……', 'Checking source permission and loading translations…', '配信元の許可を確認して翻訳を読み込んでいます…'],
+        ready: ['翻译已加载，仅影响显示与标签提示。', 'Translations loaded for display and tag suggestions only.', '表示とタグ候補用の翻訳を読み込みました。'],
+        disabled: ['请先明确启用 E-H 来源；仍可使用原始标签。', 'Explicitly enable E-H first. Original tags remain available.', '先に E-H を明示的に有効にしてください。元のタグは利用できます。'],
+        failed: ['翻译暂不可用，可重试；仍可使用原始标签。', 'Translations unavailable. Retry or keep using original tags.', '翻訳を取得できません。再試行するか元のタグを利用できます。'],
+        cancelled: ['来源或选择已变化，翻译加载已取消。', 'Translation loading cancelled after source choices changed.', '配信元または選択が変わったため、翻訳の読み込みを中止しました。'],
+        timeout: ['翻译加载超时；仍可使用原始标签。', 'Translation loading timed out. Original tags remain available.', '翻訳の取得がタイムアウトしました。元のタグは利用できます。']
+    }
+    const status = $('#v040-eh-translation-state')
+    if (status) status.textContent = t(...messages[parityState.translationStatus])
+    const button = $('#v040-eh-load-translations')
+    if (button) button.disabled = Boolean(translationRequest) || parityState.translationReady
+}
+function cancelEhTranslationLoad() {
+    const task = translationRequest
+    if (!task) return
+    translationRequest = null
+    clearTimeout(task.timer)
+    task.controller.abort()
+    parityState.translationStatus = 'cancelled'
+    renderEhTranslationState()
+}
+function loadEhTranslations() {
+    if (parityState.translationReady) return Promise.resolve()
+    if (translationRequest) return translationRequest.promise
+    if (!ehTranslationSelected()) return Promise.resolve()
+    const task = { controller: new AbortController(), timer: null, promise: null, timedOut: false }
+    translationRequest = task
+    parityState.translationStatus = 'loading'
+    task.timer = setTimeout(() => {
+        if (translationRequest !== task) return
+        task.timedOut = true
+        task.controller.abort()
+        parityState.translationStatus = 'timeout'
+        renderEhTranslationState()
+    }, 10000)
+    renderEhTranslationState()
+    task.promise = performEhTranslationLoad(task)
+    return task.promise
+}
+async function performEhTranslationLoad(task) {
+    const current = () => translationRequest === task && !task.controller.signal.aborted && ehTranslationSelected()
     try {
-        const [shaResponse, dataResponse] = await Promise.all([rawFetch(EH_SHA_URL), rawFetch(EH_DATA_URL)])
+        // Passive local snapshot only. A saved account, a dropdown selection or
+        // an event can never grant permission to this direct optional download.
+        const capabilities = await rawFetch('/api/v1/capabilities', { signal: task.controller.signal })
+        const policy = (await capabilities.json())?.externalSources
+        if (!current()) return
+        if (!capabilities.ok || policy?.schemaVersion !== 1 || !Number.isSafeInteger(policy.revision) || policy.revision < 0 || !Array.isArray(policy.enabled) || !policy.enabled.every(id => ['pica', 'eh', 'jm'].includes(id)))
+            throw new Error('TRANSLATION_POLICY_UNAVAILABLE')
+        if (!policy.enabled.includes('eh')) throw new Error('SOURCE_DISABLED')
+        const options = { signal: task.controller.signal, credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error' }
+        const [shaResponse, dataResponse] = await Promise.all([rawFetch(EH_SHA_URL, options), rawFetch(EH_DATA_URL, options)])
         if (!shaResponse.ok || !dataResponse.ok) throw new Error('translation unavailable')
-        parityState.translationSha = (await shaResponse.text()).trim()
+        const sha = (await shaResponse.text()).trim()
         const root = await dataResponse.json()
+        if (!Array.isArray(root?.data)) throw new Error('translation unavailable')
+        const translations = new Map(), valueTranslations = new Map()
         const valueMap = new Map()
         for (const group of root.data || []) {
             const ns = norm(group.namespace)
@@ -196,18 +254,33 @@ async function loadEhTranslations() {
                 const key = `${ns}:${norm(raw)}`
                 const zh = String(row?.name || '').trim()
                 if (!zh) continue
-                parityState.translations.set(key, zh)
+                translations.set(key, zh)
                 const rawKey = norm(raw)
                 const prior = valueMap.get(rawKey)
                 valueMap.set(rawKey, prior && prior !== zh ? null : zh)
             }
         }
-        for (const [key, value] of valueMap) if (value) parityState.valueTranslations.set(key, value)
-        parityState.translationReady = parityState.translations.size > 1000
+        for (const [key, value] of valueMap) if (value) valueTranslations.set(key, value)
+        if (!current()) return
+        if (translations.size <= 1000) throw new Error('translation unavailable')
+        parityState.translations = translations
+        parityState.valueTranslations = valueTranslations
+        parityState.translationSha = sha
+        parityState.translationReady = true
+        parityState.translationStatus = 'ready'
         translateVisibleTags()
         installTagSuggestions()
-    } catch {
+    } catch (error) {
+        if (translationRequest !== task) return
         parityState.translationReady = false
+        parityState.translationStatus = error?.message === 'SOURCE_DISABLED' ? 'disabled' : task.timedOut ? 'timeout' : 'failed'
+        task.controller.abort()
+    } finally {
+        clearTimeout(task.timer)
+        if (translationRequest === task) {
+            translationRequest = null
+            renderEhTranslationState()
+        }
     }
 }
 function translateValue(raw) {
@@ -294,8 +367,17 @@ function installEhBrowseParity() {
         <button id="v040-eh-apply" type="button" class="primary">${t('应用 E-H 筛选','Apply E-H filters','E-H 絞り込みを適用')}</button>
       </div>`
     toolbar.append(panel)
+    const translationControl = document.createElement('div')
+    translationControl.innerHTML = '<button id="v040-eh-load-translations" type="button"></button><span id="v040-eh-translation-state" role="status" aria-live="polite"></span>'
+    panel.append(translationControl)
+    $('#v040-eh-load-translations').textContent = t('加载中文标签翻译（GitHub）', 'Load Chinese tag translations (GitHub)', '中国語タグ翻訳を取得（GitHub）')
+    $('#v040-eh-load-translations').onclick = () => loadEhTranslations()
+    renderEhTranslationState()
     const provider = $('#search-provider')
-    const refreshVisibility = () => { panel.hidden = !['eh','exh'].includes(provider?.value || '') }
+    const refreshVisibility = () => {
+        panel.hidden = !['eh','exh'].includes(provider?.value || '')
+        if (panel.hidden) cancelEhTranslationLoad()
+    }
     provider?.addEventListener('change', refreshVisibility)
     refreshVisibility()
     panel.querySelectorAll('[data-eh-mode]').forEach((button) => button.onclick = () => setEhMode(button.dataset.ehMode, labels[button.dataset.ehMode]))
@@ -318,7 +400,6 @@ function installEhBrowseParity() {
         parityState.pageTo = Math.max(0, Number($('#v040-eh-pages-to').value || 0))
         $('#search-button')?.click()
     }
-    void loadEhTranslations()
 }
 function ensureDialog(id, title) {
     let dialog = document.getElementById(id)
@@ -490,8 +571,9 @@ function installCss() {
     const link=document.createElement('link');link.rel='stylesheet';link.href='./v040-parity.css';document.head.append(link)
 }
 function boot() {
-    installCss();installLibraryParity();installEhBrowseParity();observeUi();void loadEhTranslations()
+    installCss();installLibraryParity();installEhBrowseParity();observeUi()
 }
+document.addEventListener('pica-source-choices-changed', cancelEhTranslationLoad)
 document.addEventListener('pica-language-change',()=>{
     $('#v040-eh-tools')?.remove()
     restoreLegacyLibraryControls()

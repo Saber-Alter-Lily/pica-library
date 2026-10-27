@@ -24,12 +24,26 @@ describe('native local body export source contracts, not native runtime proof', 
         expect('import android.content.Context;').toMatch(forbiddenHost)
         expect(read('mobile/android-alpha2/app/build.gradle')).toMatch(/source fileTree\('src\/main\/java\/com\/picalibrary\/android\/local'\)[\s\S]*?classpath = files\(\)/)
     })
-    it('preserves the exact importer logic, sharing only its two existing validators', () => {
+    it('preserves unchanged importer identity/archive/path/raster validators while sharing the bounded copier', () => {
         const importer = java('local/LocalComicImporter.java')
             .replaceAll('\r\n', '\n')
             .replace('    static String extension(', '    private static String extension(')
             .replace('    static boolean signature(', '    private static boolean signature(')
-        expect(createHash('sha256').update(importer).digest('hex')).toBe(authority.importerSha256)
+        // The generated-page port intentionally extracted the copier. Do not
+        // bless a new whole-file hash: retain the old authority for untouched
+        // regions, and require existing native importer/exporter tests in CI.
+        const prefix = importer.slice(0, importer.indexOf('    public static Prepared prepare('))
+            .replace('    public interface Progress { void page(int complete,int total); }\n', '')
+        const signature = importer.slice(importer.indexOf('    private static boolean signature('))
+        expect(createHash('sha256').update(prefix).digest('hex')).toBe(authority.sharedImporterParts.prefixWithoutAddedProgressPort)
+        expect(createHash('sha256').update(signature).digest('hex')).toBe(authority.sharedImporterParts.signatureThroughEnd)
+        const sort = 'pages.sort((a,b)->naturalCompare(a.name,b.name));'
+        const inventory = importer.slice(importer.indexOf('    public static Prepared prepare('), importer.indexOf(sort) + sort.length)
+        expect(createHash('sha256').update(inventory).digest('hex')).toBe(authority.sharedImporterParts.legacyInventoryThroughNaturalSort)
+        expect(importer).toContain('return copyPages(title,pages,staging,cancel,false,')
+        expect(importer).toContain('return copyPages(title,pages,staging,cancel,true,progress)')
+        for (const check of ['count>MAX_PAGE||total>MAX_TOTAL', 'input.size>=0&&count!=input.size', 'input.crc>=0&&crc.getValue()!=input.crc', '!signature(header,headerLength,ext)', 'out.getFD().sync()', 'cancel.check();return new Prepared'])
+            expect(importer).toContain(check)
         for (const helper of ['safeName', 'extension', 'naturalCompare', 'signature'])
             expect(domain).toContain('LocalComicImporter.' + helper + '(')
     })

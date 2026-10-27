@@ -89,7 +89,8 @@ final class ReaderProgress {
     private void ensureComicMetadata(String comic){
         String id=comic==null?"":comic;
         if(id.equals(historyComicId))return;
-        historyComicId=id;historyComicTitle="漫画";historyComicAuthor="未知作者";historyComicProvider=EhClient.isEhId(id)?"eh":(id.startsWith("jm:")?"jm":("pica".equals(source.kind())?"pica":""));
+        historyComicId=id;historyComicTitle="漫画";historyComicAuthor="未知作者";historyComicProvider=EhClient.isEhId(id)?"eh":(id.startsWith("jm:")?"jm":("pica".equals(source.kind())?"pica":("host".equals(source.kind())?"host":"")));
+        String supplied=source.displayTitle(id);if(supplied!=null&&!supplied.trim().isEmpty())historyComicTitle=supplied;
         UnifiedCatalogStore.Entry entry=UnifiedCatalogStore.load(context).byId.get(id);
         if(entry!=null){historyComicTitle=entry.title;historyComicAuthor=entry.displayAuthor();historyComicProvider=entry.providerId;}
     }

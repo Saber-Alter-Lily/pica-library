@@ -1,0 +1,84 @@
+package com.picalibrary.android;
+
+import android.app.AlertDialog;
+import android.content.Intent;
+import android.os.Bundle;
+import android.text.InputType;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.widget.*;
+import java.util.*;
+import java.util.concurrent.*;
+
+/** User-configured direct Host browsing. No initial network request or automatic source selection. */
+public class HostSourceActivity extends LocaleAwareActivity {
+    private HostSourceManager manager;private ExecutorService worker;private volatile boolean destroyed;private boolean busy;private int request,offset,page;private boolean sourceNext,searchNext;private String selected="",lastQuery="";
+    private EditText label,endpoint,username,password,query;private Spinner auth,sources;private CheckBox lan,consent;private TextView status;private LinearLayout results;
+    private Button save,enable,start,end,bind,reloadSources,sourcePrevious,sourceFollowing,search,previous,next;
+    private final List<HostProtocol.Source> choices=new ArrayList<>();private final List<Button> reads=new ArrayList<>();
+    private AlertDialog chooser;
+    private Future<?> activeTask;
+    protected HostSourceManager createManager(){return HostSourceManager.get(this);}
+    protected ExecutorService createWorker(){return Executors.newSingleThreadExecutor();}
+    interface Task {Runnable execute()throws Exception;}
+    @Override public void onCreate(Bundle state){
+        super.onCreate(state);Ui.applyWindow(this);manager=createManager();worker=createWorker();
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(Ui.dp(this,14),0,Ui.dp(this,14),0);root.setBackgroundColor(Ui.BG);
+        root.setOnApplyWindowInsetsListener((view,insets)->{view.setPadding(Ui.dp(this,14),insets.getSystemWindowInsetTop(),Ui.dp(this,14),insets.getSystemWindowInsetBottom());return insets;});
+        root.addView(Ui.button(this,getString(R.string.common_back),view->finish(),true));root.addView(Ui.rawText(this,getString(R.string.host_title),22,Ui.TEXT,true));root.addView(Ui.rawText(this,getString(R.string.host_help),13,Ui.MUTED,false));
+        button(root,"host.local.library",R.string.host_local_library,view->startActivity(new Intent(this,LocalComicImportActivity.class)));
+        label=field(root,"host.label",R.string.host_label,false);endpoint=field(root,"host.endpoint",R.string.host_endpoint,false);endpoint.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
+        auth=new Spinner(this);auth.setTag("host.auth");auth.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{getString(R.string.host_anonymous),getString(R.string.host_basic)}));root.addView(auth);
+        lan=new CheckBox(this);lan.setText(R.string.host_lan);lan.setTextColor(Ui.TEXT);lan.setTag("host.lan");root.addView(lan);
+        save=button(root,"host.save",R.string.host_save,view->{String name=label.getText().toString().trim(),address=endpoint.getText().toString().trim(),mode=auth.getSelectedItemPosition()==1?"basic":"none";boolean allow=lan.isChecked();long revision=manager.config().revision;task(()->{manager.configure(revision,name,address,mode,allow);return ()->{selected="";choices.clear();results.removeAllViews();renderConfig();status.setText(R.string.host_saved);};});});
+        enable=button(root,"host.enable",R.string.host_enable,view->enable());
+        username=field(root,"host.username",R.string.host_username,false);password=field(root,"host.password",R.string.host_password,true);
+        username.setSaveEnabled(false);password.setSaveEnabled(false);username.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);password.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        consent=new CheckBox(this);consent.setText(R.string.host_consent);consent.setTextColor(Ui.TEXT);consent.setTag("host.consent");root.addView(consent);
+        start=button(root,"host.start",R.string.host_start,view->start());
+        end=button(root,"host.end",R.string.host_end,view->cancelTask());
+        status=Ui.rawText(this,"",13,Ui.MUTED,false);status.setTag("host.status");status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);root.addView(status);
+        sources=new Spinner(this);sources.setTag("host.sources");root.addView(sources);bind=button(root,"host.bind",R.string.host_bind,view->{int index=sources.getSelectedItemPosition();if(index<0||index>=choices.size())return;String id=choices.get(index).id;task(()->{manager.bind(id,true);return ()->{selected=id;sourceNext=false;controls();status.setText(R.string.host_source_bound);};});});
+        reloadSources=button(root,"host.sources.reload",R.string.host_sources_reload,view->listSources(0));sourcePrevious=button(root,"host.sources.previous",R.string.host_source_previous,view->listSources(offset-25));sourceFollowing=button(root,"host.sources.next",R.string.host_source_next,view->listSources(offset+25));
+        query=field(root,"host.query",R.string.host_query,false);query.setSingleLine(true);query.setImeOptions(EditorInfo.IME_ACTION_SEARCH);query.setOnEditorActionListener((view,action,event)->{if(action==EditorInfo.IME_ACTION_SEARCH||action==EditorInfo.IME_ACTION_DONE){search(1,query.getText().toString().trim());return true;}return false;});
+        search=button(root,"host.search",R.string.host_search,view->search(1,query.getText().toString().trim()));
+        results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);results.setTag("host.results");root.addView(results);
+        previous=button(root,"host.previous",R.string.host_previous,view->search(page-1,lastQuery));next=button(root,"host.next",R.string.host_next,view->search(page+1,lastQuery));
+        ScrollView scroll=new ScrollView(this);scroll.addView(root);setContentView(scroll);root.requestApplyInsets();
+        TextWatcher draft=new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){controls();}public void afterTextChanged(Editable e){}};
+        label.addTextChangedListener(draft);endpoint.addTextChangedListener(draft);lan.setOnCheckedChangeListener((view,checked)->controls());auth.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> parent,View view,int position,long id){controls();}public void onNothingSelected(AdapterView<?> parent){controls();}});selected=manager.selectedSource();renderConfig();String initialQuery=getIntent().getStringExtra("hostQuery");if(initialQuery!=null&&initialQuery.length()<=500)query.setText(initialQuery);controls();
+    }
+    private EditText field(LinearLayout root,String tag,int resource,boolean secret){EditText field=new EditText(this);field.setTag(tag);field.setHint(resource);field.setContentDescription(getString(resource));field.setInputType(InputType.TYPE_CLASS_TEXT|(secret?InputType.TYPE_TEXT_VARIATION_PASSWORD:InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS));Ui.styleField(field,this);root.addView(field);return field;}
+    private Button button(LinearLayout root,String tag,int resource,View.OnClickListener click){Button button=Ui.button(this,getString(resource),click,true);button.setTag(tag);root.addView(button);return button;}
+    private void renderConfig(){HostConfigStore.Config config=manager.config();label.setText(config.label);endpoint.setText(config.endpoint);auth.setSelection("basic".equals(config.authMode)?1:0);lan.setChecked(config.allowLan);enable.setText(config.enabled?R.string.host_disable:R.string.host_enable);if(!manager.storageError().isEmpty())status.setText(R.string.host_storage_error);else status.setText(manager.hasSession()?(selected.isEmpty()?R.string.host_choose_source:R.string.host_source_bound):config.enabled?R.string.host_enabled:R.string.host_disabled);}
+    private boolean savedDraft(){HostConfigStore.Config config=manager.config();return config.configured()&&config.label.equals(label.getText().toString().trim())&&config.endpoint.equals(endpoint.getText().toString().trim())&&config.authMode.equals(auth.getSelectedItemPosition()==1?"basic":"none")&&config.allowLan==lan.isChecked();}
+    private void controls(){if(next==null)return;boolean live=manager.hasSession(),editable=!busy&&!live&&manager.storageError().isEmpty(),saved=savedDraft();for(View view:new View[]{label,endpoint,auth,lan,save})view.setEnabled(editable);enable.setEnabled(!busy&&saved&&manager.storageError().isEmpty());start.setEnabled(!busy&&!live&&saved&&manager.config().enabled);end.setEnabled(live||busy);username.setEnabled(!busy&&!live&&saved&&"basic".equals(manager.config().authMode));password.setEnabled(username.isEnabled());consent.setEnabled(!busy&&!live&&saved);sources.setEnabled(!busy&&live&&selected.isEmpty()&&!choices.isEmpty());bind.setEnabled(sources.isEnabled());reloadSources.setEnabled(!busy&&live&&selected.isEmpty());sourcePrevious.setEnabled(!busy&&live&&selected.isEmpty()&&offset>0);sourceFollowing.setEnabled(!busy&&live&&selected.isEmpty()&&sourceNext&&offset<5000);query.setEnabled(!busy&&live&&!selected.isEmpty());search.setEnabled(query.isEnabled());previous.setEnabled(query.isEnabled()&&page>1);next.setEnabled(query.isEnabled()&&searchNext&&page<200);for(Button read:reads)read.setEnabled(!busy&&live);}
+    private void enable(){HostConfigStore.Config config=manager.config();new AlertDialog.Builder(this).setMessage(config.enabled?R.string.host_disable_confirm:R.string.host_enable_confirm).setNegativeButton(R.string.common_back,null).setPositiveButton(android.R.string.ok,(dialog,which)->task(()->{manager.enabled(config.revision,!config.enabled,true);return ()->{selected="";choices.clear();results.removeAllViews();renderConfig();};})).show();}
+    private void start(){if(!savedDraft()){status.setText(R.string.host_request_failed);return;}if(!consent.isChecked()){status.setText(R.string.host_consent_required);return;}String user=username.getText().toString(),secret=password.getText().toString();username.setText("");password.setText("");task(()->{manager.start(user,secret,true);HostProtocol.Sources result=manager.sources(0);return ()->{selected="";page=0;searchNext=false;showSources(result,0);status.setText(R.string.host_choose_source);};});}
+    private void listSources(int offset){if(offset<0||offset>5000)return;task(()->{HostProtocol.Sources value=manager.sources(offset);return ()->showSources(value,offset);});}
+    private void showSources(HostProtocol.Sources value,int offset){this.offset=offset;sourceNext=value.next;choices.clear();choices.addAll(value.rows);List<String> labels=new ArrayList<>();for(HostProtocol.Source source:choices)labels.add(source.name+" · "+source.language);sources.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels));}
+    private void search(int page,String text){if(busy||selected.isEmpty()||text.isEmpty()||page<1||page>200)return;task(()->{HostSourceManager.SearchResult value=manager.search(text,page);return ()->{this.page=page;lastQuery=text;searchNext=value.next;showBooks(value.books);status.setText(value.books.isEmpty()?R.string.host_no_results:R.string.host_results_ready);};});}
+    private void showBooks(List<HostSourceManager.Book> books){reads.clear();results.removeAllViews();for(HostSourceManager.Book book:books){results.addView(Ui.rawText(this,book.title,16,Ui.TEXT,true));Button read=Ui.button(this,getString(R.string.host_read),view->task(()->{manager.select(book.id);return ()->{Intent intent=new Intent(this,ReaderActivity.class);intent.putExtra("source","host");intent.putExtra("comicId",book.id);intent.putExtra("title",book.title);startActivity(intent);};}),true);read.setTag("host.read."+book.id);reads.add(read);results.addView(read);Button saveChapter=Ui.button(this,getString(R.string.host_save_chapter),view->chooseChapter(book),true);saveChapter.setTag("host.save."+book.id);reads.add(saveChapter);results.addView(saveChapter);}}
+    private void chooseChapter(HostSourceManager.Book book){task(()->{
+        HostSourceManager.Session grant=manager.requireSession();manager.select(book.id);List<BridgeClient.ChapterItem> chapters=manager.chapters(grant,book.id);
+        return ()->{if(chapters.isEmpty()){status.setText(R.string.host_no_chapters);return;}String[] labels=new String[chapters.size()];for(int i=0;i<labels.length;i++)labels[i]=chapters.get(i).title;
+            showDialog(new AlertDialog.Builder(this).setTitle(R.string.host_choose_chapter).setItems(labels,(dialog,index)->confirmSave(grant,book,chapters.get(index))).setNegativeButton(R.string.common_back,null).create());};
+    });}
+    private boolean current(HostSourceManager.Session grant){try{if(manager.requireSession()==grant)return true;}catch(RuntimeException ignored){}status.setText(R.string.host_request_failed);controls();return false;}
+    private void confirmSave(HostSourceManager.Session grant,HostSourceManager.Book book,BridgeClient.ChapterItem chapter){
+        if(!current(grant))return;LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,16),Ui.dp(this,8),Ui.dp(this,16),Ui.dp(this,8));content.addView(Ui.rawText(this,book.title+" · "+chapter.title,16,Ui.TEXT,true));content.addView(Ui.rawText(this,getString(R.string.host_save_scope),13,Ui.MUTED,false));CheckBox permission=new CheckBox(this);permission.setText(R.string.host_save_consent);permission.setTextColor(Ui.TEXT);permission.setTag("host.save.consent");content.addView(permission);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(R.string.host_save_chapter).setView(content).setNegativeButton(R.string.common_back,null).setPositiveButton(R.string.host_save_confirm,(view,which)->{if(permission.isChecked()&&current(grant))saveChapter(grant,book,chapter);}).create();dialog.setOnShowListener(view->{Button confirm=dialog.getButton(AlertDialog.BUTTON_POSITIVE);confirm.setEnabled(false);permission.setOnCheckedChangeListener((button,checked)->confirm.setEnabled(checked));});showDialog(dialog);
+    }
+    private void showDialog(AlertDialog dialog){if(destroyed)return;if(chooser!=null)chooser.dismiss();chooser=dialog;dialog.setOnDismissListener(view->{if(chooser==dialog)chooser=null;});dialog.show();}
+    private void saveChapter(HostSourceManager.Session grant,HostSourceManager.Book book,BridgeClient.ChapterItem chapter){int ticket=request+1;task(()->{
+        LocalComicStore.Comic saved=HostOfflineSaver.save(this,manager,grant,book.id,chapter.id,true,(complete,total)->runOnUiThread(()->{if(!destroyed&&request==ticket)status.setText(getString(R.string.host_save_progress,complete,total));}));
+        return ()->{status.setText(R.string.host_save_complete);results.addView(Ui.rawText(this,saved.title,16,Ui.TEXT,true));Button local=Ui.button(this,getString(R.string.host_read_local),view->startActivity(new Intent(this,ReaderActivity.class).putExtra("source","local").putExtra("comicId",saved.id).putExtra("title",saved.title)),true);local.setTag("host.saved."+saved.id);results.addView(local);};
+    });}
+    private void task(Task action){if(busy||destroyed)return;busy=true;int ticket=++request;status.setText(R.string.host_working);controls();activeTask=worker.submit(()->{Runnable complete=null;Throwable error=null;try{complete=action.execute();}catch(Exception|OutOfMemoryError failure){error=failure;}Runnable result=complete;Throwable failure=error;runOnUiThread(()->{if(destroyed||ticket!=request)return;busy=false;if(failure==null&&result!=null)result.run();else status.setText(R.string.host_request_failed);controls();});});}
+    private void cancelTask(){request++;if(activeTask!=null)activeTask.cancel(true);manager.end();selected="";choices.clear();reads.clear();results.removeAllViews();username.setText("");password.setText("");consent.setChecked(false);busy=false;status.setText(R.string.host_ended);controls();}
+    @Override protected void onResume(){super.onResume();if(status!=null)controls();}
+    @Override protected void onStop(){if(busy)cancelTask();super.onStop();}
+    @Override protected void onDestroy(){destroyed=true;request++;if(chooser!=null)chooser.dismiss();if(worker!=null)worker.shutdownNow();if(username!=null)username.setText("");if(password!=null)password.setText("");super.onDestroy();}
+}

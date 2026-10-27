@@ -1,0 +1,41 @@
+{
+  "repository": "Suwayomi/Suwayomi-Server",
+  "tag": "v2.4.2366",
+  "commit": "40bc5da57820324ed0ae724cbbc020cc4673b594",
+  "verification": "Read public official GitHub contents API; hashes computed from decoded raw blob bytes, not rendered HTML",
+  "files": [
+    {
+      "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/mutations/SourceMutation.kt",
+      "gitBlobSha": "c5428391406596d209c4905271265eba35b4fa6e",
+      "sha256": "06bb60d68071d4c3b42af08a65e645292962fd31850e5886114b946a9f90f981",
+      "bytes": 12869,
+      "facts": ["FetchSourceMangaInput.source Long, type SEARCH, page Int, query String", "fetchSourceManga returns mangas list and hasNextPage", "insertOrUpdate writes fetched metadata to the user host; not read-only"]
+    },
+    {
+      "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/mutations/MangaMutation.kt",
+      "gitBlobSha": "ff7647ec4ef6b8bad219d52f74200fa8f8acdcad",
+      "sha256": "0cb528c3df3f72e5e06b602c857db24a89497dcdcc239085aad27f6854b3cd18",
+      "bytes": 14080,
+      "facts": ["FetchMangaAndChaptersInput.id Int, fetchManga Boolean, fetchChapters Boolean", "payload manga plus chapters list, may carry GraphQL partial errors", "source fetch/caching is an explicit user action, not updateManga/inLibrary mutation"]
+    },
+    {
+      "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/types/MangaType.kt",
+      "gitBlobSha": "07fd7ddd7dc7005a3ce5efcd2995f4f8b7ec32e6",
+      "sha256": "d137363f16b6995f3d0d33fce6d9670ed801cd8d3966bbe80d1e950427d55877",
+      "bytes": 9973,
+      "facts": ["id Int, sourceId Long, url and title String, inLibrary Boolean", "inLibrary must be checked for library-only sessions even for stored search references"]
+    },
+    {
+      "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/queries/SourceQuery.kt",
+      "gitBlobSha": "4811ef341abc3f30140647c125f9ccf7eb4b9c79",
+      "sha256": "ef81162c1bd11692d9a9269d258ee6f59628b834171ec9117534b8b24820a8eb",
+      "bytes": 9569,
+      "facts": ["Reuse existing fixed installed-source pagination, no extension install or preference mutations"]
+    }
+  ],
+  "implementationCopied": false,
+  "upstreamOrProviderRuntimeExecuted": false,
+  "desktopOnlySlice": true,
+  "downloadsAndAndroidIntegration": "NOT_IMPLEMENTED_IN_THIS_SLICE",
+  "realInteroperability": "NOT_RUN"
+}

@@ -11,7 +11,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 interface ReaderSource {
-    default com.picalibrary.android.sources.SourceAccessPolicy.Permit sourceAccess(){return null;}
+    default com.picalibrary.android.sources.SourceAccessPolicy.Access sourceAccess(){return null;}
+    default String displayTitle(String comicId){return "";}
+    default boolean emitsRecommendationEvidence(){return true;}
     String kind();
     String scope();
     List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception;

@@ -27,6 +27,12 @@ public final class SourceAccessPolicy {
     public interface Persistence {void write(Snapshot value) throws IOException;}
     public interface Commit<T> {T run() throws Exception;}
     public interface Registration extends AutoCloseable {@Override void close();}
+    /** Request/short-commit port, also usable by separately authorized user-host sessions. */
+    public interface Access {
+        void check();
+        Registration onCancel(Runnable action);
+        <T>T commit(Commit<T> action) throws Exception;
+    }
     private Snapshot state;
     private final Map<String,Long> epochs=new HashMap<>();
     private final Map<String,Set<Runnable>> cancellations=new HashMap<>();
@@ -37,7 +43,7 @@ public final class SourceAccessPolicy {
 
     /** Binding is lazy: constructing a source must not enable it or start a worker. */
     public synchronized Permit bind(String id){requireId(id);return new Permit(id,epochs.get(id));}
-    public final class Permit {
+    public final class Permit implements Access {
         public final String source;
         private final long epoch;
         private Permit(String source,long epoch){this.source=source;this.epoch=epoch;}

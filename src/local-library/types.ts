@@ -20,7 +20,13 @@ export interface LocalInventoryV1 {
             localPath: string
         }
     >
-    chapters: Array<{ id: string; name: string; order: number; title: string }>
+    chapters: Array<{
+        id: string
+        name: string
+        order: number
+        title: string
+        orderHint?: number
+    }>
 }
 export const localInventoryKey = (comicId: string) =>
     `local-library.inventory.${comicId}`
@@ -29,4 +35,16 @@ export const localInventoryKey = (comicId: string) =>
 export interface LocalInventoryStore {
     getAppState<T>(key: string): T | undefined
     commitLocalInventory(inventory: LocalInventoryV1): void
+}
+
+/** Internal page producer, not an HTTP path/URL or executable source adapter. */
+export interface GeneratedLocalChapter {
+    comicKey: string
+    title: string
+    chapterKey: string
+    chapterTitle: string
+    orderHint: number
+    pageCount: number
+    assertAccess(): void
+    readPage(index: number): Promise<{ data: Buffer; extension: string }>
 }

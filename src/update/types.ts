@@ -1,6 +1,7 @@
 import type { RuntimeModuleContracts } from '../modules/contracts'
 import type { RuntimeComposition } from '../modules/runtime-composition'
 import type { RuntimeChoiceReceipt } from './runtime-choice'
+import type { LegacyTransitionGuard } from './legacy-transition-guard'
 
 export type UpdatePackageType = 'incremental' | 'local-test'
 
@@ -94,6 +95,8 @@ export interface UpdaterInstruction {
 }
 
 export interface FullApplicationUpdaterInstruction {
+    /** Only the independently build-bound first-transition entry supplies this guard. */
+    legacyTransition?: LegacyTransitionGuard
     readyFile?: string
     readyNonce?: string
     parentPid: number

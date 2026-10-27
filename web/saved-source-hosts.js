@@ -94,6 +94,10 @@ function render() {
         library.dataset.hostLibrary = host.id
         library.disabled ||= !host.enabled
         card.append(library)
+        const browse = button(t('另行授权浏览自选来源', 'Authorize browsing a chosen source separately', '選択した配信元の閲覧を別途許可'), () => document.dispatchEvent(new CustomEvent('pica-host-source-config', { detail: { ...host } })))
+        browse.dataset.hostSourceBrowse = host.id
+        browse.disabled ||= !host.enabled
+        card.append(browse)
         let username, password
         if (host.enabled && host.authMode === 'basic') {
             username = document.createElement('input'); password = document.createElement('input'); password.type = 'password'

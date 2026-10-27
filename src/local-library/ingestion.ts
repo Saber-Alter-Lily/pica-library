@@ -8,6 +8,7 @@ import {
     localInventoryKey,
     type LocalInventoryV1,
     type LocalInventoryStore,
+    type GeneratedLocalChapter,
     type LocalPageV1 as Page,
     type LocalImportKind as Kind
 } from './types'
@@ -399,18 +400,28 @@ export class LocalLibraryIngestion {
         if (this.pending?.token === token) this.pending = undefined
     }
 
-    private async ownedDirectory(relative: string) {
+    private async ownedDirectory(
+        relative: string,
+        create = true,
+        exclusiveLeaf = false
+    ) {
         const root = await fs.promises.realpath(this.dataDir)
         let directory = root
-        for (const part of relative.split('/')) {
+        const parts = relative.split('/')
+        for (const [index, part] of parts.entries()) {
             if (!/^[a-z0-9-]+$/.test(part))
                 throw new Error('Invalid owned import directory')
             directory = path.join(directory, part)
-            await fs.promises
-                .mkdir(directory)
-                .catch((e: NodeJS.ErrnoException) => {
-                    if (e.code !== 'EEXIST') throw e
-                })
+            if (create)
+                await fs.promises
+                    .mkdir(directory)
+                    .catch((e: NodeJS.ErrnoException) => {
+                        if (
+                            e.code !== 'EEXIST' ||
+                            (exclusiveLeaf && index === parts.length - 1)
+                        )
+                            throw e
+                    })
             const stat = await fs.promises.lstat(directory)
             if (
                 stat.isSymbolicLink() ||
@@ -420,6 +431,348 @@ export class LocalLibraryIngestion {
                 throw new Error('Local library directory is unsafe')
         }
         return directory
+    }
+
+    /** The existing atomic DB switch and owned-generation retirement, shared by both import paths. */
+    private async commitGeneration(
+        inventory: LocalInventoryV1,
+        directory: string,
+        didCommit: () => void,
+        assertAccess: () => void = () => {}
+    ) {
+        const previous = this.database.getAppState<LocalInventoryV1>(
+            localInventoryKey(inventory.comicId)
+        )
+        assertAccess()
+        this.database.commitLocalInventory(inventory)
+        didCommit() // no await between successful DB switch and recording ownership
+        let previousGenerationRetained = false
+        if (previous && previous.directory !== inventory.directory) {
+            try {
+                const parent = `local-library/${inventory.comicId.slice(6)}/`
+                if (
+                    !previous.directory.startsWith(parent) ||
+                    !/^[a-f0-9-]{36}$/.test(
+                        previous.directory.slice(parent.length)
+                    )
+                )
+                    throw new Error('Unrecognized previous import generation')
+                const prior = await this.ownedDirectory(
+                    previous.directory,
+                    false
+                )
+                if (
+                    path.dirname(prior) !== path.dirname(directory) ||
+                    prior === directory
+                )
+                    throw new Error('Unsafe previous import generation')
+                await fs.promises.rm(prior, { recursive: true, force: true })
+            } catch {
+                previousGenerationRetained = true
+            }
+        }
+        return {
+            comicId: inventory.comicId,
+            pages: inventory.pages.length,
+            chapters: inventory.chapters.length,
+            imported: true,
+            previousGenerationRetained
+        }
+    }
+
+    /** Publishes one fetched chapter through the SAME managed inventory and local Reader format.
+     * Previous chapters are verified/copied locally, never fetched again or relabelled favorites.
+     * No source credentials, remote URLs, scheduler, network or SQLite implementation is owned here.
+     */
+    async importGeneratedChapter(input: GeneratedLocalChapter) {
+        if (this.busy) throw new Error('Another local import is running')
+        if (!input || typeof input !== 'object')
+            throw new Error('Invalid generated local chapter')
+        const {
+            comicKey,
+            title,
+            chapterKey,
+            chapterTitle,
+            orderHint,
+            pageCount
+        } = input
+        const label = (value: unknown) =>
+            typeof value === 'string' &&
+            value.trim().length > 0 &&
+            value.length <= 500 &&
+            !/[\u0000-\u001f\u007f]/.test(value)
+        if (
+            typeof comicKey !== 'string' ||
+            typeof chapterKey !== 'string' ||
+            !/^[a-f0-9]{64}$/.test(comicKey) ||
+            !/^[a-f0-9]{64}$/.test(chapterKey) ||
+            !label(title) ||
+            !label(chapterTitle) ||
+            !Number.isFinite(orderHint) ||
+            Math.abs(orderHint) > 1e9 ||
+            !Number.isInteger(pageCount) ||
+            pageCount < 1 ||
+            pageCount > LOCAL_IMPORT_LIMITS.pages ||
+            typeof input.assertAccess !== 'function' ||
+            typeof input.readPage !== 'function'
+        )
+            throw new Error('Invalid generated local chapter')
+        const assertAccess = input.assertAccess.bind(input),
+            readPage = input.readPage.bind(input)
+        this.busy = true
+        let directory: string | undefined,
+            committed = false
+        try {
+            assertAccess()
+            const comicId =
+                'local:' + hash('owned-generated-pages-v1\n' + comicKey)
+            const name = 'chapter-' + chapterKey,
+                chapterId = `${comicId}:chapter:${hash(name)}`
+            const key = localInventoryKey(comicId),
+                previous = this.database.getAppState<LocalInventoryV1>(key)
+            const previousRevision = previous?.revision,
+                previousDirectory = previous?.directory
+            let prior: string | undefined
+            if (previous) {
+                if (
+                    previous.schemaVersion !== 1 ||
+                    previous.kind !== 'folder' ||
+                    previous.comicId !== comicId ||
+                    !Array.isArray(previous.pages) ||
+                    !previous.pages.length ||
+                    previous.pages.length > LOCAL_IMPORT_LIMITS.pages ||
+                    !Array.isArray(previous.chapters) ||
+                    !previous.chapters.length ||
+                    previous.chapters.length > LOCAL_IMPORT_LIMITS.pages ||
+                    !new RegExp(
+                        '^local-library/' + comicId.slice(6) + '/[a-f0-9-]{36}$'
+                    ).test(previous.directory)
+                )
+                    throw new Error(
+                        'Generated inventory is invalid; existing data retained'
+                    )
+                const seen = new Set<string>()
+                for (const chapter of previous.chapters) {
+                    if (
+                        !/^chapter-[a-f0-9]{64}$/.test(chapter.name) ||
+                        chapter.id !==
+                            `${comicId}:chapter:${hash(chapter.name)}` ||
+                        seen.has(chapter.id) ||
+                        !label(chapter.title) ||
+                        typeof chapter.orderHint !== 'number' ||
+                        !Number.isFinite(chapter.orderHint) ||
+                        Math.abs(chapter.orderHint) > 1e9
+                    )
+                        throw new Error(
+                            'Generated inventory is invalid; existing data retained'
+                        )
+                    seen.add(chapter.id)
+                }
+                prior = await this.ownedDirectory(previous.directory, false)
+            }
+            const chapters = [
+                ...(previous?.chapters ?? [])
+                    .filter((chapter) => chapter.id !== chapterId)
+                    .map((chapter) => ({
+                        id: chapter.id,
+                        name: chapter.name,
+                        order: chapter.order,
+                        orderHint: chapter.orderHint,
+                        title: chapter.title
+                    })),
+                {
+                    id: chapterId,
+                    name,
+                    order: 0,
+                    orderHint,
+                    title: chapterTitle
+                }
+            ]
+                .sort(
+                    (a, b) =>
+                        a.orderHint! - b.orderHint! ||
+                        a.name.localeCompare(b.name)
+                )
+                .map((chapter, index) => ({ ...chapter, order: index + 1 }))
+            const kept = (previous?.pages ?? []).filter(
+                (page) => page.episodeId !== chapterId
+            )
+            if (kept.length + pageCount > LOCAL_IMPORT_LIMITS.pages)
+                throw new Error(
+                    'Local comic exceeds the page/total byte import limit'
+                )
+            for (const chapter of chapters.filter(
+                (chapter) => chapter.id !== chapterId
+            )) {
+                const existing = kept
+                    .filter((page) => page.episodeId === chapter.id)
+                    .sort((a, b) => a.position - b.position)
+                if (
+                    !existing.length ||
+                    existing.some((page, index) => page.position !== index + 1)
+                )
+                    throw new Error(
+                        'Generated inventory is invalid; existing data retained'
+                    )
+            }
+            const relative = `local-library/${comicId.slice(6)}/${randomUUID()}`
+            directory = await this.ownedDirectory(relative, true, true)
+            const pages: LocalInventoryV1['pages'] = [],
+                seen = new Set<string>()
+            let bytes = 0
+            const writePage = async (
+                page: Page,
+                episodeId: string,
+                position: number,
+                data: Buffer
+            ) => {
+                assertAccess()
+                raster(data, page.extension)
+                bytes += data.length
+                if (
+                    data.length < 1 ||
+                    data.length > LOCAL_IMPORT_LIMITS.pageBytes ||
+                    bytes > LOCAL_IMPORT_LIMITS.totalBytes ||
+                    seen.has(page.name)
+                )
+                    throw new Error(
+                        'Local comic exceeds the page/total byte import limit'
+                    )
+                seen.add(page.name)
+                const localPath = path.join(
+                    directory!,
+                    hash(page.name) + page.extension
+                )
+                await fs.promises.writeFile(localPath, data, { flag: 'wx' })
+                assertAccess()
+                pages.push({
+                    name: page.name,
+                    extension: page.extension,
+                    bytes: page.bytes,
+                    sha256: page.sha256,
+                    id: `${comicId}:page:${hash(page.name)}`,
+                    episodeId,
+                    position,
+                    localPath
+                })
+            }
+            for (const page of kept) {
+                const chapter = chapters.find(
+                    (chapter) => chapter.id === page.episodeId
+                )
+                if (
+                    !chapter ||
+                    !Number.isInteger(page.position) ||
+                    page.position < 1 ||
+                    !extensions.has(page.extension) ||
+                    page.name !==
+                        `${chapter.name}/${String(page.position).padStart(4, '0')}${page.extension}` ||
+                    page.id !== `${comicId}:page:${hash(page.name)}` ||
+                    !/^[a-f0-9]{64}$/.test(page.sha256) ||
+                    !Number.isSafeInteger(page.bytes) ||
+                    page.bytes < 1 ||
+                    page.bytes > LOCAL_IMPORT_LIMITS.pageBytes ||
+                    page.localPath !==
+                        path.join(prior!, hash(page.name) + page.extension)
+                )
+                    throw new Error(
+                        'Generated inventory is invalid; existing data retained'
+                    )
+                const data = await readBounded(
+                    page.localPath,
+                    LOCAL_IMPORT_LIMITS.pageBytes,
+                    prior
+                )
+                if (data.length !== page.bytes || hash(data) !== page.sha256)
+                    throw new Error(
+                        'Saved page changed; existing data retained'
+                    )
+                await writePage(page, page.episodeId, page.position, data)
+            }
+            for (let index = 0; index < pageCount; index++) {
+                assertAccess()
+                const image = await readPage(index)
+                assertAccess()
+                if (
+                    !image ||
+                    !Buffer.isBuffer(image.data) ||
+                    image.data.length > LOCAL_IMPORT_LIMITS.pageBytes ||
+                    !extensions.has(image.extension)
+                )
+                    throw new Error('Generated page type is invalid')
+                const pageName = `${name}/${String(index + 1).padStart(4, '0')}${image.extension}`
+                await writePage(
+                    {
+                        name: pageName,
+                        extension: image.extension,
+                        bytes: image.data.length,
+                        sha256: hash(image.data)
+                    },
+                    chapterId,
+                    index + 1,
+                    image.data
+                )
+            }
+            // No await between access/revision checks and the existing atomic commit.
+            assertAccess()
+            const current = this.database.getAppState<LocalInventoryV1>(key)
+            if (
+                current?.revision !== previousRevision ||
+                current?.directory !== previousDirectory
+            )
+                throw new Error('Local inventory changed; retry explicitly')
+            pages.sort(
+                (a, b) =>
+                    chapters.findIndex(
+                        (chapter) => chapter.id === a.episodeId
+                    ) -
+                        chapters.findIndex(
+                            (chapter) => chapter.id === b.episodeId
+                        ) || a.position - b.position
+            )
+            const revision = hash(
+                JSON.stringify({
+                    chapters: chapters.map((chapter) => [
+                        chapter.id,
+                        chapter.title,
+                        chapter.orderHint
+                    ]),
+                    pages: pages.map((page) => [
+                        page.name,
+                        page.sha256,
+                        page.bytes
+                    ])
+                })
+            )
+            const result = await this.commitGeneration(
+                {
+                    schemaVersion: 1,
+                    kind: 'folder',
+                    comicId,
+                    title,
+                    revision,
+                    directory: relative,
+                    chapters,
+                    pages
+                },
+                directory,
+                () => {
+                    committed = true
+                },
+                assertAccess
+            )
+            return { ...result, episodeId: chapterId }
+        } finally {
+            try {
+                if (!committed && directory)
+                    await fs.promises.rm(directory, {
+                        recursive: true,
+                        force: true
+                    })
+            } finally {
+                this.busy = false
+            }
+        }
     }
 
     async confirm(token: string) {
@@ -440,7 +793,7 @@ export class LocalLibraryIngestion {
         try {
             await this.validateSelection(expected.source, expected.kind)
             const relative = `local-library/${expected.comicId.slice(6)}/${randomUUID()}`
-            directory = await this.ownedDirectory(relative)
+            directory = await this.ownedDirectory(relative, true, true)
             const actual = await scan(
                 expected.source,
                 expected.kind,
@@ -503,46 +856,9 @@ export class LocalLibraryIngestion {
                     }
                 })
             }
-            const previous = this.database.getAppState<LocalInventoryV1>(
-                localInventoryKey(actual.comicId)
-            )
-            this.database.commitLocalInventory(inventory)
-            committed = true
-            let previousGenerationRetained = false
-            if (previous && previous.directory !== inventory.directory) {
-                // Only a previously committed generation for this exact local identity is disposable.
-                try {
-                    const parent = `local-library/${actual.comicId.slice(6)}/`
-                    if (
-                        !previous.directory.startsWith(parent) ||
-                        !/^[a-f0-9-]{36}$/.test(
-                            previous.directory.slice(parent.length)
-                        )
-                    )
-                        throw new Error(
-                            'Unrecognized previous import generation'
-                        )
-                    const prior = await this.ownedDirectory(previous.directory)
-                    if (
-                        path.dirname(prior) !== path.dirname(directory) ||
-                        prior === directory
-                    )
-                        throw new Error('Unsafe previous import generation')
-                    await fs.promises.rm(prior, {
-                        recursive: true,
-                        force: true
-                    })
-                } catch {
-                    previousGenerationRetained = true
-                } // cleanup cannot roll back a committed healthy inventory
-            }
-            return {
-                comicId: actual.comicId,
-                pages: inventory.pages.length,
-                chapters: chapters.length,
-                imported: true,
-                previousGenerationRetained
-            }
+            return await this.commitGeneration(inventory, directory, () => {
+                committed = true
+            })
         } finally {
             // Only this invocation's new UUID generation is removed; prior generations/originals are never rollback targets.
             try {

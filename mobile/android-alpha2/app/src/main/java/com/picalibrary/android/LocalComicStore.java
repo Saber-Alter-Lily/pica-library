@@ -92,9 +92,21 @@ final class LocalComicStore {
                 try(LocalComicImporter.Source source=LocalComicImporter.zip(archive)){prepared=LocalComicImporter.prepare(label,source,pages,cancel);}
                 if(!archive.delete())throw new IOException("Cannot remove staging archive");
             }
-            for(LocalComicImporter.Page page:prepared.pages){cancel.check();BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(new File(pages,page.file).getPath(),bounds);if(bounds.outWidth<1||bounds.outHeight<1||bounds.outWidth>60000||bounds.outHeight>60000||(long)bounds.outWidth*bounds.outHeight>100000000L)throw new IOException("Invalid or oversized raster image");}
+            validatePages(prepared,cancel);
             cancel.check();return new Preview(LocalComicImporter.identity(DeviceIdentity.id(app),kind,uri.normalizeScheme().toString()),label,kind,prepared,work);
         } catch(Exception|OutOfMemoryError error){removeOwned(stagingRoot,work);throw error;}
+    }
+    /** Reuses local generation/manifest/Reader storage; no remote locators enter the manifest. */
+    static Preview prepareRasterPages(Context context,String id,String label,List<LocalComicImporter.Open> streams,LocalComicImporter.Cancellation cancel,LocalComicImporter.Progress progress) throws Exception {
+        if(id==null||!id.matches("local:[0-9a-f]{64}"))throw new IOException("Invalid generated comic identity");
+        Context app=context.getApplicationContext();File stagingRoot=new File(app.getFilesDir(),"local-comic-staging-v1");
+        if(!stagingRoot.isDirectory()&&!stagingRoot.mkdirs())throw new IOException("Cannot create import staging");
+        File work=inside(stagingRoot,new File(stagingRoot,UUID.randomUUID().toString()));if(!work.mkdir())throw new IOException("Cannot create import session");
+        try{File pages=new File(work,"pages");if(!pages.mkdir())throw new IOException("Cannot stage pages");String display=title(label);LocalComicImporter.Prepared prepared=LocalComicImporter.prepareRasterPages(display,streams,pages,cancel,progress);validatePages(prepared,cancel);cancel.check();return new Preview(id,display,"folder",prepared,work);}
+        catch(Exception|OutOfMemoryError error){removeOwned(stagingRoot,work);throw error;}
+    }
+    private static void validatePages(LocalComicImporter.Prepared prepared,LocalComicImporter.Cancellation cancel)throws IOException {
+        for(LocalComicImporter.Page page:prepared.pages){cancel.check();BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(new File(prepared.directory,page.file).getPath(),bounds);if(bounds.outWidth<1||bounds.outHeight<1||bounds.outWidth>60000||bounds.outHeight>60000||(long)bounds.outWidth*bounds.outHeight>100000000L)throw new IOException("Invalid or oversized raster image");}
     }
     private static void walk(Context context,DocumentFile directory,String prefix,int depth,List<LocalComicImporter.Input> out,Set<String> visited,LocalComicImporter.Cancellation cancel) throws IOException {
         cancel.check();if(depth>LocalComicImporter.MAX_DEPTH||!visited.add(directory.getUri().toString()))throw new IOException("Folder is too deep or cyclic");

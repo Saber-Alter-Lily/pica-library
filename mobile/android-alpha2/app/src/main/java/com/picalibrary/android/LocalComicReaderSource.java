@@ -12,6 +12,7 @@ final class LocalComicReaderSource implements ReaderSource {
     LocalComicReaderSource(Context context){this.context=context.getApplicationContext();}
     public String kind(){return "local";}
     public String scope(){return "android-local-import-v1";}
+    public String displayTitle(String id){try{return required(id).title;}catch(Exception unavailable){return "";}}
     public List<BridgeClient.ChapterItem> chapters(String id) throws Exception {
         LocalComicStore.Comic comic=required(id);LinkedHashMap<String,List<LocalComicStore.Page>> chapters=new LinkedHashMap<>();
         for(LocalComicStore.Page page:comic.pages)chapters.computeIfAbsent(page.chapterId,k->new ArrayList<>()).add(page);

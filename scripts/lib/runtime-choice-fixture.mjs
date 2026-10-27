@@ -12,6 +12,21 @@ export function runtimeChoiceReady(status, capabilities, mode) {
         typeof status.csrfToken === 'string' && status.csrfToken.length > 0 && status.csrfToken.length <= 256 &&
         isDeepStrictEqual(status.runtimeComposition, { status: 'declared', composition: { formatVersion: 1, sourceRuntimes: mode === 'jm' ? ['jm'] : [] } })
 }
+/** Fixed classifications only: never emit URLs, hosts, paths, query/fragment or credentials. */
+export function runtimeChoiceBrowserRequestEvidence(input, resourceType) {
+    let protocol = 'invalid', requestClass = 'unclassified'
+    try {
+        const url = new URL(input)
+        protocol = ['http:', 'https:', 'file:', 'data:', 'blob:'].includes(url.protocol) ? url.protocol : 'other'
+        const root = '/EhTagTranslation/DatabaseReleases/refs/heads/master/'
+        if (url.origin === 'https://raw.githubusercontent.com' && !url.username && !url.password) {
+            if (url.pathname === root + 'sha') requestClass = 'eh-translation-sha'
+            if (url.pathname === root + 'db.text.json') requestClass = 'eh-translation-data'
+        }
+    } catch { /* An invalid URL is still blocked and never echoed. */ }
+    const safeType = ['document', 'stylesheet', 'image', 'media', 'font', 'script', 'texttrack', 'xhr', 'fetch', 'eventsource', 'websocket', 'manifest', 'other'].includes(resourceType) ? resourceType : 'other'
+    return { kind: 'EXTERNAL_BROWSER_REQUEST_BLOCKED', protocol, resourceType: safeType, requestClass }
+}
 const repository = 'Saber-Alter-Lily/pica-library'
 export function runtimeChoicePublication(archives) {
     assert.deepEqual(Object.keys(archives).sort(), ['core', 'jm'])

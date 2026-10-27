@@ -15,6 +15,7 @@ public final class LocalComicImporter {
     public static final int MAX_ENTRIES = 10000, MAX_PAGES = 2000, MAX_DEPTH = 8;
     public interface Cancellation { void check() throws IOException; }
     public interface Open { InputStream open() throws IOException; }
+    public interface Progress { void page(int complete,int total); }
     public interface Source extends AutoCloseable {
         List<Input> entries() throws IOException;
         @Override default void close() throws IOException { }
@@ -102,19 +103,36 @@ public final class LocalComicImporter {
         ArrayList<Input> pages=new ArrayList<>(); Set<String> names=new HashSet<>();
         for(Input input:all) { cancel.check();String name=safeName(input.name);if(!names.add(name.toLowerCase(Locale.ROOT)))throw new IOException("Duplicate local comic path");if(!input.directory&&!extension(name).isEmpty()){if(input.size>MAX_PAGE)throw new IOException("Page exceeds 20 MiB");pages.add(input);} }
         if(pages.isEmpty()||pages.size()>MAX_PAGES)throw new IOException("Comic must contain 1–2000 raster pages");
-        pages.sort((a,b)->naturalCompare(a.name,b.name)); ArrayList<Page> copied=new ArrayList<>(); long total=0;
+        pages.sort((a,b)->naturalCompare(a.name,b.name));
+        return copyPages(title,pages,staging,cancel,false,(complete,total)->{});
+    }
+    /** Explicit generated chapter: same bounded ingestion, with type inferred from raster bytes. */
+    public static Prepared prepareRasterPages(String title,List<Open> streams,File staging,Cancellation cancel,Progress progress) throws IOException {
+        if(!staging.isDirectory()||staging.list()==null||staging.list().length!=0)throw new IOException("Expected empty import staging");
+        if(streams==null||streams.isEmpty()||streams.size()>MAX_PAGES)throw new IOException("Comic must contain 1–2000 raster pages");
+        List<Input> pages=new ArrayList<>();for(int i=0;i<streams.size();i++){cancel.check();if(streams.get(i)==null)throw new IOException("Missing raster stream");pages.add(new Input(String.format(Locale.ROOT,"%06d",i+1),-1,false,streams.get(i)));}
+        return copyPages(title,pages,staging,cancel,true,progress);
+    }
+    private static Prepared copyPages(String title,List<Input> pages,File staging,Cancellation cancel,boolean detectRaster,Progress progress) throws IOException {
+        ArrayList<Page> copied=new ArrayList<>(); long total=0;
         for(Input input:pages) {
-            cancel.check();String name=safeName(input.name),ext=extension(name),file=hash(name)+"."+ext;File target=new File(staging,file);long count=0;CRC32 crc=new CRC32();byte[] header=new byte[12];int headerLength=0;
-            try(InputStream in=input.open.open();FileOutputStream out=new FileOutputStream(target)) {
-                if(in==null)throw new IOException("Unreadable comic page");byte[] buffer=new byte[32768];int n;
-                while((n=in.read(buffer))!=-1) { cancel.check();count+=n;total+=n;if(count>MAX_PAGE||total>MAX_TOTAL)throw new IOException("Comic decoded bytes exceed limit");int h=Math.min(n,header.length-headerLength);if(h>0){System.arraycopy(buffer,0,header,headerLength,h);headerLength+=h;}crc.update(buffer,0,n);out.write(buffer,0,n); }
-                out.getFD().sync();
+            cancel.check();String name=safeName(input.name),ext=extension(name),file;long count=0;CRC32 crc=new CRC32();byte[] header=new byte[12];int headerLength=0;
+            InputStream opened=input.open.open();if(opened==null)throw new IOException("Unreadable comic page");
+            try(PushbackInputStream in=new PushbackInputStream(opened,12)) {
+                if(detectRaster){byte[] peek=new byte[12];int n=0,b;while(n<peek.length&&(b=in.read())!=-1){cancel.check();peek[n++]=(byte)b;}ext=rasterExtension(peek,n);if(ext.isEmpty())throw new IOException("Invalid raster body");in.unread(peek,0,n);name=name+"."+ext;}
+                file=hash(name)+"."+ext;File target=new File(staging,file);
+                try(FileOutputStream out=new FileOutputStream(target)) {
+                    byte[] buffer=new byte[32768];int n;
+                    while((n=in.read(buffer))!=-1) { cancel.check();count+=n;total+=n;if(count>MAX_PAGE||total>MAX_TOTAL)throw new IOException("Comic decoded bytes exceed limit");int h=Math.min(n,header.length-headerLength);if(h>0){System.arraycopy(buffer,0,header,headerLength,h);headerLength+=h;}crc.update(buffer,0,n);out.write(buffer,0,n); }
+                    out.getFD().sync();
+                }
             }
             if(count==0||(input.size>=0&&count!=input.size)||(input.crc>=0&&crc.getValue()!=input.crc)||!signature(header,headerLength,ext))throw new IOException("Invalid image, length or CRC");
-            copied.add(new Page(name,file,count,title));
+            copied.add(new Page(name,file,count,title));progress.page(copied.size(),pages.size());
         }
         cancel.check();return new Prepared(staging,copied,total);
     }
+    private static String rasterExtension(byte[] header,int length){for(String ext:Arrays.asList("jpg","png","gif","webp"))if(signature(header,length,ext))return ext;return "";}
     static boolean signature(byte[] h,int n,String ext) {
         if(("jpg".equals(ext)||"jpeg".equals(ext)))return n>=3&&(h[0]&255)==255&&(h[1]&255)==216&&(h[2]&255)==255;
         if("png".equals(ext))return n>=8&&Arrays.equals(Arrays.copyOf(h,8),new byte[]{(byte)137,80,78,71,13,10,26,10});

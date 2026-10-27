@@ -86,4 +86,31 @@ public class DualOnboardingTest {
             assertFalse("empty spotlight description "+i,bodies[i].trim().isEmpty());
         }
     }
+
+    @Test public void advancedStepCopyMatchesActualChapterRoutesInEverySupportedLocale(){
+        String[] locales={LocaleStore.EN,LocaleStore.ZH_CN,LocaleStore.JA};
+        String[][] firstTitles={
+            {"Choose providers","Tag participation","Visual modes","Scan pairing code",
+             "Choose a WebDAV target","View active tasks","Recommendation runtime","Current update status"},
+            {"选择漫画来源","标签参与范围","画风接入模式","扫码配对",
+             "选择 WebDAV 网盘","查看后台任务","本机推荐运行状态","当前更新状态"},
+            {"配信元を選ぶ","タグの参加範囲","画風の利用モード","QR コードで接続",
+             "WebDAV の保存先","実行中のタスク","おすすめの実行状態","現在の更新状態"}
+        };
+        for(int lang=0;lang<locales.length;lang++){
+            LocaleStore.set(context,locales[lang]);
+            Context localeContext=LocaleStore.wrap(context);
+            String[] titles=localeContext.getResources()
+                .getStringArray(R.array.advanced_spotlight_step_titles);
+            String[] bodies=localeContext.getResources()
+                .getStringArray(R.array.advanced_spotlight_step_bodies);
+            assertEquals(16,titles.length);assertEquals(16,bodies.length);
+            for(int chapter=0;chapter<8;chapter++){
+                assertEquals(locales[lang]+" chapter="+chapter,
+                    firstTitles[lang][chapter],titles[chapter*2]);
+                assertFalse(bodies[chapter*2].trim().isEmpty());
+                assertFalse(bodies[chapter*2+1].trim().isEmpty());
+            }
+        }
+    }
 }

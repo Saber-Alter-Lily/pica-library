@@ -73,4 +73,54 @@ public class AdvancedSpotlightTargetTest {
         targets(RecommendationControlActivity.class,AndroidOnboarding.ADV_PREFERENCE_SAVE);
         targets(DownloadsActivity.class,AndroidOnboarding.ADV_DOWNLOAD_TASKS);
     }
+
+    @Test public void preferenceGuideShowsRealSaveButtonButCannotSaveAnEmptyDraft(){
+        Application app=RuntimeEnvironment.getApplication();
+        Intent intent=new Intent(app,RecommendationControlActivity.class)
+            .putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,1);
+        try(ActivityController<RecommendationControlActivity> controller=
+                Robolectric.buildActivity(RecommendationControlActivity.class,intent).create()){
+            RecommendationControlActivity activity=controller.get();
+            View save=activity.getWindow().getDecorView()
+                .findViewWithTag(AndroidOnboarding.ADV_PREFERENCE_SAVE);
+            assertNotNull(save);
+            View actions=(View)save.getParent(),bar=(View)actions.getParent();
+            assertEquals("guide-only empty Save area must be visible",View.VISIBLE,bar.getVisibility());
+            assertFalse("guide cannot enable a Save operation without changes",save.isEnabled());
+            android.os.Bundle state=new android.os.Bundle();
+            controller.saveInstanceState(state);
+            assertTrue(state.getBoolean("guidePreview"));
+        }
+        try(ActivityController<RecommendationControlActivity> controller=
+                Robolectric.buildActivity(RecommendationControlActivity.class).create()){
+            View save=controller.get().getWindow().getDecorView()
+                .findViewWithTag(AndroidOnboarding.ADV_PREFERENCE_SAVE);
+            assertNotNull(save);
+            View bar=(View)((View)save.getParent()).getParent();
+            assertEquals("ordinary empty editor must not gain a persistent bar",
+                View.GONE,bar.getVisibility());
+        }
+    }
+
+    @Test public void guideUpdatePreviewStateSurvivesConfigurationRecreation(){
+        Application app=RuntimeEnvironment.getApplication();
+        Intent intent=new Intent(app,UpdateActivity.class)
+            .putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,7);
+        android.os.Bundle saved=new android.os.Bundle();
+        try(ActivityController<UpdateActivity> c=
+                Robolectric.buildActivity(UpdateActivity.class,intent).create()){
+            c.saveInstanceState(saved);
+            assertTrue(saved.getBoolean("guidePreview"));
+        }
+        intent.removeExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER);
+        try(ActivityController<UpdateActivity> c=
+                Robolectric.buildActivity(UpdateActivity.class,intent).create(saved)){
+            UpdateActivity screen=c.get();
+            TextView state=(TextView)screen.getWindow().getDecorView()
+                .findViewWithTag(AndroidOnboarding.ADV_UPDATE_STATUS);
+            assertNotNull(state);
+            assertEquals("rotation must not silently start update check",
+                screen.getString(R.string.advanced_guide_update_preview),state.getText().toString());
+        }
+    }
 }

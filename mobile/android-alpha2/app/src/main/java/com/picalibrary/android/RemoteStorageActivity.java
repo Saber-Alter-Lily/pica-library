@@ -81,8 +81,19 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
     private RemoteConfigStore.Config formCandidate(){RemoteConfigStore.Config fallback=creating?null:RemoteConfigStore.find(this,selectedId);RemoteConfigStore.Preset preset=currentPreset();return RemoteConfigStore.candidate(selectedId,label.getText().toString(),preset.vendor,url.getText().toString(),root.getText().toString(),user.getText().toString(),password.getText().toString(),fallback);}
 
     private void test(boolean save){
-        final boolean createRequest=creating;final String currentId=selectedId;status.setText(save?LocalizedText.ui("正在保存并连接…"):LocalizedText.ui("正在测试…"));new Thread(()->{try{
-            RemoteConfigStore.Config candidate=formCandidate();boolean ok=new RemoteLibraryClient(candidate).test();RemoteConfigStore.Config saved=candidate;
+        // Snapshot Android EditText/Spinner values before leaving the UI thread.
+        // Remote connectivity and persistence stay on the worker; invalid input starts no network operation.
+        final RemoteConfigStore.Config candidate;
+        try{candidate=formCandidate();}
+        catch(Exception error){
+            status.setText(LocalizedText.ui("连接失败：")+message(error));
+            return;
+        }
+        final boolean createRequest=creating;
+        final String currentId=selectedId;
+        status.setText(save?LocalizedText.ui("正在保存并连接…"):LocalizedText.ui("正在测试…"));
+        new Thread(()->{try{
+            boolean ok=new RemoteLibraryClient(candidate).test();RemoteConfigStore.Config saved=candidate;
             if(save&&ok){String saveId=createRequest?"remote-"+UUID.randomUUID().toString().replace("-","").substring(0,16):currentId;saved=RemoteConfigStore.saveTarget(this,saveId,candidate.label,candidate.vendor,candidate.baseUrl,candidate.root,candidate.username,candidate.password);try{cachePortableState();}catch(Exception ignored){}}
             RemoteConfigStore.Config finalSaved=saved;runOnUiThread(()->{url.setText(finalSaved.baseUrl);status.setText(ok?(save?LocalizedText.ui("已保存并连接成功 · 当前：")+finalSaved.label:LocalizedText.ui("连接成功 · ")+finalSaved.label):LocalizedText.ui("连接不可用"));if(save&&ok){password.setText("");user.setText("");loadUi(finalSaved.id);}});
         }catch(Exception e){runOnUiThread(()->status.setText(LocalizedText.ui("连接失败：")+message(e)));}}).start();

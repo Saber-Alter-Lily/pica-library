@@ -69,6 +69,30 @@ public class AdvancedSpotlightTargetTest {
         }
     }
 
+    @Test public void updateGuideIgnoresAnAlreadyPendingSystemDownloadBroadcast(){
+        Application app=RuntimeEnvironment.getApplication();
+        android.content.SharedPreferences prefs=app.getSharedPreferences("updater-v2",Context.MODE_PRIVATE);
+        prefs.edit().clear().putLong("downloadId",987654321L).commit();
+        try{
+            Intent intent=new Intent(app,UpdateActivity.class)
+                .putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,7);
+            try(ActivityController<UpdateActivity> c=
+                    Robolectric.buildActivity(UpdateActivity.class,intent).create().start().resume().visible()){
+                UpdateActivity screen=c.get();
+                TextView label=(TextView)screen.getWindow().getDecorView()
+                    .findViewWithTag(AndroidOnboarding.ADV_UPDATE_STATUS);
+                assertNotNull(label);
+                assertEquals(screen.getString(R.string.advanced_guide_update_preview),label.getText().toString());
+                Intent completed=new Intent(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+                completed.putExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID,987654321L);
+                screen.sendBroadcast(completed);
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+                assertEquals("a system broadcast must not resume update processing during the guide",
+                    screen.getString(R.string.advanced_guide_update_preview),label.getText().toString());
+            }
+        }finally{prefs.edit().clear().commit();}
+    }
+
     @Test public void manualPreferenceSaveAndDownloadTasksHaveStableTargets(){
         targets(RecommendationControlActivity.class,AndroidOnboarding.ADV_PREFERENCE_SAVE);
         targets(DownloadsActivity.class,AndroidOnboarding.ADV_DOWNLOAD_TASKS);

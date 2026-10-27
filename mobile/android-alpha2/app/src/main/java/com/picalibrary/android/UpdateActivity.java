@@ -43,7 +43,10 @@ public final class UpdateActivity extends LocaleAwareActivity {
     private long downloadId=-1,lastBytes=-1,lastProgressAt=0;
     private boolean registered,destroyed,guidePreview;
     private final Runnable poll=new Runnable(){@Override public void run(){if(destroyed)return;updateDownloadState();if(downloadId>=0)handler.postDelayed(this,1000);}};
-    private final BroadcastReceiver receiver=new BroadcastReceiver(){@Override public void onReceive(Context context,Intent intent){long id=intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1);long expected=downloadId>=0?downloadId:prefs().getLong(P_DOWNLOAD,-1);if(id==expected){downloadId=id;updateDownloadState();}}};
+    private final BroadcastReceiver receiver=new BroadcastReceiver(){@Override public void onReceive(Context context,Intent intent){
+        // Read-only guided inspection must not resume a pre-existing download or overwrite its preview UI.
+        if(guidePreview)return;
+        long id=intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1);long expected=downloadId>=0?downloadId:prefs().getLong(P_DOWNLOAD,-1);if(id==expected){downloadId=id;updateDownloadState();}}};
 
     private static final class DownloadState{
         final boolean found;final int status,reason;final long bytes,total;

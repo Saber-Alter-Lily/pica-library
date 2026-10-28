@@ -1,13 +1,27 @@
 import { randomUUID } from 'node:crypto'
 import { SignedReaderInputError } from '../source-extensions/signed-reader-errors'
 import type { ReadingLibraryRow } from '../library/reading-library'
+import type { ExternalReaderAccess, ExternalReaderTransport } from '../source-extensions/reader-contract'
 import type {
-    OnlineReaderCache, OnlineReaderState, OnlineReaderContract
+    OnlineReaderCache, OnlineReaderState, OnlineReaderContract, OnlineReaderSource
 } from '../services/online-reader-service'
 import { OnlineReaderService } from '../services/online-reader-service'
 import { bindExternalReader } from '../source-extensions/desktop-reader-adapter'
 import type { TrustedSourceProcess } from '../source-extensions/trusted-process'
 import { SignedWorkerStore } from '../source-extensions/signed-worker-store'
+
+/**
+ * Only the trusted application composition root may opt a worker into a
+ * legacy identity codec. A manifest or HTTP request cannot supply this map.
+ */
+export interface SignedReaderIdentityBridge {
+    bind(
+        manifest: unknown,
+        transport: ExternalReaderTransport,
+        access: ExternalReaderAccess
+    ): { source: OnlineReaderSource; contract: OnlineReaderContract }
+    ownsComicId(comicId: string): boolean
+}
 
 interface SignedSession {
     id: string
@@ -54,8 +68,14 @@ export class SignedSourceDesktopReader {
     constructor(
         private readonly store: SignedWorkerStore,
         private readonly state: OnlineReaderState,
-        private readonly makeCache: () => OnlineReaderCache
+        private readonly makeCache: () => OnlineReaderCache,
+        private readonly identityBridges: ReadonlyMap<string, SignedReaderIdentityBridge> = new Map()
     ) {}
+
+    private ownsSourceComic(sourceId: string, comicId: string) {
+        const bridge = this.identityBridges.get(sourceId)
+        return bridge ? bridge.ownsComicId(comicId) : comicId.startsWith(sourceId + ':')
+    }
 
     private drop(session: SignedSession) {
         this.sessions.delete(session.id)
@@ -172,7 +192,8 @@ export class SignedSourceDesktopReader {
                     id,
                     capabilities: { chapters: true as const, pages: true as const, media: true as const }
                 }
-                const bound = bindExternalReader(manifest, worker, worker)
+                const bound = this.identityBridges.get(id)?.bind(manifest, worker, worker) ??
+                    bindExternalReader(manifest, worker, worker)
                 const contract: OnlineReaderContract = {
                     ...bound.contract,
                     progressKey: 'signed-source-progress-v1:' + id,
@@ -224,7 +245,7 @@ export class SignedSourceDesktopReader {
         const reader = session.reader
         if (operation === 'progress') {
             return reader.recentProgress().filter(row =>
-                row.comicId.startsWith(session.sourceId + ':'))
+                this.ownsSourceComic(session.sourceId, row.comicId))
         }
         const comicId = field(input.comicId)
         if (operation === 'chapters')
@@ -262,7 +283,7 @@ export class SignedSourceDesktopReader {
                     current.activeVersion === null) continue
                 session.worker.assertEnabled()
                 for (const entry of session.reader.recentProgress()) {
-                    if (!entry.comicId.startsWith(session.sourceId + ':'))
+                    if (!this.ownsSourceComic(session.sourceId, entry.comicId))
                         continue
                     rows.push({
                         source: {

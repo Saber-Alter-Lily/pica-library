@@ -149,6 +149,7 @@ export function moduleBoundaryViolations(edges: DependencyEdge[]): string[] {
         const to = edge.to
         const isCoreReader = from.startsWith('src/reader/') ||
             from === 'src/services/online-reader-service.ts' ||
+            from === 'src/services/reader-service.ts' ||
             from === 'src/library/reading-library.ts'
         const isConcreteSource = to.startsWith('src/providers/') ||
             to === 'src/sdk.ts' || to.startsWith('src/desktop/') ||
@@ -156,7 +157,9 @@ export function moduleBoundaryViolations(edges: DependencyEdge[]): string[] {
             to === 'src/services/provider-service.ts'
         let reason: string | undefined
 
-        if (isCoreReader && (isConcreteSource || to === '<runtime-loader>'))
+        if (isCoreReader && (isConcreteSource ||
+            to === 'src/services/external-reader-adapter.ts' ||
+            to === 'node:child_process' || to === '<runtime-loader>'))
             reason = 'Reader must not depend on concrete sources'
         if (from === 'src/services/provider-service.ts' && !edge.typeOnly &&
             ['src/providers/pica-provider.ts',

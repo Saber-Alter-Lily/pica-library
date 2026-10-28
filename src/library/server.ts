@@ -26,6 +26,8 @@ import {
 import { ReaderService } from '../services/reader-service'
 import { ExternalReaderAdapter } from '../services/external-reader-adapter'
 import { OnlineReaderService } from '../services/online-reader-service'
+import type { SignedSourceDesktopReader } from '../desktop/signed-source-reader'
+import { SignedReaderInputError } from '../source-extensions/signed-reader-errors'
 import type { UserEventInput, V3EventType } from '../recommendation-v3/types'
 import { CycleCoordinatorV3 } from '../recommendation-v3/cycle-coordinator-v3'
 import { FINAL_PROFILE_VERSION } from '../recommendation-v3/final-profile'
@@ -45,6 +47,8 @@ import { RUNTIME_CHOICE_ROUTES, runtimeChoiceAuthority, runtimeChoiceCommand } f
 export interface DesktopServerController {
     csrfToken: string
     hostedReader?: HostedLibraryReader
+    /** Signed worker QA integration is absent in production without a pinned publisher. */
+    signedSourceReader?: SignedSourceDesktopReader
     inspectSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
     sourceHostConnections?: (input: Record<string, unknown>) => unknown
     inspectSavedSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
@@ -397,6 +401,13 @@ export async function startLibraryServer(options: {
                         catalogueReadingPort('local', () => options.database.recentReadingProgress(100), options.database, id => options.service.sources.isEnabled(id)),
                         catalogueReadingPort('online', () => onlineReader.recentProgress(), options.database, id => options.service.sources.isEnabled(id))
                     ]
+                    if (options.desktop.signedSourceReader) {
+                        const signed = options.desktop.signedSourceReader
+                        ports.push({
+                            id: 'signed-source-reader',
+                            snapshot: () => signed.readingLibraryRows()
+                        })
+                    }
                     if (typeof input.hostSessionId === 'string') {
                         const sessionId = input.hostSessionId
                         ports.push({ id: 'selected-host', snapshot: () => {
@@ -409,6 +420,138 @@ export async function startLibraryServer(options: {
                     response.setHeader('connection', 'close')
                     return json(response, 400, { error: 'Invalid reading library query' })
                 }
+            }
+            if (url.pathname === '/api/v1/desktop/signed-reader' ||
+                url.pathname.startsWith('/api/v1/desktop/signed-reader/')) {
+                // This optional app-supplied port cannot be enabled by a
+                // manifest or browser. Management and JSON require CSRF.
+                // Session-owned image tags additionally have a tightly scoped
+                // same-origin, image-only allowance; no install/upload route.
+                const peer = request.socket.remoteAddress ?? ''
+                // Do not trust arbitrary Host as the origin authority. A
+                // browser on a DNS-rebinding domain can be same-origin with
+                // its own forged Host/Referer while connecting to loopback.
+                // Keep this image-only CSRF exception on the actual local
+                // listener, never on attacker-controlled hostnames.
+                const port = request.socket.localPort
+                const hostHeader = request.headers.host?.toLowerCase() ?? ''
+                const trustedHost = port !== undefined && [
+                    `127.0.0.1:${port}`,
+                    `localhost:${port}`,
+                    `[::1]:${port}`
+                ].includes(hostHeader)
+                const expectedOrigin = trustedHost ? `http://${hostHeader}` : ''
+                let referrerOrigin = ''
+                try {
+                    referrerOrigin = new URL(
+                        String(request.headers.referer ?? '')
+                    ).origin
+                } catch { /* no referrer is not same-origin proof */ }
+                // Browsers do not reliably send an Origin header on GET.
+                // Accept only a same-origin fetch with matching referrer,
+                // or an explicitly originating trusted Desktop client.
+                const sameOriginRead = request.method === 'GET' &&
+                    request.headers['sec-fetch-site'] === 'same-origin' &&
+                    referrerOrigin === expectedOrigin
+                const csrfAuthorized =
+                    (origin === expectedOrigin || sameOriginRead) &&
+                    request.headers['x-pica-csrf'] === options.desktop?.csrfToken
+                // <img> cannot attach x-pica-csrf. This narrow exception
+                // never authorizes metadata, progress or mutation requests.
+                const nativeSignedImage =
+                    request.method === 'GET' &&
+                    /^\/api\/v1\/desktop\/signed-reader\/[0-9a-f-]{36}\/comics\/[^/]+\/chapters\/[^/]+\/pages\/\d+$/.test(url.pathname) &&
+                    !origin &&
+                    request.headers['sec-fetch-site'] === 'same-origin' &&
+                    request.headers['sec-fetch-dest'] === 'image' &&
+                    referrerOrigin === expectedOrigin
+                const authorized =
+                    trustedHost &&
+                    Boolean(options.desktop?.signedSourceReader) &&
+                    Boolean(options.desktop?.configured()) &&
+                    options.desktop?.status().startupReady !== false &&
+                    /^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) &&
+                    (csrfAuthorized || nativeSignedImage)
+                if (!authorized)
+                    return json(response, 403, { error: 'Signed source Desktop authority required' })
+                if (url.search || !['GET', 'POST'].includes(request.method ?? ''))
+                    return json(response, 400, { error: 'INVALID_SIGNED_READER' })
+                const controller = options.desktop!.signedSourceReader!
+                try {
+                    const readCommand = async () => {
+                        if (!/^application\/json(?:\s*;|$)/i.test(
+                            request.headers['content-type'] ?? ''
+                        )) throw new SignedReaderInputError()
+                        const deadline = setTimeout(() => request.destroy(), 5000)
+                        try {
+                            try { return await body(request, 2048) }
+                            catch { throw new SignedReaderInputError() }
+                        } finally { clearTimeout(deadline) }
+                    }
+                    if (url.pathname === '/api/v1/desktop/signed-reader') {
+                        if (request.method !== 'POST')
+                            return json(response, 405, { error: 'Explicit signed reader command required' })
+                        return json(response, 200,
+                            await controller.command(await readCommand()))
+                    }
+                    const match = url.pathname.match(
+                        /^\/api\/v1\/desktop\/signed-reader\/([0-9a-f-]{36})\/(?:progress|comics\/([^/]+)\/chapters(?:\/([^/]+)(?:\/pages\/(\d+))?)?)$/
+                    )
+                    if (!match) throw new SignedReaderInputError()
+                    const [, sessionId, rawComic, rawChapter, page] = match
+                    if (!rawComic) {
+                        if (request.method === 'GET')
+                            return json(response, 200,
+                                await controller.read(sessionId, 'progress', {}))
+                        const input = await readCommand()
+                        if (!input || Array.isArray(input) ||
+                            Object.keys(input).sort().join(',') !==
+                            'comicId,episodeId,pageIndex')
+                            throw new SignedReaderInputError()
+                        return json(response, 200, await controller.read(
+                            sessionId, 'save-progress', {
+                                comicId: String(input.comicId ?? ''),
+                                episodeId: String(input.episodeId ?? ''),
+                                pageIndex: input.pageIndex as number
+                            }
+                        ))
+                    }
+                    if (request.method !== 'GET')
+                        return json(response, 405, { error: 'Signed reader pages are read-only' })
+                    const comicId = decodeURIComponent(rawComic)
+                    if (!rawChapter)
+                        return json(response, 200, await controller.read(
+                            sessionId, 'chapters', { comicId }
+                        ))
+                    const episodeId = decodeURIComponent(rawChapter)
+                    if (page === undefined)
+                        return json(response, 200, await controller.read(
+                            sessionId, 'chapter', { comicId, episodeId }
+                        ))
+                    const image = await controller.read(sessionId, 'picture', {
+                        comicId, episodeId, pageIndex: Number(page)
+                    }) as { data: Buffer; contentType: string }
+                    if (!response.destroyed) {
+                        response.writeHead(200, {
+                            'content-type': image.contentType,
+                            'cache-control': 'private, no-store',
+                            'x-content-type-options': 'nosniff',
+                            'cross-origin-resource-policy': 'same-origin',
+                            'referrer-policy': 'no-referrer'
+                        })
+                        response.end(image.data)
+                    }
+                    return
+                } catch (error) {
+                    const code = error instanceof SignedReaderInputError ||
+                        error instanceof URIError
+                        ? 'INVALID_SIGNED_READER'
+                        : 'SIGNED_SOURCE_UNAVAILABLE'
+                    if (!response.destroyed) return json(response,
+                        code === 'INVALID_SIGNED_READER' ? 400 : 409,
+                        { error: code })
+                }
+                return
             }
             if (url.pathname === '/api/v1/desktop/host-reader' || url.pathname.startsWith('/api/v1/desktop/host-reader/')) {
                 const peer = request.socket.remoteAddress ?? '', expectedOrigin = `http://${request.headers.host}`

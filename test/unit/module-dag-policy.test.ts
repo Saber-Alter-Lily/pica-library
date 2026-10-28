@@ -131,6 +131,57 @@ describe('S2 actual TypeScript module ownership graph', () => {
         )).toBe(false)
     })
 
+    it('keeps the default Desktop HTTP server free of signed worker process execution', () => {
+        const graph = collectSourceModuleGraph()
+        expect(graph.nodes).toContain('src/source-extensions/signed-reader-errors.ts')
+        expect(graph.edges).toContainEqual({
+            from: 'src/library/server.ts',
+            to: 'src/source-extensions/signed-reader-errors.ts',
+            typeOnly: false
+        })
+        expect(graph.edges).toContainEqual({
+            from: 'src/library/server.ts',
+            to: 'src/desktop/signed-source-reader.ts',
+            typeOnly: true
+        })
+        const adjacency = new Map<string, string[]>()
+        for (const edge of graph.edges) {
+            if (edge.typeOnly || !edge.to.startsWith('src/')) continue
+            const dependencies = adjacency.get(edge.from) ?? []
+            dependencies.push(edge.to)
+            adjacency.set(edge.from, dependencies)
+        }
+        const visited = new Set(['src/library/server.ts'])
+        const queue = [...visited]
+        for (const from of queue) {
+            for (const to of adjacency.get(from) ?? []) {
+                if (visited.has(to)) continue
+                visited.add(to)
+                queue.push(to)
+            }
+        }
+        for (const privileged of [
+            'src/desktop/signed-source-reader.ts',
+            'src/source-extensions/trusted-process.ts',
+            'src/source-extensions/signed-worker-store.ts'
+        ]) {
+            expect(visited.has(privileged), 'Server eagerly imports ' + privileged)
+                .toBe(false)
+        }
+        expect(moduleBoundaryViolations([
+            {
+                from: 'src/library/server.ts',
+                to: 'src/desktop/signed-source-reader.ts',
+                typeOnly: false
+            },
+            {
+                from: 'src/source-extensions/signed-reader-errors.ts',
+                to: 'node:child_process',
+                typeOnly: false
+            }
+        ])).toHaveLength(2)
+    })
+
     it('fails when concrete SDKs or dynamic loaders cross protected reader boundaries', () => {
         const illegal: DependencyEdge[] = [
             {

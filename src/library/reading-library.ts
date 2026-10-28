@@ -1,5 +1,5 @@
 /** A read-only projection, not a catalogue import or permission to connect a source. */
-export type ReadingChannel = 'local' | 'online' | 'hosted'
+export type ReadingChannel = 'local' | 'online' | 'hosted' | 'signed'
 export interface ReadingPosition {
     episodeId: string
     pageIndex: number
@@ -12,6 +12,8 @@ export interface ReadingLibraryRow {
     channel: ReadingChannel
     available: boolean
     progress?: ReadingPosition
+    /** Volatile application-issued session for signed sources; not persisted. */
+    sessionId?: string
 }
 export interface ReadingLibraryPort {
     id: string
@@ -30,7 +32,7 @@ export interface ReadingLibraryItem {
     source: { key: string; label: string }
     comicId: string
     title: string | null
-    routes: Array<{ channel: ReadingChannel; available: boolean; progress?: ReadingPosition }>
+    routes: Array<{ channel: ReadingChannel; available: boolean; progress?: ReadingPosition; sessionId?: string }>
     lastReadAt: string | null
 }
 export class ReadingLibraryInputError extends Error {
@@ -48,7 +50,7 @@ export function readingLibraryQuery(value: unknown): Required<ReadingLibraryQuer
     return { text: text(value.text ?? '', 200, true).trim(), sourceKey: text(value.sourceKey ?? '', 512, true), recentOnly: value.recentOnly ?? false, offset: Number(offset), limit: Number(limit) }
 }
 function row(value: ReadingLibraryRow): ReadingLibraryRow {
-    if (!object(value) || !object(value.source) || !['local', 'online', 'hosted'].includes(value.channel) || typeof value.available !== 'boolean') throw new ReadingLibraryInputError()
+    if (!object(value) || !object(value.source) || !['local', 'online', 'hosted', 'signed'].includes(value.channel) || typeof value.available !== 'boolean') throw new ReadingLibraryInputError()
     const source = { key: text(value.source.key, 512), label: text(value.source.label, 160) }
     const comicId = text(value.comicId, 2048), title = value.title === null ? null : text(value.title, 1000)
     let progress: ReadingPosition | undefined
@@ -58,7 +60,18 @@ function row(value: ReadingLibraryRow): ReadingLibraryRow {
         if (!Number.isFinite(Date.parse(updatedAt))) throw new ReadingLibraryInputError()
         progress = { episodeId: text(value.progress.episodeId, 2048), pageIndex: value.progress.pageIndex, updatedAt }
     }
-    return { source, comicId, title, channel: value.channel, available: value.available, ...(progress ? { progress } : {}) }
+    // A signed source must never masquerade as the legacy online provider.
+    // It needs an explicitly granted, volatile source session for its reader.
+    const isSigned = value.channel === 'signed'
+    if (isSigned !== (value.sessionId !== undefined) ||
+        (isSigned && (typeof value.sessionId !== 'string' ||
+            !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value.sessionId))))
+        throw new ReadingLibraryInputError()
+    return {
+        source, comicId, title, channel: value.channel, available: value.available,
+        ...(progress ? { progress } : {}),
+        ...(isSigned ? { sessionId: value.sessionId } : {})
+    }
 }
 const timestamp = (value?: ReadingPosition) => value ? Date.parse(value.updatedAt) : -Infinity
 const searchText = (value: string) => value.normalize('NFKC').toLowerCase()
@@ -97,7 +110,7 @@ export class ReadingLibrary {
                 const item = items.get(key) ?? { key, source: value.source, comicId: value.comicId, title: value.title, routes: [], lastReadAt: null }
                 if (item.title === null && value.title !== null) item.title = value.title
                 const previous = item.routes.find(route => route.channel === value.channel)
-                if (!previous) item.routes.push({ channel: value.channel, available: value.available, ...(value.progress ? { progress: value.progress } : {}) })
+                if (!previous) item.routes.push({ channel: value.channel, available: value.available, ...(value.progress ? { progress: value.progress } : {}), ...(value.sessionId ? { sessionId: value.sessionId } : {}) })
                 else {
                     // A source cannot grant availability through a duplicate stale replica.
                     previous.available = previous.available && value.available

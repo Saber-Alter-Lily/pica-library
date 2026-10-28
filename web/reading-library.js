@@ -1,7 +1,7 @@
 import { copy as t } from './locale-runtime.js'
 
 /** Shared Library entry point. Only same-app read projections; no source activation or storage. */
-export function installReadingLibrary({ target, canQuery, isVisible, query, hostSession, openReader, openHosted }) {
+export function installReadingLibrary({ target, canQuery, isVisible, query, hostSession, openReader, openHosted, openSigned }) {
     if (!target) return { refresh: async () => {}, dispose() {} }
     let generation = 0, ownership = 0, active = null, disposed = false, offset = 0, total = 0
     const pageSize = 12
@@ -40,18 +40,20 @@ export function installReadingLibrary({ target, canQuery, isVisible, query, host
             const card = node('article'); card.className = 'panel'
             card.append(node('strong', item.title ?? t('本地元数据暂缺', 'Local metadata unavailable', 'ローカルメタデータがありません')), node('p', item.source.label))
             for (const route of item.routes) {
-                if (!['local', 'online', 'hosted'].includes(route.channel)) throw Error('Invalid reading route')
-                const caption = route.channel === 'local' ? t('本地阅读', 'Read locally', 'ローカルで読む') : route.channel === 'online' ? t('在线阅读', 'Read online', 'オンラインで読む') : t('从自己的 Host 阅读', 'Read from your host', '自分のホストで読む')
-                const button = node('button', caption + (route.progress ? t(' · 第 ', ' · Page ', ' · ページ ') + (route.progress.pageIndex + 1) : '')); button.type = 'button'; button.disabled = !route.available
+                if (!['local', 'online', 'hosted', 'signed'].includes(route.channel)) throw Error('Invalid reading route')
+                if (route.channel === 'signed' && !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(route.sessionId || '')) throw Error('Invalid signed reading route')
+                const caption = route.channel === 'local' ? t('本地阅读', 'Read locally', 'ローカルで読む') : route.channel === 'online' ? t('在线阅读', 'Read online', 'オンラインで読む') : route.channel === 'hosted' ? t('从自己的 Host 阅读', 'Read from your host', '自分のホストで読む') : t('从已验证来源阅读', 'Read from signed source', '署名済みソースから読む')
+                const button = node('button', caption + (route.progress ? t(' · 第 ', ' · Page ', ' · ページ ') + (route.progress.pageIndex + 1) : '')); button.type = 'button'; button.disabled = !route.available || route.channel === 'signed' && typeof openSigned !== 'function'
                 button.onclick = async () => {
                     if (owner !== ownership || !ready() || route.channel === 'hosted' && scopeId() !== scope) return
                     button.disabled = true
                     try {
                         if (route.channel === 'hosted') await openHosted(item.comicId, scope)
+                        else if (route.channel === 'signed') await openSigned(item.comicId, route.sessionId)
                         else await openReader(item.comicId, route.channel === 'online')
                     } catch {
                         if (owner === ownership && ready()) status.textContent = t('无法继续。来源可能已停用或会话已结束；本地记录未删除。', 'Cannot continue. The source may be disabled or the session ended; local records were not deleted.', '続行できません。配信元が無効かセッションが終了しています。ローカル記録は削除していません。')
-                    } finally { if (owner === ownership) button.disabled = !route.available }
+                    } finally { if (owner === ownership) button.disabled = !route.available || route.channel === 'signed' && typeof openSigned !== 'function' }
                 }
                 card.append(button)
             }

@@ -42,11 +42,13 @@ const flush = parsed.statements
             node.name?.text === 'flushReaderProgress'
     )!
     .getText(parsed)
-function adapter(hosted = false) {
+function adapter(hosted = false, signed = false) {
     const owner = {
             ...reader(),
             hostedSessionId: hosted ? 'synthetic-session' : null,
-            hostedCsrfToken: hosted ? 'synthetic-csrf' : null
+            hostedCsrfToken: hosted ? 'synthetic-csrf' : null,
+            signedSessionId: signed ? 'synthetic-signed-session' : null,
+            signedCsrfToken: signed ? 'synthetic-signed-csrf' : null
         },
         response = deferred<unknown>()
     recordReaderProgress(owner, 4)
@@ -58,7 +60,7 @@ function adapter(hosted = false) {
         captureReaderProgress,
         acknowledgeReaderProgress,
         clearTimeout: vi.fn(),
-        readerApiRoot: () => (hosted ? '/owned-host' : '/owned-local'),
+        readerApiRoot: () => (hosted ? '/owned-host' : signed ? '/owned-signed' : '/owned-local'),
         fetch: vi.fn(() => response.promise),
         api: vi.fn(() => response.promise),
         post: vi.fn(() => response.promise),
@@ -207,6 +209,25 @@ describe('actual AST-extracted Web save transport with mocked ports', () => {
         await saving
         expect(h.owner.dirty).toBe(false)
     })
+    it('uses the signed Reader session endpoint and CSRF without touching legacy progress', async () => {
+        const h = adapter(false, true)
+        const saving = h.flush()
+        expect(h.context.api).toHaveBeenCalledWith(
+            '/owned-signed/progress',
+            expect.objectContaining({
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-pica-csrf': 'synthetic-signed-csrf'
+                }
+            })
+        )
+        expect(h.context.post).not.toHaveBeenCalled()
+        h.response.resolve({})
+        await expect(saving).resolves.toBe(true)
+        expect(h.owner.dirty).toBe(false)
+    })
+
     it('keeps the immediate keepalive request on pagehide and captures the old identity', async () => {
         const h = adapter(true),
             saving = h.flush(true)

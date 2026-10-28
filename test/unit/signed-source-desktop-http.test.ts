@@ -161,6 +161,12 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
             const reply = await post(endpoint, command)
             expect(reply.status).toBe(400)
         }
+        const malformed = await fetch(baseUrl + endpoint, {
+            method: 'POST',
+            headers: { ...authorized(), 'content-type': 'application/json' },
+            body: '{bad-json'
+        })
+        expect(malformed.status).toBe(400)
         const unchanged = await post(endpoint, { operation: 'status', sourceId: 'demo' })
         expect((await unchanged.json()).revision).toBe(0)
     })
@@ -194,6 +200,24 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
         expect(imageResponse.headers.get('cache-control')).toContain('no-store')
         expect(Buffer.from(await imageResponse.arrayBuffer()).subarray(0, 8))
             .toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+        // Browser GET fetch often sends no Origin; Referrer + Sec-Fetch
+        // and the application CSRF token must still authorize it.
+        const browserImage = await fetch(baseUrl + chapter.pages[0].url, {
+            headers: {
+                referer: baseUrl + '/reader',
+                'sec-fetch-site': 'same-origin',
+                'x-pica-csrf': token
+            }
+        })
+        expect(browserImage.status).toBe(200)
+        const forgedReferrer = await fetch(baseUrl + chapter.pages[0].url, {
+            headers: {
+                referer: 'https://evil.invalid/',
+                'sec-fetch-site': 'same-origin',
+                'x-pica-csrf': token
+            }
+        })
+        expect(forgedReferrer.status).toBe(403)
 
         const progress = await post(root + '/progress', {
             comicId: 'demo:book1', episodeId: 'chapter-1', pageIndex: 1

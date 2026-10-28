@@ -4,7 +4,7 @@ import path from 'node:path'
 import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { Server } from 'node:http'
+import { request as httpRequest, type Server } from 'node:http'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
@@ -260,6 +260,32 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
             }
         })
         expect(nativeImage.status).toBe(200)
+        // A hostile page can DNS-rebind its own hostname to 127.0.0.1,
+        // making its Host/Referer/Fetch-Metadata internally consistent.
+        // The TCP destination must not determine the authorized web origin.
+        const boundPort = Number(new URL(baseUrl).port)
+        for (const forgedHost of [
+            `rebind.attacker.invalid:${boundPort}`,
+            `127.0.0.1:${boundPort + 1}`
+        ]) {
+            const denied = await new Promise<number>((resolve, reject) => {
+                const request = httpRequest(baseUrl + chapter.pages[0].url, {
+                    headers: {
+                        host: forgedHost,
+                        referer: `http://${forgedHost}/reader`,
+                        'sec-fetch-site': 'same-origin',
+                        'sec-fetch-dest': 'image'
+                    }
+                }, (response) => {
+                    response.resume()
+                    response.once('end', () => resolve(response.statusCode ?? 0))
+                    response.once('error', reject)
+                })
+                request.once('error', reject)
+                request.end()
+            })
+            expect(denied).toBe(403)
+        }
         const wrongDest = await fetch(baseUrl + chapter.pages[0].url, {
             headers: {
                 referer: baseUrl + '/reader',

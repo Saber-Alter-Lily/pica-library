@@ -1,0 +1,72 @@
+name: S1 Android three-language, theme and width evidence (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/product-recovery-s0-s1-20261027
+    paths:
+      - '.github/workflows/s1-android-locale-matrix.yml'
+      - 'scripts/run-s1-android-locale-matrix.sh'
+      - 'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/S1AndroidLocaleMatrixTest.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AdvancedGuideActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AccountSourcesActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationStyleActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RemoteStorageActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsRow.java'
+      - 'mobile/android-alpha2/app/src/main/res/**/guide_strings.xml'
+      - 'mobile/android-alpha2/app/src/main/res/**/account_sources_strings.xml'
+      - 'mobile/android-alpha2/app/src/main/res/**/phone_downloads_strings.xml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s1-android-layout-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulator-layout:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Require working KVM
+        run: |
+          test -e /dev/kvm || exit 1
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Real six-page Android UI under nine representative scenarios
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          emulator-boot-timeout: 600
+          disable-linux-hw-accel: false
+          script: bash scripts/run-s1-android-locale-matrix.sh
+      - name: Retain short-lived screenshots and failures
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-android-locale-matrix-${{ github.sha }}
+          path: mobile/android-alpha2/s1-locale-matrix-evidence/
+          retention-days: 1
+          if-no-files-found: warn

@@ -25,7 +25,7 @@
 
 传输格式采取随机会话标识、版本化请求序号、固定操作枚举（握手、章节、页信息、媒体）和 fail-closed 验证；媒体仍使用 S2 统一的来源-作品绑定 token，不以裸 HTTP URL 猜测来源。禁止超限消息、过多请求、过期会话或撤销后的缓存命中。工作进程非正常退出或超时时拒绝所有待处理操作，**不会悄悄自动重新连接或重新启用来源**。
 
-S3 实测证据：[Linux + Windows 真实进程专项 CI #40690767200](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40690767200) 在代码 `a785af6f` 下 **SUCCESS**；两套独立工作均经过 TypeScript 校验，Windows 工作流真实执行本仓 worker、IPC、撤销、超时、媒体和身份的集成测试。它只证明签名前的测试代码路径，不能代替正式版 Windows 工件签名/安装/更新。最新完整项目 CI 需按同一 SHA 独立核实。
+S3 实测证据：[Linux + Windows 真实进程专项 CI #40690767200](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40690767200) 在代码 `a785af6f` 下 **SUCCESS**；两套独立工作均经过 TypeScript 校验，Windows 工作流真实执行本仓 worker、IPC、撤销、超时、媒体和身份的集成测试。它只证明签名前的测试代码路径，不能代替正式版 Windows 工件签名/安装/更新。对应完整项目 [CI #40690777919](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40690777919) 在同一代码 `a785af6f` 下 **SUCCESS**；Linux/Windows 真实子进程专项与完整 CI 两套验证均已完成。后续新增的 Reader → privileged worker 传递依赖禁令提交 `e52bf61a` 尚有 [专项 #40691301737](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40691301737) 与 [完整 CI #40691317341](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40691317341) 待获得最终结果，不能继承 `a785af6f` 的绿灯。
 
 ## 3. 可追踪验收矩阵
 

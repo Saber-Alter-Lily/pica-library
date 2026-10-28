@@ -11,14 +11,14 @@ function response(items: any[] = [book()], total = items.length): any { return {
 function fixture(locale = 1) {
     const dom = inertReadingDom(), target = new ReadingElement('section'); dom.body.append(target)
     let enabled = true, visible = true, scope: { sessionId: string; expiresAt: number } | null = null
-    const query = vi.fn(async (_value: any, _signal: AbortSignal) => response()), openReader = vi.fn(async () => {}), openHosted = vi.fn(async () => {})
+    const query = vi.fn(async (_value: any, _signal: AbortSignal) => response()), openReader = vi.fn(async () => {}), openHosted = vi.fn(async () => {}), openSigned = vi.fn(async () => {})
     const exports: Record<string, any> = {}, copy = vi.fn((...values: string[]) => values[locale])
     const source = fs.readFileSync('web/reading-library.js', 'utf8')
     const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
     vm.runInNewContext(code, { exports, require: (name: string) => { expect(name).toBe('./locale-runtime.js'); return { copy } }, document: dom.document, window: dom.window, AbortController, setTimeout, clearTimeout }, { timeout: 1000 })
-    const panel = exports.installReadingLibrary({ target, canQuery: () => enabled, isVisible: () => visible, query, hostSession: () => scope, openReader, openHosted }) as { refresh(): Promise<void>; dispose(): void }
+    const panel = exports.installReadingLibrary({ target, canQuery: () => enabled, isVisible: () => visible, query, hostSession: () => scope, openReader, openHosted, openSigned }) as { refresh(): Promise<void>; dispose(): void }
     cleanups.push(() => panel.dispose())
-    return { ...dom, panel, target, query, copy, openReader, openHosted, allow: (value: boolean) => { enabled = value }, visible: (value: boolean) => { visible = value }, scope: (value: typeof scope) => { scope = value }, changed: () => dom.document.dispatchEvent({ type: 'pica-hosted-reading-scope-changed' }) }
+    return { ...dom, panel, target, query, copy, openReader, openHosted, openSigned, allow: (value: boolean) => { enabled = value }, visible: (value: boolean) => { visible = value }, scope: (value: typeof scope) => { scope = value }, changed: () => dom.document.dispatchEvent({ type: 'pica-hosted-reading-scope-changed' }) }
 }
 describe('actual reading-panel JavaScript with inert DOM/query ports only', () => {
     it('does not query on installation, in Browser Lite or while the Library view is not visible', async () => {
@@ -66,6 +66,40 @@ describe('actual reading-panel JavaScript with inert DOM/query ports only', () =
         f.scope(null); f.changed(); await button.click()
         expect(f.openHosted).toHaveBeenCalledOnce()
     })
+    it('keeps signed source reading distinct from generic online and requires its volatile session', async () => {
+        const f = fixture()
+        const sessionId = '64d223e0-5d29-4320-babb-5a2da654d345'
+        f.query.mockResolvedValueOnce(response([{
+            ...book('Signed chapter'),
+            comicId: 'demo:book1',
+            source: { key: 'signed-source:demo', label: 'demo' },
+            routes: [{
+                channel: 'signed', available: true, sessionId,
+                progress: { pageIndex: 4 }
+            }]
+        }]))
+        await f.panel.refresh()
+        const button = f.target.querySelectorAll('button').find(
+            node => node.textContent.startsWith('Read from signed source')
+        )!
+        expect(button.disabled).toBe(false)
+        expect(button.textContent).toContain('5')
+        await button.click()
+        expect(f.openSigned).toHaveBeenCalledWith('demo:book1', sessionId)
+        expect(f.openReader).not.toHaveBeenCalled()
+        expect(f.openHosted).not.toHaveBeenCalled()
+        // A server bug returning an unbound signed route is never turned
+        // into an ordinary online reader request.
+        f.query.mockResolvedValueOnce(response([{
+            ...book(),
+            comicId: 'demo:book1',
+            routes: [{ channel: 'signed', available: true }]
+        }]))
+        await f.panel.refresh()
+        expect(f.target.textContent).toContain('temporarily unavailable')
+        expect(f.openReader).not.toHaveBeenCalled()
+    })
+
     it('keeps an already displayed local Read button usable after a failed refresh', async () => {
         const f = fixture(); await f.panel.refresh()
         const button = f.target.querySelectorAll('button').find(node => node.textContent.startsWith('Read locally'))!

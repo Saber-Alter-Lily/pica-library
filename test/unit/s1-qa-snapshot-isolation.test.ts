@@ -28,4 +28,18 @@ describe('S1 disposable Android QA identities', () => {
         expect(yml).toContain('retention-days: 1')
         expect(yml).not.toMatch(/assembleRelease|secrets\.|gh release|git tag|contents: write/)
     })
+    it('rejects external launcher ANR overlays instead of trusting painted pixels', () => {
+        const java = read('mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/S1AndroidLocaleMatrixTest.java')
+        const workflow = read('.github/workflows/s1-android-locale-matrix.yml')
+        const runner = read('scripts/run-s1-android-locale-matrix.sh')
+        expect(java).toContain('getRootInActiveWindow()')
+        expect(java).toContain('getWindow().getDecorView().hasWindowFocus()')
+        expect(java).toContain('focused[0]&&ownPackage.equals(windowOwner)&&painted')
+        expect(java).toContain('saveRejectedScreenshot(image,dir,page)')
+        expect(java).toContain('"rejected-"+page+".png"')
+        expect(workflow).toContain('target: aosp_atd')
+        expect(runner).toContain('rejected-$page.png')
+        expect(runner).toContain('mCurrentFocus|mFocusedApp')
+    })
+
 })

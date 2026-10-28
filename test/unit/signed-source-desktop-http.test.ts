@@ -135,7 +135,7 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
             { 'x-pica-csrf': token },
             { origin: 'https://evil.invalid', 'x-pica-csrf': token },
             { origin: baseUrl, 'x-pica-csrf': 'incorrect' }
-        ]) {
+        ] as Array<Record<string, string>>) {
             const reply = await fetch(baseUrl + endpoint, {
                 method: 'POST',
                 headers: { 'content-type': 'application/json', ...headers },

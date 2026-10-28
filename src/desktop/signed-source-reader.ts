@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { SignedReaderInputError } from '../source-extensions/signed-reader-errors'
+import type { ReadingLibraryRow } from '../library/reading-library'
 import type {
     OnlineReaderCache, OnlineReaderState, OnlineReaderContract
 } from '../services/online-reader-service'
@@ -244,6 +245,47 @@ export class SignedSourceDesktopReader {
             return reader.saveProgress(comicId, episodeId, Number(input.pageIndex))
         }
         throw new SignedReaderInputError()
+    }
+
+    /**
+     * Read-only projection into the existing unified ReadingLibrary. No
+     * source discovery, network, session creation, downloads or persistence.
+     * Disconnected sources retain their progress state but cannot claim
+     * an available route until a user explicitly reconnects.
+     */
+    readingLibraryRows(): ReadingLibraryRow[] {
+        const rows: ReadingLibraryRow[] = []
+        for (const session of this.sessions.values()) {
+            try {
+                const current = this.store.state(session.sourceId)
+                if (current.revision !== session.revision ||
+                    current.activeVersion === null) continue
+                session.worker.assertEnabled()
+                for (const entry of session.reader.recentProgress()) {
+                    if (!entry.comicId.startsWith(session.sourceId + ':'))
+                        continue
+                    rows.push({
+                        source: {
+                            key: 'signed-source:' + session.sourceId,
+                            label: session.sourceId
+                        },
+                        comicId: entry.comicId,
+                        title: null,
+                        channel: 'online',
+                        available: true,
+                        progress: {
+                            episodeId: entry.episodeId,
+                            pageIndex: entry.pageIndex,
+                            updatedAt: entry.updatedAt
+                        }
+                    })
+                }
+            } catch {
+                // A failed optional source never blocks local/CBZ/WebDAV
+                // reading-library queries or triggers auto-reconnection.
+            }
+        }
+        return rows
     }
 
     close() {

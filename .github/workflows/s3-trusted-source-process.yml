@@ -56,3 +56,22 @@ jobs:
           path: s3-source-evidence/import-graph.json
           retention-days: 1
           if-no-files-found: ignore
+
+  windows-process:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Check actual Windows Node worker types
+        run: pnpm type:check
+      - name: Test pinned worker launch, IPC, revoke and timeout on Windows
+        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts

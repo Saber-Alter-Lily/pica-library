@@ -55,9 +55,13 @@ describe('S2 actual TypeScript module ownership graph', () => {
             {
                 from: 'src/services/online-reader-service.ts',
                 to: '<runtime-loader>', typeOnly: false
+            },
+            {
+                from: 'src/services/provider-service.ts',
+                to: 'src/providers/jm-provider.ts', typeOnly: false
             }
         ]
-        expect(moduleBoundaryViolations(illegal)).toHaveLength(5)
+        expect(moduleBoundaryViolations(illegal)).toHaveLength(6)
     })
 
     it('permits only the explicit benign dependency direction for the new bridge', () => {

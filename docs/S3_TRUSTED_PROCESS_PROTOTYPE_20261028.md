@@ -25,15 +25,17 @@
 
 传输格式采取随机会话标识、版本化请求序号、固定操作枚举（握手、章节、页信息、媒体）和 fail-closed 验证；媒体仍使用 S2 统一的来源-作品绑定 token，不以裸 HTTP URL 猜测来源。禁止超限消息、过多请求、过期会话或撤销后的缓存命中。工作进程非正常退出或超时时拒绝所有待处理操作，**不会悄悄自动重新连接或重新启用来源**。
 
+S3 实测证据：[Linux + Windows 真实进程专项 CI #40690767200](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40690767200) 在代码 `a785af6f` 下 **SUCCESS**；两套独立工作均经过 TypeScript 校验，Windows 工作流真实执行本仓 worker、IPC、撤销、超时、媒体和身份的集成测试。它只证明签名前的测试代码路径，不能代替正式版 Windows 工件签名/安装/更新。最新完整项目 CI 需按同一 SHA 独立核实。
+
 ## 3. 可追踪验收矩阵
 
 | 编号 | 验收内容 | 证据 | 当前状态 |
 |---|---|---|---|
-| S3-PROC-01 | 受信任文件 SHA/路径核验、版本和来源握手 | 集成测试 | Linux PASS；Windows 待复验 |
-| S3-PROC-02 | 真实独立进程的章节→页→媒体→Reader 进度 | 集成测试 | Linux PASS；Windows 待复验 |
-| S3-PROC-03 | 禁源、迟到回复、进程退出/超时、缓存失效 | 集成测试 | Linux PASS；Windows 待复验 |
-| S3-PROC-04 | 父进程敏感环境变量不传给来源进程 | 集成测试 | Linux PASS；Windows 待复验 |
-| S3-PROC-05 | 固定协议、输入校验、媒体大小/格式限额 | TypeScript + 集成测试 | Linux PASS；Windows 待复验 |
+| S3-PROC-01 | 受信任文件 SHA/路径核验、版本和来源握手 | 集成测试 | Linux/Windows 双平台专项 PASS（源码 a785af6f） |
+| S3-PROC-02 | 真实独立进程的章节→页→媒体→Reader 进度 | 集成测试 | Linux/Windows 双平台专项 PASS（源码 a785af6f） |
+| S3-PROC-03 | 禁源、迟到回复、进程退出/超时、缓存失效 | 集成测试 | Linux/Windows 双平台专项 PASS（源码 a785af6f） |
+| S3-PROC-04 | 父进程敏感环境变量不传给来源进程 | 集成测试 | Linux/Windows 双平台专项 PASS（源码 a785af6f） |
+| S3-PROC-05 | 固定协议、输入校验、媒体大小/格式限额 | TypeScript + 集成测试 | Linux/Windows 双平台专项 PASS（源码 a785af6f） |
 | S3-WIN-01 | 实际 Windows 同源码跨进程可用，且随签名包交付 | Windows QA + 发行物哈希 | NOT_VERIFIED |
 | S3-AND-01 | Android 隔离 Service/Binder、无来源权限/凭据泄漏 | 真 APK + 原生 Instrumentation | NOT_IMPLEMENTED |
 | S3-EXT-01 | Pica/E-H/ExH/JM 具体协议完整移出纯核心 Windows/APK | 依赖图+包内逐字节+离线 Reader | NOT_IMPLEMENTED |

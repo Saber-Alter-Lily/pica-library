@@ -250,6 +250,41 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
             }
         })
         expect(forgedReferrer.status).toBe(403)
+        // Real <img> tags cannot add CSRF. Permit only image-destination
+        // same-origin requests carrying a matching document Referrer.
+        const nativeImage = await fetch(baseUrl + chapter.pages[0].url, {
+            headers: {
+                referer: baseUrl + '/reader',
+                'sec-fetch-site': 'same-origin',
+                'sec-fetch-dest': 'image'
+            }
+        })
+        expect(nativeImage.status).toBe(200)
+        const wrongDest = await fetch(baseUrl + chapter.pages[0].url, {
+            headers: {
+                referer: baseUrl + '/reader',
+                'sec-fetch-site': 'same-origin',
+                'sec-fetch-dest': 'empty'
+            }
+        })
+        expect(wrongDest.status).toBe(403)
+        const crossSiteImage = await fetch(baseUrl + chapter.pages[0].url, {
+            headers: {
+                referer: 'https://untrusted.invalid/',
+                'sec-fetch-site': 'cross-site',
+                'sec-fetch-dest': 'image'
+            }
+        })
+        expect(crossSiteImage.status).toBe(403)
+        const noCsrfMetadata = await fetch(baseUrl +
+            root + '/comics/demo%3Abook1/chapters', {
+            headers: {
+                referer: baseUrl + '/reader',
+                'sec-fetch-site': 'same-origin',
+                'sec-fetch-dest': 'image'
+            }
+        })
+        expect(noCsrfMetadata.status).toBe(403)
 
         const progress = await post(root + '/progress', {
             comicId: 'demo:book1', episodeId: 'chapter-1', pageIndex: 1
@@ -279,6 +314,7 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
                 routes: Array<{
                     channel: string
                     available: boolean
+                    sessionId: string
                     progress: { pageIndex: number }
                 }>
             }>
@@ -289,8 +325,8 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
             title: null,
             source: { key: 'signed-source:demo' },
             routes: [{
-                channel: 'online', available: true,
-                progress: { pageIndex: 1 }
+                channel: 'signed', sessionId: connected.sessionId,
+                available: true, progress: { pageIndex: 1 }
             }]
         })
 

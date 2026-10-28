@@ -86,6 +86,27 @@ public class SettingsRowNarrowLayoutTest {
         assertTrue(row.getChildAt(1) instanceof TextView);
     }
 
+    @Test public void largeFontProfileStatusLineUsesFullWidthForLongEngineIdentifier(){
+        Application app=RuntimeEnvironment.getApplication();
+        Configuration config=new Configuration(app.getResources().getConfiguration());
+        config.screenWidthDp=360;config.fontScale=1.5f;
+        Context enlarged=app.createConfigurationContext(config);
+        LinearLayout line=SettingsRow.statusLine(enlarged,"Engine",
+            "native-v3.1-frozen-neutral-compatible");
+        assertEquals(LinearLayout.VERTICAL,line.getOrientation());
+        assertEquals(2,line.getChildCount());
+        int width=Ui.dp(enlarged,290);
+        line.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(Ui.dp(enlarged,600),View.MeasureSpec.AT_MOST));
+        line.layout(0,0,width,line.getMeasuredHeight());
+        TextView title=(TextView)line.getChildAt(0);
+        TextView value=(TextView)line.getChildAt(1);
+        assertEquals(width,title.getMeasuredWidth());
+        assertEquals(width,value.getMeasuredWidth());
+        assertEquals("Technical status should read left-to-right from a full-width line",
+            android.view.Gravity.START|android.view.Gravity.CENTER_VERTICAL,value.getGravity());
+    }
+
     @Test public void statusLineAlsoBoundsBothColumns(){
         Application app=RuntimeEnvironment.getApplication();
         Ui.applyTheme(app);

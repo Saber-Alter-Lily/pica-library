@@ -52,10 +52,22 @@ final class SettingsRow {
 
     static LinearLayout statusLine(Context c,String title,String status){return statusLine(c,title,Ui.text(c,status,13,statusColor(status),true));}
     static LinearLayout statusLine(Context c,String title,TextView state){
-        LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,Ui.dp(c,6),0,Ui.dp(c,6));row.addView(Ui.text(c,title,14,Ui.TEXT,false),new LinearLayout.LayoutParams(0,-2,1.15f));
-        state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
-
-        row.addView(state,new LinearLayout.LayoutParams(0,-2,1f));
+        LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,Ui.dp(c,6),0,Ui.dp(c,6));
+        android.content.res.Configuration config=c.getResources().getConfiguration();
+        boolean stack=config.fontScale>=1.3f&&config.screenWidthDp>0&&config.screenWidthDp<=480;
+        if(stack){
+            // Fully visible technical identifiers should not break into single-character
+            // fragments in the 150%-font profile and account status cards.
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.addView(Ui.text(c,title,14,Ui.TEXT,false),new LinearLayout.LayoutParams(-1,-2));
+            state.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+            state.setPadding(0,Ui.dp(c,4),0,0);
+            row.addView(state,new LinearLayout.LayoutParams(-1,-2));
+        }else{
+            row.addView(Ui.text(c,title,14,Ui.TEXT,false),new LinearLayout.LayoutParams(0,-2,1.15f));
+            state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
+            row.addView(state,new LinearLayout.LayoutParams(0,-2,1f));
+        }
         return row;
     }
     static int statusColor(String status){if(status==null)return Ui.MUTED;if(status.contains("可用")||status.contains("已连接")||status.contains("已登录")||status.contains("已同步"))return Ui.GOOD;if(status.contains("异常")||status.contains("失效")||status.contains("无权限")||status.contains("失败"))return Ui.BAD;return Ui.MUTED;}

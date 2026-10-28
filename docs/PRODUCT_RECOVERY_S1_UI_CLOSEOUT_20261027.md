@@ -1,3 +1,12 @@
+## S1 视觉质量闭锁续修｜2026-10-28：ATD 纯黑截图的精确失败与非黑白门禁
+
+- **新失败的硬证据**：AOSP-ATD 视觉矩阵 [#40649923301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649923301) 在第二组 `zhCN-dark-w393-f130/guide` FAIL，日志证明 `active-owner=com.picalibrary.android.dev` 且 `app-focused=true`，但是 `painted=false`；第一组 `zhCN-light-w360-f100` 的七张自动通过 PNG 经下载后逐图像素检验全部是 **720×1280 的 100% #000000 纯黑图（1种颜色、921600个黑像素）**。此时来源不是 Pixel Launcher 弹窗，而是 `aosp_atd` 图形帧不可用与原 `looksPainted` 浅色分支把纯黑当文字的**错误通过**；两种失败源分别保留。黑色 PNG **不能证明 Pica 自身持续黑屏**，更不能认定第一组已通过视觉 QA。
+- **实现变更且已回读**：`12537807` 给真实 `S1AndroidLocaleMatrixTest` 增加纯黑/纯白双主题拒绝断言，并将 PNG 判定从单向“墨色数量”升级为**主题背景 + 明暗两端像素 + 非均匀边缘**门禁，仍保持前台窗口所有权判定，不放宽页面锚点、页面已加载和全部九组合验收。 `0724234d` 只将此独立视觉矩阵从图形不可用的 `aosp_atd` 换为 **API35 普通 graphical AOSP (`target: default`)**，独立于已有 Google APIs 八章聚光和完整 CI；官方 android-emulator-runner 支持此系统映像类型。 `41560ff3`、`c6a5af47` 对拒绝/成功 PNG 添加真实 8-byte PNG magic 校验，避免 `run-as cat` 的错误文字被当作 PNG；`57c542cc` 锁定新门禁的静态回归。
+- **已知成功的历史测试范围**：`c23a1e3` [完整 CI #40649865872](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649865872) SUCCESS，`81fbaed5` [完整 CI #40649938731](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649938731) SUCCESS，均不是新的图形映像/新像素门禁的终态结果。原 `e44de731` 八章 VSpot [#40634745706](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706) SUCCESS、中文浅色两字号的 40 张单独截图已抽查，不替代三语言九组矩阵。
+- **待严格收口**：新精确源码 `c6a5af47` 的 [普通 AOSP 九组实页 #40651031422](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40651031422) 与 [完整 CI #40651038857](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40651038857) 在本登记时 **QUEUED/NOT_VERIFIED**。必须真实运行9组、保存有效63张、逐图人工核对，不能对黑屏做主题特判或降低阈值混过去。继续 G1=NOT_ACCEPTED，S2/S3 来源 SDK 真外置与 S5 旧 v0.5.0 数据升级均未完成，正式 main/Release/OTA 未改变。
+
+---
+
 ## 2026-10-28 接续审图：识别模拟器 Launcher ANR 截图假阳性，改为前台归属门禁
 
 旧业务源码 `e44de731` 的完整 CI、Android 定向测试和八章 VSpot 模拟器均 SUCCESS，但九组 Android 七页 [真实截图矩阵 #40634745695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695) FAIL（第六组 `en-dark-w480-f130/guide` 失去有效绘制，后续三个场景未运行）。已下载 [失败工件 #12793718801](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695/artifacts/12793718801) 并目视核对：前五组标 PASS 的 **35 张图全部可见 `Pixel Launcher isn't responding` 系统弹窗**。这不是可接受的 Pica UI 证据；现有仅靠像素亮度/主题的门禁错误放行了系统弹窗/壁纸，因此需更正之前的 “35 张实页通过”解释。独立 [VSpot 工件 #12792869042](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706/artifacts/12792869042) 抽查未见同一遮挡。系统 Launcher 弹窗**不能证明 Pica App 在真机 ANR**；先区分模拟器环境与业务缺陷。

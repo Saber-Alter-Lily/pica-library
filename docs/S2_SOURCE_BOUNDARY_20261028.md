@@ -44,3 +44,12 @@ The full `pnpm test` in PR CI also runs these tests. `module-graph.json` is a lo
 5. **S4/S5**: preserve old credentials (without copying them into modules), 1,500-work catalog, downloads, local progress, source namespaces, previous release upgrade and rollback.
 
 The G1 user/device UI gate is still open but is not a precondition for isolated S2/S3 architecture work per the user's 2026-10-28 instruction. **G2, G3, G4 and production release are not authorized by this prototype**.
+
+
+## First real DAG evidence and next composition cut (2026-10-28)
+
+The isolated [S2 graph workflow #40677952242](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40677952242) completed successfully for SHA `383c89e5` (before compiled-composition extraction). Downloaded source-only artifact #12810649687 and checked its JSON. The TypeScript-only analysis counted **239 source files, 1,079 import edges, zero runtime SCC cycles and zero forbidden core reverse edges**. It also explicitly recorded the then-current `ProviderService` runtime imports of `pica-provider`, `eh-provider`, `jm-provider`, registry and source types. This is graph evidence, not a core-only release.
+
+The next Draft commits introduced `src/providers/compiled-composition.ts` as a **single explicit legacy construction entry** and changed `ProviderService` to request the existing trio from this entry. The constructor's public argument order, optional EH/JM instance injection, Pica legacy namespace, original provider routing and source-access lease configuration are preserved. A new regression test checks this behavior and the real AST gate now refuses new runtime `ProviderService` imports of the three concrete provider classes. The full application still transitively bundles those source implementations: this change does **not** satisfy NEW-SRC-01 or G2.
+
+These later commits must pass their own **exact-head** unit, TypeScript, Android, packaged app and source-boundary gates; the earlier `383c89e5` green workflow cannot verify the new composition root. Real Android transport/IPC and user source installation remain NOT_IMPLEMENTED.

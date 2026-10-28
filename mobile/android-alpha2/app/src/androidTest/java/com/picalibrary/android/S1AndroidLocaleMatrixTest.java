@@ -118,7 +118,7 @@ public final class S1AndroidLocaleMatrixTest {
                     }
                     assertTrue("Tags page did not finish loading actual controls",ready);
                 }
-                Bitmap image=readyScreenshot(inst,page,theme,caseId);
+                Bitmap image=readyScreenshot(inst,page,theme,caseId,dir,current);
                 try{
                     assertTrue(page+": screenshot width "+image.getWidth(),
                         Math.abs(image.getWidth()-width*2)<=8);
@@ -140,22 +140,53 @@ public final class S1AndroidLocaleMatrixTest {
         }
     }
 
-    /** Reject white transitional frames and undrawn screenshots rather than
-     * accepting any non-empty PNG as a real UI acceptance artifact. */
-    private Bitmap readyScreenshot(Instrumentation inst,String page,String theme,String caseId){
+    /** A launcher ANR dialog can make a blank or obscured frame pass a simple
+     * luminance test. Require this Activity to own the active focused window,
+     * in addition to painted content, before accepting any screenshot. */
+    private Bitmap readyScreenshot(Instrumentation inst,String page,String theme,String caseId,File dir,Activity current){
+        String ownPackage=inst.getTargetContext().getPackageName();
+        String lastOwner="<none>";
+        boolean lastFocused=false,lastPainted=false;
         for(int attempt=0;attempt<15;attempt++){
             SystemClock.sleep(attempt==0?200:220);
+            final boolean[] focused={false};
+            inst.runOnMainSync(()->focused[0]=current.getWindow().getDecorView().hasWindowFocus());
+            android.view.accessibility.AccessibilityNodeInfo root=
+                inst.getUiAutomation().getRootInActiveWindow();
+            String windowOwner=root==null?"<none>":String.valueOf(root.getPackageName());
+            if(root!=null)root.recycle();
             Bitmap image=inst.getUiAutomation().takeScreenshot();
+            lastOwner=windowOwner;
+            lastFocused=focused[0];
             if(image!=null){
-                if(looksPainted(image,theme)){
-                    Log.i(TAG,"case="+caseId+" page="+page+" painted-attempt="+(attempt+1));
+                boolean painted=looksPainted(image,theme);
+                lastPainted=painted;
+                if(focused[0]&&ownPackage.equals(windowOwner)&&painted){
+                    Log.i(TAG,"case="+caseId+" page="+page+" painted-attempt="+(attempt+1)
+                        +" active-owner="+windowOwner+" app-focused=true");
                     return image;
                 }
+                if(attempt==14)saveRejectedScreenshot(image,dir,page);
                 image.recycle();
             }
+            if(attempt==0||attempt==4||attempt==9||attempt==14){
+                Log.w(TAG,"case="+caseId+" page="+page+" rejected-attempt="+(attempt+1)
+                    +" active-owner="+windowOwner+" expected="+ownPackage
+                    +" app-focused="+focused[0]+" painted="+lastPainted);
+            }
         }
-        throw new AssertionError("No painted UI frame for "+caseId+"/"+page+
-            "; refusing blank screenshot acceptance");
+        throw new AssertionError("No unobscured, app-owned painted UI frame for "+caseId+"/"+page+
+            "; active-owner="+lastOwner+" app-focused="+lastFocused+" painted="+lastPainted+
+            "; last rejected frame saved when available");
+    }
+
+    private void saveRejectedScreenshot(Bitmap image,File dir,String page){
+        File file=new File(dir,"rejected-"+page+".png");
+        try(FileOutputStream out=new FileOutputStream(file)){
+            if(!image.compress(Bitmap.CompressFormat.PNG,100,out))
+                throw new java.io.IOException("Cannot encode rejected screenshot");
+            out.getFD().sync();
+        }catch(Exception e){Log.e(TAG,"Cannot retain rejected frame for "+page,e);}
     }
 
     private boolean looksPainted(Bitmap image,String theme){

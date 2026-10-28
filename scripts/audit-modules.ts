@@ -154,6 +154,7 @@ export function moduleBoundaryViolations(edges: DependencyEdge[]): string[] {
         const isConcreteSource = to.startsWith('src/providers/') ||
             to === 'src/sdk.ts' || to.startsWith('src/desktop/') ||
             to.startsWith('src/source-hosts/') ||
+            to === 'src/source-extensions/trusted-process.ts' ||
             to === 'src/services/provider-service.ts'
         let reason: string | undefined
 

@@ -1,5 +1,17 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-28 S3 阶段关口｜真实 Windows/Linux 进程原型
+
+- 开发分支：[S2 Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) → [S3 Draft PR #220](https://github.com/Saber-Alter-Lily/pica-library/pull/220)。基于 v0.5.0 正式版继续做未发布隔离开发，不触碰 main、签名包、OTA 或用户数据。
+- **S2 代码边界**已经完成本轮完整 [CI #40689775058](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40689775058) SUCCESS；S2 不是全项目模块化完成声明，历史 G1 和其余 G2–G4 保持 OPEN。
+- **S3 原型里程碑**：固定 SHA-256 的 Node 受控工作进程、随机会话握手、受限协议/DTO、及时撤销/超时处理、媒体大小约束和环境隔离。使用真实 `fork` 和 synthetic worker，无来源帐号或联网。
+- **精确系统测试**：[Linux + Windows 双平台 S3 CI #40690767200](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40690767200) 对代码 `a785af6f` SUCCESS：Windows 8/8、Linux 31/31 分别执行，并非同一个平台的模拟。后续增补 Reader 闭包防倒灌门禁为更新代码，**其自己的完整 CI 尚需独立核查**。
+- **S3 余下工作按阻断顺序**：真实受信任发布清单及完整可执行依赖链、Windows 私有安装目录与签名/原子更新/撤销和完整包对照；Android Service/Binder 和权限隔离；迁移 Pica/E-H/JM 的实际来源协议，保证来源可以真正独立启停/升级；最后纯核心 Windows/APK 无在线源 SDK 的实体证明与 v0.5.0 老库回滚。
+- **禁止错误验收**：独立测试进程不等于 OS 沙箱，签名固定测试工件不等于用户可安装任意插件，核心仍编译具体平台来源 SDK，不可提前将 NEW-SRC-01、G2/G3/G4 标为 PASS。S3 详细证据与边界：`docs/S3_TRUSTED_PROCESS_PROTOTYPE_20261028.md`。
+
+---
+
+
 ## 2026-10-28 开发优先级调整（用户已授权；S1 验收不豁免）
 
 - 本轮停止围绕模拟器截图测试反复优化；已通过自动视觉矩阵不等于 G1 用户/设备验收。S1 残余问题继续登记为发布阻断，但**不再阻断独立 Draft 中 S2/S3 的受控架构研发**。

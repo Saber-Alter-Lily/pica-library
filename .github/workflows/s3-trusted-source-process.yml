@@ -1,0 +1,79 @@
+name: S3 trusted source process QA (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s3-trusted-source-process-20261028
+    paths:
+      - '.github/workflows/s3-trusted-source-process.yml'
+      - 'src/source-extensions/**'
+      - 'test/unit/trusted-source-process.test.ts'
+      - 'test/unit/module-dag-policy.test.ts'
+      - 'test/unit/compiled-source-composition.test.ts'
+      - 'test/fixtures/s3-trusted-worker.cjs'
+      - 'scripts/audit-modules.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-source-process-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node-process:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck without runtime privilege changes
+        run: pnpm type:check
+      - name: Real isolated source process, DTO and Reader tests
+        run: |
+          pnpm exec vitest run \
+            test/unit/trusted-source-process.test.ts \
+            test/unit/external-reader-boundary.test.ts \
+            test/unit/module-dag-policy.test.ts \
+            test/unit/compiled-source-composition.test.ts \
+            test/unit/reader-service.test.ts
+      - name: Keep source-only import-closure evidence
+        run: |
+          mkdir -p s3-source-evidence
+          pnpm exec tsx scripts/audit-modules.ts --output=s3-source-evidence/import-graph.json
+      - name: Retain bounded synthetic-only evidence
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-source-process-graph-${{ github.sha }}
+          path: s3-source-evidence/import-graph.json
+          retention-days: 1
+          if-no-files-found: ignore
+
+  windows-process:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Check actual Windows Node worker types
+        run: pnpm type:check
+      - name: Test pinned worker launch, IPC, revoke and timeout on Windows
+        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts

@@ -1,5 +1,19 @@
 # Pica Library Development Task Log
 
+## S3 独立来源运行时｜2026-10-28 · Linux/Windows 受控 IPC 原型与安全门禁
+
+**用户授权推进 S2/S3，正式 `v0.5.0`、main、Release/OTA 和个人账号/书库保持不动。** 从 [S2 Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) 分出独立 [S3 Draft PR #220](https://github.com/Saber-Alter-Lily/pica-library/pull/220)，确保架构实验不夹带生产发布。
+
+- **基线 S2**：完整 [CI #40689775058](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40689775058) 在 `3c544bd8` SUCCESS，先前因新架构工件保留7天而违反原仓保留1天安全约束，已按原门禁修复，不放松安全测试。
+- **S3 新代码**：`src/source-extensions/trusted-process.ts` 采用 Node 原生 `child_process.fork` 复用 IPC，不开发任意插件加载器；只接受显式可信根目录下固定 SHA-256 的入口，握手校验来源和随机会话、4路并发上限、媒体大小/安全 MIME 与请求超时边界；父进程不传 `PICA_*` 和 `NODE_OPTIONS` 环境变量。中止、故障、超时都关闭并拒绝挂起请求，原 Reader 内缓存命中前再次校验权限。
+- **实际进程测试**：`test/fixtures/s3-trusted-worker.cjs` 无真实漫画源、账号、网络；`test/unit/trusted-source-process.test.ts` 启动独立 worker，经原 `OnlineReaderService` 实际完成章/页/媒体/进度与缓存；错误哈希/路径/握手、跨作品归属、超限/非法媒体、敏感环境隔离、迟到请求撤销/超时/崩溃均有自动化断言。
+- **实证**：[S3 Linux + Windows 双系统专项 #40690767200](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40690767200)，精确代码 `a785af6f` **SUCCESS，2/2 独立 jobs**。Windows 是 Actions Windows 系统实际运行测试，而非仅在 Linux 上做平台模拟。完整项目 CI 与正式安装包认证另行检查；不能把专项绿灯当 G2 PASS。
+- **未完成关键出口**：真实 Pica/E-H/JM 协议仍在旧正式安装包；本次受控工作进程不是沙箱、没有真实签名/应用私有不可修改目录、没有跨进程凭据 broker、没有 Android 独立 Service/Binder、没有单源安装/撤销/回滚/版本管理、没有 v0.5.0 无损升级及双端纯 Core 证明。G1 用户真机与 G2/G3/G4 全保持 OPEN。
+- **下一步**：验证最新完整 CI，按 `docs/S3_TRUSTED_PROCESS_PROTOTYPE_20261028.md` 推进 Windows QA 签名/真实打包与 Android 受控 Service 原型；实际一项来源接入前先评估信任模型和许可，不直接借用 Mihon 具有全应用权限的第三方插件机制；Suwayomi 保持用户自选可选 Host。
+
+---
+
+
 ## S2-01/S2-02 续修回执｜2026-10-28 · 已验证依赖图与内置来源构造入口抽离
 
 - **首轮独立架构 CI 实证**：[S2 run #40677952242](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40677952242) 于 `383c89e5` SUCCESS，生成并下载 `module-graph.json`：实际分析 **239 个 TypeScript 源文件、1,079 条静态依赖边、0 个 TypeScript runtime SCC 循环、0 条受保护 Reader 反向依赖违规**；旧 `ProviderService` 直连 Pica/E-H/JM 类、ProviderRegistry 的边均如实留在该基线证据中，不代表 Android/Windows 纯核心包已经去掉 SDK。

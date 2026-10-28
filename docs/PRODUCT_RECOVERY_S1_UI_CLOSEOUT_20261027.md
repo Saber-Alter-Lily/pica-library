@@ -1,3 +1,10 @@
+## 2026-10-27 S1 checkpoint — actual source `079b9e37`, CI regression repair (pending rerun)
+
+- [Exact-head real emulator run #40609472634](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40609472634) **SUCCESS**: 100% and 150% font, Chinese/light/360dp; each scale ran three independent Android Instrumentation cases (guide menu, source two-step spotlight, downloads two-step spotlight), **6/6 PASS**, with 5 images per scale (**10 real PNG total**). [Evidence artifact #12781184746](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40609472634/artifacts/12781184746) is short-lived; its existence and logged images do not establish other languages, actual physical devices or user acceptance.
+- [Exact-head Web/Desktop CI #40609478800](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40609478800) was **FAILED in Web/Desktop** (2638 passed/3 failed/14 conditional skipped, 334 files); Android job outcome separately pending at log read. The three failures are outdated source-contract expectations: prior literal debug application suffix no longer reflects bounded QA suffix+pair scheme; account-hub Chinese-only literal checks no longer reflect the trilingual resources; source-host frozen ProviderRegistry checksum predates a reviewed fail-closed `forPageForComic` addition.
+- Correction preserves full test coverage and stronger runtime guardrails. Android test now verifies default `.dev` **and** bounded isolated QA suffix; account test verifies real resource IDs and three locale files; Host protection retains all original frozen hashes and requires byte-for-byte restoration of the old Registry after removing **only** the reviewed identity-bound routing seam. Do not rebaseline or replace the protected fixture checksum. All corrections remain **unverified** until exact new CI runs.
+- No merge, public release, OTA or production install. The S0 data durability risk and full G1/G2/G3/G4 gates remain OPEN.
+
 ## S1-03/04 增量：下载页实际 VSpot 测试（本批执行结果待验证）
 
 - 已在已通过的第0章聚光外增加第5章下载页的实际 Android Instrumentation：任务/存储两目标、两张截图、跳过不记已读；原第0章源码与验证证据保留。模拟器 100%/150% 各新增两张目标图片；**期望总计10张 PNG，但只能按实际 GitHub Actions 结果认定**。

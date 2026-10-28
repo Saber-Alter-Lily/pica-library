@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+## S3 PR #223｜E-H 真实来源协议独立进程首片（2026-10-28）
+
+- 新建 [Draft PR #223](https://github.com/Saber-Alter-Lily/pica-library/pull/223)，叠加 #222 而不合并正式 main。复用原有 EhProvider，抽出匿名公开的真实来源解析，在可选工作进程执行，旧 eh:gid:token 身份和旧书库记录不改，原 Reader 复用而非复制。新增可选 identity bridge、HMAC 页面 token、受限 IPC 和签名 CJS worker。
+- 真实源读取由带固定无账号 HTTP fixture 的旧 EhProvider 执行：单元/类型与真实 OS child-process IPC、签名安装、禁用撤销、进度/书库合并在 Linux 和 Windows 运行。旧源码 21831684 的 [专项 #40732088085](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40732088085) SUCCESS（Linux91/91，Windows65/65）。此后补充 token 资源边界/安全刷新和实际 worker import 图，必须由新 HEAD 重测，不继承旧通过。
+- 未测试真实站点和用户账号；不含 ExH、登录/收藏/搜索/下载，不是可安装正式来源，更不是两个 Core 包真实去 SDK。发行者公钥、OS 保护根、Android Binder/Service、完整 v0.5.0 兼容/回滚、G1–G4 均 OPEN。无 Release、OTA、用户数据、main 更改。
+- 详细方案、适用边界、S3-EH-01～06 与后续计划：[S3 E-H 来源交付与风险](docs/S3_EH_PUBLIC_WORKER_20261028.md)。
+
 ## S3 安全及 CI 续接｜2026-10-28（HEAD 2e3bcf3）
 
 - **实际基线**：当前开发树的最后一项运行代码提交为 `2e3bcf32fba43c041009099afa3d7de6f2296c91`，位于未合并 Draft [PR #222](https://github.com/Saber-Alter-Lily/pica-library/pull/222)，继承 #221 → #220 → #219 → #218；正式 main 与 v0.5.0、用户数据/账号、签名 APK、OTA、安装包未修改。此日志更新是文档提交，不可把旧源码测试伪装成文档 HEAD 的独立通过。

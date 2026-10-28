@@ -71,7 +71,13 @@ export class SignedSourceDesktopReader {
             this.drop(session)
             throw new Error('Signed source session was revoked')
         }
-        session.worker.assertEnabled()
+        try { session.worker.assertEnabled() }
+        catch (error) {
+            // A dead worker must not pin this source's single-session slot.
+            // Never restart it implicitly; the user must explicitly connect.
+            this.drop(session)
+            throw error
+        }
         return session
     }
 
@@ -79,6 +85,25 @@ export class SignedSourceDesktopReader {
         for (const session of [...this.sessions.values()])
             if (session.sourceId === sourceId) this.drop(session)
     }
+    /** A passive status query may reap a dead worker, never start one. */
+    private connectedSource(sourceId: string, sourceRevision: number) {
+        let connected = false
+        for (const session of [...this.sessions.values()]) {
+            if (session.sourceId !== sourceId) continue
+            if (session.revision !== sourceRevision) {
+                this.drop(session)
+                continue
+            }
+            try {
+                session.worker.assertEnabled()
+                connected = true
+            } catch {
+                this.drop(session)
+            }
+        }
+        return connected
+    }
+
 
     async command(raw: unknown): Promise<unknown> {
         if (!raw || typeof raw !== 'object' || Array.isArray(raw))
@@ -92,8 +117,7 @@ export class SignedSourceDesktopReader {
             return {
                 sourceId: id,
                 ...state,
-                connected: [...this.sessions.values()].some(s =>
-                    s.sourceId === id && s.revision === state.revision)
+                connected: this.connectedSource(id, state.revision)
             }
         }
         if (op === 'activate' || op === 'rollback') {
@@ -105,9 +129,13 @@ export class SignedSourceDesktopReader {
             const state = op === 'activate'
                 ? this.store.activate(id, version, expected)
                 : this.store.rollback(id, version, expected)
-            // Invalid commands cannot tear down a running source.
+            // No-op re-selection does not close an otherwise valid session.
+            // A real revision advance invalidates old sessions through the store.
             if (state.revision !== expected) this.invalidateSource(id)
-            return { sourceId: id, ...state, connected: false }
+            return {
+                sourceId: id, ...state,
+                connected: this.connectedSource(id, state.revision)
+            }
         }
         if (op === 'disable') {
             if (!exact(raw, ['operation', 'sourceId', 'expectedRevision']))
@@ -116,16 +144,21 @@ export class SignedSourceDesktopReader {
             const expected = revision(raw.expectedRevision)
             const state = this.store.disable(id, expected)
             if (state.revision !== expected) this.invalidateSource(id)
-            return { sourceId: id, ...state, connected: false }
+            return {
+                sourceId: id, ...state,
+                connected: this.connectedSource(id, state.revision)
+            }
         }
         if (op === 'connect') {
             if (!exact(raw, ['operation', 'sourceId']))
                 throw new SignedReaderInputError()
             const id = field(raw.sourceId)
+            const selected = this.store.state(id)
+            // Reap any crashed session before enforcing per-source limits.
+            this.connectedSource(id, selected.revision)
             if (this.sessions.size >= MAX_SESSIONS ||
                 [...this.sessions.values()].some(s => s.sourceId === id))
                 throw new Error('Signed source reader is busy')
-            const selected = this.store.state(id)
             if (!selected.activeVersion)
                 throw new Error('Signed source is disabled')
             const worker = await this.store.openActive(id)

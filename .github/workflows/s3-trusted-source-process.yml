@@ -13,7 +13,13 @@ on:
       - 'test/unit/signed-worker-lifecycle.test.ts'
       - 'src/desktop/signed-source-reader.ts'
       - 'src/library/server.ts'
+      - 'src/library/reading-library.ts'
+      - 'web/app.js'
+      - 'web/reading-library.js'
       - 'test/unit/signed-source-desktop-http.test.ts'
+      - 'test/unit/reading-library.test.ts'
+      - 'test/unit/reading-library-ui.test.ts'
+      - 'test/unit/web-reader-progress.test.ts'
       - 'test/unit/module-dag-policy.test.ts'
       - 'test/unit/compiled-source-composition.test.ts'
       - 'test/fixtures/s3-trusted-worker.cjs'
@@ -50,6 +56,9 @@ jobs:
             test/unit/trusted-source-process.test.ts \
             test/unit/signed-worker-lifecycle.test.ts \
             test/unit/signed-source-desktop-http.test.ts \
+            test/unit/reading-library.test.ts \
+            test/unit/reading-library-ui.test.ts \
+            test/unit/web-reader-progress.test.ts \
             test/unit/external-reader-boundary.test.ts \
             test/unit/module-dag-policy.test.ts \
             test/unit/compiled-source-composition.test.ts \
@@ -84,4 +93,4 @@ jobs:
       - name: Check actual Windows Node worker types
         run: pnpm type:check
       - name: Test pinned worker launch, IPC, revoke and timeout on Windows
-        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts test/unit/signed-worker-lifecycle.test.ts test/unit/signed-source-desktop-http.test.ts
+        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts test/unit/signed-worker-lifecycle.test.ts test/unit/signed-source-desktop-http.test.ts test/unit/reading-library.test.ts test/unit/reading-library-ui.test.ts test/unit/web-reader-progress.test.ts

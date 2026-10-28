@@ -50,9 +50,8 @@ function fixture() {
     const cache = {
         get(key: string, fingerprint?: string) {
             const record = images.get(key)
-            return record?.fingerprint === fingerprint
-                ? { data: record.data, contentType: record.contentType }
-                : null
+            if (!record || record.fingerprint !== fingerprint) return null
+            return { data: record.data, contentType: record.contentType }
         },
         put(key: string, data: Buffer, contentType: string, fingerprint?: string) {
             images.set(key, { data, contentType, fingerprint })

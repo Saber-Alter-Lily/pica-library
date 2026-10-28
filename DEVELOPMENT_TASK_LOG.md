@@ -1,4 +1,17 @@
 # Pica Library Development Task Log
+
+## S1-02 视觉矩阵假阳性闭锁｜2026-10-28 · Pixel Launcher ANR 与前台画面归属
+
+**来源/边界**：正式 `v0.5.0` 与 `main 095d6910` 无修改；继续在未合并 Draft PR #218、隔离 Debug/模拟器中实施。G1 用户验收仍 **NOT_ACCEPTED**，G2/G3/G4 继续 OPEN。保留历史 42 + 新增 12 验收案例。
+
+- **精确旧源码实证**：`e44de731` 的 [完整 CI #40634752986](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634752986) SUCCESS、[定向 Android #40634745752](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745752) SUCCESS、[八章 VSpot #40634745706](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706) SUCCESS；但 [九组实页矩阵 #40634745695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695) FAIL。实际失败是第六组 `en-dark-w480-f130` 的 `guide` 截图未通过有效绘制判断，后续三组未运行。
+- **新增 P1 证据污染**：下载并目视检查该次矩阵工件 [#12793718801](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695/artifacts/12793718801)，前五组通过的 **35/35 张所谓有效页面截图都被系统弹窗 `Pixel Launcher isn't responding` 覆盖**，个别甚至只显示系统壁纸。原来的主题/亮度像素门禁对非本应用弹窗出现假阳性；此前 9/9 的 `d8b7f4c` 截图也存在空白转场，故不可将矩阵 Instrumentation 成功等同于页面视觉验收。ANR 弹窗归因于模拟器系统 Launcher 的图像证据，**尚未证明 Pica 正式/候选应用发生 ANR 或持续白屏**。
+- **独立参考**：同批八章引导 [#12792869042](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706/artifacts/12792869042) 实页聚光抽样未见 Launcher 遮挡；继续复用现有 VSpot 引导，不因此重写业务 UI/动画。
+- **隔离修复（GitHub 已提交并读回）**：`c23a1e3b` 在 `S1AndroidLocaleMatrixTest` 的真实截图验收上新增“当前 Activity 有窗口焦点 + Accessibility 活动窗口归属本 APK + 有实际绘制像素”三重门禁，失败保留 `rejected-*.png` 与诊断而非套用旧 PASS；`f48f9897` 在失败用例导出拒绝截图和窗口焦点状态；`3c89e981` 只将 S1 独立视觉矩阵的 Android 系统映像切换为 `aosp_atd`，避免该组 Pixel Launcher 特定干扰（其他工作流基线不动）；`81fbaed5` 加入预防回退的仓库契约测试。**不缩减矩阵、不跳过失效用例、不取消外部遮挡检测**。
+- **验收与下一步**：新 `aosp_atd` 九组矩阵 [#40649923301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649923301) 和新 HEAD `81fbaed5` [CI #40649938731](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649938731) 在本回执时尚未产生成功终态，不能宣称 PASS。必须逐图审查实际 63 PNG，保证页面可读、无系统对话框、深色下拉高对比、英日翻译和标签真实已加载，再在真实 Android/OEM 验证，最后推进 S2 模块依赖 DAG / S3 SDK 真外置及 S5 老数据升级事务，保持既有 G1–G4 门槛。
+
+---
+
 ## S1 人工视觉验收接续｜2026-10-27 · 63张截图复核与新版门禁
 
 **当前事实基线：** Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)，业务最新候选 `e44de731`，正式 v0.5.0 / 生产 `main` `095d6910` / OTA / 用户资料均未改。S1 = IN_PROGRESS，G1 USER_ACCEPTANCE = NOT_ACCEPTED；S2/S3 来源 SDK 真正外置与 S5 老用户数据升级仍未完成。

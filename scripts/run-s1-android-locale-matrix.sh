@@ -53,7 +53,9 @@ for scenario in "${scenarios[@]}"; do
             if ! adb exec-out run-as com.picalibrary.android.dev cat \
                 "files/s1-layout-$key/rejected-$page.png" > "$rejected" 2>/dev/null; then
                 rm -f "$rejected"
-            elif [[ ! -s "$rejected" ]]; then
+            elif [[ "$(head -c 8 "$rejected" | od -An -tx1 | tr -d ' \\n')" != "89504e470d0a1a0a" ]]; then
+                # Some run-as errors exit zero and print text to stdout.
+                # Never upload those messages as fake PNG evidence.
                 rm -f "$rejected"
             fi
         done
@@ -67,6 +69,7 @@ for scenario in "${scenarios[@]}"; do
         adb exec-out run-as com.picalibrary.android.dev cat "files/s1-layout-$key/$page.png" \
             > "s1-locale-matrix-evidence/$key/$page.png"
         test -s "s1-locale-matrix-evidence/$key/$page.png"
+        test "$(head -c 8 "s1-locale-matrix-evidence/$key/$page.png" | od -An -tx1 | tr -d ' \\n')" = "89504e470d0a1a0a"
     done
     printf 'source_sha=%s case=%s pages=7 locale=%s theme=%s width_dp=%s font=%s\n' \
         "$GITHUB_SHA" "$key" "$language" "$theme" "$width" "$scale" \

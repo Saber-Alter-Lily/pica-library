@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { SignedReaderInputError } from '../source-extensions/signed-reader-errors'
 import type {
     OnlineReaderCache, OnlineReaderState, OnlineReaderContract
 } from '../services/online-reader-service'
@@ -19,9 +20,7 @@ const UUID = /^[0-9a-f-]{36}$/
 const MAX_SESSIONS = 4
 const READER_ROOT = '/api/v1/desktop/signed-reader'
 
-export class SignedReaderInputError extends Error {
-    constructor() { super('Invalid signed source reader command') }
-}
+export { SignedReaderInputError } from '../source-extensions/signed-reader-errors'
 
 function exact(input: unknown, keys: string[]): input is Record<string, unknown> {
     return input !== null && typeof input === 'object' && !Array.isArray(input) &&

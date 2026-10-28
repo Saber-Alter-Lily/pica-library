@@ -1,3 +1,13 @@
+## 2026-10-28 接续审图：识别模拟器 Launcher ANR 截图假阳性，改为前台归属门禁
+
+旧业务源码 `e44de731` 的完整 CI、Android 定向测试和八章 VSpot 模拟器均 SUCCESS，但九组 Android 七页 [真实截图矩阵 #40634745695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695) FAIL（第六组 `en-dark-w480-f130/guide` 失去有效绘制，后续三个场景未运行）。已下载 [失败工件 #12793718801](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695/artifacts/12793718801) 并目视核对：前五组标 PASS 的 **35 张图全部可见 `Pixel Launcher isn't responding` 系统弹窗**。这不是可接受的 Pica UI 证据；现有仅靠像素亮度/主题的门禁错误放行了系统弹窗/壁纸，因此需更正之前的 “35 张实页通过”解释。独立 [VSpot 工件 #12792869042](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706/artifacts/12792869042) 抽查未见同一遮挡。系统 Launcher 弹窗**不能证明 Pica App 在真机 ANR**；先区分模拟器环境与业务缺陷。
+
+候选提交 `c23a1e3b` 在单张截图被认可前，核验应用根窗口焦点、当前系统 Accessibility 活动窗口的包名以及绘制内容；失败保存被拒绝图片和窗口诊断，由 `f48f9897` 提取到 Actions 工件。候选 `3c89e981` **仅视觉矩阵**换 Android35 `aosp_atd`（其余 Android 完整 CI 和八章测试仍各自独立），`81fbaed5` 加入回退契约测试。不更改实际 WebDAV、标签、账号、VSpot、下载或生产数据，也不允许后续通过关闭检查绕过缺陷。
+
+本批提交后的确切验证：新九组矩阵 [#40649923301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649923301) 当前 IN_PROGRESS，新 HEAD `81fbaed5` [完整 CI #40649938731](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649938731) 当前 QUEUED。**均未填 PASS**。下一步必须实际拿到 9×7、无外部遮挡的截图与日志，人工核对三语言、深浅主题、字号和控件换行，然后补真机/OEM G1；截至此回执 `USER_ACCEPTANCE=NOT_ACCEPTED`。
+
+---
+
 ## S1 人工审图发现的深色/翻译/空白截图真实缺陷（2026-10-27，新代码待复测）
 
 - 下载解包实际查看 [9组×7页 #40632432541](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40632432541) 的 **63 张真实PNG**：9/9 Instrumentation **SUCCESS**，但初步人工视觉审阅发现部分截图完全没有页面内容（例如多张高级指南/来源/下载/推荐画面），不能按 PNG 非空统计判定可视验收。测试只要求真实 Activity 启动、标记控件存在，却可能在操作系统转场画面未绘制前就截屏。原 PNG 和日志保留，属于**截图采集稳定性/可观察性 P1**，尚不能归因于实际页面永久白屏。

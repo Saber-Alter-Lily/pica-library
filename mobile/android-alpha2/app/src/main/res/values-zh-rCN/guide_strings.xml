@@ -68,6 +68,6 @@
     <string name="advanced_guide_preference_preview">当前没有待保存的调整。修改偏好后才可保存。</string>
     <string name="advanced_guide_notes_show">查看详细文字说明</string>
     <string name="advanced_guide_notes_hide">收起详细文字说明</string>
-    <string name="advanced_guide_safety_short">本引导只展示控件，不会自动登录、下载或修改设置。</string>
-    <string name="advanced_guide_interactive_hint_short">进入功能页后，按提示查看高亮控件。</string>
+    <string name="advanced_guide_safety_short">只演示控件位置，不会自动登录、下载或修改设置。</string>
+    <string name="advanced_guide_interactive_hint_short">按高亮提示查看控件。</string>
 </resources>

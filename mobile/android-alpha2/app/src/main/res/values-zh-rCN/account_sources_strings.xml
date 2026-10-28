@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="account_sources_title">账号与来源</string>
+    <string name="account_sources_status_local">本机已登录</string>
+    <string name="account_sources_status_desktop">Desktop 已连接</string>
+    <string name="account_sources_status_disconnected">未连接</string>
+    <string name="account_sources_eh_account">E-H 账号</string>
+    <string name="account_sources_exh_extension">ExH 扩展</string>
+    <string name="account_sources_desktop_provided">由 Desktop 提供</string>
+    <string name="account_sources_jm_description">本机登录、收藏导入与在线阅读</string>
+    <string name="account_sources_paired_explanation">已同步 Desktop 账号连接状态。只有希望电脑离线时仍由手机直接访问在线来源，才需要在手机配置账号。</string>
+</resources>

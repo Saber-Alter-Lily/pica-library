@@ -69,5 +69,5 @@
     <string name="advanced_guide_notes_show">詳しい説明を表示</string>
     <string name="advanced_guide_notes_hide">詳しい説明を閉じる</string>
     <string name="advanced_guide_safety_short">操作位置を案内するだけで、ログイン・ダウンロード・設定変更はしません。</string>
-    <string name="advanced_guide_interactive_hint_short">機能画面でハイライトを順に確認できます。</string>
+    <string name="advanced_guide_interactive_hint_short">ハイライトを順に確認してください。</string>
 </resources>

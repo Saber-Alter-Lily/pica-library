@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 import android.app.Application;
 import android.content.Intent;
 import android.os.Bundle;
+import android.widget.TextView;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
@@ -45,6 +46,29 @@ public final class AccountSourcesGuidePreviewTest {
                 Robolectric.buildActivity(AccountSourcesActivity.class,intent)
                     .create(saved).start().resume().visible()){
             assertTrue(controller.get().isGuidePreview());
+        }
+    }
+
+    @Test public void sourceHubTitleAndBackControlRespectEachAppLocale(){
+        Application app=RuntimeEnvironment.getApplication();
+        String[] locales={LocaleStore.ZH_CN,LocaleStore.EN,LocaleStore.JA};
+        String[] titles={"账号与来源","Account & sources","アカウントと配信元"};
+        try{
+            for(int i=0;i<locales.length;i++){
+                LocaleStore.set(app,locales[i]);
+                try(ActivityController<AccountSourcesActivity> controller=
+                        Robolectric.buildActivity(AccountSourcesActivity.class).create()){
+                    AccountSourcesActivity activity=controller.get();
+                    TextView heading=(TextView)activity.getWindow().getDecorView()
+                        .findViewWithTag("account-sources-heading");
+                    assertNotNull(heading);
+                    assertEquals(locales[i],titles[i],heading.getText().toString());
+                    assertEquals(2,heading.getMaxLines());
+                    assertFalse(activity.getString(R.string.common_back).isEmpty());
+                }
+            }
+        }finally{
+            LocaleStore.set(app,LocaleStore.ZH_CN);
         }
     }
 

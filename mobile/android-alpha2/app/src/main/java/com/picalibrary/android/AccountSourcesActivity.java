@@ -56,8 +56,11 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         LinearLayout bar=new LinearLayout(this);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));
-        bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));
-        bar.addView(Ui.text(this,"账号与来源",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
+        bar.addView(Ui.button(this,getString(R.string.common_back),v->finish(),true));
+        TextView heading=Ui.text(this,getString(R.string.account_sources_title),22,Ui.TEXT,true);
+        heading.setTag("account-sources-heading");
+        heading.setMaxLines(2);
+        bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
         root.addView(bar);
         ScrollView scroll=new ScrollView(this);
         content=new LinearLayout(this);
@@ -70,10 +73,10 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         renderContent();
     }
 
-    private static String status(boolean local,boolean desktop){
-        if(local)return "已登录（本机）";
-        if(desktop)return "已由 Desktop 连接";
-        return "未连接";
+    private String status(boolean local,boolean desktop){
+        if(local)return getString(R.string.account_sources_status_local);
+        if(desktop)return getString(R.string.account_sources_status_desktop);
+        return getString(R.string.account_sources_status_disconnected);
     }
 
     private void renderContent(){
@@ -109,7 +112,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         card.addView(head);
         card.addView(SettingsRow.statusLine(
             this,
-            "E-H 账号",
+            getString(R.string.account_sources_eh_account),
             SourceAccessUi.status(this,"eh",status(localEh,desktop.ehConfigured))
         ));
 
@@ -117,7 +120,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         String exhLabel=!SourceAccess.enabled(this,"eh")?getString(R.string.source_disabled):localEh
             ? capability.label()
             : desktop.ehConfigured
-                ? "由 Desktop 提供"
+                ? getString(R.string.account_sources_desktop_provided)
                 : capability.label();
         exhState=Ui.text(
             this,
@@ -128,14 +131,14 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
                 : Ui.MUTED,
             true
         );
-        card.addView(SettingsRow.statusLine(this,"ExH 扩展",exhState));
+        card.addView(SettingsRow.statusLine(this,getString(R.string.account_sources_exh_extension),exhState));
         content.addView(card);
 
-        content.addView(SettingsRow.row(this,"JM",SourceAccessUi.status(this,"jm","本机登录、收藏导入与在线阅读"),v->startActivity(new Intent(this,JmSourceActivity.class))));
+        content.addView(SettingsRow.row(this,"JM",SourceAccessUi.status(this,"jm",getString(R.string.account_sources_jm_description)),v->startActivity(new Intent(this,JmSourceActivity.class))));
         if(paired&&(desktop.picaConfigured||desktop.ehConfigured)){
             TextView note=Ui.text(
                 this,
-                "已自动同步 Desktop 的账号连接状态。电脑在线且已配对时，不需要为了 Desktop 提供的功能在手机重复登录；只有希望电脑关闭后仍由手机直接访问在线来源时，才需要配置手机本机账号。",
+                getString(R.string.account_sources_paired_explanation),
                 13,
                 Ui.MUTED,
                 false

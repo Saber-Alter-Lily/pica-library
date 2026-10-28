@@ -1,4 +1,13 @@
 # S1 Android UI 第一轮整改及验收边界｜2026-10-27
+
+## 本轮精确聚光测试失败与后续源码修复（未验证通过）
+
+- [真实聚光运行 #40547904187](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40547904187)，源码 `e2c50623`，**terminal FAILURE**：API35/KVM 与 Debug/AndroidTest 编译通过，第一个中文浅色指南目录截图通过；独立的来源第0章聚光测试停在 `phase=spotlight-launch`，150秒外层超时（exit124），未产生两步 VSpot 的合格截图。属于目前已确认的测试/启动阻断，不能以目录截图替代聚光可视化证据；因缺乏足够日志，还不能断言产品页本身死锁。
+- 后续独立 Draft 修改：`AccountSourcesActivity` 将引导只读标记跨 Intent extra 被消费后的 `onResume` 及配置重建保存，避免返回时自动发起 Desktop/ExH 探测；新增 Robolectric 回归。真实聚光 Instrumentation 改用 Android 原生 `ActivityMonitor` 观察页面和主线程读取 VSpot，不再用 ActivityScenario 的 Espresso 空闲等待；增加启动/发现阶段日志。
+- 同期来源管理页补齐三语言用户可见状态，标题两行上限；缩短高级导览的紧凑说明，缓解放大字体的文字孤行风险。**这些均是源码改动，真实页面截图、物理设备及原 42+12 验收状态尚待新源码运行。**
+- [QA3 独立 APK #40542505173](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40542505173) 已是 terminal SUCCESS，属于隔离包 `com.picalibrary.android.s1qa3` 的 Debug 构建证据，不是正式签名覆盖/用户接受。
+- 本批更改的精确源码新 CI / 模拟器视觉运行在提交时仍为 **PENDING**。G1 继续 NOT_ACCEPTED；main、Release、正式 OTA 与用户数据不变。
+
 ## 已核实两代 Debug QA 与真实截图证据（2026-10-27）
 
 | 精确对象 | 已证实 | 不允许误判 |

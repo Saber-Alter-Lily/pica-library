@@ -13,10 +13,17 @@ describe('S2 actual TypeScript module ownership graph', () => {
         expect(graph.nodes).toContain('src/services/provider-service.ts')
         expect(graph.nodes).toContain('src/services/online-reader-service.ts')
         expect(graph.nodes).toContain('src/source-extensions/reader-contract.ts')
+        // The concrete factory is now the sole runtime source composition seam.
+        // ProviderRegistry remains a type-only import in the consuming service.
+        expect(graph.edges).toContainEqual({
+            from: 'src/services/provider-service.ts',
+            to: 'src/providers/compiled-composition.ts',
+            typeOnly: false
+        })
         expect(graph.edges).toContainEqual({
             from: 'src/services/provider-service.ts',
             to: 'src/providers/provider-registry.ts',
-            typeOnly: false
+            typeOnly: true
         })
         expect(moduleBoundaryViolations(graph.edges)).toEqual([])
     })

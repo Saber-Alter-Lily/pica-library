@@ -1,5 +1,18 @@
 # Pica Library Development Task Log
 
+## S3 PR #222 接续验收｜2026-10-28：安全隔离与真正阅读 UI 路由
+
+- **历史基线已经精确核实**：旧源码 `dd03822e` 的 [签名来源双平台专项 #40712630322](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712630322) 和 [完整 CI #40712643773](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712643773) 均 SUCCESS；这两项不能直接覆盖后续 UI 修改。
+- **本轮最主要的产品错误已实际解决**：之前统一书库的签名来源被标记成 legacy `online` 通道，点击会误跳旧 Provider 而非签名源。新的 `ReadingLibrary` 使用 `signed` 独立 channel、严格 UUID 会话归属；`web/reading-library.js` 中英日按钮走 `openSigned`；`web/app.js` 的唯一 Reader UI 复用导航/分页/纵向滚动、调用 `/desktop/signed-reader/<session>` 的真实章/页/进度接口，进度写入用独立有 CSRF 的 signed session 而不是覆盖现有 `online-reader-progress-v1`。
+- **安全与默认禁用**：`signed-reader-errors.ts` 零依赖合同阻止普通 HTTP server 为错误处理而传递加载签名来源执行器；TypeScript 真正的 runtime import DAG/负向注入测试检测整个默认 `src/library/server.ts` 的依赖闭包，禁止隐式加载进程管理器与签名安装器。默认无受控组件的 HTTP 服务必须返回 403。子进程崩溃后回收 session 但永不悄悄重连；同版本 no-op 激活不会误断线。
+- **原生图片受限同源读取**：浏览器 `<img>` 不能加自定义 CSRF 头，签名来源图片仅在准确的会话作品图片 URL 且有匹配同源 Referrer、`Sec-Fetch-Site:same-origin`、`Sec-Fetch-Dest:image`、无外来 Origin 时接受无 CSRF 的 GET，普通 JSON/状态/进度/修改均继续强制原有 Local Desktop origin+CSRF；跨站 GET、错误 Fetch Dest 与裸来源 URL 拒绝，安全包头保留。
+- **新源码精确专项 CI**：[Linux + Windows #40715552549](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40715552549) **SUCCESS**，代码 `4a13b65d`，Linux **87/87** + Windows **61/61**。覆盖原有真实进程 IPC、Ed25519 签名 lifecycle、实际 HTTP、书库页面按钮与进度、跨站媒体权限、会话崩溃撤销和来源 DTO。对应 [完整 CI #40715568582](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40715568582) 登记时仍为 **QUEUED / NOT_VERIFIED**，不得把专项通过冒充正式全绿。
+- **余下 G2/G3 关键点**：生产 `src/desktop/main.ts` **没有注入**签名组件，因为未有已审核的真实发行者公钥与可信不可改写安装目录；Pica/E-H/JM 核心 SDK 仍在正式两个安装包中、Android Binder/AIDL 没有、真实来源迁移/旧账号及数据升级/一键安装回滚没有。S1 真机用户交互 G1 也尚未签收。全部 Draft、未合并/未发布。
+- 当前技术与验收记录：`docs/S3_SIGNED_DESKTOP_READER_20261028.md`；开发 PR [#222](https://github.com/Saber-Alter-Lily/pica-library/pull/222)。
+
+---
+
+
 ## 2026-10-28｜S3 受控签名源 → 桌面实际 UI/Reader 接续（Draft PR #222）
 
 **这次不再继续做纯隔离 mock 原型，而是把已通过真实 IPC / Ed25519 的组件接入现有 Desktop 服务和统一书库，保障用户点击能打开**。来源执行/管理必须来自应用显式可信组合入口，尚不能让第三方普通资源包/来源清单自行执行代码。全部仍为 Draft，不修改 main、正式 v0.5.0、Release、OTA、个人收藏/凭证/下载。

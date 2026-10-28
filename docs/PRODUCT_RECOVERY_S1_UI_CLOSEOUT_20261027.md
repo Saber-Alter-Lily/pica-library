@@ -1,3 +1,10 @@
+## S1 人工审图发现的深色/翻译/空白截图真实缺陷（2026-10-27，新代码待复测）
+
+- 下载解包实际查看 [9组×7页 #40632432541](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40632432541) 的 **63 张真实PNG**：9/9 Instrumentation **SUCCESS**，但初步人工视觉审阅发现部分截图完全没有页面内容（例如多张高级指南/来源/下载/推荐画面），不能按 PNG 非空统计判定可视验收。测试只要求真实 Activity 启动、标记控件存在，却可能在操作系统转场画面未绘制前就截屏。原 PNG 和日志保留，属于**截图采集稳定性/可观察性 P1**，尚不能归因于实际页面永久白屏。
+- 另发现 `RemoteStorageActivity` 在深色模式使用系统 Spinner 默认黑字，选择项对比度不足；英文/日文默认 WebDAV 页面保留硬编码中文按钮、厂商名、用户名/密码提示等。新的 `Ui.spinnerAdapter` 统一显示字体、前景与点击高度；`RemoteStoragePresetUi` 仅翻译 13 个已知 WebDAV 厂商的展示名/提示/注意事项，不触碰原 `RemoteConfigStore` 的 vendor ID、URL、账号或存储格式；`RemoteStorageActivity` 的默认可见标签/按钮/输入占位/状态也改为三语内容。
+- 新的真实截图门禁从固定450ms拍一张改为**先等待标签编辑器的真实行控件完成加载，且反复采集直到图像包含可辨识的非空页面文字/实际主题底色**，超时则 FAIL，不生成假合格截图。避免把纯白 Android 转场图当成正常画面。此为新源码待跑结果，不得继承旧63张的自动 PASS。
+- 增加 `RemoteStorageVisualContractTest`：无账号、无联网的三语/深浅主题/Spinner 字色和厂商提示验证；独立 Robolectric 作业额外保存 JUnit，工作流与 CI 路径触发均明确，不改变已通过的既有七类测试。
+
 ## S1-02 + S4 标签页 CI 真失败 / 多语言矩阵脚本故障收口（2026-10-27，新提交待复验）
 
 - **两个独立问题不混淆**：旧 `a0f2d9` 和 `061b2c1` 的完整 Android [CI #40629479729](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629479729)、[#40629559940](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629559940) 的 `:app:testDebugUnitTest` 都报告 `TagParticipationActivityTest.headerFitsEnglishNarrowPhoneWithoutCoveringBack` 第66行 FAIL：原生标签编辑器在360dp英语下的标题起始位置和返回按钮间距不足。保留断言，并在真正页面的紧凑返回键上预留72dp最小宽度/触控面积，保留标题动态换行；单测增强为实际控件边界比较，不仅依赖绝对40dp阈值。

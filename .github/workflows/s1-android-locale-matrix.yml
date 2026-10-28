@@ -13,6 +13,8 @@ on:
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationStyleActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RemoteStorageActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RemoteStoragePresetUi.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/Ui.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/TagParticipationActivity.java'
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/TagParticipationActivityTest.java'

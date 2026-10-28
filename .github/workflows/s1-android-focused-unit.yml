@@ -13,6 +13,10 @@ on:
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/SettingsRowNarrowLayoutTest.java'
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/PhoneDownloadStoreAtomicTest.java'
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/TagParticipationActivityTest.java'
+      - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/RemoteStorageVisualContractTest.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RemoteStorageActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RemoteStoragePresetUi.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/Ui.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PhoneDownloadStore.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AccountSourcesActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java'
@@ -53,6 +57,8 @@ jobs:
             testClass: com.picalibrary.android.PhoneDownloadStoreAtomicTest
           - key: tag-header-and-state
             testClass: com.picalibrary.android.TagParticipationActivityTest
+          - key: remote-locale-contrast
+            testClass: com.picalibrary.android.RemoteStorageVisualContractTest
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

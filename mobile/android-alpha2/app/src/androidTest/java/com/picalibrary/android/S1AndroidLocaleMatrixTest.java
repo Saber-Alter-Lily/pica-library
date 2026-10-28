@@ -106,8 +106,19 @@ public final class S1AndroidLocaleMatrixTest {
                     assertNotNull(page+": actual control is missing",anchor);
                     assertTrue(page+": actual control is not visible",anchor.isShown());
                 });
-                Bitmap image=inst.getUiAutomation().takeScreenshot();
-                assertNotNull(page+": no real display screenshot",image);
+                if(current instanceof TagParticipationActivity){
+                    // A loading shell is not visual evidence for the tag editor.
+                    boolean ready=false;
+                    for(int poll=0;poll<40;poll++){
+                        final boolean[] found={false};
+                        inst.runOnMainSync(()->found[0]=current.getWindow().getDecorView()
+                            .findViewWithTag("tag-all")!=null);
+                        if(found[0]){ready=true;break;}
+                        SystemClock.sleep(180);
+                    }
+                    assertTrue("Tags page did not finish loading actual controls",ready);
+                }
+                Bitmap image=readyScreenshot(inst,page,theme,caseId);
                 try{
                     assertTrue(page+": screenshot width "+image.getWidth(),
                         Math.abs(image.getWidth()-width*2)<=8);
@@ -127,5 +138,42 @@ public final class S1AndroidLocaleMatrixTest {
                 }
             }
         }
+    }
+
+    /** Reject white transitional frames and undrawn screenshots rather than
+     * accepting any non-empty PNG as a real UI acceptance artifact. */
+    private Bitmap readyScreenshot(Instrumentation inst,String page,String theme,String caseId){
+        for(int attempt=0;attempt<15;attempt++){
+            SystemClock.sleep(attempt==0?200:220);
+            Bitmap image=inst.getUiAutomation().takeScreenshot();
+            if(image!=null){
+                if(looksPainted(image,theme)){
+                    Log.i(TAG,"case="+caseId+" page="+page+" painted-attempt="+(attempt+1));
+                    return image;
+                }
+                image.recycle();
+            }
+        }
+        throw new AssertionError("No painted UI frame for "+caseId+"/"+page+
+            "; refusing blank screenshot acceptance");
+    }
+
+    private boolean looksPainted(Bitmap image,String theme){
+        int width=image.getWidth(),height=image.getHeight();
+        if(width<320||height<500)return false;
+        boolean dark=ThemeStore.MODE_DARK.equals(theme);
+        int outer=image.getPixel(4,height/2);
+        int outerLight=(android.graphics.Color.red(outer)+
+            android.graphics.Color.green(outer)+android.graphics.Color.blue(outer))/3;
+        if(dark&&outerLight>145)return false;
+        int ink=0;
+        for(int y=80;y<Math.min(height-80,420);y+=4)
+            for(int x=20;x<width-20;x+=4){
+                int pixel=image.getPixel(x,y);
+                int light=(android.graphics.Color.red(pixel)+
+                    android.graphics.Color.green(pixel)+android.graphics.Color.blue(pixel))/3;
+                if(dark?light>140:light<145)ink++;
+            }
+        return ink>=130;
     }
 }

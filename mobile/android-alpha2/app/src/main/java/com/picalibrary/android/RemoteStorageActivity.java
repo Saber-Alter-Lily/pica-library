@@ -91,10 +91,10 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
         if(creating&&label.getText().toString().trim().isEmpty())label.setText(copy.label);
     }
 
-    private void beginNew(){binding=true;beginNewInternal();binding=false;status.setText(LocalizedText.ui("正在新增网盘配置；保存成功后才会切换当前来源。"));}
+    private void beginNew(){binding=true;beginNewInternal();binding=false;status.setText(t("正在新增网盘配置；保存成功后才会切换当前来源。","Creating a connection. The active storage changes only after a successful save.","新しい接続を作成しています。保存に成功するまで現在の保存先は変わりません。"));}
     private void beginNewInternal(){creating=true;selectedId="";label.setText("");url.setText("");root.setText("PicaLibrary");user.setText("");password.setText("");selectVendor("generic");applyPreset(false);}
 
-    private void switchTarget(RemoteConfigStore.Config target){try{RemoteConfigStore.setActive(this,target.id);fill(target);updateStatus();status.setText(LocalizedText.ui("已切换到“")+target.label+LocalizedText.ui("”，正在刷新云端目录…"));refreshPortableState();}catch(Exception e){status.setText(LocalizedText.ui("切换失败：")+message(e));}}
+    private void switchTarget(RemoteConfigStore.Config target){try{RemoteConfigStore.setActive(this,target.id);fill(target);updateStatus();status.setText(t("已切换到“","Switched to ","切り替え先：")+target.label+t("”，正在刷新云端目录…","; refreshing cloud listing…","。クラウドの一覧を更新中…"));refreshPortableState();}catch(Exception e){status.setText(t("切换失败：","Switch failed: ","切り替え失敗：")+message(e));}}
 
     private RemoteConfigStore.Config formCandidate(){RemoteConfigStore.Config fallback=creating?null:RemoteConfigStore.find(this,selectedId);RemoteConfigStore.Preset preset=currentPreset();return RemoteConfigStore.candidate(selectedId,label.getText().toString(),preset.vendor,url.getText().toString(),root.getText().toString(),user.getText().toString(),password.getText().toString(),fallback);}
 
@@ -104,17 +104,17 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
         final RemoteConfigStore.Config candidate;
         try{candidate=formCandidate();}
         catch(Exception error){
-            status.setText(LocalizedText.ui("连接失败：")+message(error));
+            status.setText(t("连接失败：","Connection failed: ","接続失敗：")+message(error));
             return;
         }
         final boolean createRequest=creating;
         final String currentId=selectedId;
-        status.setText(save?LocalizedText.ui("正在保存并连接…"):LocalizedText.ui("正在测试…"));
+        status.setText(save?t("正在保存并连接…","Saving and connecting…","保存して接続中…"):t("正在测试…","Testing connection…","接続を確認中…"));
         new Thread(()->{try{
             boolean ok=new RemoteLibraryClient(candidate).test();RemoteConfigStore.Config saved=candidate;
             if(save&&ok){String saveId=createRequest?"remote-"+UUID.randomUUID().toString().replace("-","").substring(0,16):currentId;saved=RemoteConfigStore.saveTarget(this,saveId,candidate.label,candidate.vendor,candidate.baseUrl,candidate.root,candidate.username,candidate.password);try{cachePortableState();}catch(Exception ignored){}}
-            RemoteConfigStore.Config finalSaved=saved;runOnUiThread(()->{url.setText(finalSaved.baseUrl);status.setText(ok?(save?LocalizedText.ui("已保存并连接成功 · 当前：")+finalSaved.label:LocalizedText.ui("连接成功 · ")+finalSaved.label):LocalizedText.ui("连接不可用"));if(save&&ok){password.setText("");user.setText("");loadUi(finalSaved.id);}});
-        }catch(Exception e){runOnUiThread(()->status.setText(LocalizedText.ui("连接失败：")+message(e)));}}).start();
+            RemoteConfigStore.Config finalSaved=saved;runOnUiThread(()->{url.setText(finalSaved.baseUrl);status.setText(ok?(save?t("已保存并连接成功 · 当前：","Saved and connected · Active: ","保存・接続完了 · 使用中：")+finalSaved.label:t("连接成功 · ","Connection successful · ","接続成功 · ")+finalSaved.label):t("连接不可用","Connection unavailable","接続できません"));if(save&&ok){password.setText("");user.setText("");loadUi(finalSaved.id);}});
+        }catch(Exception e){runOnUiThread(()->status.setText(t("连接失败：","Connection failed: ","接続失敗：")+message(e)));}}).start();
     }
 
     private void deleteCurrent(){
@@ -129,8 +129,8 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
         try{ReaderSettingsStore.reconcile(this);}catch(Exception ignored){}UnifiedCatalogStore.reconcileLocalReferences(this);StoragePolicy.maintain(this);
     }
 
-    private void refreshPortableState(){RemoteConfigStore.Config active=RemoteConfigStore.load(this);if(!active.configured()){status.setText(LocalizedText.ui("请先保存一个网盘配置"));return;}status.setText(LocalizedText.ui("正在刷新“")+active.label+"”…");new Thread(()->{try{cachePortableState();runOnUiThread(()->{updateStatus();status.setText("“"+RemoteConfigStore.load(this).label+LocalizedText.ui("”云端状态已刷新"));});}catch(Exception e){runOnUiThread(()->status.setText(LocalizedText.ui("刷新失败：")+message(e)));}}).start();}
+    private void refreshPortableState(){RemoteConfigStore.Config active=RemoteConfigStore.load(this);if(!active.configured()){status.setText(t("请先保存一个网盘配置","Save a storage connection first","先に保存先の接続を保存してください"));return;}status.setText(t("正在刷新“","Refreshing ","更新中：")+active.label+"…");new Thread(()->{try{cachePortableState();runOnUiThread(()->{updateStatus();status.setText(RemoteConfigStore.load(this).label+t(" 云端状态已刷新"," · Cloud status refreshed"," · クラウドの状態を更新しました"));});}catch(Exception e){runOnUiThread(()->status.setText(t("刷新失败：","Refresh failed: ","更新失敗：")+message(e)));}}).start();}
 
-    private void updateStatus(){RemoteConfigStore.Config active=RemoteConfigStore.load(this);int count=RemoteConfigStore.targets(this).size();status.setText(active.configured()?LocalizedText.ui("已配置 ")+count+LocalizedText.ui(" 个网盘 · 当前：")+active.label:LocalizedText.ui("尚未配置远程存储"));}
-    private String message(Exception e){return e.getMessage()==null?"请检查配置":e.getMessage();}
+    private void updateStatus(){RemoteConfigStore.Config active=RemoteConfigStore.load(this);int count=RemoteConfigStore.targets(this).size();status.setText(active.configured()?t("已配置 ","Configured ","設定数：")+count+t(" 个网盘 · 当前："," storage connections · Active: "," 件 · 使用中：")+active.label:t("尚未配置远程存储","No remote storage configured","リモートストレージは未設定"));}
+    private String message(Exception e){return e.getMessage()==null?t("请检查配置","Check connection settings","接続設定を確認してください"):e.getMessage();}
 }

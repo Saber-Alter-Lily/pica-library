@@ -59,7 +59,9 @@ jobs:
         with:
           api-level: 35
           arch: x86_64
-          target: google_apis
+          # Avoid Pixel Launcher ANR overlays in synthetic visual evidence.
+          # The separate Android CI retains its existing emulator baseline.
+          target: aosp_atd
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true

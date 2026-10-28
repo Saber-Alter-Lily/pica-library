@@ -1,0 +1,54 @@
+name: S2 source-neutral module architecture evidence (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s2-source-contract-20261028
+    paths:
+      - '.github/workflows/s2-module-architecture.yml'
+      - 'scripts/audit-modules.ts'
+      - 'src/source-extensions/**'
+      - 'src/reader/**'
+      - 'src/services/online-reader-service.ts'
+      - 'test/unit/external-reader-boundary.test.ts'
+      - 'test/unit/module-dag-policy.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s2-architecture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  module-graph:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Resolve actual TypeScript imports, SCCs and prohibited reverse edges
+        run: |
+          mkdir -p architecture-evidence
+          pnpm exec tsx scripts/audit-modules.ts --output=architecture-evidence/module-graph.json
+      - name: Typecheck the unchanged runtime and new adapter
+        run: pnpm type:check
+      - name: Real Reader, revocation, DTO and forbidden-layer tests
+        run: pnpm exec vitest run test/unit/external-reader-boundary.test.ts test/unit/module-dag-policy.test.ts
+      - name: Keep bounded source-only architecture evidence
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s2-source-import-graph-${{ github.sha }}
+          path: architecture-evidence/module-graph.json
+          retention-days: 7
+          if-no-files-found: warn

@@ -271,7 +271,8 @@ export class SignedSourceDesktopReader {
                         },
                         comicId: entry.comicId,
                         title: null,
-                        channel: 'online',
+                        channel: 'signed',
+                        sessionId: session.id,
                         available: true,
                         progress: {
                             episodeId: entry.episodeId,

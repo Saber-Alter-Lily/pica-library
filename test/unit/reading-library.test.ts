@@ -24,6 +24,35 @@ describe('actual source-neutral reading-library query, no persistence/network/ru
         result.items[0].source.label = 'Changed output'
         expect(JSON.stringify(rows)).toBe(before)
     })
+    it('projects signed work only through a distinct session-owned channel, never legacy online', () => {
+        const sessionId = '64d223e0-5d29-4320-babb-5a2da654d345'
+        const signed = entry({
+            source: { key: 'signed-source:demo', label: 'demo' },
+            comicId: 'demo:book1', title: null,
+            channel: 'signed', sessionId, progress: position()
+        })
+        const item = new ReadingLibrary([{ id: 'signed', snapshot: () => [signed] }])
+            .query({ sourceKey: 'signed-source:demo' })
+        expect(item).toMatchObject({
+            total: 1,
+            items: [{
+                comicId: 'demo:book1',
+                routes: [{ channel: 'signed', sessionId, available: true }]
+            }]
+        })
+        const missing = new ReadingLibrary([{ id: 'signed', snapshot: () => [
+            entry({ ...signed, sessionId: undefined })
+        ] }]).query()
+        expect(missing).toMatchObject({
+            total: 0, complete: false,
+            issues: [{ port: 'signed', code: 'READING_STATE_UNAVAILABLE' }]
+        })
+        const spoofed = new ReadingLibrary([{ id: 'signed', snapshot: () => [
+            entry({ ...signed, channel: 'online' })
+        ] }]).query()
+        expect(spoofed).toMatchObject({ total: 0, complete: false })
+    })
+
     it('never merges identical titles or remote row IDs from different host/principal/source ownership', () => {
         const rows = ['principal-a', 'principal-b', 'other-host'].map(key => entry({ source: { key, label: key }, channel: 'hosted' }))
         expect(new ReadingLibrary([{ id: 'fixture', snapshot: () => rows }]).query().total).toBe(3)

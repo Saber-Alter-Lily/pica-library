@@ -67,3 +67,13 @@
 - **新增真实测试**：Linux/Windows Node 本地 HTTP 签名源测试扩充默认无控制器 403、手动断线重连、故障后旧 session 不可用、只读统一书库投影、同源图片授权和元数据 CSRF 反例；`reading-library.test.ts`、`reading-library-ui.test.ts`、`web-reader-progress.test.ts` 限定 signed route 与实际用户调用行为。专项工作流同时在 Linux 和 Windows 跑这些已有测试文件。
 
 **验证边界**：[首轮带 HTTP 签名源的双系统专项 #40712630322](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712630322) SUCCESS；同源原代码 [全项目 CI #40712643773](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712643773) SUCCESS，均只针对旧代码 `dd03822e`。本轮新增的错误依赖隔离、崩溃处理和用户点击链路需要 **新 SHA 的两平台专项与完整 CI**，未跑完前不能登记 PASS。正式发行者公钥、OS 受保护安装根、真实 Pica/E-H/JM 外置适配、Android Binder/纯 Core APK、旧用户升级/回滚仍 **NOT_IMPLEMENTED/NOT_VERIFIED**，G1–G4 OPEN。
+
+## 本轮精确 SHA 的双平台验收（2026-10-28）
+
+继承上轮通过的 `dd03822e` 之后，新的前端与依赖/安全变更已在 `4a13b65d` 的 [S3 Linux + Windows 专项 #40715552549](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40715552549) 得到 **SUCCESS（Linux 87/87；Windows 61/61）**。这次专项同时覆盖已有真实 IPC 进程、受签名代际管理、真实 HTTP 与带授权的图片请求、Reader 崩溃回收、默认禁用、不可从普通服务传递加载特权执行器、统一阅读进度投影、单独 signed 路由以及浏览器三语言签名来源按钮。全部使用受控合成源，不包含真实源账号和网络访问。
+
+相同源代码的 [全项目 CI #40715568582](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40715568582) 最后查询时仍 **QUEUED / NOT_VERIFIED**。上一版 `dd03822e` 的完整 [CI #40712643773](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712643773) SUCCESS 是历史证据，**不能替代新源码的完整 CI**。后续对正式 Windows 安装包/Android APK 的 G1–G4 验收仍未执行。
+
+统一书库通过的是**已连接签名源的会话限定恢复阅读**，而不是会话断开后自动重连、全来源收藏夹导入或常驻在线来源：页面仅在当前签名 session 已启用时获得可点击 signed route，并携带易失 UUID；禁源后的本地进度仍保留，重新连接必须用户明确操作。正常情况下没有有效官方公钥与受保护组件根，现行 Desktop 默认不会启用此入口。
+
+下一步必须将经过审计的正式发布者公钥及可信应用目录加入签名发行流程，并逐一迁移已有具体 Provider 协议，验证旧用户账号/收藏/下载/进度和真实双端读写，再证明纯 Core 安装包确实没有具体站点 SDK。**不因为本次专项 CI 全绿就宣布来源外置完成。**

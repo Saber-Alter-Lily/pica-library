@@ -81,6 +81,15 @@ describe('S3 first real existing-Provider extraction (no account)', () => {
         const image = await transport.media(album, pages[0].key)
         expect(image.contentType).toBe('image/jpeg')
         expect([...image.bytes]).toEqual([...jpeg])
+        // A malformed/oversized refreshed locator list must not evict
+        // already valid opaque tokens or expose the original image URL.
+        vi.spyOn(provider, 'pages').mockResolvedValueOnce([
+            { url: 'eh-page:' + 'x'.repeat(600) }
+        ] as unknown as Awaited<ReturnType<EhProvider['pages']>>)
+        await expect(transport.pages(album, chapters[0].id))
+            .rejects.toThrow('Invalid E-H page locator')
+        expect([...((await transport.media(album, pages[0].key)).bytes)])
+            .toEqual([...jpeg])
         await expect(transport.media(
             toEhPublicWorkerId('eh:124:abcdef1234'), pages[0].key
         )).rejects.toThrow(/not belong/)

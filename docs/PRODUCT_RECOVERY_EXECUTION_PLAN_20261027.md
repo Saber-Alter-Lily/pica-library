@@ -3,10 +3,10 @@
 ## 2026-10-28 开发优先级调整（用户已授权；S1 验收不豁免）
 
 - 本轮停止围绕模拟器截图测试反复优化；已通过自动视觉矩阵不等于 G1 用户/设备验收。S1 残余问题继续登记为发布阻断，但**不再阻断独立 Draft 中 S2/S3 的受控架构研发**。
-- 新增 [Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219)，从 PR #218 冻结头 \`6e5c1a4a\` 分支，仅从 Android/UI 主线隔离来源依赖研发；当前正式 \`v0.5.0\`、\`main\`、OTA 与真实用户数据不变。
-- S2-01 开始使用已有 TypeScript AST 来导出项目真实 import 图及 runtime SCC，CI 阻止核心 Reader 反向依赖具体 SDK；S2-02 使用原有 \`OnlineReaderService\` 插入可撤销的来源中立 transport，先以 synthetic Reader 实际章节/媒体/进度链作为原型。
+- 新增 [Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219)，从 PR #218 冻结头 `6e5c1a4a` 分支，仅从 Android/UI 主线隔离来源依赖研发；当前正式 `v0.5.0`、`main`、OTA 与真实用户数据不变。
+- S2-01 开始使用已有 TypeScript AST 来导出项目真实 import 图及 runtime SCC，CI 阻止核心 Reader 反向依赖具体 SDK；S2-02 使用原有 `OnlineReaderService` 插入可撤销的来源中立 transport，先以 synthetic Reader 实际章节/媒体/进度链作为原型。
 - 以上只是 **IMPLEMENTED_IN_DRAFT / CI_PENDING**。核心 Android/Windows 安装包仍包含具体来源 SDK，S3 来源签名/安装/撤销/运行隔离尚未完成；无源安装和正式迁移未验证，G2/G3/G4 仍 OPEN。
-- 执行和验收资料：\`docs/S2_SOURCE_BOUNDARY_20261028.md\`、现有 \`docs/PRODUCT_RECOVERY_S2_S3_SOURCE_DEPENDENCY_AUDIT_20261027.md\`、旧42+新增12 验收表。接续先核 CI，后推 composition root 与真正 IPC，不改变用户书库/模型/身份语义。
+- 执行和验收资料：`docs/S2_SOURCE_BOUNDARY_20261028.md`、现有 `docs/PRODUCT_RECOVERY_S2_S3_SOURCE_DEPENDENCY_AUDIT_20261027.md`、旧42+新增12 验收表。接续先核 CI，后推 composition root 与真正 IPC，不改变用户书库/模型/身份语义。
 
 ---
 

@@ -421,12 +421,24 @@ export async function startLibraryServer(options: {
                 // including binary page reads; no direct script/install upload.
                 const peer = request.socket.remoteAddress ?? ''
                 const expectedOrigin = `http://${request.headers.host}`
+                let referrerOrigin = ''
+                try {
+                    referrerOrigin = new URL(
+                        String(request.headers.referer ?? '')
+                    ).origin
+                } catch { /* no referrer is not same-origin proof */ }
+                // Browsers do not reliably send an Origin header on GET.
+                // Accept only a same-origin fetch with matching referrer,
+                // or an explicitly originating trusted Desktop client.
+                const sameOriginRead = request.method === 'GET' &&
+                    request.headers['sec-fetch-site'] === 'same-origin' &&
+                    referrerOrigin === expectedOrigin
                 const authorized =
                     Boolean(options.desktop?.signedSourceReader) &&
                     Boolean(options.desktop?.configured()) &&
                     options.desktop?.status().startupReady !== false &&
                     /^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) &&
-                    origin === expectedOrigin &&
+                    (origin === expectedOrigin || sameOriginRead) &&
                     request.headers['x-pica-csrf'] === options.desktop?.csrfToken
                 if (!authorized)
                     return json(response, 403, { error: 'Signed source Desktop authority required' })
@@ -439,8 +451,10 @@ export async function startLibraryServer(options: {
                             request.headers['content-type'] ?? ''
                         )) throw new SignedReaderInputError()
                         const deadline = setTimeout(() => request.destroy(), 5000)
-                        try { return await body(request, 2048) }
-                        finally { clearTimeout(deadline) }
+                        try {
+                            try { return await body(request, 2048) }
+                            catch { throw new SignedReaderInputError() }
+                        } finally { clearTimeout(deadline) }
                     }
                     if (url.pathname === '/api/v1/desktop/signed-reader') {
                         if (request.method !== 'POST')

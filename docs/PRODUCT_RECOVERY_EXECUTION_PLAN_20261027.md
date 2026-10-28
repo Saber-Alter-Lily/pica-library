@@ -1,6 +1,16 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
-日期：2026-10-27。状态：**S0 IN_PROGRESS；S1 PLANNED；S2–S6 PLANNED**。本文件是下一轮开发的执行权威，不是已完成证明。
+日期：2026-10-27。**最新执行状态：S0 IN_PROGRESS；S1 IN_PROGRESS；S2 IN_PROGRESS（有限来源归属端口）；S3–S6 PLANNED。G1/G2/G3/G4 尚未验收。** 本文件是工作计划，实际完成证据以当前分支日志与精确 Actions 结果为准。
+
+## 2026-10-27 执行检查点（以后续成功/失败证据为准）
+
+- **正式版与边界**：对照仍为 v0.5.0，生产 main `095d6910c34e00824e03b08a30af0ce4e708137e`。主开发 Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 从冻结 Dev89 #217 继承，不合并正式分支、不触碰 Release/OTA/用户数据。
+- **S1-04 有效实证**：Android 35 模拟器 [#40620663666](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666) 源码 `cab5067c` **SUCCESS**，10 次独立 Instrumentation PASS；100% 和 150% 字体各 9 张 PNG，共 18 张；已验证章节 0 来源、3 配对、5 下载、7 更新的真实 VSpot 与跳过不记已读。更新章保持只读预览。原始截图/日志 [#12787147081](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666/artifacts/12787147081) 短期保存。不能据此认定另外四章、多语言/深色/实体手机或用户满意。
+- **S1-03 已提交候选**：设置行窄宽度、选中栏两行、标签标题、下载界面中英日资源与有界按钮、账户来源三语、指南默认聚光优先。回归中保留曾经失败的第0章旧截图测试；新 UI 仍需完整真机交互和正式版功能对照。
+- **CI**：`079b9e37` Web/Desktop 曾 2638PASS/3FAIL/14SKIP；修复 `34ffaa1` 保留原 Host 冻结哈希、动态 QA 后缀与本地化断言，`34ffaa1` 与 `cab5067` Web/Desktop 作业经 GitHub 重新核实 SUCCESS，但不等于两作业组成的整套 CI PASS。Android 全量作业仍在运行；为区别卡住与真实失败添加限时定向 [S1 Robolectric workflow](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/s1-android-focused-unit.yml)，源码 `b44b9f97`，最新运行结论需回查，不提前填 PASS。
+- **S0 风险**：`PhoneDownloadStore.load()` 读错返回空索引、`save()` 删除旧文件再替换，存在**潜在**索引持久性问题，需隔离错误注入与 AtomicFile/回滚兼容设计；不是实测用户数据丢失，也未修改真实索引。
+- **S2/S3 状态**：已添加来源身份绑定的图片路由并要求 cache hit 前校验归属；Pica/E-H/JM SDK/协议尚未从全部核心发行物真正外置，G2 不通过。
+- **下一步**：先看新 Android 全量与定向测试结果，纠正真实失败；继续 S1-04 章节 1/2/4/6 实控件聚光，补 360/393/480dp × 字体100/130/150% × 中英日 × 浅深代表性截图，再执行真实手机/Windows 功能对照。之后以 S2→S3 主线拆来源，S4 标签/推荐/同步，S5 升级/数据回滚，S6 集中验收为序。旧 42 + 新 12 案例全保留；未经逐项执行不重判。
 
 ## 权威基线与产品定位
 

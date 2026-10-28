@@ -1,4 +1,18 @@
 # Pica Library Development Task Log
+## 当前执行权威快照｜2026-10-27 产品恢复 S0–S6
+
+**本段更新最近结果，以下历史段落均为各自时间点的原始记录，不自动改写。** 仍基于 Stable v0.5.0 + [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)；正式 main `095d6910`、Release、OTA、安装与生产资料未改。当前阶段 S0 IN_PROGRESS、S1 IN_PROGRESS、S2 有限安全端口 IN_PROGRESS，S3–S6 PLANNED；G1 用户验收 NOT_ACCEPTED，G2/G3/G4 OPEN。
+
+- **实际成功：** `cab5067c` 的 [Android35 模拟器 #40620663666](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666) 10/10 Instrumentation PASS，18 张真实 PNG（100%/150%字体各9张）。已验证第0/3/5/7章真实 VSpot 两步、跳过不记已读；更新导览只读。有效证据 [#12787147081](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666/artifacts/12787147081)。不是全八章、多语言、真机或用户 ACCEPTED。
+- **已修复旧静态测试漂移：** `34ffaa1` 将原先 3 个 Web/Desktop 失败契约对应到现有 QA 安装隔离、多语言资源、来源归属路由；**保留冻结 Host 哈希及原测试，无删减。** [此 SHA 的 Web/Desktop 作业](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620102405) 已实际 SUCCESS；Android 全量 CI 终态及后续源码须另核对。
+- **新增聚焦单测基础设施：** `b44b9f97` 添加限时 Android Robolectric 工作流，执行本批账户/下载/高级引导相关真实测试，上传原始 JUnit 结果。新增工作流的首轮运行状态只以 Actions 原始结果为准。
+- **尚未达标：** 四个高级章节 1/2/4/6、三语/深浅/多设备完整视觉矩阵、用户提出的具体手机缺陷全链路复现、物理手机验收、Windows 功能对等、纯核心包去除所有来源 SDK、正式签名覆盖升级、全量42+12案例复测。
+- **新增潜在风险未修复：** `PhoneDownloadStore` 索引损坏与不原子替换路径需 S0/S5 独立故障注入和回滚方案；尚无现实事故证据，不改动用户数据。
+
+**近期下一动作**：先处理当前 Android 全量 CI 与定向测试真实失败，再补 S1 的其余四章及真实屏宽/字体/语言证据；在 G1 通过前不宣布架构与完整产品验收。工作计划见 [S0–S6](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md)，历史 42 项与新增 12 项分别沿用 [验收映射](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。
+
+---
+
 ## S1 真实截图整改、QA2 产物校验与 QA3 数据隔离（2026-10-27）
 
 当前代码最新提交 `a28404e7fbdbad20906688a9fd0814bd1f658acd`，仍为 [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)，`main`、正式 v0.5.0、Release/OTA 与用户生产资料均未改变。**G1 用户验收、G2 来源外置、G3 旧版无损升级、G4 正式发布仍 OPEN**。

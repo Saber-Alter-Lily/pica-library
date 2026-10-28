@@ -1,3 +1,10 @@
+## S1-02 + S4 标签页 CI 真失败 / 多语言矩阵脚本故障收口（2026-10-27，新提交待复验）
+
+- **两个独立问题不混淆**：旧 `a0f2d9` 和 `061b2c1` 的完整 Android [CI #40629479729](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629479729)、[#40629559940](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629559940) 的 `:app:testDebugUnitTest` 都报告 `TagParticipationActivityTest.headerFitsEnglishNarrowPhoneWithoutCoveringBack` 第66行 FAIL：原生标签编辑器在360dp英语下的标题起始位置和返回按钮间距不足。保留断言，并在真正页面的紧凑返回键上预留72dp最小宽度/触控面积，保留标题动态换行；单测增强为实际控件边界比较，不仅依赖绝对40dp阈值。
+- **矩阵的 #40629907105 工作流 FAIL 原因不同**：首个 `zhCN-light-w360-f100` 案例已完成真实六页 Instrumentation PASS、六张PNG和README；调用 `adb` 后因为用重定向的 here-doc 作为 `while read` 标准输入，余下8行案例被子进程消费，最后 `count==9` 校验失败。不是该中文组合的渲染失败。修复为先 `mapfile -t scenarios` 读取全部九条，再迭代内存数组，保留 `count==9` 严格校验。
+- 矩阵额外增加第七个真实页面 **TagParticipationActivity**（标签参与编辑器），覆盖中英日和深浅/字号九组组合并直接比较 Tag 标题与返回控件坐标，新目标从54张提高至 **63张**，这是目标不是通过实证。完整单测与九案例要以最新 exact-SHA 的 Actions 日志/实际工件为准。
+- 不触及来源配置、正式 APK/OTA、真实下载、自动帐密或既有用户数据。
+
 ## S0→S5 下载索引持久性风险：隔离源码整改候选（未正式数据迁移）
 
 - 已核对 `PhoneDownloadStore` 旧实现：JSON损坏/读取异常直接返回空索引；写入先删除原文件，再以 `.tmp` 重命名；`remove()` 更在索引提交前删除已下载的实际页面。存在可解释的数据丢失风险，未有真实用户事故证据。

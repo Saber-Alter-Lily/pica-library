@@ -69,8 +69,16 @@ public class TagParticipationActivity extends LocaleAwareActivity {
         LinearLayout bar=new LinearLayout(this);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(Ui.dp(this,8),Ui.dp(this,4),Ui.dp(this,8),Ui.dp(this,4));
-        bar.addView(Ui.button(this,tr("‹ 返回","‹ Back","‹ 戻る"),v->close(),true));
+        // A small intrinsic compact back button can collapse below 40dp in
+        // English at 360dp. Reserve a real touch/reading target before the
+        // weighted heading so translated titles never overlap the navigation.
+        Button back=Ui.button(this,tr("‹ 返回","‹ Back","‹ 戻る"),v->close(),true);
+        back.setMinimumWidth(Ui.dp(this,72));
+        back.setMinWidth(Ui.dp(this,72));
+        back.setTag("tag-participation-back");
+        bar.addView(back,new LinearLayout.LayoutParams(-2,-2));
         TextView heading=Ui.text(this,tr("用于推荐的标签","Recommendation tag scope","おすすめに使うタグ"),20,Ui.TEXT,true);
+        heading.setMaxLines(2);
         heading.setTag("tag-participation-heading");
         // Reserve width for the back control; long English/Japanese text wraps instead of leaving the screen.
         bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));

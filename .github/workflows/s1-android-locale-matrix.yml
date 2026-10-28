@@ -14,6 +14,8 @@ on:
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationStyleActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RemoteStorageActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/TagParticipationActivity.java'
+      - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/TagParticipationActivityTest.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsRow.java'
       - 'mobile/android-alpha2/app/src/main/res/**/guide_strings.xml'
       - 'mobile/android-alpha2/app/src/main/res/**/account_sources_strings.xml'
@@ -50,7 +52,7 @@ jobs:
           test -e /dev/kvm || exit 1
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
-      - name: Real six-page Android UI under nine representative scenarios
+      - name: Real seven-page Android UI under nine representative scenarios
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35

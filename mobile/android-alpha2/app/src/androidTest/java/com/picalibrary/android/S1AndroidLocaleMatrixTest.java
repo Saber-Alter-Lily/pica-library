@@ -24,10 +24,11 @@ public final class S1AndroidLocaleMatrixTest {
     private static final String TAG="S1_MATRIX";
     private static final Class<? extends Activity>[] PAGES=new Class[]{
         AdvancedGuideActivity.class,AccountSourcesActivity.class,DownloadsActivity.class,
-        RecommendationStyleActivity.class,RemoteStorageActivity.class,PairingActivity.class
+        RecommendationStyleActivity.class,RemoteStorageActivity.class,PairingActivity.class,
+        TagParticipationActivity.class
     };
     private static final String[] NAMES={
-        "guide","sources","downloads","recommendation","webdav","pairing"
+        "guide","sources","downloads","recommendation","webdav","pairing","tags"
     };
 
     @Test public void sixRealPagesRenderAtRequestedLocaleThemeFontAndWidth() throws Exception {
@@ -92,6 +93,16 @@ public final class S1AndroidLocaleMatrixTest {
                         anchor=decor.findViewWithTag(AndroidOnboarding.ADV_REMOTE_VENDOR);
                     else if(current instanceof PairingActivity)
                         anchor=decor.findViewWithTag(AndroidOnboarding.ADV_PAIR_MANUAL);
+                    else if(current instanceof TagParticipationActivity){
+                        anchor=decor.findViewWithTag("tag-participation-heading");
+                        View back=decor.findViewWithTag("tag-participation-back");
+                        assertNotNull("Tag editor missing actual back control",back);
+                        assertNotNull("Tag editor missing actual heading",anchor);
+                        android.graphics.Rect left=new android.graphics.Rect(),right=new android.graphics.Rect();
+                        assertTrue("Back control not in viewport",back.getGlobalVisibleRect(left));
+                        assertTrue("Tag heading not in viewport",anchor.getGlobalVisibleRect(right));
+                        assertTrue("Tag heading overlaps back",right.left>=left.right);
+                    }
                     assertNotNull(page+": actual control is missing",anchor);
                     assertTrue(page+": actual control is not visible",anchor.isShown());
                 });

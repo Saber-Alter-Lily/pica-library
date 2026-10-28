@@ -58,12 +58,19 @@ public class TagParticipationActivityTest {
             content.layout(0,0,width,height);
             TextView heading=(TextView)find(activity,"tag-participation-heading");
             assertNotNull(heading);
+            View back=find(activity,"tag-participation-back");
+            assertNotNull("tag heading needs an actual back control",back);
+            assertTrue("back must have a readable touch width",back.getMeasuredWidth()>=Ui.dp(activity,64));
             assertTrue("heading must have usable width",heading.getMeasuredWidth()>Ui.dp(activity,100));
             android.graphics.Rect bounds=new android.graphics.Rect();
             heading.getDrawingRect(bounds);
             content.offsetDescendantRectToMyCoords(heading,bounds);
             assertTrue("heading clips outside narrow screen: "+bounds,bounds.right<=width);
             assertTrue("heading must not overlap back control",bounds.left>Ui.dp(activity,40));
+            android.graphics.Rect backBounds=new android.graphics.Rect();
+            back.getDrawingRect(backBounds);
+            content.offsetDescendantRectToMyCoords(back,backBounds);
+            assertTrue("heading overlaps actual back control",bounds.left>=backBounds.right);
         }
     }
 

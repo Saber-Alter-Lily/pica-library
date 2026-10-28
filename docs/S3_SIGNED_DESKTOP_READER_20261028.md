@@ -54,3 +54,16 @@
 在取得 PR #222 的两平台真实 HTTP 验收后，下一步**不再新增一个 synthetic worker**：选择一个现有 Provider 的来源读取链，保留旧的库身份与已下载数据，验证其请求/凭据代理如何穿过进程 IPC，同时保持本地/CBZ/WebDAV 完全独立。然后才建立官方可信发布根、实际 Windows 安装组件与签名、Android Binder 服务和纯核心包的物理外置。
 
 **法律与安全边界**：用户自己添加来源不构成普遍的版权或平台条款免责；未审核的用户代码不能因为“签名字段存在”就取得应用完整权限。同用户身份的 Node 进程不等于 OS 沙箱。任何生产发布必须明确说明这一点。
+
+## 2026-10-28 接续：真正的同一 Reader UI 与默认进程边界
+
+本轮在先前 HTTP 成功基础上补充真实用户可点击链路，而不是把签名源伪装成 legacy `online`：
+
+- **保护默认桌面安装**：把 `SignedReaderInputError` 移入零依赖的 `src/source-extensions/signed-reader-errors.ts`，`src/library/server.ts` 仅 `import type` 签名组件控制器，默认 HTTP 服务不得递归导入 `SignedWorkerStore`、`TrustedSourceProcess` 或 `src/desktop/signed-source-reader.ts` 的运行时执行器。实际 TypeScript AST/解析后的运行时依赖闭包与人工注入的违规依赖均进入 `module-dag-policy` 自动测试。
+- **崩溃后回收**：当签名源子进程崩溃或提前退出，`SignedSourceDesktopReader` 的查询/连接入口可清理失效会话，但**绝不自行 fork/restart**；必须由用户明确发起下一次 connect。重新选择相同签名版本不会不必要地断开健康会话，且 `connected` 状态不再错误显示为 false。
+- **业务身份隔离**：统一阅读投影新增独立 `signed` 通道和易失 `sessionId`，拒绝把签名源假装成旧 `online` 路由，缺少有效 session 的行 fail-closed。已连接组件的阅读进度进入现有 `ReadingLibrary` 只读查询、用户记录的 `signed-source-progress-v1:<sourceId>` 依旧独立；来源停用后行不可再声称可读，不删除原有进度。不存在来源目录写入、云端同步或下载的隐式副作用。
+- **复用现有 Web Reader**：`web/reading-library.js` 增加中英日签名源阅读按钮，调用 `openSigned(comicId, sessionId)` 而非普通在线 Provider；`web/app.js` 保留原来的 Reader、章节导航、滚动/分页模式和进度写入算法，仅在明确签名 session 时切换 API root 与 CSRF 头。普通 Pica/E-H/JM、本地文件和 Host 路径不改写。
+- **图片例外非常有限**：浏览器原生 `<img>` 不能附加 CSRF 头，因此仅当**同源、匹配 Referrer、`Sec-Fetch-Site:same-origin`、`Sec-Fetch-Dest:image`、无异源 Origin，且请求落在签名 session 的确切 `/pages/<index>`** 时允许无 CSRF 的 GET 图像；所有管理、章节元数据、进度及其他 HTTP 请求继续要求应用已有的 loopback+Origin/CSRF 授权。响应仍标注 `no-store`、`nosniff`、同源资源策略。不能把无 CSRF 图像例外扩大成任意 GET。
+- **新增真实测试**：Linux/Windows Node 本地 HTTP 签名源测试扩充默认无控制器 403、手动断线重连、故障后旧 session 不可用、只读统一书库投影、同源图片授权和元数据 CSRF 反例；`reading-library.test.ts`、`reading-library-ui.test.ts`、`web-reader-progress.test.ts` 限定 signed route 与实际用户调用行为。专项工作流同时在 Linux 和 Windows 跑这些已有测试文件。
+
+**验证边界**：[首轮带 HTTP 签名源的双系统专项 #40712630322](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712630322) SUCCESS；同源原代码 [全项目 CI #40712643773](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712643773) SUCCESS，均只针对旧代码 `dd03822e`。本轮新增的错误依赖隔离、崩溃处理和用户点击链路需要 **新 SHA 的两平台专项与完整 CI**，未跑完前不能登记 PASS。正式发行者公钥、OS 受保护安装根、真实 Pica/E-H/JM 外置适配、Android Binder/纯 Core APK、旧用户升级/回滚仍 **NOT_IMPLEMENTED/NOT_VERIFIED**，G1–G4 OPEN。

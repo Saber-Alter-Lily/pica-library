@@ -21,6 +21,8 @@ export interface SignedReaderIdentityBridge {
         access: ExternalReaderAccess
     ): { source: OnlineReaderSource; contract: OnlineReaderContract }
     ownsComicId(comicId: string): boolean
+    /** Optional app-owned catalogue projection identity for legacy migration. */
+    readingSource?: Readonly<{ key: string; label: string }>
 }
 
 interface SignedSession {
@@ -287,8 +289,10 @@ export class SignedSourceDesktopReader {
                         continue
                     rows.push({
                         source: {
-                            key: 'signed-source:' + session.sourceId,
-                            label: session.sourceId
+                            key: this.identityBridges.get(session.sourceId)?.readingSource?.key ??
+                                'signed-source:' + session.sourceId,
+                            label: this.identityBridges.get(session.sourceId)?.readingSource?.label ??
+                                session.sourceId
                         },
                         comicId: entry.comicId,
                         title: null,

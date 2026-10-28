@@ -50,8 +50,26 @@ function fixture() {
 afterEach(() => {
     vi.restoreAllMocks()
     for (const store of stores.splice(0)) store.close()
-    for (const folder of tempRoots.splice(0))
-        fs.rmSync(folder, { recursive: true, force: true })
+    for (const folder of tempRoots.splice(0)) {
+        // Signed QA generations are deliberately read-only. Windows will
+        // sometimes deny recursive removal until their attributes are reset
+        // and a newly killed child releases the worker.cjs file handle.
+        if (process.platform === 'win32') {
+            const versions = path.join(folder, 'workers', 'demo', 'versions')
+            if (fs.existsSync(versions)) {
+                for (const version of fs.readdirSync(versions)) {
+                    for (const name of ['worker.cjs', 'release.json']) {
+                        const location = path.join(versions, version, name)
+                        if (fs.existsSync(location))
+                            fs.chmodSync(location, 0o600)
+                    }
+                }
+            }
+        }
+        fs.rmSync(folder, {
+            recursive: true, force: true, maxRetries: 20, retryDelay: 150
+        })
+    }
 })
 
 describe('S3 signed source generations: real worker lifecycle', () => {

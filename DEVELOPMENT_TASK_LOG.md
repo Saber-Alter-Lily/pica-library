@@ -1,4 +1,19 @@
 # Pica Library Development Task Log
+## S1 人工视觉验收接续｜2026-10-27 · 63张截图复核与新版门禁
+
+**当前事实基线：** Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)，业务最新候选 `e44de731`，正式 v0.5.0 / 生产 `main` `095d6910` / OTA / 用户资料均未改。S1 = IN_PROGRESS，G1 USER_ACCEPTANCE = NOT_ACCEPTED；S2/S3 来源 SDK 真正外置与 S5 老用户数据升级仍未完成。
+
+- **八章真实 VSpot**：`b5e134f` [Android 35 #40622970105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105) 18/18 Instrumentation PASS、40 张实际截图；`8e581ea` 的 [#40629907241](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907241) 同类专项 SUCCESS。仅中文/浅色/360dp/字体100和150%，不等于真机和其他组合验收。
+- **九组实页矩阵自动通过但人工视觉不通过**：`d8b7f4` 的 [#40632432541](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40632432541) 9/9 Android Instrumentation SUCCESS、63 PNG，涵盖 3 语言、2 主题、360/393/480dp、100/130/150% 字体的代表性九组，每组七页。已下载全部图并逐页人工审视，**至少七张为空白转场帧**（尚不能断言程序持续白屏）；标签页图多次停在“读取本地标签”，WebDAV 深色下拉文本与背景低对比、英日页面混有中文。故此阶段**视觉质量 FAIL/OPEN**，不因自动 PASS 偷换验收结论。
+- **修复候选**：`8eb0c11` 新增深浅主题显式前景色 Spinner 与 WebDAV 13 厂商 UI-only 翻译，保留原厂商 ID/地址和数据结构；`9d86fda`、`c4e435c`、`e44de731` 补 WebDAV 初始标签、表单提示、状态和删除确认三语，新增 `RemoteStorageVisualContractTest`；`3a39ef1` 同步修复高级指南章节/标签筛选 Spinner 对比度并加入深色回归。所有均为 Draft 源码，**新 SHA 尚未得到完整模拟器、Android CI 和真机验收**。
+- **真正的截图门禁**：`c4e435c` 在 S1 语言矩阵中加入真实内容已绘制的像素/主题检查与重试，标签页先等到真正标签操作按钮加载完成，超时 FAIL，绝不保存纯白帧当 PASS。此约束可能暴露真实耗时/加载失败，应保留最新运行日志而非放宽阈值。
+- **单元测试已核实的历史部分**：`7b5cbcc` Robolectric [#40629290421](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629290421) 5/5 组 SUCCESS；`8e581ea` 原子下载索引合成回归测试成功。旧全量 CI `b0db300` [#40630048456](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40630048456) 为516测试中1条标签英语窄屏布局断言 FAIL；`d8b7f4` 更正后 `e42919a` 的定向标签单测 SUCCESS，但 **最新候选全量 Android CI 仍需单独确认**。
+- **当前精确源码门禁**：[真实九组矩阵](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695)、[八章模拟器](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706)、[定向 Robolectric](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745752)、[全量 CI](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634752986) 均在最近查询时未有最终结论，不得判成 PASS。
+
+**下一步优先顺序**：检查上述精确 SHA 的实际成功/失败与新图，修复仍空白或读不清的页面；真实 Android OEM 设备复核、Windows/v0.5.0 功能对照；之后按 S2→S3 来源解耦、S4 Issue #199/#200/推荐、S5 原子索引/迁移/升级回滚、S6 双端发布推进。历史42+新增12案例原文和状态继续保留。
+
+---
+
 ## S0/S1 当前新增回执｜2026-10-27：标签英语窄屏与九组脚本失败分类
 
 - 旧 [Android CI #40629479729](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629479729)、[#40629559940](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629559940) 的 Android job 是实际 **FAIL**，失败测试精确定位 `TagParticipationActivityTest.headerFitsEnglishNarrowPhoneWithoutCoveringBack` 第66行（标题起点不应贴住紧凑返回键）。`d8b7f4c` 在正式标签页加至少72dp返回控制宽度、标题最多两行，并强化原测试的实际 back/title 几何边界检查。仍以新 SHA Android 复测判定是否真的修好。

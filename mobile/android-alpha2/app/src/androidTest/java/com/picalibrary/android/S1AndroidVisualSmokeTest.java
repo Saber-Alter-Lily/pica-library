@@ -232,6 +232,92 @@ public final class S1AndroidVisualSmokeTest {
         }
     }
 
+
+    /** Actual Activity and VSpot controls; no downloads or source actions are initiated. */
+    @Test public void captureRealDownloadsSpotlightWithoutStartingTasks() throws Exception {
+        prepare();
+        Context context=app();
+        LocaleStore.set(context,LocaleStore.ZH_CN);
+        context.getSharedPreferences("appearance-v1",Context.MODE_PRIVATE)
+            .edit().putString("mode",ThemeStore.MODE_LIGHT).commit();
+        Intent intent=new Intent(context,DownloadsActivity.class)
+            .putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,5)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Instrumentation inst=InstrumentationRegistry.getInstrumentation();
+        Instrumentation.ActivityMonitor monitor=inst.addMonitor(
+            DownloadsActivity.class.getName(),null,false);
+        DownloadsActivity activity=null;
+        Log.i(TAG,"phase=downloads-spotlight-launch");
+        try{
+            context.startActivity(intent);
+            Activity observed=monitor.waitForActivityWithTimeout(20000);
+            assertNotNull("Downloads Activity did not start",observed);
+            assertTrue("Unexpected page for chapter 5",observed instanceof DownloadsActivity);
+            activity=(DownloadsActivity)observed;
+            final DownloadsActivity screen=activity;
+            Log.i(TAG,"phase=downloads-activity-observed");
+            AtomicReference<VSpotView> current=new AtomicReference<>();
+            for(int attempt=0;attempt<60;attempt++){
+                inst.runOnMainSync(()->{
+                    View decor=screen.getWindow().getDecorView();
+                    if(!(decor instanceof ViewGroup))return;
+                    ViewGroup group=(ViewGroup)decor;
+                    for(int i=0;i<group.getChildCount();i++){
+                        View child=group.getChildAt(i);
+                        if(child instanceof VSpotView&&((VSpotView)child).isShowing())
+                            current.set((VSpotView)child);
+                    }
+                });
+                if(current.get()!=null&&current.get().getCurrentStep()!=null)break;
+                SystemClock.sleep(150);
+            }
+            assertNotNull("Downloads chapter must show an actual VSpot",current.get());
+            AtomicReference<String> firstTag=new AtomicReference<>();
+            AtomicReference<Integer> stepCount=new AtomicReference<>();
+            AtomicReference<Integer> firstIndex=new AtomicReference<>();
+            AtomicReference<Boolean> storageExists=new AtomicReference<>(false);
+            inst.runOnMainSync(()->{
+                VSpotView overlay=current.get();
+                stepCount.set(overlay.getStepCount());
+                firstIndex.set(overlay.getCurrentIndex());
+                View target=overlay.getCurrentTargetView();
+                firstTag.set(target==null?null:String.valueOf(target.getTag()));
+                storageExists.set(screen.getWindow().getDecorView()
+                    .findViewWithTag(AndroidOnboarding.ADV_DOWNLOAD_STORAGE)!=null);
+            });
+            assertEquals(Integer.valueOf(2),stepCount.get());
+            assertEquals(Integer.valueOf(0),firstIndex.get());
+            assertEquals(AndroidOnboarding.ADV_DOWNLOAD_TASKS,firstTag.get());
+            assertTrue("Real storage settings control missing",storageExists.get());
+            Log.i(TAG,"phase=downloads-spotlight-visible");
+            SystemClock.sleep(240);
+            saveSpotlightImage(context,"downloads-spotlight-1");
+            AtomicReference<String> secondTag=new AtomicReference<>();
+            AtomicReference<Integer> secondIndex=new AtomicReference<>();
+            inst.runOnMainSync(()->{
+                current.get().next();
+                secondIndex.set(current.get().getCurrentIndex());
+                View target=current.get().getCurrentTargetView();
+                secondTag.set(target==null?null:String.valueOf(target.getTag()));
+            });
+            assertEquals(Integer.valueOf(1),secondIndex.get());
+            assertEquals(AndroidOnboarding.ADV_DOWNLOAD_STORAGE,secondTag.get());
+            SystemClock.sleep(240);
+            saveSpotlightImage(context,"downloads-spotlight-2");
+            inst.runOnMainSync(()->current.get().dismiss());
+            SystemClock.sleep(480);
+            assertFalse("Skip must not mark download chapter read",
+                OnboardingStore.advancedRead(context).contains("5"));
+            Log.i(TAG,"phase=downloads-spotlight-skipped-without-starting-tasks");
+        }finally{
+            inst.removeMonitor(monitor);
+            if(activity!=null){
+                DownloadsActivity closing=activity;
+                inst.runOnMainSync(()->{if(!closing.isFinishing())closing.finish();});
+            }
+        }
+    }
+
     private void saveSpotlightImage(Context context,String name) throws Exception {
         String font=InstrumentationRegistry.getArguments().getString("expectedFontScale","1.0");
         String folder=Float.parseFloat(font)>=1.3f?"f150":"f100";

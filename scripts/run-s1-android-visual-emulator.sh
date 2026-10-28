@@ -75,6 +75,30 @@ for scale in 1.0 1.5; do
             > "s1-visual-evidence/$folder/$proof"
         test -s "s1-visual-evidence/$folder/$proof"
     done
-    printf 'stage=guide-plus-two-real-vspot-steps font_scale=%s captured=3 source_sha=%s\n' \
+    # Stage-3: exercise the real download page's tasks and storage spotlight without tapping either.
+    task_log="s1-visual-evidence/${folder}-downloads-instrumentation.txt"
+    task_trace="s1-visual-evidence/${folder}-downloads-logcat.txt"
+    adb logcat -c || true
+    set +e
+    timeout --signal=TERM --kill-after=10s 150s adb shell am instrument -w -r \
+        -e expectedFontScale "$scale" \
+        -e class com.picalibrary.android.S1AndroidVisualSmokeTest#captureRealDownloadsSpotlightWithoutStartingTasks \
+        com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner > "$task_log" 2>&1
+    task_exit=$?
+    set -e
+    adb logcat -d -s S1_VISUAL:I AndroidRuntime:E > "$task_trace" || true
+    cat "$task_log"
+    grep "S1_VISUAL" "$task_trace" || true
+    if [[ "$task_exit" -ne 0 ]] || ! grep -Fq 'OK (1 test)' "$task_log"; then
+        echo "::error::S1 downloads spotlight failed/timeout ($folder exit=$task_exit)" >&2
+        exit 1
+    fi
+    for phase in 1 2; do
+        proof="zhCN-light-downloads-spotlight-$phase.png"
+        adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$proof" \
+            > "s1-visual-evidence/$folder/$proof"
+        test -s "s1-visual-evidence/$folder/$proof"
+    done
+    printf 'stage=guide-source-downloads-vspot font_scale=%s captured=5 source_sha=%s\n' \
         "$scale" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
 done

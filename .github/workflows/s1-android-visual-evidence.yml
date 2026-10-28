@@ -10,8 +10,10 @@ on:
       - 'scripts/run-s1-android-visual-emulator.sh'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AdvancedGuideActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AccountSourcesActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AndroidOnboarding.java'
       - 'mobile/android-alpha2/app/src/main/res/**/account_sources_strings.xml'
+      - 'mobile/android-alpha2/app/src/main/res/**/phone_downloads_strings.xml'
       - 'mobile/android-alpha2/app/src/main/res/**/guide_strings.xml'
   workflow_dispatch:
 

@@ -8,10 +8,13 @@ on:
       - '.github/workflows/s2-module-architecture.yml'
       - 'scripts/audit-modules.ts'
       - 'src/source-extensions/**'
+      - 'src/providers/compiled-composition.ts'
+      - 'src/services/provider-service.ts'
       - 'src/reader/**'
       - 'src/services/online-reader-service.ts'
       - 'test/unit/external-reader-boundary.test.ts'
       - 'test/unit/module-dag-policy.test.ts'
+      - 'test/unit/compiled-source-composition.test.ts'
   workflow_dispatch:
 
 permissions:
@@ -43,7 +46,7 @@ jobs:
       - name: Typecheck the unchanged runtime and new adapter
         run: pnpm type:check
       - name: Real Reader, revocation, DTO and forbidden-layer tests
-        run: pnpm exec vitest run test/unit/external-reader-boundary.test.ts test/unit/module-dag-policy.test.ts
+        run: pnpm exec vitest run test/unit/external-reader-boundary.test.ts test/unit/module-dag-policy.test.ts test/unit/compiled-source-composition.test.ts
       - name: Keep bounded source-only architecture evidence
         if: always() && github.event.repository.private == false
         uses: actions/upload-artifact@v4

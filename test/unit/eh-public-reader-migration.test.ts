@@ -57,7 +57,7 @@ describe('S3 first real existing-Provider extraction (no account)', () => {
         expect(ownsLegacyEhId(legacyId)).toBe(true)
         for (const bad of [
             'eh:0:abcdef1234', 'eh:123:xyz', 'pica:123:abcdef1234',
-            'eh:900719925474099:abcdef1234', 'eh:-1:abcdef1234'
+            'eh:9007199254740992:abcdef1234', 'eh:-1:abcdef1234'
         ]) {
             expect(ownsLegacyEhId(bad)).toBe(false)
             expect(() => toEhPublicWorkerId(bad)).toThrow()

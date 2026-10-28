@@ -56,5 +56,5 @@ jobs:
         with:
           name: s2-source-import-graph-${{ github.sha }}
           path: architecture-evidence/module-graph.json
-          retention-days: 7
+          retention-days: 1
           if-no-files-found: warn

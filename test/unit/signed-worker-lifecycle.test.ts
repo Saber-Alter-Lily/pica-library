@@ -236,6 +236,20 @@ describe('S3 signed source generations: real worker lifecycle', () => {
         expect(third.state('demo').revision).toBe(2)
     })
 
+    it('refuses dangling generation and active-pointer symlinks instead of resetting trust state', () => {
+        if (process.platform === 'win32') return // Creating symlinks needs Windows privileges.
+        const f = fixture()
+        f.store.install(f.signed('1.0.0'), workerBytes)
+        const versions = path.join(f.root, 'demo', 'versions')
+        const missing = path.join(f.folder, 'missing-target')
+        fs.symlinkSync(missing, path.join(versions, '1.1.0'), 'dir')
+        expect(() => f.store.install(f.signed('1.1.0'), workerBytes))
+            .toThrow('Untrusted source worker directory')
+        fs.symlinkSync(missing, path.join(f.root, 'demo', 'active.json'))
+        expect(() => f.store.state('demo'))
+            .toThrow('Invalid or linked source worker file')
+    })
+
     it('rejects invalid source IDs, versions, manifest fields and signature algorithms', () => {
         const f = fixture()
         expect(() => sourceWorkerSignaturePayload({

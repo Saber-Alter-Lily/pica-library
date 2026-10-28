@@ -1,4 +1,18 @@
 # Pica Library Development Task Log
+## S1 最新执行回执｜2026-10-27，7章真实聚光及大字号缺陷整改
+
+本段为后续推进的**当前权威状态快照**；不改写下文历史失败/中间运行和旧42+新增12条验收映射。生产正式版 `v0.5.0` / main `095d6910` / OTA / 用户真实数据保持不动；Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 未合并。
+
+- **实际通过**：源码 `eea0db58` 的 [Android35 模拟器运行 #40621769915](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915) **SUCCESS**，16/16 独立 Instrumentation PASS、30张实际 PNG（中/浅色/360dp、100%与150%字体）。第0、1、3、4、5、6、7章真实高亮和跳过不记已读；人工偏好保存键维持禁用、远程来源无自动连接。截图及原始日志见短期工件 [#12787068908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915/artifacts/12787068908)。
+- **真实图像复核及纠正**：下载解包目视检查，150%字体来源行标题末字孤行，推荐画像 Engine 长版本号被窄列拆成多段且整张卡片成为过大 VSpot 目标。已提交 `ff37b77`（大字号窄屏 SettingsRow 上下排）、`116244b`（技术状态行上下排、画像高亮真实标题），附 Robolectric 测量测试和截图路径守卫。此修复必须以新源码复拍才能判已验收。
+- **最后一个高级章节**：`b5e134f` 将第2章原有五步画风 VSpot 加入真实 Instrumentation，校验控件在视口内、五张每档字体截图、跳过不写入已读或推荐新周期，同时补齐滚动目标逻辑。**尚未返回完整运行结论，当前仍是7/8个章节已验证，绝不宣称8/8通过**；[视觉工作流](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105)。
+- **Android 测试阻断仍开放**：[首次聚焦单测 #40621041603](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621041603) 在 Gradle Javac 通过后卡在 `:app:testDebugUnitTest`，至任务时限被取消；没有 JUnit 成功证据，不将其记作测试失败或 PASS。新 `8efe395` 用5个独立 Robolectric 类、每个12分钟上限及逐类 JUnit 产物诊断卡点，实际运行仍待核实。普通 Android 全量 CI 亦未获得当前精确源码的完整通过结论。
+- **阶段门禁**：S0/S1 IN_PROGRESS，S2 限定来源身份路由 IN_PROGRESS，S3–S6 OPEN。G1 用户未验收、G2 真正来源外置、G3 老版升级回滚、G4 双端发布均未通过。存在潜在 `PhoneDownloadStore` 损坏索引静默空值/非原子替换风险，未实测生产事故，也未修改个人下载。
+
+**下一动作**：收口本次最后一章及字号修复的真实截图 → 独立判定被取消的 Android 单测故障原因并修复 → 全量中英日/浅深主题/360-480dp与物理手机 G1 → 然后 S2-S3、S4、S5、S6。禁止把模拟器 PASS 直接改成用户接受或正式发布。
+
+---
+
 ## 当前执行权威快照｜2026-10-27 产品恢复 S0–S6
 
 **本段更新最近结果，以下历史段落均为各自时间点的原始记录，不自动改写。** 仍基于 Stable v0.5.0 + [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)；正式 main `095d6910`、Release、OTA、安装与生产资料未改。当前阶段 S0 IN_PROGRESS、S1 IN_PROGRESS、S2 有限安全端口 IN_PROGRESS，S3–S6 PLANNED；G1 用户验收 NOT_ACCEPTED，G2/G3/G4 OPEN。

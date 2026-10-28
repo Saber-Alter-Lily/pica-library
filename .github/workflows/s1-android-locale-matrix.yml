@@ -59,10 +59,12 @@ jobs:
         with:
           api-level: 35
           arch: x86_64
-          # Avoid Pixel Launcher ANR overlays in synthetic visual evidence.
-          # The separate Android CI retains its existing emulator baseline.
-          target: aosp_atd
+          # Android 35 aosp_atd returns all-black framebuffer captures in
+          # this runner. Use the ordinary graphical AOSP image without Pixel
+          # Launcher, and retain explicit foreground/pixel gates.
+          target: default
           profile: pixel_2
+          ram-size: 3072M
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           emulator-boot-timeout: 600

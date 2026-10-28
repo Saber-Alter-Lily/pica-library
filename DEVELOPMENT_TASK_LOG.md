@@ -1,5 +1,22 @@
 # Pica Library Development Task Log
 
+## 2026-10-28｜S3 受控签名组件生命周期：实际安装/启停/回滚工程薄片（Draft PR #221）
+
+**授权与分支边界**：用户要求按计划继续将来源从漫画阅读器本体解耦。项目依赖链保持 [S1 #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) → [S2 #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) → [S3 进程 #220](https://github.com/Saber-Alter-Lily/pica-library/pull/220) → [S3 签名生命周期 #221](https://github.com/Saber-Alter-Lily/pica-library/pull/221)。全部 Draft、未合并，生产 `main`/Release/OTA/用户账号与库数据未修改。S1 真机 G1、核心源外置 G2、迁移 G3、发布 G4 均未验收。
+
+- **前置真实工程基线**：[S3 真实 IPC 专项 #40691301737](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40691301737) 与 [完整 CI #40691317341](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40691317341) 在旧代码 `e52bf61a` SUCCESS。已具备 Linux/Windows 真实来源进程、随机握手、无网络 QA worker、撤销/超时等验证。
+- **本批实际代码**：新增 `src/source-extensions/signed-worker-store.ts`，在已有 `TrustedSourceProcess` 上方提供带固定 schema v1 的 Ed25519 发布者验签、应用代码外给定的**受信任公钥**、canonical message、SHA256/大小双校验、固定单文件 `worker.cjs`、同目录分代 staging + 重命名。安装**不启用/不执行**；旧版本目录不可覆盖；每次显式激活和打开前复验源 ID、版本、签名、文件清单与实体 hash；拒绝 symlink/hardlink 和悬空激活指针。
+- **生命周期和恢复**：`activate/disable/rollback` 显式带存储 `revision` CAS，切换前先停止旧会话及挂起 IPC，持久化 `active.json` 使用临时文件 + 原子替换；旧签名版本留存供手动回滚，进程 crash/重启不自动激活未选组件，其他已运行进程不获额外权限。单一 Node 写入者，不宣称跨进程并发和断电事务已证明。
+- **真实测试**：`test/unit/signed-worker-lifecycle.test.ts` 运行时生成临时 Ed25519 keypair（私钥不提交），受控 QA worker 实际 fork → S2 Reader → 章节/图片/进度，覆盖伪签名、篡改、跨源目录、非法版本、悬空链接、不可覆盖、过时 revision、激活后撤销、旧版本回滚、模拟原子写入失败、Windows 只读 worker 文件清理。原 `scripts/audit-modules.ts` + `test/unit/module-dag-policy.test.ts` 继续阻断签名安装器/进程执行器反向污染 Reader 核心；没有绕过现有代码安全门禁。
+- **已经完成的验证**：[S3 新源码 Linux/Windows 双平台专项 #40695633671](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40695633671)，精确代码 `8a476400` **SUCCESS：Linux 43/43，Windows 18/18**。Windows 曾因测试清理只读文件/已退出 worker 的文件句柄报 `EPERM`；只调整测试清理的只读属性恢复和重试，不降低签名或权限要求。最新同源 [完整 CI #40695640938](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40695640938) 登记时仍在运行，未将单项成功填写为正式 G2。
+- **重要产品差距**：目前 `SignedWorkerStore` **只在隔离测试组合入口使用**；不允许用户通过普通资源包下载安装可执行源，没有真实生产用发布者公钥/Windows 安装器私有根权限和可执行文件签名链，没有真实漫画源迁移、Android Binder Service，也没有 Windows/Android 纯 Core 包去 SDK、1,500 作品库/旧 v0.5.0 一键升级回滚和设备验收。因此 `S3-LIFECYCLE_DRAFT_TESTED`，`S3_PRODUCT_INTEGRATION_NOT_DONE`，`G2/G3/G4_OPEN`。
+- **接续**：先看精确完整 CI；再以稳定官方签名包内置且不可由用户覆盖的公钥、受限源码与可信安装根、可观测安装失败/回滚状态，组织一条实际来源的业务连接及账号凭据 broker；随后 Android 受控/独立进程、删除原核心源 SDK 和实体升级验收。不得用仅合成 source 的通过替代真实使用。
+
+完整基线和验收表：[签名组件设计](docs/S3_SIGNED_WORKER_LIFECYCLE_20261028.md)、[此前 IPC 执行](docs/S3_TRUSTED_PROCESS_PROTOTYPE_20261028.md)、[S2 依赖图](docs/S2_SOURCE_BOUNDARY_20261028.md)。
+
+---
+
+
 ## S3 独立来源运行时｜2026-10-28 · Linux/Windows 受控 IPC 原型与安全门禁
 
 **用户授权推进 S2/S3，正式 `v0.5.0`、main、Release/OTA 和个人账号/书库保持不动。** 从 [S2 Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) 分出独立 [S3 Draft PR #220](https://github.com/Saber-Alter-Lily/pica-library/pull/220)，确保架构实验不夹带生产发布。

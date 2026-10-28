@@ -33,20 +33,24 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
     private LinearLayout pendingBar;
     private TextView pendingText;
     private Button saveButton,undoButton;
-    private boolean saving;
+    private boolean saving,guidePreview;
     private volatile PreferenceSearchIndex searchIndex;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private int loadGeneration;
     private boolean destroyed,loadedOnce;
 
     @Override public void onCreate(Bundle state){
-        super.onCreate(state);Ui.applyWindow(this);expanded.add("people");activeQuery=getIntent().getStringExtra("query");if(activeQuery==null)activeQuery="";
+        super.onCreate(state);Ui.applyWindow(this);
+        guidePreview=state!=null&&state.containsKey("guidePreview")
+            ?state.getBoolean("guidePreview")
+            :getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)==1;
+        expanded.add("people");activeQuery=getIntent().getStringExtra("query");if(activeQuery==null)activeQuery="";
         if(state!=null)try{draft.restore(new JSONArray(state.getString("preferenceDraft","[]")));activeQuery=state.getString("activeQuery",activeQuery);}catch(Exception ignored){}
         renderShell();
     }
     @Override protected void onResume(){super.onResume();loadAsync();}
     @Override protected void onDestroy(){destroyed=true;++loadGeneration;worker.shutdownNow();super.onDestroy();}
-    @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("preferenceDraft",draft.mutations().toString());out.putString("activeQuery",currentQuery());}
+    @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("preferenceDraft",draft.mutations().toString());out.putString("activeQuery",currentQuery());out.putBoolean("guidePreview",guidePreview);}
     @Override public void onBackPressed(){requestClose();}
     private void requestClose(){if(saving)return;if(draft.isEmpty()){finish();return;}new AlertDialog.Builder(this).setTitle("还有尚未保存的调整").setMessage("保存后才会影响推荐和待同步偏好。").setNegativeButton("继续调整",null).setNeutralButton("放弃修改",(d,w)->finish()).setPositiveButton("保存并返回",(d,w)->saveDraft(true)).show();}
 
@@ -63,11 +67,21 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         LinearLayout pendingActions=new LinearLayout(this);
         undoButton=Ui.button(this,"撤销修改",v->{if(saving)return;draft.clear();updatePending();renderSignals(currentQuery());},true);
         saveButton=Ui.button(this,"保存调整",v->saveDraft(false),false);
+        saveButton.setTag(AndroidOnboarding.ADV_PREFERENCE_SAVE);
         pendingActions.addView(undoButton,new LinearLayout.LayoutParams(0,-2,1));pendingActions.addView(saveButton,new LinearLayout.LayoutParams(0,-2,1));pendingBar.addView(pendingActions);root.addView(pendingBar);
         updatePending();setContentView(root);root.requestApplyInsets();showLoading();
     }
 
-    private void updatePending(){if(pendingBar==null)return;pendingBar.setVisibility(draft.isEmpty()&&!saving?View.GONE:View.VISIBLE);pendingText.setText(saving?"正在保存调整…":"已修改 "+draft.size()+" 项 · 尚未保存");saveButton.setEnabled(!saving);undoButton.setEnabled(!saving);}
+    private void updatePending(){
+        if(pendingBar==null)return;
+        // The guided example must show the real Save control, but never invent a pending edit.
+        pendingBar.setVisibility(guidePreview||saving||!draft.isEmpty()?View.VISIBLE:View.GONE);
+        pendingText.setText(saving?"正在保存调整…":
+                draft.isEmpty()?getString(R.string.advanced_guide_preference_preview):
+                "已修改 "+draft.size()+" 项 · 尚未保存");
+        saveButton.setEnabled(!saving&&!draft.isEmpty());
+        undoButton.setEnabled(!saving&&!draft.isEmpty());
+    }
     private void saveDraft(boolean closeAfter){
         if(saving||draft.isEmpty()){if(closeAfter&&!saving)finish();return;}
         final JSONArray mutations=draft.mutations();saving=true;updatePending();
@@ -131,7 +145,9 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         sessionStatus=Ui.text(this,session+" · 仅本机",12,Ui.MUTED,true);intro.addView(SettingsRow.statusLine(this,"本次想看",sessionStatus));
         intro.addView(SettingsRow.statusLine(this,"屏蔽偏好 / 作品",Ui.text(this,blockedTargets+" / "+hardSuppressedCount,12,Ui.MUTED,true)));
         content.addView(intro);
-        content.addView(Ui.button(this,LocalizedText.ui(this,"用于推荐的标签与私人标签","Recommendation tag scope and private labels","おすすめに使うタグ・個人タグ"),v->startActivity(new Intent(this,TagParticipationActivity.class)),false));
+        Button tagScope=Ui.button(this,LocalizedText.ui(this,"用于推荐的标签与私人标签","Recommendation tag scope and private labels","おすすめに使うタグ・個人タグ"),v->startActivity(new Intent(this,TagParticipationActivity.class)),false);
+        tagScope.setTag(AndroidOnboarding.ADV_PREFERENCE_TAGS);
+        content.addView(tagScope);
 
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);
         actions.addView(Ui.button(this,"推荐同步",v->startActivity(new Intent(this,RecommendationSyncActivity.class)),false),new LinearLayout.LayoutParams(0,-2,1));

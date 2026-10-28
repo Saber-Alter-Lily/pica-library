@@ -20,6 +20,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
@@ -35,31 +36,66 @@ public final class UpdateActivity extends LocaleAwareActivity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private TextView status,notes,detail;
+    private ScrollView notesScroll;
     private ProgressBar loading;
     private Button action,cancel;
     private UpdateClient.Info info;
     private long downloadId=-1,lastBytes=-1,lastProgressAt=0;
-    private boolean registered,destroyed;
+    private boolean registered,destroyed,guidePreview;
     private final Runnable poll=new Runnable(){@Override public void run(){if(destroyed)return;updateDownloadState();if(downloadId>=0)handler.postDelayed(this,1000);}};
-    private final BroadcastReceiver receiver=new BroadcastReceiver(){@Override public void onReceive(Context context,Intent intent){long id=intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1);long expected=downloadId>=0?downloadId:prefs().getLong(P_DOWNLOAD,-1);if(id==expected){downloadId=id;updateDownloadState();}}};
+    private final BroadcastReceiver receiver=new BroadcastReceiver(){@Override public void onReceive(Context context,Intent intent){
+        // Read-only guided inspection must not resume a pre-existing download or overwrite its preview UI.
+        if(guidePreview)return;
+        long id=intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1);long expected=downloadId>=0?downloadId:prefs().getLong(P_DOWNLOAD,-1);if(id==expected){downloadId=id;updateDownloadState();}}};
 
     private static final class DownloadState{
         final boolean found;final int status,reason;final long bytes,total;
         DownloadState(boolean found,int status,int reason,long bytes,long total){this.found=found;this.status=status;this.reason=reason;this.bytes=bytes;this.total=total;}
     }
 
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);downloadId=prefs().getLong(P_DOWNLOAD,-1);lastBytes=prefs().getLong(P_LAST_BYTES,-1);lastProgressAt=prefs().getLong(P_LAST_PROGRESS,0);render();register();check();}
+    @Override public void onCreate(Bundle saved){
+        super.onCreate(saved);Ui.applyWindow(this);
+        guidePreview=saved!=null&&saved.containsKey("guidePreview")
+            ?saved.getBoolean("guidePreview")
+            :getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)==7;
+        downloadId=prefs().getLong(P_DOWNLOAD,-1);
+        lastBytes=prefs().getLong(P_LAST_BYTES,-1);
+        lastProgressAt=prefs().getLong(P_LAST_PROGRESS,0);
+        render();register();
+        if(guidePreview){
+            loading.setVisibility(View.GONE);
+            status.setText(R.string.advanced_guide_update_preview);
+            detail.setText("");
+            action.setEnabled(true);
+        }else check();
+    }
+    @Override protected void onSaveInstanceState(Bundle out){
+        out.putBoolean("guidePreview",guidePreview);
+        super.onSaveInstanceState(out);
+    }
     private android.content.SharedPreferences prefs(){return getSharedPreferences(PREFS,MODE_PRIVATE);}
     private Button button(String label,View.OnClickListener click){return Ui.button(this,label,click,false);}
 
     private void render(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(Ui.dp(this,18),i.getSystemWindowInsetTop()+Ui.dp(this,12),Ui.dp(this,18),i.getSystemWindowInsetBottom()+Ui.dp(this,18));return i;});
         LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));bar.addView(Ui.text(this,"软件更新",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);
-        status=Ui.text(this,"正在检查更新…",15,Ui.TEXT,true);status.setPadding(0,Ui.dp(this,16),0,0);root.addView(status);
+        status=Ui.text(this,"正在检查更新…",15,Ui.TEXT,true);
+        status.setTag(AndroidOnboarding.ADV_UPDATE_STATUS);
+        status.setPadding(0,Ui.dp(this,16),0,0);root.addView(status);
         detail=Ui.text(this,"",13,Ui.MUTED,false);detail.setPadding(0,Ui.dp(this,6),0,Ui.dp(this,8));root.addView(detail);
         loading=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);loading.setMax(100);loading.setIndeterminate(true);root.addView(loading,new LinearLayout.LayoutParams(-1,Ui.dp(this,8)));
-        notes=Ui.text(this,"",13,Ui.MUTED,false);notes.setPadding(0,Ui.dp(this,14),0,Ui.dp(this,14));root.addView(notes);
-        LinearLayout buttons=new LinearLayout(this);action=button("重新检查",v->check());action.setEnabled(false);buttons.addView(action,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(buttons,this,8);cancel=button("取消下载",v->cancelCurrent(false));cancel.setVisibility(View.GONE);buttons.addView(cancel,new LinearLayout.LayoutParams(0,-2,1));root.addView(buttons);
+        notes=Ui.text(this,"",13,Ui.MUTED,false);
+        notes.setPadding(0,Ui.dp(this,14),0,Ui.dp(this,14));
+        notesScroll=new ScrollView(this);
+        notesScroll.setTag("update.release.notes.scroll");
+        notesScroll.setFillViewport(false);
+        notesScroll.addView(notes,new ScrollView.LayoutParams(-1,-2));
+        notesScroll.setVisibility(View.GONE);
+        // Long release notes are scrollable while update/check/cancel controls remain visible.
+        root.addView(notesScroll,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout buttons=new LinearLayout(this);action=button("重新检查",v->check());
+        action.setTag(AndroidOnboarding.ADV_UPDATE_CHECK);
+        action.setEnabled(false);buttons.addView(action,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(buttons,this,8);cancel=button("取消下载",v->cancelCurrent(false));cancel.setVisibility(View.GONE);buttons.addView(cancel,new LinearLayout.LayoutParams(0,-2,1));root.addView(buttons);
         TextView hint=Ui.text(this,"下载、校验和安装都可在这里完成；异常任务可以直接终止并重新开始。",12,Ui.MUTED,false);hint.setPadding(0,Ui.dp(this,12),0,0);root.addView(hint);
         setContentView(root);root.requestApplyInsets();
     }
@@ -67,12 +103,15 @@ public final class UpdateActivity extends LocaleAwareActivity {
     private void register(){IntentFilter filter=new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);ContextCompat.registerReceiver(this,receiver,filter,ContextCompat.RECEIVER_EXPORTED);registered=true;}
 
     private void check(){
+        guidePreview=false; // After the user explicitly presses Check, normal update behavior resumes.
         stopPolling();loading.setVisibility(View.VISIBLE);loading.setIndeterminate(true);action.setEnabled(false);cancel.setVisibility(View.GONE);status.setText(LocalizedText.ui("正在检查更新…"));detail.setText("");
         worker.submit(()->{try{UpdateClient.Info value=UpdateClient.check(this);runOnUiThread(()->{if(!destroyed)show(value);});}catch(Exception e){runOnUiThread(()->{if(destroyed)return;loading.setVisibility(View.GONE);status.setText(LocalizedText.ui("检查更新失败"));detail.setText(LocalizedText.ui("请检查网络后重试"));retryCheckButton();});}});
     }
 
     private void show(UpdateClient.Info value){
-        info=value;loading.setVisibility(View.GONE);notes.setText(value.notes);
+        info=value;loading.setVisibility(View.GONE);
+        notes.setText(value.notes==null?"":value.notes);
+        notesScroll.setVisibility(value.notes==null||value.notes.trim().isEmpty()?View.GONE:View.VISIBLE);
         int savedCode=prefs().getInt(P_CODE,-1);
         if(downloadId>=0&&savedCode>0&&savedCode!=value.versionCode)cancelCurrent(false);
         if(!UpdateClient.newer(this,value)){status.setText(LocalizedText.ui("当前已是最新版本"));detail.setText(value.versionName);retryCheckButton();return;}
@@ -146,6 +185,6 @@ public final class UpdateActivity extends LocaleAwareActivity {
 
     private void install(File file){if(Build.VERSION.SDK_INT>=26&&!getPackageManager().canRequestPackageInstalls()){new AlertDialog.Builder(this).setTitle(LocalizedText.ui("允许安装更新")).setMessage(LocalizedText.ui("请允许 Pica Library 安装下载的更新。返回后再次点击“安装更新”即可。")) .setNegativeButton(LocalizedText.ui("取消"),null).setPositiveButton(LocalizedText.ui("打开设置"),(d,w)->startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+getPackageName())))).show();return;}Uri uri=FileProvider.getUriForFile(this,getPackageName()+".files",file);Intent intent=new Intent(Intent.ACTION_VIEW);intent.setDataAndType(uri,"application/vnd.android.package-archive");intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(intent);}
 
-    @Override protected void onResume(){super.onResume();if(action==null)return;downloadId=prefs().getLong(P_DOWNLOAD,downloadId);if(downloadId>=0){startPolling();updateDownloadState();return;}File file=target();String sha=prefs().getString(P_SHA,"");if(file.isFile()&&!sha.isEmpty())verifyDownloaded();}
+    @Override protected void onResume(){super.onResume();if(action==null||guidePreview)return;downloadId=prefs().getLong(P_DOWNLOAD,downloadId);if(downloadId>=0){startPolling();updateDownloadState();return;}File file=target();String sha=prefs().getString(P_SHA,"");if(file.isFile()&&!sha.isEmpty())verifyDownloaded();}
     @Override protected void onDestroy(){destroyed=true;stopPolling();if(registered)try{unregisterReceiver(receiver);}catch(Exception ignored){}worker.shutdownNow();super.onDestroy();}
 }

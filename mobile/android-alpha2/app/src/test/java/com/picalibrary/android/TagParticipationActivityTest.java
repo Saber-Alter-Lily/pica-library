@@ -44,4 +44,34 @@ public class TagParticipationActivityTest {
             TestActivity activity=controller.get();shadowOf(Looper.getMainLooper()).idle();assertTrue(((CheckBox)find(activity,"tag-row:pica|tag-0000")).isChecked());assertFalse(((CheckBox)find(activity,"tag-row:pica|tag-0001")).isChecked());assertTrue(find(activity,"tag-save").isEnabled());find(activity,"tag-undo").performClick();assertFalse(find(activity,"tag-save").isEnabled());assertFalse(RecommendationPolicyStore.hasPendingPortableChanges(context));
         }
     }
+
+    @Test @Config(qualifiers="w360dp-h900dp-mdpi")
+    public void headerFitsEnglishNarrowPhoneWithoutCoveringBack(){
+        LocaleStore.set(context,LocaleStore.EN);
+        try(ActivityController<TestActivity> controller=Robolectric.buildActivity(TestActivity.class).setup()){
+            TestActivity activity=controller.get();
+            shadowOf(Looper.getMainLooper()).idle();
+            ViewGroup content=activity.findViewById(android.R.id.content);
+            int width=Ui.dp(activity,360),height=Ui.dp(activity,900);
+            content.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));
+            content.layout(0,0,width,height);
+            TextView heading=(TextView)find(activity,"tag-participation-heading");
+            assertNotNull(heading);
+            View back=find(activity,"tag-participation-back");
+            assertNotNull("tag heading needs an actual back control",back);
+            assertTrue("back must have a readable touch width",back.getMeasuredWidth()>=Ui.dp(activity,64));
+            assertTrue("heading must have usable width",heading.getMeasuredWidth()>Ui.dp(activity,100));
+            android.graphics.Rect bounds=new android.graphics.Rect();
+            heading.getDrawingRect(bounds);
+            content.offsetDescendantRectToMyCoords(heading,bounds);
+            assertTrue("heading clips outside narrow screen: "+bounds,bounds.right<=width);
+            assertTrue("heading must not overlap back control",bounds.left>Ui.dp(activity,40));
+            android.graphics.Rect backBounds=new android.graphics.Rect();
+            back.getDrawingRect(backBounds);
+            content.offsetDescendantRectToMyCoords(back,backBounds);
+            assertTrue("heading overlaps actual back control",bounds.left>=backBounds.right);
+        }
+    }
+
 }

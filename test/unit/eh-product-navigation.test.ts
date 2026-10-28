@@ -49,11 +49,19 @@ describe('source-oriented product navigation', () => {
     expect(hub).toContain('"Pica"')
     expect(hub).toContain('"E-Hentai / ExHentai"')
     expect(hub).toContain('SettingsRow.panel(this')
-    expect(hub).toContain('"E-H 账号"')
+    expect(hub).toContain('getString(R.string.account_sources_eh_account)')
     expect(hub).toContain('status(localEh,desktop.ehConfigured)')
     expect(hub).toContain('DesktopAccountStatusStore.load(this)')
-    expect(hub).toContain('"已由 Desktop 连接"')
-    expect(hub).toContain('"ExH 扩展"')
+    expect(hub).toContain('getString(R.string.account_sources_status_desktop)')
+    expect(hub).toContain('getString(R.string.account_sources_exh_extension)')
+    // Localized UI is now the contract; do not revert to Chinese-only labels.
+    for (const locale of ['values', 'values-zh-rCN', 'values-ja']) {
+      const xml = fs.readFileSync(`mobile/android-alpha2/app/src/main/res/${locale}/account_sources_strings.xml`, 'utf8')
+      for (const key of ['account_sources_eh_account', 'account_sources_status_desktop', 'account_sources_exh_extension']) {
+        expect(xml).toContain(`name="${key}"`)
+      }
+    }
+    expect(hub).not.toContain('status(localEh,desktop.ehConfigured),"已由 Desktop 连接"')
     expect(hub).toContain('EhCapabilityStore.load(this)')
     expect(hub).toContain('EhCapabilityStore.refreshAsync(this,false')
     expect(hub).not.toContain('"ExH 权限"')

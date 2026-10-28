@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_downloads_title">端末内ダウンロード</string>
+    <string name="phone_downloads_tasks_short">タスク</string>
+    <string name="phone_downloads_loading">端末内ダウンロードを読み込み中…</string>
+    <string name="phone_downloads_note">ダウンロード済みの本文は閲覧・表紙の一時キャッシュとは別に保持します（約 %1$s）。</string>
+    <string name="phone_downloads_background_tasks">バックグラウンドのタスク</string>
+    <string name="phone_downloads_storage_settings">保存先の設定</string>
+    <string name="phone_downloads_chapter_page_count">%1$d 章 · %2$d ページ</string>
+    <string name="phone_downloads_open">開く</string>
+    <string name="phone_downloads_cancel">キャンセル</string>
+    <string name="phone_downloads_delete">削除</string>
+    <string name="phone_downloads_delete_title">端末内のダウンロードを削除しますか？</string>
+    <string name="phone_downloads_index_error">ダウンロード索引を読み込めません。元のファイルは保持され、復旧まで変更を停止します。</string>
+    <string name="phone_downloads_delete_failed">ダウンロードを削除できません</string>
+</resources>

@@ -1,5 +1,185 @@
 # Pica Library Development Task Log
 
+## S1 视觉质量闭锁续修｜2026-10-28：ATD 纯黑截图的精确失败与非黑白门禁
+
+- **新失败的硬证据**：AOSP-ATD 视觉矩阵 [#40649923301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649923301) 在第二组 `zhCN-dark-w393-f130/guide` FAIL，日志证明 `active-owner=com.picalibrary.android.dev` 且 `app-focused=true`，但是 `painted=false`；第一组 `zhCN-light-w360-f100` 的七张自动通过 PNG 经下载后逐图像素检验全部是 **720×1280 的 100% #000000 纯黑图（1种颜色、921600个黑像素）**。此时来源不是 Pixel Launcher 弹窗，而是 `aosp_atd` 图形帧不可用与原 `looksPainted` 浅色分支把纯黑当文字的**错误通过**；两种失败源分别保留。黑色 PNG **不能证明 Pica 自身持续黑屏**，更不能认定第一组已通过视觉 QA。
+- **实现变更且已回读**：`12537807` 给真实 `S1AndroidLocaleMatrixTest` 增加纯黑/纯白双主题拒绝断言，并将 PNG 判定从单向“墨色数量”升级为**主题背景 + 明暗两端像素 + 非均匀边缘**门禁，仍保持前台窗口所有权判定，不放宽页面锚点、页面已加载和全部九组合验收。 `0724234d` 只将此独立视觉矩阵从图形不可用的 `aosp_atd` 换为 **API35 普通 graphical AOSP (`target: default`)**，独立于已有 Google APIs 八章聚光和完整 CI；官方 android-emulator-runner 支持此系统映像类型。 `41560ff3`、`c6a5af47` 对拒绝/成功 PNG 添加真实 8-byte PNG magic 校验，避免 `run-as cat` 的错误文字被当作 PNG；`57c542cc` 锁定新门禁的静态回归。
+- **已知成功的历史测试范围**：`c23a1e3` [完整 CI #40649865872](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649865872) SUCCESS，`81fbaed5` [完整 CI #40649938731](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649938731) SUCCESS，均不是新的图形映像/新像素门禁的终态结果。原 `e44de731` 八章 VSpot [#40634745706](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706) SUCCESS、中文浅色两字号的 40 张单独截图已抽查，不替代三语言九组矩阵。
+- **待严格收口**：新精确源码 `c6a5af47` 的 [普通 AOSP 九组实页 #40651031422](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40651031422) 与 [完整 CI #40651038857](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40651038857) 在本登记时 **QUEUED/NOT_VERIFIED**。必须真实运行9组、保存有效63张、逐图人工核对，不能对黑屏做主题特判或降低阈值混过去。继续 G1=NOT_ACCEPTED，S2/S3 来源 SDK 真外置与 S5 旧 v0.5.0 数据升级均未完成，正式 main/Release/OTA 未改变。
+
+---
+
+
+## S1-02 视觉矩阵假阳性闭锁｜2026-10-28 · Pixel Launcher ANR 与前台画面归属
+
+**来源/边界**：正式 `v0.5.0` 与 `main 095d6910` 无修改；继续在未合并 Draft PR #218、隔离 Debug/模拟器中实施。G1 用户验收仍 **NOT_ACCEPTED**，G2/G3/G4 继续 OPEN。保留历史 42 + 新增 12 验收案例。
+
+- **精确旧源码实证**：`e44de731` 的 [完整 CI #40634752986](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634752986) SUCCESS、[定向 Android #40634745752](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745752) SUCCESS、[八章 VSpot #40634745706](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706) SUCCESS；但 [九组实页矩阵 #40634745695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695) FAIL。实际失败是第六组 `en-dark-w480-f130` 的 `guide` 截图未通过有效绘制判断，后续三组未运行。
+- **新增 P1 证据污染**：下载并目视检查该次矩阵工件 [#12793718801](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695/artifacts/12793718801)，前五组通过的 **35/35 张所谓有效页面截图都被系统弹窗 `Pixel Launcher isn't responding` 覆盖**，个别甚至只显示系统壁纸。原来的主题/亮度像素门禁对非本应用弹窗出现假阳性；此前 9/9 的 `d8b7f4c` 截图也存在空白转场，故不可将矩阵 Instrumentation 成功等同于页面视觉验收。ANR 弹窗归因于模拟器系统 Launcher 的图像证据，**尚未证明 Pica 正式/候选应用发生 ANR 或持续白屏**。
+- **独立参考**：同批八章引导 [#12792869042](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706/artifacts/12792869042) 实页聚光抽样未见 Launcher 遮挡；继续复用现有 VSpot 引导，不因此重写业务 UI/动画。
+- **隔离修复（GitHub 已提交并读回）**：`c23a1e3b` 在 `S1AndroidLocaleMatrixTest` 的真实截图验收上新增“当前 Activity 有窗口焦点 + Accessibility 活动窗口归属本 APK + 有实际绘制像素”三重门禁，失败保留 `rejected-*.png` 与诊断而非套用旧 PASS；`f48f9897` 在失败用例导出拒绝截图和窗口焦点状态；`3c89e981` 只将 S1 独立视觉矩阵的 Android 系统映像切换为 `aosp_atd`，避免该组 Pixel Launcher 特定干扰（其他工作流基线不动）；`81fbaed5` 加入预防回退的仓库契约测试。**不缩减矩阵、不跳过失效用例、不取消外部遮挡检测**。
+- **验收与下一步**：新 `aosp_atd` 九组矩阵 [#40649923301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649923301) 和新 HEAD `81fbaed5` [CI #40649938731](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649938731) 在本回执时尚未产生成功终态，不能宣称 PASS。必须逐图审查实际 63 PNG，保证页面可读、无系统对话框、深色下拉高对比、英日翻译和标签真实已加载，再在真实 Android/OEM 验证，最后推进 S2 模块依赖 DAG / S3 SDK 真外置及 S5 老数据升级事务，保持既有 G1–G4 门槛。
+
+---
+
+## S1 人工视觉验收接续｜2026-10-27 · 63张截图复核与新版门禁
+
+**当前事实基线：** Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)，业务最新候选 `e44de731`，正式 v0.5.0 / 生产 `main` `095d6910` / OTA / 用户资料均未改。S1 = IN_PROGRESS，G1 USER_ACCEPTANCE = NOT_ACCEPTED；S2/S3 来源 SDK 真正外置与 S5 老用户数据升级仍未完成。
+
+- **八章真实 VSpot**：`b5e134f` [Android 35 #40622970105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105) 18/18 Instrumentation PASS、40 张实际截图；`8e581ea` 的 [#40629907241](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907241) 同类专项 SUCCESS。仅中文/浅色/360dp/字体100和150%，不等于真机和其他组合验收。
+- **九组实页矩阵自动通过但人工视觉不通过**：`d8b7f4` 的 [#40632432541](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40632432541) 9/9 Android Instrumentation SUCCESS、63 PNG，涵盖 3 语言、2 主题、360/393/480dp、100/130/150% 字体的代表性九组，每组七页。已下载全部图并逐页人工审视，**至少七张为空白转场帧**（尚不能断言程序持续白屏）；标签页图多次停在“读取本地标签”，WebDAV 深色下拉文本与背景低对比、英日页面混有中文。故此阶段**视觉质量 FAIL/OPEN**，不因自动 PASS 偷换验收结论。
+- **修复候选**：`8eb0c11` 新增深浅主题显式前景色 Spinner 与 WebDAV 13 厂商 UI-only 翻译，保留原厂商 ID/地址和数据结构；`9d86fda`、`c4e435c`、`e44de731` 补 WebDAV 初始标签、表单提示、状态和删除确认三语，新增 `RemoteStorageVisualContractTest`；`3a39ef1` 同步修复高级指南章节/标签筛选 Spinner 对比度并加入深色回归。所有均为 Draft 源码，**新 SHA 尚未得到完整模拟器、Android CI 和真机验收**。
+- **真正的截图门禁**：`c4e435c` 在 S1 语言矩阵中加入真实内容已绘制的像素/主题检查与重试，标签页先等到真正标签操作按钮加载完成，超时 FAIL，绝不保存纯白帧当 PASS。此约束可能暴露真实耗时/加载失败，应保留最新运行日志而非放宽阈值。
+- **单元测试已核实的历史部分**：`7b5cbcc` Robolectric [#40629290421](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629290421) 5/5 组 SUCCESS；`8e581ea` 原子下载索引合成回归测试成功。旧全量 CI `b0db300` [#40630048456](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40630048456) 为516测试中1条标签英语窄屏布局断言 FAIL；`d8b7f4` 更正后 `e42919a` 的定向标签单测 SUCCESS，但 **最新候选全量 Android CI 仍需单独确认**。
+- **当前精确源码门禁**：[真实九组矩阵](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695)、[八章模拟器](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706)、[定向 Robolectric](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745752)、[全量 CI](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634752986) 均在最近查询时未有最终结论，不得判成 PASS。
+
+**下一步优先顺序**：检查上述精确 SHA 的实际成功/失败与新图，修复仍空白或读不清的页面；真实 Android OEM 设备复核、Windows/v0.5.0 功能对照；之后按 S2→S3 来源解耦、S4 Issue #199/#200/推荐、S5 原子索引/迁移/升级回滚、S6 双端发布推进。历史42+新增12案例原文和状态继续保留。
+
+---
+
+## S0/S1 当前新增回执｜2026-10-27：标签英语窄屏与九组脚本失败分类
+
+- 旧 [Android CI #40629479729](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629479729)、[#40629559940](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629559940) 的 Android job 是实际 **FAIL**，失败测试精确定位 `TagParticipationActivityTest.headerFitsEnglishNarrowPhoneWithoutCoveringBack` 第66行（标题起点不应贴住紧凑返回键）。`d8b7f4c` 在正式标签页加至少72dp返回控制宽度、标题最多两行，并强化原测试的实际 back/title 几何边界检查。仍以新 SHA Android 复测判定是否真的修好。
+- [首次三语矩阵 #40629907105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907105) **FAIL** 的实际根因是 here-doc 输入被子 `adb` 进程提前读取：首个中文浅色360dp100%案例已通过1次 Instrumentation 且写出6张 PNG，余下八个案例未执行；它不是第一个页面渲染FAIL。`d8b7f4c` 改为 `mapfile` 事先完整读取9条用例，仍保留 `count == 9` 的硬门禁，新增标签参与页为第7个视图，目标63张原生截图；任何未执行不可算PASS。
+- `e42919a` 将 `TagParticipationActivityTest` 原测试加入**独立 Robolectric 矩阵**，与原 Full Android CI 双轨诊断。运行结果仍待新 SHA Actions/原始 JUnit。
+- `8e581ea` 的 `PhoneDownloadStoreAtomicTest` 已在 [定向 job #40629907129](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907129) 单组 **SUCCESS**；测试全部使用合成文件，无生产升级证据。八章 VSpot 的复测 [#40629907241](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907241) **SUCCESS**，但 G1 仍待实体设备和用户确认。
+- S2 仅执行 read-only import 关系核查（见 [来源耦合审计](docs/PRODUCT_RECOVERY_S2_S3_SOURCE_DEPENDENCY_AUDIT_20261027.md)），还未达到 `NEW-MOD-01`、`NEW-SRC-01` 的 CI/产物验收。保持 Draft、正式 main、发布和 OTA 不变。
+
+---
+
+## 最新执行回执｜2026-10-27 深度开发续轮（精确证据）
+
+当前 Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 继续保留 `main` `095d6910` / Stable v0.5.0 / OTA / 用户生产数据不变。**G1 用户验收、G2 真正来源外置、G3 正式升级回退、G4 发布仍 OPEN**。下列成果不代表完整 S1 或 S5 验收。
+
+- **8章实页引导通过**：`b5e134f` 的 [Android 35模拟器 #40622970105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105) **SUCCESS**，18/18 Instrumentation 正常、40 张原始 PNG（中/浅/360dp，100%和150%字号）。画风最后一章确实显示5个目标，逐步可见与跳过无模型操作已验证，短期工件 [#12788940746](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105/artifacts/12788940746)。实际下载并检查两张字体汇总图，未自动给出全部语言/主题/OEM 的 PASS。
+- **Robolectric 停滞收口**：旧5组中3 SUCCESS、2因持续动画进入测试周期而 CANCELLED（不是FAIL断言）。`7b5cbcc` 使测试生命周期只观察已消费 one-shot 引导后状态，另保留真机模拟器对动画的验收。[隔离矩阵 #40629290421](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629290421) **5/5组 SUCCESS 且独立 JUnit 文件存在**。整套 Android 全量 CI 仍须独立验证。
+- **新增多语言/主题/屏宽真实图任务**：`a0f2d9a`+`061b2c1` 加入9组交叉模拟器测试，六页×九组目标54张原始PNG；英文/日文、深色、393/480dp、130%字号首次进入真实截图流程。原始 #40629554559 被后续新 SHA 触发的同组并发策略 CANCELLED，**不能计为测试失败/通过**；需看最新 #40629907105 的结果。9组仅为代表性，不是3×3×3×2全排列。
+- **S0 数据持久性候选修复**：`c9e31e9`+`8e581ea` 将 `PhoneDownloadStore` JSON 索引改为 AtomicFile 原子提交；读取损坏/旧 `.tmp` 时 UI 警示并阻止任何保存/删除/目录重算，防止隐式将错误空索引写回；显式删除正文移至索引保存成功之后。保留旧 JSON v1 schema 和路径，增加5个纯合成 Robolectric 测试：损坏保护、兼容写、备份恢复、旧 `.tmp`、禁止误删本地正文。**尚未经这些新测试完整运行，不等于真实迁移/用户数据安全验收**，更不意味着已触及生产目录。
+- **完整 CI 可观测性**：本轮给 Android 测试设置明确 step/job 超时，`--info` 输出测试运行细节，并在失败/超时上传有效 JUnit，避免再把无限停滞当作全量通过。Web/Desktop 与发布过程未删改。
+
+近期应以新 SHA 的 Android focused/locale-matrix/CI 运行结果为依据继续修复，S1 完成物理手机验收前不进入正式 S6 发布。
+
+---
+
+## S1 最新执行回执｜2026-10-27，7章真实聚光及大字号缺陷整改
+
+本段为后续推进的**当前权威状态快照**；不改写下文历史失败/中间运行和旧42+新增12条验收映射。生产正式版 `v0.5.0` / main `095d6910` / OTA / 用户真实数据保持不动；Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 未合并。
+
+- **实际通过**：源码 `eea0db58` 的 [Android35 模拟器运行 #40621769915](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915) **SUCCESS**，16/16 独立 Instrumentation PASS、30张实际 PNG（中/浅色/360dp、100%与150%字体）。第0、1、3、4、5、6、7章真实高亮和跳过不记已读；人工偏好保存键维持禁用、远程来源无自动连接。截图及原始日志见短期工件 [#12787068908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915/artifacts/12787068908)。
+- **真实图像复核及纠正**：下载解包目视检查，150%字体来源行标题末字孤行，推荐画像 Engine 长版本号被窄列拆成多段且整张卡片成为过大 VSpot 目标。已提交 `ff37b77`（大字号窄屏 SettingsRow 上下排）、`116244b`（技术状态行上下排、画像高亮真实标题），附 Robolectric 测量测试和截图路径守卫。此修复必须以新源码复拍才能判已验收。
+- **最后一个高级章节**：`b5e134f` 将第2章原有五步画风 VSpot 加入真实 Instrumentation，校验控件在视口内、五张每档字体截图、跳过不写入已读或推荐新周期，同时补齐滚动目标逻辑。**尚未返回完整运行结论，当前仍是7/8个章节已验证，绝不宣称8/8通过**；[视觉工作流](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105)。
+- **Android 测试阻断仍开放**：[首次聚焦单测 #40621041603](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621041603) 在 Gradle Javac 通过后卡在 `:app:testDebugUnitTest`，至任务时限被取消；没有 JUnit 成功证据，不将其记作测试失败或 PASS。新 `8efe395` 用5个独立 Robolectric 类、每个12分钟上限及逐类 JUnit 产物诊断卡点，实际运行仍待核实。普通 Android 全量 CI 亦未获得当前精确源码的完整通过结论。
+- **阶段门禁**：S0/S1 IN_PROGRESS，S2 限定来源身份路由 IN_PROGRESS，S3–S6 OPEN。G1 用户未验收、G2 真正来源外置、G3 老版升级回滚、G4 双端发布均未通过。存在潜在 `PhoneDownloadStore` 损坏索引静默空值/非原子替换风险，未实测生产事故，也未修改个人下载。
+
+**下一动作**：收口本次最后一章及字号修复的真实截图 → 独立判定被取消的 Android 单测故障原因并修复 → 全量中英日/浅深主题/360-480dp与物理手机 G1 → 然后 S2-S3、S4、S5、S6。禁止把模拟器 PASS 直接改成用户接受或正式发布。
+
+---
+
+## 当前执行权威快照｜2026-10-27 产品恢复 S0–S6
+
+**本段更新最近结果，以下历史段落均为各自时间点的原始记录，不自动改写。** 仍基于 Stable v0.5.0 + [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)；正式 main `095d6910`、Release、OTA、安装与生产资料未改。当前阶段 S0 IN_PROGRESS、S1 IN_PROGRESS、S2 有限安全端口 IN_PROGRESS，S3–S6 PLANNED；G1 用户验收 NOT_ACCEPTED，G2/G3/G4 OPEN。
+
+- **实际成功：** `cab5067c` 的 [Android35 模拟器 #40620663666](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666) 10/10 Instrumentation PASS，18 张真实 PNG（100%/150%字体各9张）。已验证第0/3/5/7章真实 VSpot 两步、跳过不记已读；更新导览只读。有效证据 [#12787147081](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666/artifacts/12787147081)。不是全八章、多语言、真机或用户 ACCEPTED。
+- **已修复旧静态测试漂移：** `34ffaa1` 将原先 3 个 Web/Desktop 失败契约对应到现有 QA 安装隔离、多语言资源、来源归属路由；**保留冻结 Host 哈希及原测试，无删减。** [此 SHA 的 Web/Desktop 作业](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620102405) 已实际 SUCCESS；Android 全量 CI 终态及后续源码须另核对。
+- **新增聚焦单测基础设施：** `b44b9f97` 添加限时 Android Robolectric 工作流，执行本批账户/下载/高级引导相关真实测试，上传原始 JUnit 结果。新增工作流的首轮运行状态只以 Actions 原始结果为准。
+- **尚未达标：** 四个高级章节 1/2/4/6、三语/深浅/多设备完整视觉矩阵、用户提出的具体手机缺陷全链路复现、物理手机验收、Windows 功能对等、纯核心包去除所有来源 SDK、正式签名覆盖升级、全量42+12案例复测。
+- **新增潜在风险未修复：** `PhoneDownloadStore` 索引损坏与不原子替换路径需 S0/S5 独立故障注入和回滚方案；尚无现实事故证据，不改动用户数据。
+
+**近期下一动作**：先处理当前 Android 全量 CI 与定向测试真实失败，再补 S1 的其余四章及真实屏宽/字体/语言证据；在 G1 通过前不宣布架构与完整产品验收。工作计划见 [S0–S6](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md)，历史 42 项与新增 12 项分别沿用 [验收映射](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。
+
+---
+
+## S1 真实截图整改、QA2 产物校验与 QA3 数据隔离（2026-10-27）
+
+当前代码最新提交 `a28404e7fbdbad20906688a9fd0814bd1f658acd`，仍为 [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)，`main`、正式 v0.5.0、Release/OTA 与用户生产资料均未改变。**G1 用户验收、G2 来源外置、G3 旧版无损升级、G4 正式发布仍 OPEN**。
+
+- **首次实体 UI 图像证据已成功**：[Android 35 模拟器 #40539159767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40539159767) 在源码 `d7afa3db` 上获得了真实中文浅色 `AdvancedGuideActivity` 截图 2 张（Android 字体 100% 和 150%），已下载 PNG 与 Instrumentation/Logcat 并由本对话进行人工目视核查。该画面无明显横向裁切，但安全说明过长、选中章节重复展示、主 CTA 层级弱和底部导航按钮贴边。**不等于八章节聚光动画或其他语言/手机已通过。**
+- **针对截图修复**：`7689f26b` 将首屏安全及操作说明压缩为短提示，原完整文本移入原可折叠说明，移除与 Spinner 重复的章节标题，主 CTA 用主题强调色，底部两个按钮增间距，补 Robotlectic 测试和 3 语言资源。修复后 [模拟器复拍 #40541090821](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090821) **仍为 QUEUED**；新截图未回收之前不能视为修复验收。
+- **QA2 Dev v91 已完成**：[CI #40541090823](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090823) **SUCCESS**；工件 [#12750938267](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090823/artifacts/12750938267) 已下载，六文件逐项核验，APK 独立 SHA 计算 PASS。`com.picalibrary.android.dev` / code91 / APK 14,578,316 bytes / SHA-256 `568bbcb04f1af56ce0056599e103fb38d1244807acbd898032e3c35d4afd76ed` / Debug 证书 `a2f84443b72af8c85ad69d0d7d1c47a729b03169b4edc9c84165fe141e26576a`；与 v90 Debug 证书 `d3588d98...` 不一致，**不得称 v91 可覆盖升级既有 Dev90**。
+- **修复 QA 测试数据风险**：`a28404e7` 添加仅允许 `.s1qaN` 的独立 QA 后缀配置，普通 Debug 默认 `com.picalibrary.android.dev` 不变；下一工件 QA3 `v92` 使用 `com.picalibrary.android.s1qa3`、不同配对 scheme、单独应用显示名，避免不同临时 Debug 证书覆盖旧 Dev 资料。对应 [QA3 workflow #40542505173](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40542505173) **QUEUED**，尚无实际 APK 产物/验收；这不是生产签名迁移的解决方案。
+- **S2 端口切入**：前面 `ProviderRegistry.forPageForComic`、ProviderService/OnlineReaderService work-owned 图片权限校验及独立模块测试已提交，**不能**由 S1 Debug 包结果推断来源已从 APK/Windows 移除或 G2 成功。
+- 旧 42 案例和 12 新增标准保持原有状态，不把 Debug 打包成功或“2 张主目录图像”重判为完整 NEW-UI-01/02 PASS。阶段证据详见 [S1 验收台账](docs/PRODUCT_RECOVERY_S1_UI_CLOSEOUT_20261027.md)、[Dev90/QA3 交接](docs/PRODUCT_RECOVERY_S1_DEV90_HANDOFF_20261027.md)。
+
+---
+
+## S1 开发包实体校验与最小模拟器回归（2026-10-27）
+
+**唯一交付事实**：独立的 [S1 Dev QA workflow #40526064065](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065) 在精确源码 `d288bc225e15e49c40eea06b52c67193f95ba457` 上 **SUCCESS**。已实际下载其 [6 文件 ZIP #12745469077](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065/artifacts/12745469077)，逐文件回读并独立计算 APK SHA-256，等于包内 SHA256SUMS。编译/Lint/签名合法性/包身份均经 GitHub Actions PASS；测试包含 Debug APK 但**未执行这条工作流内的完整 Robolectric 或用户手机验收**。
+
+- APK `Pica-Library-S1-Android-Dev-v90.apk`：**14,576,408 字节**，SHA-256 `bee99853830d5244c68eff2cda5eb58063564ea952a892d69de7b67e5c69ab28`；身份 `com.picalibrary.android.dev`、versionCode `90`、versionName `0.5.0-S1-QA-dev-pr35`，应用名称 `Pica Library Dev`，Android minSDK `28` / targetSDK `35`。证书 SHA-256 `d3588d987b4d0a6afdf4aed66909722db63011d5b7dacb1d7a8f509a07e4f6b1`。完整 ZIP 5,681,155 字节，SHA-256 `f4ee25f3ee182a0af0802334f79e7b124751091cbdd5bf70ef07579b377cb0d4`。GitHub Actions artifact 仅保留 1 天。
+- 该 DEBUG 签名不承诺兼容之前别的 Dev 安装；发生签名冲突不得为了覆盖测试包而自动删除已有 Dev 数据。正式 v0.5.0 APK 是不同的 `com.picalibrary.android` 包，当前未经稳定覆盖升级验收。测试包不含任何 S2 新增桌面 TypeScript 路由代码的部署证明。
+- **真实 UI 截图仍 NOT_ACCEPTED**：[#40526314386](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526314386) 已冷启动/构建 APK 但 Instrumentation 长时无完成信号，随后 CANCELLED；不是 24 张截图 PASS。新 [第一张真实指南最小截图 #40539159767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40539159767) 基于 `d7afa3db`，保留详细进度日志/150 秒超时，每个字体档先争取一张 `AdvancedGuideActivity`，**进行中，未确认 PNG**。
+- 对测试人员的简明交接：[S1 Android Dev90 测试包与验证规范](docs/PRODUCT_RECOVERY_S1_DEV90_HANDOFF_20261027.md)，覆盖真实聚光指南、书库多选、三个语言长标题、更新只读模式和数据不破坏。此前错误/原 42 验收仍保留，S1/G1 用户接受为 NOT_ACCEPTED，S2/G2 来源真正外置未完成，正式发布无授权。
+
+---
+
+
+## S1/S2 最近一次执行回执（2026-10-27 · PR #218）
+
+当前代码提交基线 **`2bb3b44b6c0b5fbfe0455f7beaa57995acbae07c`**。此条是本轮新增回执，不删除此前所有实际失败/证据。正式 v0.5.0、`main`、OTA 和用户资料仍未更动。Draft PR #218 未合并，S1/G1、S2/G2、S5/G3、S6/G4 均未通过用户验收。
+
+- **S1 模拟器真实证据**：首次 Gradle CWD 错误 `#40517358640`；第二次 Android 35 `/sdcard/Android/data` 权限拒绝 `#40519878220`（Debug APK、AndroidTest APK 已构建）；第三次 `#40522901087` 因 runner 用户缺 `/dev/kvm` 硬件加速而启动超时。均是 **FAIL / 没有可验收截图**，不可认定 UI 已验收。
+- 最新 KVM 预检/授权修正 `82558994`：Android 35 真实模拟器工作流 [#40526314386](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526314386) 的 **KVM 检查已 PASS**，但首次读取时完整截图步骤仍 `IN_PROGRESS`；尚未确认24张 PNG、字型布局与操作。如果 CI 仍失败，应严格区分启动、Instrumentation 或真实页面缺陷。
+- **Dev QA 安装物**：`#40521071684` 因重复完整 Android unit suite 达到工作流时间上限 CANCELLED，无 APK 工件。新 `d288bc22` 只保留打包工作流内 Lint/Debug assembly，并要求原 Android CI 独立做 JUnit；[#40526064065](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065) 最近查询是 QUEUED，未经证实的 APK 不能发给用户或称“可无痛升级”。
+- **S2 开始有真实读图链路**：在原 `ProviderRegistry` 之上新增 `forPageForComic`；真实 `ProviderService` 接入 `assertPageOwnedByComic/fetchPageForComic`；在线 `OnlineReaderService.picture()` 在缓存命中之前校验作品归属。新增回归覆盖来源冲突、缓存绕过与不完整新端口的 fail-closed 拒绝，旧 `fetchPage` 仍为 legacy 兼容。**源码已提交，不等于新 SHA 的测试已 PASS；尚未外置 Pica/EH/JM SDK。**
+- 当前阶段以 [S1 视觉验收矩阵](docs/PRODUCT_RECOVERY_S1_UI_CLOSEOUT_20261027.md)、[S2/S3 来源解耦审计](docs/PRODUCT_RECOVERY_S2_S3_SOURCE_DEPENDENCY_AUDIT_20261027.md) 为证据入口，并严格保留原 [42 项+新增 12 项验收映射](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。后续精确 SHA 的 Android/Web CI 仍在队列；NOT_RUN / QUEUED / PASS 不得混写。
+
+---
+
+
+## S1 视觉验证第 2 次失败与存储边界修复（2026-10-27）
+
+当前 [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 保持独立候选；最后这次源码修复为 `505b4a90b8da1eb78808e1b4fc859b6eec30171f`。正式 `main`、Stable v0.5.0、OTA 与用户账号/数据均未触及。G1 真实用户 UI 验收仍为 **NOT_ACCEPTED**。
+
+- `45e6e641` 修复了 Gradle 工作目录错误，真实 [Android API35 模拟器运行 #40519878220](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40519878220) 成功冷启动并执行 Gradle `:app:assembleDebug :app:assembleDebugAndroidTest`（**59 tasks / BUILD SUCCESSFUL**），两个调试 APK 均已编译。**之后的流程仍失败**：Android 35 拒绝 `adb shell rm -rf /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual`（Permission denied）。因此 **0 份可信 UI 截图，不能把 APK 编译成功写成模拟器验收通过**。
+- `505b4a90` 改用 `getFilesDir()/s1-visual-f100|f150` 的应用私有临时证据目录，使用仅对 Debug 应用可用的 `adb exec-out run-as com.picalibrary.android.dev cat` 逐个提取 12 个已知文件名。禁用 shell 直接删除受保护的 Android/data 目录；不读取应用用户其他数据。新 [模拟器运行 #40522901087](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40522901087) 已触发，**当前不得宣称成功或提供 PNG**。
+- 并行 [S1 Dev QA 构建 #40521071684](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40521071684) 源码 `b1cc4777` 使用隔离包名 `com.picalibrary.android.dev`、versionCode 90，严格经 JUnit/Lint/打包/签名/校验；构建任务仍应以真实 run 成功和工件存在为准。它与 `505b4a90` 只差视觉测试脚本/AndroidTest 改动，没有普通 Android UI 业务代码差异；**仍未正式发布**。
+- 本次仅修复证据基础设施，不改推荐/Visual、数据库/来源 SDK、正式 updater。Android 真机/多字体/三语言的完整视觉证据与 G1 仍待验证；S2/S3 来源真实外置、老用户一键迁移和发布门禁保持未完成。
+
+---
+
+## S1 实际视觉证据与独立测试包（2026-10-27，继续推进）
+
+**开发主体：** [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)；正式版 `v0.5.0`、生产 `main`、正式 OTA、历史 PR 和真实用户数据均未改。S1/G1 用户验收仍为 **NOT_ACCEPTED**。
+
+- **独立模拟器真实 UI 验证**：新增 `.github/workflows/s1-android-visual-evidence.yml` 和 `S1AndroidVisualSmokeTest.java`，计划以 Android 35/360dp、100%/150% 字体、中文/英语/日语、深浅模式，对高级引导、标签/多选/更新页留下 **24 张截图**。数据仅写入 `com.picalibrary.android.dev` 临时目录；不需要正式来源、账号或用户数据。截图只允许公开仓库上传且保留 1 天。**未有截图包之前禁止宣称可视化通过。**
+- **真实失败与修复**：首次视觉运行没有 APK/PNG：模拟器成功启动，但 `android-emulator-runner` 的多行 `script` 各命令工作目录不能保证持久，Gradle 错误在仓库根目录找不到 `settings.gradle`（失败运行 [40517358640](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40517358640)）。`45e6e641` 将完整流程改为同一 Bash 进程内执行的 `scripts/run-s1-android-visual-emulator.sh`；新 [可视化运行 40519878220](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40519878220) 发起时未完成，**不得沿用旧版 CI PASS**。
+- **独立 Dev QA APK**：添加 `.github/workflows/s1-android-dev-package.yml`，在源码 `b1cc4777` 上独立执行 Android JUnit/Lint/Debug 编译并验证 APK 签名、包名、版本和 SHA256；目标输出 `Pica-Library-S1-Android-Dev-v90.apk`，固定 `com.picalibrary.android.dev`，与 Stable 正式包隔离。自动产物仅保留一天，无第三方签名私钥及 Release/OTA。首次 [QA 工作流 40521071684](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40521071684) 发起时仍在运行，**未证明候选 APK 已产生**。
+- **边界不改变**：Gradle/API35 模拟器证据并非真实手机/OEM 验收；Dev APK 不代表正式签名覆盖升级；Pica/EH/JM 具体来源协议仍捆绑于历史程序，S2/S3 仍需要真正外置、独立组件生命周期与老用户迁移。
+
+**下一动作**：按精确 GitHub Actions run 结果定位脚本、仪表测试或实际布局故障；只在生成的可审阅截图/Dev 安装包确实存在时，把对应记录由 NOT_RUN 更新为自动/模拟器已验证；维持 G1 人工验收 OPEN，不越级提交 Release。
+
+---
+
+
+## S0–S1 当前开发回执（2026-10-27，PR #218 独立 Draft）
+
+产品策略不变：正式 `v0.5.0` 是功能/视觉体验基线；Dev89 源码是未发布工程起点。当前本分支精确源码 `8f8124657d203c71a51ea5e7121fd6798bfee998`；不得合并/发布/OTA。新版用户验收状态 **NOT_ACCEPTED**，真实手机/UI/字体放大和源码包体/来源外置门禁仍 OPEN。
+
+- **S1 首批有效改动**：设置行有界标题/状态宽度、窄屏五项多选操作栏分行、标签参与页面标题宽度限制、更新版本说明可滚动、WebDAV 表单在主线程快照、只读引导不会重启更新任务。
+- **高级引导可用性推进**：真实 VSpot 页面控件定位，8 章（其中画风复用历史五步），步骤说明三语言；手册正文改为可展开的次级内容，**交互引导默认呈现在正文前**，不再让长文字挡住入口；进度返回刷新，断点/跳过按现有 store，业务操作需用户手动执行。
+- **自动证据范围**：Robolectric/Java 回归覆盖导航/控件/预览/窄屏/三语言部分情况；新的 Tag 标题有 360dp 测量测试。用户多处手机排版问题尚未提供完整截图，不伪造具体位置或宣布已消除；物理设备与 130%/150% 字体及 OEM 验收仍须补充。
+- **历史失败可追溯**：早期 Android 测试行数断言失败（caacd016）；Lint `WrongConstant` 失败（868e4ec）；Web 测试 20 次固定引导重试断言失败（f64143b）；测试中 Activity 视图查找编译失败（a7118094）；较早 57275365 / 64009d41 集中旧 P2 工作流曾因外部实机证据/运行取消导致 automated-summary FAIL，不可与独立 Android/Web CI 绿灯混为全项 PASS。未覆盖全量专项时保持未验收。
+- 先前 `be75219` Android/Web 两项 CI 已通过；之后各源码提交须以**对应 SHA** 的 Actions 为准。当前 `8f812465` 自动验证在提交时仍未结束，**不可预先填 PASS**。
+- **证据与下一动作**：[S1 UI 修复/待验收矩阵](docs/PRODUCT_RECOVERY_S1_UI_CLOSEOUT_20261027.md)；严格按 [S0–S6 权威任务计划](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md) 和 [原 42 项+新增门禁](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。继续完成来源与真实 UI 证据之后才可讨论 G1；S2/S3 只已完成静态审计，来源正式外置未实现。
+
+---
+
+## 当前执行权威：产品恢复 S0–S6（2026-10-27）
+
+**本段优先于下面全部历史“下一步/状态快照”；历史事实、任务 ID、失败记录均原样保留。** 此次工作基于正式 `v0.5.0` 作为功能/UX 基线、Dev89 `af42b4d3ecafd1d51b3c2ef8aee7339c56c75921` 作为未发布工程起点；当前新分支 `codex/product-recovery-s0-s1-20261027` / [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)。旧 PR #203/#205–#217 及 main 均不自动合并或发布。
+
+- **总计划**：[S0–S6 分阶段实施方案](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md)；两条主线为正式版用户体验保留基础上的**实际模块维护隔离**和**Pica/EH/JM 等来源可选外置**。一键升级、Issue #199/#200、推荐/Visual、LAN/WebDAV 和旧用户数据兼容持续保留。
+- **原验收**：[42 个原案例逐一映射 + 12 个明确新增案例](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)；新阶段不删除/重判旧 42 项，不以“关闭来源默认启用”或“Windows 不带 JM JVM”冒充来源外置。
+- **S0 已推进**：[首轮源码核查](docs/PRODUCT_RECOVERY_S0_BASELINE_20261027.md)、[v0.5.0 官方 Release 资产/功能基线](docs/PRODUCT_RECOVERY_V050_OFFICIAL_BASELINE_20261027.md)。正式资产哈希来自官方元数据，本轮未重新下载独立计算；真实 Windows/手机对照、完整来源文件清单仍需验收。
+- **S1 已提交源码，未经用户验收**：Android `SettingsRow` 长状态文本宽度约束；高级 8 章节中的 7 个使用现有 VSpot 复用真实双控件聚光、画风章节沿用原五步；三语言独立短说明；教程进入更新页不自动检查更新，账户页教程避免首次自动账户探测；窄屏书库多选栏自适应两行、宽屏一行。已增加 Robolectric 测试；**物理手机/真实截图仍 NOT_RUN，排版问题还不能标为修完**。
+- **新 CI 的原始失败不可删改**：PR218 首次 `caacd016` Android 481 测试中 2 个新增 Robolectric 行数断言失败；后续 `868e4ec` 定位并修复该断言，但 Android Lint 因两个错误的旧 Layout 常量引用 FAIL；后续源码已移除常量并重新提交。**最终精确 SHA 门禁结果以新的 Actions 检查为准，不预先声称通过**。
+- **安全边界**：仅独立 Draft；不改生产 app/数据、账号、OTA、Release/tag、冻结 PR，不下载私钥，不在用户设备上安装或擅自迁移。任何 CI PASS 不等于 USER_ACCEPTED。
+
+当前顺序：**S0 功能差异与资料矩阵 → S1 Android 排版/交互与真实控件引导 G1 → S2 核心模块隔离 → S3 漫画源真实外置 G2 → S4 书库/标签/推荐/跨端整合 → S5 升级/性能 G3 → S6 双端集中验收 G4**。后续小修只改变对应任务和证据，不得无限扩展 Dev 候选或宣布整个项目完成。
+
+---
+
 ## Concentrated Dev89 — actual packages verified, teardown-only gate correction (2026-10-27 local)
 
 Exactfe84055f4202b2c2917d0d9ee4fd8992fedd2b32 ordinaryCI40474512657 both jobsPASS. Dedicated40474606748 terminal9/10PASS, overallFAIL: source/Windowsunit/actualWindows/Androidsigning and five runtime scenesPASS; launch-rollback failed only in finally/stopOwned. Original result has actualHelperRollback=true, exactApplicationTree=true, selectedStateCanaries=true and no browser/source boundary events, but teardownError='Refuse process outside exact owned root'. Preserve overallFAIL, not waive cleanup. Raw stack is ownedPid called after process.kill at the existing second wait. Original generic assertion omitted PID/path-presence details; it cannot distinguish a transient missing CIM executable path from PID reuse/foreign process, so no retrospective exact-cause claim.

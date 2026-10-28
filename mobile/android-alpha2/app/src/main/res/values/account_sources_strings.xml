@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="account_sources_title">Account &amp; sources</string>
+    <string name="account_sources_status_local">Signed in on this device</string>
+    <string name="account_sources_status_desktop">Connected via Desktop</string>
+    <string name="account_sources_status_disconnected">Not connected</string>
+    <string name="account_sources_eh_account">E-H account</string>
+    <string name="account_sources_exh_extension">ExH access</string>
+    <string name="account_sources_desktop_provided">Provided by Desktop</string>
+    <string name="account_sources_jm_description">Phone login, favorites import and online reading</string>
+    <string name="account_sources_paired_explanation">Desktop account status is synced when paired. Configure an account on this phone only if you want direct access while Desktop is offline.</string>
+</resources>

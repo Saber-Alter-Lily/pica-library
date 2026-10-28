@@ -8,6 +8,15 @@ def previewSigningConfigured = previewKeystorePath != null && !previewKeystorePa
         previewKeystorePassword != null && !previewKeystorePassword.isBlank()
 def buildVersionCode = Integer.parseInt(System.getenv('PICA_ANDROID_VERSION_CODE') ?: '55')
 def buildVersionName = System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.5.0'
+// Each disposable manual-QA snapshot has a distinct Android identity. Never
+// replace an earlier Dev install with a different ephemeral Debug key.
+def isolatedQaSuffix = System.getenv('PICA_ANDROID_QA_PACKAGE_SUFFIX') ?: ''
+if (isolatedQaSuffix && !(isolatedQaSuffix ==~ /^\.s1qa[1-9][0-9]{0,2}$/)) {
+    throw new GradleException('Invalid S1 QA application suffix')
+}
+def debugAppSuffix = isolatedQaSuffix ? isolatedQaSuffix : '.dev'
+def debugAppLabel = isolatedQaSuffix ? "Pica Library S1 QA${isolatedQaSuffix.substring(5)}" : 'Pica Library Dev'
+def debugPairScheme = isolatedQaSuffix ? "picalibrary-${isolatedQaSuffix.substring(1)}" : 'picalibrary'
 
 android {
     namespace 'com.picalibrary.android'
@@ -57,12 +66,12 @@ android {
     buildTypes {
         debug {
             // Side-by-side manual QA build. It must never replace the formal app.
-            applicationIdSuffix '.dev'
+            applicationIdSuffix debugAppSuffix
             versionNameSuffix '-dev-pr35'
             debuggable true
             manifestPlaceholders = [
-                    appLabel  : 'Pica Library Dev',
-                    pairScheme: 'picalibrary'
+                    appLabel  : debugAppLabel,
+                    pairScheme: debugPairScheme
             ]
             // CI candidate builds reuse the fixed official signing identity when configured so future Dev APKs
             // can upgrade the previous Dev installation without shipping a private key.

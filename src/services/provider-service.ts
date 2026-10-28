@@ -464,7 +464,19 @@ export class ProviderService {
     }
 
     async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
+        // Preserve the legacy image-locator API for callers without a comic identity.
         const provider = this.registry.forPage(locator)
+        return this.sources.run(provider.id, () => provider.fetchPage(locator, maxBytes))
+    }
+
+    /** A media cache hit must not bypass ownership between a work and its source. */
+    assertPageOwnedByComic(comicId: string, locator: string): void {
+        this.registry.forPageForComic(comicId, locator)
+    }
+
+    /** Preferred source-bound online reading transport, independent of URL ownership guesses. */
+    async fetchPageForComic(comicId: string, locator: string, maxBytes = 20 * 1024 * 1024) {
+        const provider = this.registry.forPageForComic(comicId, locator)
         return this.sources.run(provider.id, () => provider.fetchPage(locator, maxBytes))
     }
 

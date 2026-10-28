@@ -9,8 +9,16 @@ describe('Android side-by-side Dev package contract', () => {
     const gate = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/OfficialBuildGate.java', 'utf8')
 
     expect(gradle).toContain("applicationId 'com.picalibrary.android'")
-    expect(gradle).toContain("applicationIdSuffix '.dev'")
-    expect(gradle).toContain("appLabel  : 'Pica Library Dev'")
+    // Normal dev remains .dev; each isolated QA build must use a bounded, explicit
+    // suffix and distinct pairing scheme rather than sharing a different debug key.
+    expect(gradle).toContain("def isolatedQaSuffix = System.getenv('PICA_ANDROID_QA_PACKAGE_SUFFIX') ?: ''")
+    expect(gradle).toContain("def debugAppSuffix = isolatedQaSuffix ? isolatedQaSuffix : '.dev'")
+    expect(gradle).toContain('applicationIdSuffix debugAppSuffix')
+    expect(gradle).toContain("throw new GradleException('Invalid S1 QA application suffix')")
+    expect(gradle).toContain("def debugPairScheme = isolatedQaSuffix ?")
+    expect(gradle).toContain('pairScheme: debugPairScheme')
+    expect(gradle).toContain('appLabel  : debugAppLabel')
+    expect(gradle).toContain("'Pica Library Dev'")
     expect(gradle).toContain("appLabel  : 'Pica Library'")
     expect(gradle).toContain("versionNameSuffix '-dev-pr35'")
     expect(manifest).toContain('android:label="${appLabel}"')

@@ -11,17 +11,32 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
     private LinearLayout content;
     private TextView exhState;
     private int probeSerial,desktopSerial;
+    private static final String STATE_GUIDE_PREVIEW="guidePreview";
+    // The chapter extra is consumed by LocaleAwareActivity.onPostResume. Keep the
+    // non-probing state for later resumes and configuration changes.
+    private boolean guidePreview;
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
+        boolean requested=getIntent()!=null
+            &&getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)==0;
+        guidePreview=saved==null?requested:saved.getBoolean(STATE_GUIDE_PREVIEW,requested);
         Ui.applyWindow(this);
         renderShell();
     }
 
+    @Override protected void onSaveInstanceState(Bundle state){
+        state.putBoolean(STATE_GUIDE_PREVIEW,guidePreview);
+        super.onSaveInstanceState(state);
+    }
+
+    // Read-only, package-scoped contract for guide preview regression tests.
+    boolean isGuidePreview(){return guidePreview;}
+
     @Override protected void onResume(){
         super.onResume();
         renderContent();
-        refreshDesktopAccountState();
+        if(!guidePreview)refreshDesktopAccountState();
     }
 
     @Override protected void onDestroy(){
@@ -41,8 +56,11 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         LinearLayout bar=new LinearLayout(this);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));
-        bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));
-        bar.addView(Ui.text(this,"账号与来源",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
+        bar.addView(Ui.button(this,getString(R.string.common_back),v->finish(),true));
+        TextView heading=Ui.text(this,getString(R.string.account_sources_title),22,Ui.TEXT,true);
+        heading.setTag("account-sources-heading");
+        heading.setMaxLines(2);
+        bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
         root.addView(bar);
         ScrollView scroll=new ScrollView(this);
         content=new LinearLayout(this);
@@ -55,18 +73,22 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         renderContent();
     }
 
-    private static String status(boolean local,boolean desktop){
-        if(local)return "已登录（本机）";
-        if(desktop)return "已由 Desktop 连接";
-        return "未连接";
+    private String status(boolean local,boolean desktop){
+        if(local)return getString(R.string.account_sources_status_local);
+        if(desktop)return getString(R.string.account_sources_status_desktop);
+        return getString(R.string.account_sources_status_disconnected);
     }
 
     private void renderContent(){
         if(content==null)return;
         probeSerial++;
         content.removeAllViews();
-        content.addView(SettingsRow.row(this,getString(R.string.source_choices_title),getString(R.string.source_choices_summary),v->startActivity(new Intent(this,SourceChoicesActivity.class))));
-        content.addView(SettingsRow.row(this,getString(R.string.host_title),getString(R.string.host_entry),v->startActivity(new Intent(this,HostSourceActivity.class))));
+        LinearLayout sourceChoices=SettingsRow.row(this,getString(R.string.source_choices_title),getString(R.string.source_choices_summary),v->startActivity(new Intent(this,SourceChoicesActivity.class)));
+        sourceChoices.setTag(AndroidOnboarding.ADV_SOURCE_CHOICES);
+        content.addView(sourceChoices);
+        LinearLayout hostChoices=SettingsRow.row(this,getString(R.string.host_title),getString(R.string.host_entry),v->startActivity(new Intent(this,HostSourceActivity.class)));
+        hostChoices.setTag(AndroidOnboarding.ADV_SOURCE_HOST);
+        content.addView(hostChoices);
 
         boolean paired=BridgeStore.paired(this);
         boolean localPica=PicaAccountStore.load(this).configured();
@@ -90,7 +112,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         card.addView(head);
         card.addView(SettingsRow.statusLine(
             this,
-            "E-H 账号",
+            getString(R.string.account_sources_eh_account),
             SourceAccessUi.status(this,"eh",status(localEh,desktop.ehConfigured))
         ));
 
@@ -98,7 +120,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         String exhLabel=!SourceAccess.enabled(this,"eh")?getString(R.string.source_disabled):localEh
             ? capability.label()
             : desktop.ehConfigured
-                ? "由 Desktop 提供"
+                ? getString(R.string.account_sources_desktop_provided)
                 : capability.label();
         exhState=Ui.text(
             this,
@@ -109,14 +131,14 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
                 : Ui.MUTED,
             true
         );
-        card.addView(SettingsRow.statusLine(this,"ExH 扩展",exhState));
+        card.addView(SettingsRow.statusLine(this,getString(R.string.account_sources_exh_extension),exhState));
         content.addView(card);
 
-        content.addView(SettingsRow.row(this,"JM",SourceAccessUi.status(this,"jm","本机登录、收藏导入与在线阅读"),v->startActivity(new Intent(this,JmSourceActivity.class))));
+        content.addView(SettingsRow.row(this,"JM",SourceAccessUi.status(this,"jm",getString(R.string.account_sources_jm_description)),v->startActivity(new Intent(this,JmSourceActivity.class))));
         if(paired&&(desktop.picaConfigured||desktop.ehConfigured)){
             TextView note=Ui.text(
                 this,
-                "已自动同步 Desktop 的账号连接状态。电脑在线且已配对时，不需要为了 Desktop 提供的功能在手机重复登录；只有希望电脑关闭后仍由手机直接访问在线来源时，才需要配置手机本机账号。",
+                getString(R.string.account_sources_paired_explanation),
                 13,
                 Ui.MUTED,
                 false
@@ -125,7 +147,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
             content.addView(note);
         }
 
-        if(localEh&&SourceAccess.enabled(this,"eh"))refreshExh();
+        if(localEh&&SourceAccess.enabled(this,"eh")&&!guidePreview)refreshExh();
     }
 
     private void refreshDesktopAccountState(){

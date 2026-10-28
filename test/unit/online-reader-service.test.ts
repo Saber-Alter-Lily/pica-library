@@ -138,4 +138,50 @@ describe('independent online reader', () => {
             reader.picture('comic', 'episode-1', 0)
         ).resolves.toMatchObject({ contentType: 'image/png' })
     })
+
+    it('uses source-owned page transport and checks ownership even on cache hits', async () => {
+        const {db,dir,provider}=fixture()
+        const source={
+            ...provider,
+            assertPageOwnedByComic:vi.fn(),
+            fetchPageForComic:vi.fn(async()=>({
+                data:Buffer.from('owner-bound-page'),contentType:'image/png'
+            }))
+        }
+        const reader=new OnlineReaderService(
+            db,source,new PreviewCacheManager(path.join(dir,'owned-cache'))
+        )
+        await reader.picture('pica-work','episode-1',0)
+        expect(source.assertPageOwnedByComic).toHaveBeenCalledWith(
+            'pica-work','https://media.example/static/demo.png'
+        )
+        expect(source.fetchPageForComic).toHaveBeenCalledWith(
+            'pica-work','https://media.example/static/demo.png'
+        )
+        expect(source.fetchPage).not.toHaveBeenCalled()
+        source.assertPageOwnedByComic.mockImplementationOnce(()=>{
+            throw new Error('Page source does not match comic source')
+        })
+        await expect(reader.picture('pica-work','episode-1',0)).rejects.toThrow(
+            'Page source does not match comic source'
+        )
+        expect(source.fetchPageForComic).toHaveBeenCalledTimes(1)
+    })
+
+    it('rejects a partial work-owned transport contract before cached image access', async () => {
+        const {db,dir,provider}=fixture()
+        const cache=new PreviewCacheManager(path.join(dir,'partial-contract-cache'))
+        const partial={
+            ...provider,
+            fetchPageForComic:vi.fn(async()=>({
+                data:Buffer.from('image'),contentType:'image/png'
+            }))
+        }
+        const reader=new OnlineReaderService(db,partial,cache)
+        await expect(reader.picture('comic','episode-1',0)).rejects.toThrow(
+            'Source-owned page transport requires an ownership validator'
+        )
+        expect(partial.fetchPageForComic).not.toHaveBeenCalled()
+        expect(partial.fetchPage).not.toHaveBeenCalled()
+    })
 })

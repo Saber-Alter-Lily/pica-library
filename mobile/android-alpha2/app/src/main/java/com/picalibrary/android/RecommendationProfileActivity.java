@@ -96,7 +96,11 @@ public final class RecommendationProfileActivity extends LocaleAwareActivity {
         PortableRecommendationPackageStore.Snapshot portable=data.portable==null?new PortableRecommendationPackageStore.Snapshot():data.portable;
 
         LinearLayout identity=SettingsRow.panel(this,null);
-        identity.addView(Ui.text(this,"本机推荐运行",17,Ui.TEXT,true));
+        // The actual heading is the spotlight target. Highlighting the entire
+        // long card obscures most of the screen under large system fonts.
+        TextView runtimeHeading=Ui.text(this,"本机推荐运行",17,Ui.TEXT,true);
+        runtimeHeading.setTag(AndroidOnboarding.ADV_PROFILE_RUNTIME);
+        identity.addView(runtimeHeading);
         identity.addView(SettingsRow.statusLine(this,"Engine",Ui.text(this,NativeRecommendationStore.MODEL_VERSION,12,Ui.TEXT,true)));
         identity.addView(SettingsRow.statusLine(this,"本机 Cycle",Ui.text(this,runtime.cycleId.isEmpty()?"尚未生成":shortId(runtime.cycleId),12,Ui.MUTED,true)));
         identity.addView(SettingsRow.statusLine(this,"当前批次",Ui.text(this,runtime.available()?(runtime.batchIndex+1)+" / "+runtime.batches.size():"无",12,Ui.MUTED,true)));
@@ -105,7 +109,9 @@ public final class RecommendationProfileActivity extends LocaleAwareActivity {
         content.addView(identity);
 
         LinearLayout evidence=SettingsRow.panel(this,null);
-        evidence.addView(Ui.text(this,"画像证据",17,Ui.TEXT,true));
+        TextView evidenceHeading=Ui.text(this,"画像证据",17,Ui.TEXT,true);
+        evidenceHeading.setTag(AndroidOnboarding.ADV_PROFILE_EVIDENCE);
+        evidence.addView(evidenceHeading);
         evidence.addView(SettingsRow.statusLine(this,"手机收藏 / 已拥有",Ui.text(this,data.localFavorites+" / "+data.localOwned,12,Ui.MUTED,true)));
         evidence.addView(SettingsRow.statusLine(this,"Portable 人工调整",Ui.rawText(this,LocalizedText.ui(this,(data.localControls==null?0:data.localControls.length())+" 项",(data.localControls==null?0:data.localControls.length())+" items",(data.localControls==null?0:data.localControls.length())+" 件"),12,Ui.MUTED,true)));
         evidence.addView(SettingsRow.statusLine(this,"最近 30 天行为",Ui.rawText(this,LocalizedText.ui(this,data.recentCount+" 条 · 本机 + 已同步",data.recentCount+" behaviors · local + synced",data.recentCount+" 件の行動 · 端末内 + 同期済み"),12,Ui.MUTED,true)));

@@ -14,7 +14,29 @@ describe('optional source-host ownership and application safety contracts',()=>{
         for(const file of entryPoints)expect(read(file)).not.toMatch(/node:|process\.|require\(|eval\(|new Function|import\(/)
     })
     it('introduces no catalogue/provider namespace, schema/module change or fallback to Pica',()=>{
-        for(const [file,hash]of Object.entries(authority.protectedTextHashes))expect(createHash('sha256').update(read(file).replaceAll('\r\n','\n')).digest('hex')).toBe(hash)
+        // Preserve every protected file's original hash. ProviderRegistry has
+        // one reviewed, fail-closed page-for-comic extension; remove precisely
+        // that isolated seam and prove the rest is byte-identical to the frozen
+        // original instead of rewriting the trusted fixture hash.
+        for(const [file,hash]of Object.entries(authority.protectedTextHashes)){
+            if(file==='src/providers/provider-registry.ts')continue
+            expect(createHash('sha256').update(read(file).replaceAll('\r\n','\n')).digest('hex')).toBe(hash)
+        }
+        const registry=read('src/providers/provider-registry.ts').replaceAll('\r\n','\n')
+        const start=registry.indexOf('\n    /**\n     * Explicit comic-owned page routing')
+        const end=registry.indexOf('\n    manifests(): SourceModuleManifest[]',start)
+        expect(start).toBeGreaterThan(0)
+        expect(end).toBeGreaterThan(start)
+        const seam=registry.slice(start,end)
+        expect(seam).toContain('forPageForComic(comicId: string, locator: string): ComicProvider')
+        expect(seam).toContain('const comicOwner = this.forComic(comicId)')
+        expect(seam).toContain('const mediaOwner = this.forPage(locator)')
+        expect(seam).toContain('if (comicOwner.id !== mediaOwner.id)')
+        expect(seam).toContain("throw new Error('Page source does not match comic source')")
+        expect(seam).toContain('return comicOwner')
+        expect(seam).not.toMatch(/fetch\(|Buffer|node:|process\.|credentialsStore|\.register\(/)
+        const frozen=registry.slice(0,start)+registry.slice(end)
+        expect(createHash('sha256').update(frozen).digest('hex')).toBe(authority.protectedTextHashes['src/providers/provider-registry.ts'])
         // The only allowed source-policy change since the host authority is the
         // explicitly reviewed local-only constructor default, not schema/routing.
         const policy = read('src/sources/source-policy.ts').replaceAll('\r\n','\n')

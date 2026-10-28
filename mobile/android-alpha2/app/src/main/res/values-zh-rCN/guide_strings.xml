@@ -24,4 +24,50 @@
     <string-array name="advanced_guide_actions">
         <item>打开账号与来源</item><item>打开偏好调整</item><item>打开画风设置</item><item>打开电脑配对</item><item>打开远程存储</item><item>打开下载任务</item><item>查看本机推荐画像</item><item>打开软件更新</item>
     </string-array>
+
+    <!-- S1: short text for real VSpot targets, separate from the detailed offline reading handbook. -->
+    <string name="advanced_guide_interactive_hint">打开功能后会在真实页面标注操作控件。目标不可用会明确停止，不会代替你执行操作。</string>
+    <string name="advanced_guide_update_preview">引导预览：尚未检查更新，也未开始下载。</string>
+    <string-array name="advanced_spotlight_step_titles">
+        <item>选择漫画来源</item>
+        <item>用户自选 Host</item>
+        <item>标签参与范围</item>
+        <item>保存偏好调整</item>
+        <item>画风接入模式</item>
+        <item>画风影响强度</item>
+        <item>扫码配对</item>
+        <item>手动配对</item>
+        <item>选择 WebDAV 网盘</item>
+        <item>选择 WebDAV 网盘类型</item>
+        <item>查看后台任务</item>
+        <item>下载存储设置</item>
+        <item>本机推荐运行状态</item>
+        <item>画像证据</item>
+        <item>当前更新状态</item>
+        <item>主动检查更新</item>
+    </string-array>
+    <string-array name="advanced_spotlight_step_bodies">
+        <item>只启用真正需要的来源；打开此页不代表已登录。</item>
+        <item>自选 Host 是可选功能，本地阅读不依赖它。</item>
+        <item>先决定原始标签与私人标签是否参与推荐，再调整具体偏好。</item>
+        <item>偏好先暂存，保存是单独操作；引导不会替你点击。</item>
+        <item>画风是否参与实际排序需单独选择。</item>
+        <item>影响强度只会在你主动确认后修改。</item>
+        <item>仅在主动点击扫码按钮后，才会启动相机。</item>
+        <item>手动配对需电脑地址和临时配对码，引导不会填写或提交。</item>
+        <item>从已配置的网盘中选择；仅查看引导不会切换存储。</item>
+        <item>选择网盘类型并查看配置提示。只有主动点击测试或保存才会连接。</item>
+        <item>完成的下载与进行中的后台任务分开管理。</item>
+        <item>这里可以检查存储占用，不会因引导而删除作品。</item>
+        <item>查看手机当前推荐批次和同步的候选基础。</item>
+        <item>收藏构成与行为证据不等于你明确喜欢每个标签。</item>
+        <item>从帮助进入此页仅显示引导预览，不会自动检查更新。</item>
+        <item>需要检查更新时再主动点击此按钮。</item>
+    </string-array>
+    <string name="advanced_guide_start_interactive">开始本章交互引导</string>
+    <string name="advanced_guide_preference_preview">当前没有待保存的调整。修改偏好后才可保存。</string>
+    <string name="advanced_guide_notes_show">查看详细文字说明</string>
+    <string name="advanced_guide_notes_hide">收起详细文字说明</string>
+    <string name="advanced_guide_safety_short">只演示控件位置，不会自动登录、下载或修改设置。</string>
+    <string name="advanced_guide_interactive_hint_short">按高亮提示查看控件。</string>
 </resources>

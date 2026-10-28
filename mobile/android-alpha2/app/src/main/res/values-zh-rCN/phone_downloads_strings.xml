@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_downloads_title">手机下载</string>
+    <string name="phone_downloads_tasks_short">任务</string>
+    <string name="phone_downloads_loading">正在读取手机下载…</string>
+    <string name="phone_downloads_note">主动下载的正文单独持久保存，不受阅读与封面临时缓存上限或 LRU 清理影响。当前约 %1$s。</string>
+    <string name="phone_downloads_background_tasks">后台任务</string>
+    <string name="phone_downloads_storage_settings">存储设置</string>
+    <string name="phone_downloads_chapter_page_count">%1$d 章 · %2$d 页</string>
+    <string name="phone_downloads_open">打开</string>
+    <string name="phone_downloads_cancel">取消</string>
+    <string name="phone_downloads_delete">删除</string>
+    <string name="phone_downloads_delete_title">删除手机下载？</string>
+    <string name="phone_downloads_index_error">手机下载索引无法读取，原文件已保留。为防止数据丢失，暂时禁止修改，请先备份并检查存储。</string>
+    <string name="phone_downloads_delete_failed">删除失败</string>
+</resources>

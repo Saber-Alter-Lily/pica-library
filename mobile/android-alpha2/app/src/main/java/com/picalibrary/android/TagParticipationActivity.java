@@ -66,7 +66,23 @@ public class TagParticipationActivity extends LocaleAwareActivity {
     private void shell(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
-        LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.addView(Ui.button(this,tr("‹ 返回","‹ Back","‹ 戻る"),v->close(),true));bar.addView(Ui.text(this,tr("用于推荐的标签","Recommendation tag scope","おすすめに使うタグ"),20,Ui.TEXT,true));root.addView(bar);
+        LinearLayout bar=new LinearLayout(this);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(Ui.dp(this,8),Ui.dp(this,4),Ui.dp(this,8),Ui.dp(this,4));
+        // A small intrinsic compact back button can collapse below 40dp in
+        // English at 360dp. Reserve a real touch/reading target before the
+        // weighted heading so translated titles never overlap the navigation.
+        Button back=Ui.button(this,tr("‹ 返回","‹ Back","‹ 戻る"),v->close(),true);
+        back.setMinimumWidth(Ui.dp(this,72));
+        back.setMinWidth(Ui.dp(this,72));
+        back.setTag("tag-participation-back");
+        bar.addView(back,new LinearLayout.LayoutParams(-2,-2));
+        TextView heading=Ui.text(this,tr("用于推荐的标签","Recommendation tag scope","おすすめに使うタグ"),20,Ui.TEXT,true);
+        heading.setMaxLines(2);
+        heading.setTag("tag-participation-heading");
+        // Reserve width for the back control; long English/Japanese text wraps instead of leaving the screen.
+        bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+        root.addView(bar);
         ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,8),Ui.dp(this,14),Ui.dp(this,20));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         status=Ui.text(this,tr("正在读取本地标签…","Loading local tags…","ローカルタグを読み込み中…"),13,Ui.MUTED,true);root.addView(status);footer=new LinearLayout(this);footer.setOrientation(LinearLayout.VERTICAL);root.addView(footer);setContentView(root);root.requestApplyInsets();
     }
@@ -97,7 +113,7 @@ public class TagParticipationActivity extends LocaleAwareActivity {
         Button save=button(footer,tr("保存并应用本机","Save and apply locally","保存して端末に適用"),v->save());save.setTag("tag-save");save.setEnabled(dirty()&&!saving);updateStatus();
     }
     private interface Selection{void select(String value);}
-    private void addFilter(LinearLayout parent,List<String> values,String current,Selection action,boolean providers){Spinner spinner=new Spinner(this);List<String> labels=new ArrayList<>();for(String value:values)labels.add(value.isEmpty()?tr("全部","All","全て"):providers?(value.equals("private")?tr("私人","Private","個人"):value.toUpperCase(Locale.ROOT)):groupLabel(value));spinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels));spinner.setSelection(Math.max(0,values.indexOf(current)));spinner.setEnabled(!saving);spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){action.select(values.get(pos));}});parent.addView(spinner);}
+    private void addFilter(LinearLayout parent,List<String> values,String current,Selection action,boolean providers){Spinner spinner=new Spinner(this);List<String> labels=new ArrayList<>();for(String value:values)labels.add(value.isEmpty()?tr("全部","All","全て"):providers?(value.equals("private")?tr("私人","Private","個人"):value.toUpperCase(Locale.ROOT)):groupLabel(value));spinner.setAdapter(Ui.spinnerAdapter(this,labels));spinner.setSelection(Math.max(0,values.indexOf(current)));spinner.setEnabled(!saving);spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){action.select(values.get(pos));}});parent.addView(spinner);}
     private String groupLabel(String value){if(value.equals("PRIVATE"))return tr("私人标签","Private labels","個人タグ");if(value.startsWith("EH_"))return "E-H · "+value.substring(3);if(value.contains("FANDOM"))return tr("作品与角色","Works and characters","作品・キャラクター");if(value.contains("APPEARANCE")||value.contains("BODY"))return tr("外观与身体","Appearance and body","外見・身体");if(value.contains("ROLE")||value.contains("IDENTITY")||value.contains("RELATION"))return tr("人物与关系","People and relationships","人物・関係");if(value.contains("GENRE")||value.contains("STORY")||value.contains("SETTING"))return tr("题材与设定","Theme and setting","テーマ・設定");if(value.contains("BEHAVIOR")||value.contains("FETISH")||value.contains("CONTROL")||value.contains("CONTENT"))return tr("行为与情境","Behavior and situations","行動・状況");if(value.equals("VISUAL_STYLE"))return tr("平台标注画风","Provider style annotation","サイトの画風表記");return tr("其他 / 未分类","Other / unclassified","その他・未分類");}
     private void updateStatus(){status.setText(saving?tr("正在保存…","Saving…","保存中…"):!error.isEmpty()?error:dirty()?tr("尚未保存","Unsaved changes","未保存"):tr("已保存","Saved","保存済み"));}
     private void setMode(String mode){try{draft.put("mode",mode);draft.put("selected",new JSONArray());draft.put("disabled",new JSONArray());draft=TagParticipation.normalize(draft);error="";render();}catch(Exception e){error=e.getMessage();updateStatus();}}

@@ -46,6 +46,21 @@ describe('compiled source module routing contract', () => {
         for (const p of [pica, eh, jm])
             expect(p.fetchPage).not.toHaveBeenCalled()
     })
+    it('binds page resolution to the work owner, not an arbitrary HTTP locator', () => {
+        const pica=provider('pica'),eh=provider('eh'),jm=provider('jm')
+        const registry=new ProviderRegistry([pica,eh,jm])
+        expect(registry.forPageForComic('old-pica-id','https://images.example.test/0.jpg')).toBe(pica)
+        expect(registry.forPageForComic('eh:123','eh-page:abc')).toBe(eh)
+        expect(registry.forPageForComic('jm:12','jm-page:12:2')).toBe(jm)
+
+        for(const [comic,page] of [
+            ['jm:12','https://another.example.test/0.jpg'],
+            ['eh:123','jm-page:12:2'],
+            ['old-pica-id','eh-page:abc'],
+            ['host:user-selected','https://images.example.test/0.jpg']
+        ])expect(()=>registry.forPageForComic(comic,page)).toThrow()
+        for(const item of [pica,eh,jm]) expect(item.fetchPage).not.toHaveBeenCalled()
+    })
     it('rejects unknown or missing schemes and identities before choosing any account', () => {
         const registry = new ProviderRegistry([provider('eh'), provider('jm')])
         for (const id of [

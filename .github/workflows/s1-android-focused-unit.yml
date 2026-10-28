@@ -1,0 +1,60 @@
+name: S1 Android focused unit regression (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/product-recovery-s0-s1-20261027
+    paths:
+      - '.github/workflows/s1-android-focused-unit.yml'
+      - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/AccountSourcesGuidePreviewTest.java'
+      - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/DownloadsActivityUiTest.java'
+      - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/AdvancedSpotlightTargetTest.java'
+      - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/DualOnboardingTest.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AccountSourcesActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AndroidOnboarding.java'
+      - 'mobile/android-alpha2/app/src/main/res/**/phone_downloads_strings.xml'
+      - 'mobile/android-alpha2/app/src/main/res/**/account_sources_strings.xml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s1-android-unit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-regression:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Run actual S1 Robolectric regressions with bounded job duration
+        working-directory: mobile/android-alpha2
+        run: |
+          gradle :app:testDebugUnitTest --no-daemon --stacktrace \
+            --tests com.picalibrary.android.AccountSourcesGuidePreviewTest \
+            --tests com.picalibrary.android.DownloadsActivityUiTest \
+            --tests com.picalibrary.android.AdvancedSpotlightTargetTest \
+            --tests com.picalibrary.android.DualOnboardingTest
+      - name: Upload focused JUnit evidence, including failures
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-android-focused-unit-${{ github.sha }}
+          path: mobile/android-alpha2/app/build/test-results/testDebugUnitTest/
+          retention-days: 1
+          if-no-files-found: warn

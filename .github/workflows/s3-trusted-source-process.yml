@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - codex/s3-trusted-source-process-20261028
+      - codex/s3-signed-worker-lifecycle-20261028
     paths:
       - '.github/workflows/s3-trusted-source-process.yml'
       - 'src/source-extensions/**'
       - 'test/unit/trusted-source-process.test.ts'
+      - 'test/unit/signed-worker-lifecycle.test.ts'
       - 'test/unit/module-dag-policy.test.ts'
       - 'test/unit/compiled-source-composition.test.ts'
       - 'test/fixtures/s3-trusted-worker.cjs'
@@ -42,6 +44,7 @@ jobs:
         run: |
           pnpm exec vitest run \
             test/unit/trusted-source-process.test.ts \
+            test/unit/signed-worker-lifecycle.test.ts \
             test/unit/external-reader-boundary.test.ts \
             test/unit/module-dag-policy.test.ts \
             test/unit/compiled-source-composition.test.ts \
@@ -76,4 +79,4 @@ jobs:
       - name: Check actual Windows Node worker types
         run: pnpm type:check
       - name: Test pinned worker launch, IPC, revoke and timeout on Windows
-        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts
+        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts test/unit/signed-worker-lifecycle.test.ts

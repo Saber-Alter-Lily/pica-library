@@ -81,10 +81,32 @@ describe('S2 actual TypeScript module ownership graph', () => {
                 file.startsWith('src/source-hosts/') ||
                 file === 'src/sdk.ts' ||
                 file === 'src/services/provider-service.ts' ||
-                file === 'src/services/external-reader-adapter.ts'
+                file === 'src/services/external-reader-adapter.ts' ||
+                file === 'src/source-extensions/trusted-process.ts'
             )
             expect(forbidden, entry + ' runtime dependency closure').toEqual([])
         }
+    })
+
+    it('keeps privileged worker IPC outside Reader and concrete provider SDKs', () => {
+        const graph = collectSourceModuleGraph()
+        const workerImports = graph.edges.filter((edge) =>
+            edge.from === 'src/source-extensions/trusted-process.ts' &&
+            !edge.typeOnly
+        ).map((edge) => edge.to).sort()
+        expect(workerImports).toEqual([
+            'node:child_process',
+            'node:crypto',
+            'node:fs',
+            'node:path',
+            'src/source-extensions/reader-contract.ts'
+        ])
+        expect(graph.edges.filter((edge) =>
+            edge.from === 'src/services/reader-service.ts' ||
+            edge.from === 'src/services/online-reader-service.ts'
+        ).some((edge) =>
+            edge.to === 'src/source-extensions/trusted-process.ts'
+        )).toBe(false)
     })
 
     it('fails when concrete SDKs or dynamic loaders cross protected reader boundaries', () => {
@@ -117,9 +139,14 @@ describe('S2 actual TypeScript module ownership graph', () => {
                 from: 'src/services/reader-service.ts',
                 to: 'src/services/external-reader-adapter.ts',
                 typeOnly: false
+            },
+            {
+                from: 'src/services/online-reader-service.ts',
+                to: 'src/source-extensions/trusted-process.ts',
+                typeOnly: false
             }
         ]
-        expect(moduleBoundaryViolations(illegal)).toHaveLength(7)
+        expect(moduleBoundaryViolations(illegal)).toHaveLength(8)
     })
 
     it('permits only the explicit benign dependency direction for the new bridge', () => {

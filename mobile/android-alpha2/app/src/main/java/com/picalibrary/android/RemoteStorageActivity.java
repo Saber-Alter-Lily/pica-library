@@ -119,8 +119,18 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
 
     private void deleteCurrent(){
         if(creating||selectedId.isEmpty()){beginNew();return;}RemoteConfigStore.Config target=RemoteConfigStore.find(this,selectedId);if(target==null)return;
-        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("删除网盘配置？")).setMessage(LocalizedText.ui("只删除手机上的“")+target.label+LocalizedText.ui("”连接信息，不会删除网盘里的漫画文件。"))
-            .setNegativeButton(LocalizedText.ui("取消"),null).setPositiveButton(LocalizedText.ui("删除"),(d,w)->{RemoteConfigStore.deleteTarget(this,target.id);loadUi(RemoteConfigStore.activeTargetId(this));status.setText(LocalizedText.ui("已删除手机端网盘配置；云端文件未删除。"));}).show();
+        new AlertDialog.Builder(this)
+            .setTitle(t("删除网盘配置？","Remove saved connection?","保存済みの接続を削除しますか？"))
+            .setMessage(t("只删除手机上的“","Remove only the saved connection for ","スマートフォン内の接続情報のみ削除：")+
+                target.label+t("”连接信息，不会删除网盘里的漫画文件。",". Cloud files will not be deleted.","。クラウド内の作品は削除されません。"))
+            .setNegativeButton(t("取消","Cancel","キャンセル"),null)
+            .setPositiveButton(t("删除","Remove","削除"),(d,w)->{
+                RemoteConfigStore.deleteTarget(this,target.id);
+                loadUi(RemoteConfigStore.activeTargetId(this));
+                status.setText(t("已删除手机端网盘配置；云端文件未删除。",
+                    "Saved connection removed; cloud files are untouched.",
+                    "保存済み接続を削除しました。クラウド内の作品はそのままです。"));
+            }).show();
     }
 
     private void cachePortableState() throws Exception {

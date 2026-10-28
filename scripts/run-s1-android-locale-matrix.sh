@@ -46,7 +46,20 @@ for scenario in "${scenarios[@]}"; do
     cat "$logfile"
     grep 'S1_MATRIX' "$trace" || true
     if [[ "$result" -ne 0 ]] || ! grep -Fq 'OK (1 test)' "$logfile"; then
-        echo "::error::S1 locale matrix failed or timed out for $key (exit=$result)" >&2
+        # Retain the rejected, synthetic-only frame as diagnostic evidence.
+        # A launcher ANR overlay must never count as an accepted app screenshot.
+        for page in "${pages[@]}"; do
+            rejected="s1-locale-matrix-evidence/$key/rejected-$page.png"
+            if ! adb exec-out run-as com.picalibrary.android.dev cat \
+                "files/s1-layout-$key/rejected-$page.png" > "$rejected" 2>/dev/null; then
+                rm -f "$rejected"
+            elif [[ ! -s "$rejected" ]]; then
+                rm -f "$rejected"
+            fi
+        done
+        adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' \
+            > "s1-locale-matrix-evidence/$key-window-focus.txt" || true
+        echo "::error::S1 locale matrix failed or timed out for $key (exit=$result); see rejected frames and foreground diagnostics" >&2
         exit 1
     fi
     for page in "${pages[@]}"; do

@@ -77,7 +77,12 @@ describe('dev.2 connected Web lifecycle contracts', () => {
         'reader_resume_clamps_removed_page'
     ])('%s', () => {
         expect(app).toContain("'/api/v1/online-reader' : '/api/v1/reader'")
-        expect(app).toContain('api(`${root}/progress`)')
+        // The same Reader uses the original local/online roots and an optional,
+        // CSRF-scoped signed-session root. Signed read options must not be
+        // accidentally removed when extending the shared progress endpoint.
+        expect(app).toContain('api(`${root}/progress`, signedReadOptions)')
+        expect(app).toContain('const signedReadOptions = signedSessionId ? { headers:')
+        expect(app).toContain("'x-pica-csrf': signedCsrfToken || desktop?.csrfToken || ''")
         expect(app).toContain('chapter.progress?.pageIndex || 0')
         expect(app).toContain('Math.max(0, chapter.pages.length - 1)')
     })

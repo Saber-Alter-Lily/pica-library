@@ -11,18 +11,32 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
     private LinearLayout content;
     private TextView exhState;
     private int probeSerial,desktopSerial;
+    private static final String STATE_GUIDE_PREVIEW="guidePreview";
+    // The chapter extra is consumed by LocaleAwareActivity.onPostResume. Keep the
+    // non-probing state for later resumes and configuration changes.
+    private boolean guidePreview;
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
+        boolean requested=getIntent()!=null
+            &&getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)==0;
+        guidePreview=saved==null?requested:saved.getBoolean(STATE_GUIDE_PREVIEW,requested);
         Ui.applyWindow(this);
         renderShell();
     }
 
+    @Override protected void onSaveInstanceState(Bundle state){
+        state.putBoolean(STATE_GUIDE_PREVIEW,guidePreview);
+        super.onSaveInstanceState(state);
+    }
+
+    // Read-only, package-scoped contract for guide preview regression tests.
+    boolean isGuidePreview(){return guidePreview;}
+
     @Override protected void onResume(){
         super.onResume();
         renderContent();
-        if(getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)!=0)
-            refreshDesktopAccountState();
+        if(!guidePreview)refreshDesktopAccountState();
     }
 
     @Override protected void onDestroy(){
@@ -130,8 +144,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
             content.addView(note);
         }
 
-        if(localEh&&SourceAccess.enabled(this,"eh")
-            &&getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)!=0)refreshExh();
+        if(localEh&&SourceAccess.enabled(this,"eh")&&!guidePreview)refreshExh();
     }
 
     private void refreshDesktopAccountState(){

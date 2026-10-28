@@ -79,5 +79,26 @@ final class Ui {
 
     static ImageButton iconButton(Context c,int icon,String description,View.OnClickListener action){ImageButton b=new ImageButton(c);int size=dp(c,48);b.setLayoutParams(new LinearLayout.LayoutParams(size,size));b.setMinimumWidth(0);b.setMinimumHeight(0);b.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));b.setImageResource(icon);b.setColorFilter(PRIMARY);b.setBackground(rounded(ACTION,14,c));b.setContentDescription(LocalizedText.ui(c,description));b.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);b.setOnClickListener(action);return b;}
     static void styleField(EditText e,Context c){e.setTextColor(TEXT);e.setHintTextColor(MUTED);e.setBackground(outlined(SURFACE,OUTLINE,Math.min(14,ThemePackStore.cardRadiusDp(c)),c));e.setPadding(dp(c,12),dp(c,8),dp(c,12),dp(c,8));e.setMinHeight(dp(c,48));}
+    /** Consistent dark/light contrast and touch size for native Spinner entries. */
+    static android.widget.ArrayAdapter<String> spinnerAdapter(Context c,java.util.List<String> values){
+        return new android.widget.ArrayAdapter<String>(c,android.R.layout.simple_spinner_item,values){
+            private View cell(int index,boolean dropdown){
+                TextView text=rawText(c,getItem(index),14,Ui.TEXT,false);
+                text.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+                text.setMinHeight(dp(c,44));
+                text.setMaxLines(3);
+                text.setPadding(dp(c,10),dp(c,9),dp(c,10),dp(c,9));
+                text.setBackground(rounded(dropdown?Ui.SURFACE:Ui.ACTION,8,c));
+                return text;
+            }
+            @Override public View getView(int position,View convertView,android.view.ViewGroup parent){
+                return cell(position,false);
+            }
+            @Override public View getDropDownView(int position,View convertView,android.view.ViewGroup parent){
+                return cell(position,true);
+            }
+        };
+    }
+
     static void gap(LinearLayout parent,Context c,int dp){View v=new View(c);v.setLayoutParams(parent.getOrientation()==LinearLayout.HORIZONTAL?new LinearLayout.LayoutParams(Ui.dp(c,dp),1):new LinearLayout.LayoutParams(1,Ui.dp(c,dp)));parent.addView(v);}
 }

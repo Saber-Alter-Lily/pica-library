@@ -37,8 +37,12 @@ describe('S1 disposable Android QA identities', () => {
         expect(java).toContain('focused[0]&&ownPackage.equals(windowOwner)&&painted')
         expect(java).toContain('saveRejectedScreenshot(image,dir,page)')
         expect(java).toContain('"rejected-"+page+".png"')
-        expect(workflow).toContain('target: aosp_atd')
+        expect(workflow).toContain('target: default')
+        expect(workflow).not.toContain('target: aosp_atd')
+        expect(java).toContain('Blank black/white screen accepted')
+        expect(java).toContain('darkSamples>=80&&lightSamples>=80&&edges>=8')
         expect(runner).toContain('rejected-$page.png')
+        expect(runner).toContain('89504e470d0a1a0a')
         expect(runner).toContain('mCurrentFocus|mFocusedApp')
     })
 

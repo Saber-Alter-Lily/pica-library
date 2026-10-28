@@ -11,6 +11,8 @@ import {
     SignedWorkerStore, sourceWorkerSignaturePayload
 } from '../../src/source-extensions/signed-worker-store'
 import { PreviewCacheManager } from '../../src/services/preview-cache-manager'
+import { ReadingLibrary } from '../../src/library/reading-library'
+import { catalogueReadingPort } from '../../src/services/reading-library-adapters'
 
 const legacyId = 'eh:123:abcdef1234'
 /**
@@ -135,8 +137,29 @@ describe('S3 E-H existing Provider bundled in a real signed child process', () =
             const library = controller.readingLibraryRows()
             expect(library).toHaveLength(1)
             expect(library[0]).toMatchObject({
-                comicId: legacyId, channel: 'signed', sessionId: session.sessionId
+                comicId: legacyId, channel: 'signed', sessionId: session.sessionId,
+                source: { key: 'catalogue:eh', label: 'E-H / ExH' }
             })
+            // The existing catalogue view and optional signed route must
+            // become one item with two routes, never duplicate the same work.
+            const projected = new ReadingLibrary([
+                catalogueReadingPort('online', () => [{
+                    comicId: legacyId, episodeId: 'eh-123',
+                    pageIndex: 0, updatedAt: new Date().toISOString()
+                }], {
+                    getComicsByIds: () => [{
+                        comicId: legacyId, title: 'Saved legacy gallery',
+                        providerId: 'eh', downloadedPictures: 0
+                    }]
+                }, () => false),
+                { id: 'signed', snapshot: () => controller!.readingLibraryRows() }
+            ]).query({})
+            expect(projected.total).toBe(1)
+            expect(projected.items[0].title).toBe('Saved legacy gallery')
+            expect(projected.items[0].routes.map(route => route.channel).sort())
+                .toEqual(['online', 'signed'])
+            expect(projected.items[0].routes.find(route => route.channel === 'signed')?.available)
+                .toBe(true)
             await controller.command({
                 operation: 'disable', sourceId: EH_PUBLIC_WORKER_ID,
                 expectedRevision: 1

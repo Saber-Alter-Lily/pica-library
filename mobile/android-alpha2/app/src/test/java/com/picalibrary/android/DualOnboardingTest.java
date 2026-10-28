@@ -23,6 +23,30 @@ public class DualOnboardingTest {
     @Test public void advancedSkipNeverDismissesDaily(){OnboardingStore.skipAdvanced(context);assertTrue(OnboardingStore.shouldPrompt(context));assertEquals(0,OnboardingStore.dismissedVersion(context));assertTrue(OnboardingStore.advancedRead(context).isEmpty());}
     @Test public void invalidChaptersAndGetterMutationAreIgnored(){OnboardingStore.markAdvancedRead(context,-1);OnboardingStore.markAdvancedRead(context,8);OnboardingStore.advancedRead(context).add("0");assertTrue(OnboardingStore.advancedRead(context).isEmpty());OnboardingStore.advancedPosition(context,99);assertEquals(7,OnboardingStore.advancedPosition(context));}
     @Test public void dailyCompletionAndAutomaticPreferenceStayIndependent(){OnboardingStore.setAutoShow(context,false);OnboardingStore.markAdvancedRead(context,1);OnboardingStore.complete(context);assertFalse(OnboardingStore.autoShow(context));assertEquals(1,OnboardingStore.advancedRead(context).size());assertEquals(OnboardingStore.CURRENT_VERSION,OnboardingStore.completedVersion(context));}
+    @Test public void chapterPickerIsReadableInDarkModeWithoutStartingAnyTour(){
+        LocaleStore.set(context,LocaleStore.EN);
+        context.getSharedPreferences("appearance-v1",Context.MODE_PRIVATE).edit()
+            .putString("mode",ThemeStore.MODE_DARK).commit();
+        try(ActivityController<AdvancedGuideActivity> controller=
+                Robolectric.buildActivity(AdvancedGuideActivity.class).create()){
+            AdvancedGuideActivity page=controller.get();
+            android.widget.Spinner picker=(android.widget.Spinner)page.getWindow().getDecorView()
+                .findViewWithTag("advanced-guide-chapters");
+            assertNotNull(picker);
+            android.widget.TextView selected=(android.widget.TextView)picker.getAdapter()
+                .getView(0,null,picker);
+            assertEquals("Dark guide picker must use theme text",Ui.TEXT,
+                selected.getCurrentTextColor());
+            assertTrue("Dark picker text must be light",
+                android.graphics.Color.red(selected.getCurrentTextColor())>180);
+            assertEquals(0,OnboardingStore.advancedRead(context).size());
+        }finally{
+            LocaleStore.set(context,LocaleStore.ZH_CN);
+            context.getSharedPreferences("appearance-v1",Context.MODE_PRIVATE).edit()
+                .putString("mode",ThemeStore.MODE_LIGHT).commit();
+        }
+    }
+
     @Test public void advancedGuideRestoresChapterAndOnlyRecordsExplicitRead(){
         OnboardingStore.advancedPosition(context,2);
         try(ActivityController<AdvancedGuideActivity> controller=Robolectric.buildActivity(AdvancedGuideActivity.class).setup()){

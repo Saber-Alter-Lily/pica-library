@@ -51,7 +51,12 @@ public final class AdvancedGuideActivity extends LocaleAwareActivity {
         progress.setTag("advanced-guide-progress");
         content.addView(progress);
         String[] chapterLabels=titles.clone();for(int i=0;i<chapterLabels.length;i++)if(displayedRead.contains(String.valueOf(i)))chapterLabels[i]="✓ "+chapterLabels[i];
-        Spinner chapters=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,chapterLabels);adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);chapters.setAdapter(adapter);chapters.setSelection(chapter);content.addView(chapters);
+        Spinner chapters=new Spinner(this);
+        chapters.setTag("advanced-guide-chapters");
+        android.widget.ArrayAdapter<String> adapter=Ui.spinnerAdapter(this,java.util.Arrays.asList(chapterLabels));
+        chapters.setAdapter(adapter);
+        chapters.setSelection(chapter);
+        content.addView(chapters);
         chapters.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
             @Override public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){if(position!=chapter){chapter=position;OnboardingStore.advancedPosition(AdvancedGuideActivity.this,chapter);render();}}
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent){}

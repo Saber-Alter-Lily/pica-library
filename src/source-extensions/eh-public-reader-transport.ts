@@ -12,6 +12,7 @@ import { fromEhPublicWorkerId } from './eh-public-identity'
 
 type PublicEhPages = Pick<EhProvider, 'episodes' | 'pages' | 'fetchPage'>
 const MAX_CACHED_CHAPTERS = 4
+const MAX_PAGE_LOCATOR_LENGTH = 512 // 4 * 10k pages => bounded per-worker locator memory
 
 /**
  * Real, public/anonymous E-H reader operations behind the source worker IPC.
@@ -30,13 +31,11 @@ export function createEhPublicReaderTransport(
 
     function cachePages(owner: string, episodeId: string, locators: string[]) {
         const chapter = owner + '\n' + episodeId
-        const oldKeys = chapterTokens.get(chapter) ?? []
-        for (const key of oldKeys) tokens.delete(key)
-        chapterTokens.delete(chapter)
-
+        // Validate the entire replacement first. A malformed remote page
+        // list must not revoke an otherwise healthy cached chapter.
         const keys = locators.map((locator, index) => {
             if (typeof locator !== 'string' || !locator.startsWith('eh-page:') ||
-                locator.length > 4096)
+                locator.length > MAX_PAGE_LOCATOR_LENGTH)
                 throw new Error('Invalid E-H page locator from provider')
             return createHmac('sha256', secret)
                 .update(owner + '\n' + episodeId + '\n' + index + '\n' + locator)
@@ -44,6 +43,9 @@ export function createEhPublicReaderTransport(
         })
         if (new Set(keys).size !== keys.length)
             throw new Error('Colliding E-H page keys')
+        const oldKeys = chapterTokens.get(chapter) ?? []
+        for (const key of oldKeys) tokens.delete(key)
+        chapterTokens.delete(chapter)
         for (let i = 0; i < keys.length; i++)
             tokens.set(keys[i], { owner, locator: locators[i] })
         chapterTokens.set(chapter, keys)

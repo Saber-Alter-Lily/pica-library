@@ -52,6 +52,41 @@ describe('S2 actual TypeScript module ownership graph', () => {
         expect(directSdk).toBe(true)
     })
 
+    it('keeps the full local and online Reader runtime closure free of provider SDKs and Desktop shell', () => {
+        const graph = collectSourceModuleGraph()
+        const dependencies = new Map<string, string[]>()
+        for (const edge of graph.edges) {
+            if (edge.typeOnly || !edge.to.startsWith('src/')) continue
+            const targets = dependencies.get(edge.from) ?? []
+            targets.push(edge.to)
+            dependencies.set(edge.from, targets)
+        }
+        for (const entry of [
+            'src/services/reader-service.ts',
+            'src/services/online-reader-service.ts',
+            'src/source-extensions/desktop-reader-adapter.ts'
+        ]) {
+            const closure = new Set([entry])
+            const queue = [entry]
+            for (const file of queue) {
+                for (const target of dependencies.get(file) ?? []) {
+                    if (closure.has(target)) continue
+                    closure.add(target)
+                    queue.push(target)
+                }
+            }
+            const forbidden = [...closure].filter((file) =>
+                file.startsWith('src/providers/') ||
+                file.startsWith('src/desktop/') ||
+                file.startsWith('src/source-hosts/') ||
+                file === 'src/sdk.ts' ||
+                file === 'src/services/provider-service.ts' ||
+                file === 'src/services/external-reader-adapter.ts'
+            )
+            expect(forbidden, entry + ' runtime dependency closure').toEqual([])
+        }
+    })
+
     it('fails when concrete SDKs or dynamic loaders cross protected reader boundaries', () => {
         const illegal: DependencyEdge[] = [
             {

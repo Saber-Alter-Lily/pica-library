@@ -1,3 +1,15 @@
+## 2026-10-28｜S2 原型与实际依赖图增量（基于用户授权，单独 Draft PR #219）
+
+从 PR #218 的 `6e5c1a4a` 分支隔离开发，正式 `main` / v0.5.0 / OTA 不变。2026-10-28 用户明确要求停止重复追求 S1 视觉矩阵完善，先推进 S2/S3 架构；**G1 真机验收仍是发布阻断，不作为隔离研究性 Draft 的前置门禁**。
+
+- S2 首轮真正运行的 [架构 CI #40677952242](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40677952242) 对 SHA `383c89e5` SUCCESS，下载审阅其 239 TS 文件、1,079 import 边、0 runtime SCC cycles 的完整 JSON；6 条 `ProviderService` 对具体来源/SDK的旧 import（含 type-only）均可列举，不是凭空假设依赖已经清除。
+- `src/source-extensions/{reader-contract,desktop-reader-adapter}.ts` 用版本化严格契约和授权 runtime epoch，实际适配原 `OnlineReaderService`；无用户账号、无默认 URL/Host 和无任意可执行插件注册。实读测试含章节、图片、页缓存、进度、跨作品拒绝、禁源与迟到请求回滚；首轮验证范围为合成来源，不涉及真实站点接入。
+- 随后新增 `src/providers/compiled-composition.ts` 作为旧三源**唯一受控构造入口**，`ProviderService` 不再直接 `new` Pica/EH/JM 类；新 CI 门禁和兼容性测试保留历史 ID、media scheme、注入对象与 permission lease。此修改在其精确 HEAD CI 完成前仍是候选，不应判 PASS。
+- **尚未完成**：在 Desktop 实际入口采用外置运行进程、Android IPC/签名与组件分发、核心包物理移除来源 SDK、独立禁源/安装/撤销/升级事务，以及旧数据/源码/真机/一键升级 G2/G3 全覆盖。可选 Suwayomi 不成为强制依赖。
+
+后续以 [S2 实施文档](S2_SOURCE_BOUNDARY_20261028.md) 为准；先看最新确切 CI 与模块 DAG，再迁移一条真实受控来源的组合入口与独立运行时，不将用户自行接入视为自动版权免责。
+
+---
 ## S2-A 静态实际依赖边记录（2026-10-27，未改变运行代码）
 
 本项仅按当前 Draft `e42919a` 实际源码读取 import 入口，作为 `S2-01 / NEW-MOD-01` 的**待实施依赖重排输入**。它不是生成/验证过的全库 AST import DAG，也不算纯核心安装通过。用户 G1 尚未验收，按既定顺序不提前执行外置来源运行时。

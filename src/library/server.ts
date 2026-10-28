@@ -24,6 +24,7 @@ import {
     type VisualSamplingMode
 } from '../recommendation-v4/visual-style'
 import { ReaderService } from '../services/reader-service'
+import { ExternalReaderAdapter } from '../services/external-reader-adapter'
 import { OnlineReaderService } from '../services/online-reader-service'
 import type { UserEventInput, V3EventType } from '../recommendation-v3/types'
 import { CycleCoordinatorV3 } from '../recommendation-v3/cycle-coordinator-v3'
@@ -304,7 +305,8 @@ export async function startLibraryServer(options: {
     )
     const readerService = new ReaderService(
         options.database,
-        options.service.dataDir
+        options.service.dataDir,
+        new ExternalReaderAdapter()
     )
     const onlineReader = new OnlineReaderService(options.database, providerService,
         new PreviewCacheManager(path.join(options.cacheDir ?? options.service.dataDir, 'online-reader'), {

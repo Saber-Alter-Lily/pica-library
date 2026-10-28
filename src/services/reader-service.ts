@@ -3,7 +3,6 @@ import path from 'node:path'
 import AdmZip from 'adm-zip'
 import type { LibraryDatabase } from '../library/database'
 import { safePathSegment } from '../library/path-template'
-import { ExternalReaderAdapter } from './external-reader-adapter'
 import { localInventoryKey, type LocalInventoryV1 } from '../local-library/types'
 
 const contentTypes: Record<string, string> = {
@@ -14,13 +13,18 @@ const contentTypes: Record<string, string> = {
     '.gif': 'image/gif'
 }
 
+/** OS file launch is a desktop-host capability, not a Reader dependency. */
+export interface ExternalFileOpener {
+    openDefault(file: string): { opened: boolean }
+}
+
 export class ReaderService {
     private readonly root: string
 
     constructor(
         private readonly database: LibraryDatabase,
         dataDir: string,
-        private readonly externalReader = new ExternalReaderAdapter()
+        private readonly externalReader?: ExternalFileOpener
     ) {
         this.root = path.resolve(dataDir)
     }
@@ -160,6 +164,8 @@ export class ReaderService {
 
     openDefault(file: string) {
         const safe = this.safeLocalFile(file)
+        if (!this.externalReader)
+            throw new Error('External file opening is not configured')
         return this.externalReader.openDefault(safe)
     }
 }

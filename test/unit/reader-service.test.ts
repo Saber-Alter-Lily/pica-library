@@ -58,6 +58,22 @@ afterEach(() => {
 })
 
 describe('ReaderService', () => {
+    it('keeps native shell launch outside core Reader and requires a trusted desktop opener', () => {
+        const { root, database, reader } = fixture(1)
+        const owned = path.join(root, 'downloads', '1.jpg')
+        expect(() => reader.openDefault(owned)).toThrow(
+            'External file opening is not configured'
+        )
+        const opener = { openDefault: vi.fn((_file: string) => ({ opened: true })) }
+        const withOpener = new ReaderService(database, root, opener)
+        expect(withOpener.openDefault(owned)).toEqual({ opened: true })
+        expect(opener.openDefault).toHaveBeenCalledWith(fs.realpathSync.native(owned))
+        expect(() => withOpener.openDefault(path.join(root, '..', 'outside.jpg')))
+            .toThrow('Downloaded page is unavailable')
+        expect(opener.openDefault).toHaveBeenCalledTimes(1)
+        database.close()
+    })
+
     it('uses native canonical roots so Windows 8.3 aliases do not reject owned imported pages', () => {
         const {root,database,reader}=fixture(1)
         const original=fs.realpathSync,native=vi.fn(original.native)

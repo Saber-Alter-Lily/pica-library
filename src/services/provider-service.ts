@@ -3,14 +3,18 @@ import type { Pica } from '../sdk'
 import type { Comic, Episode, Picture } from '../types'
 import type { FavoriteRecord } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
-import {
+import type {
     EhProvider,
-    type EhSession,
-    type ExHentaiCapability
+    EhSession,
+    ExHentaiCapability
 } from '../providers/eh-provider'
-import { PicaProvider, picaComic } from '../providers/pica-provider'
-import { JmProvider } from '../providers/jm-provider'
-import { ProviderRegistry } from '../providers/provider-registry'
+import type { PicaProvider } from '../providers/pica-provider'
+import type { JmProvider } from '../providers/jm-provider'
+import type { ProviderRegistry } from '../providers/provider-registry'
+import {
+    createCompiledProviderComposition,
+    picaComic
+} from '../providers/compiled-composition'
 import { SourceRuntime } from '../sources/source-policy'
 import {
     providerComicToRecord,
@@ -55,20 +59,23 @@ export class ProviderService {
     readonly capabilities: ProviderCapabilities
     private readonly picaProvider: PicaProvider
     private readonly ehProvider: EhProvider
+    private readonly jmProvider: JmProvider
     private readonly registry: ProviderRegistry
 
     constructor(
         private readonly connectProvider: () => Promise<Pica>,
         private readonly database: LibraryDatabase,
-        ehProvider = new EhProvider(),
-        private readonly jmProvider = new JmProvider(),
+        ehProvider?: EhProvider,
+        jmProvider?: JmProvider,
         readonly sources = new SourceRuntime()
     ) {
-        this.picaProvider = new PicaProvider(connectProvider)
-        this.ehProvider = ehProvider
-        this.ehProvider.setSourceAccess?.(sources.acquire)
-        this.jmProvider.setSourceAccess?.(sources.acquire)
-        this.registry = new ProviderRegistry([this.picaProvider, this.ehProvider, this.jmProvider])
+        const compiled = createCompiledProviderComposition(
+            connectProvider, sources, { eh: ehProvider, jm: jmProvider }
+        )
+        this.picaProvider = compiled.pica
+        this.ehProvider = compiled.eh
+        this.jmProvider = compiled.jm
+        this.registry = compiled.registry
         this.capabilities = {
             favoriteMutation: true,
             providers: this.registry.capabilities()

@@ -1,3 +1,9 @@
+## S1-04 新增独立无副作用引导验证（待运行）
+
+- 延续已确认为 PASS 的第0和第5章真实聚光，新增第3章（扫描和手动配对按钮）与第7章（更新状态和手动检查按钮）的独立 Android Instrumentation。复用原生 ActivityMonitor 和 VSpot；只读高亮+截图+跳过，不执行扫码、配对、更新、下载或安装。第7章额外对比导览前后状态均为只读预览。
+- Android 35/360dp/中文/浅色，100%和150%字体，目标截图数从10增加至18（每档9张）。目标数量不是结果，**新源码模拟器与完整 CI 还未验证**。真人设备、其余章节和全 UI/字体矩阵持续 OPEN。
+- 保留历史失败；不改变 v0.5.0/main/Release/OTA 或用户资料。
+
 ## 2026-10-27 S1 checkpoint — actual source `079b9e37`, CI regression repair (pending rerun)
 
 - [Exact-head real emulator run #40609472634](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40609472634) **SUCCESS**: 100% and 150% font, Chinese/light/360dp; each scale ran three independent Android Instrumentation cases (guide menu, source two-step spotlight, downloads two-step spotlight), **6/6 PASS**, with 5 images per scale (**10 real PNG total**). [Evidence artifact #12781184746](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40609472634/artifacts/12781184746) is short-lived; its existence and logged images do not establish other languages, actual physical devices or user acceptance.

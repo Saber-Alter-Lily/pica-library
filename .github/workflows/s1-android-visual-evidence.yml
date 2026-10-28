@@ -7,10 +7,13 @@ on:
     paths:
       - '.github/workflows/s1-android-visual-evidence.yml'
       - 'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/S1AndroidVisualSmokeTest.java'
+      - 'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/S1AdditionalSpotlightTest.java'
       - 'scripts/run-s1-android-visual-emulator.sh'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AdvancedGuideActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AccountSourcesActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UpdateActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AndroidOnboarding.java'
       - 'mobile/android-alpha2/app/src/main/res/**/account_sources_strings.xml'
       - 'mobile/android-alpha2/app/src/main/res/**/phone_downloads_strings.xml'

@@ -99,6 +99,34 @@ for scale in 1.0 1.5; do
             > "s1-visual-evidence/$folder/$proof"
         test -s "s1-visual-evidence/$folder/$proof"
     done
-    printf 'stage=guide-source-downloads-vspot font_scale=%s captured=5 source_sha=%s\n' \
+    # Stages 4/5: real passive pairing/update VSpot, without scanning, pairing or checking updates.
+    for spec in "pairingTwoLiveControlsWithoutPairing:pairing" "updateTwoLiveControlsWithoutCheckingUpdates:update"; do
+        method=$(printf '%s' "$spec" | cut -d: -f1)
+        page=$(printf '%s' "$spec" | cut -d: -f2)
+        log="s1-visual-evidence/$folder-$page-instrumentation.txt"
+        trace="s1-visual-evidence/$folder-$page-logcat.txt"
+        adb logcat -c || true
+        set +e
+        timeout --signal=TERM --kill-after=10s 150s adb shell am instrument -w -r \
+            -e expectedFontScale "$scale" \
+            -e class "com.picalibrary.android.S1AdditionalSpotlightTest#$method" \
+            com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner > "$log" 2>&1
+        page_exit=$?
+        set -e
+        adb logcat -d -s S1_VISUAL:I AndroidRuntime:E > "$trace" || true
+        cat "$log"
+        grep "S1_VISUAL" "$trace" || true
+        if [[ "$page_exit" -ne 0 ]] || ! grep -Fq 'OK (1 test)' "$log"; then
+            echo "::error::S1 $page spotlight failed/timeout ($folder exit=$page_exit)" >&2
+            exit 1
+        fi
+        for phase in 1 2; do
+            proof="zhCN-light-$page-spotlight-$phase.png"
+            adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$proof" \
+                > "s1-visual-evidence/$folder/$proof"
+            test -s "s1-visual-evidence/$folder/$proof"
+        done
+    done
+    printf 'stage=guide-source-downloads-pairing-update-vspot font_scale=%s captured=9 source_sha=%s\n' \
         "$scale" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
 done

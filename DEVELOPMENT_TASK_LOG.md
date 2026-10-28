@@ -1,4 +1,14 @@
 # Pica Library Development Task Log
+## S0/S1 当前新增回执｜2026-10-27：标签英语窄屏与九组脚本失败分类
+
+- 旧 [Android CI #40629479729](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629479729)、[#40629559940](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629559940) 的 Android job 是实际 **FAIL**，失败测试精确定位 `TagParticipationActivityTest.headerFitsEnglishNarrowPhoneWithoutCoveringBack` 第66行（标题起点不应贴住紧凑返回键）。`d8b7f4c` 在正式标签页加至少72dp返回控制宽度、标题最多两行，并强化原测试的实际 back/title 几何边界检查。仍以新 SHA Android 复测判定是否真的修好。
+- [首次三语矩阵 #40629907105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907105) **FAIL** 的实际根因是 here-doc 输入被子 `adb` 进程提前读取：首个中文浅色360dp100%案例已通过1次 Instrumentation 且写出6张 PNG，余下八个案例未执行；它不是第一个页面渲染FAIL。`d8b7f4c` 改为 `mapfile` 事先完整读取9条用例，仍保留 `count == 9` 的硬门禁，新增标签参与页为第7个视图，目标63张原生截图；任何未执行不可算PASS。
+- `e42919a` 将 `TagParticipationActivityTest` 原测试加入**独立 Robolectric 矩阵**，与原 Full Android CI 双轨诊断。运行结果仍待新 SHA Actions/原始 JUnit。
+- `8e581ea` 的 `PhoneDownloadStoreAtomicTest` 已在 [定向 job #40629907129](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907129) 单组 **SUCCESS**；测试全部使用合成文件，无生产升级证据。八章 VSpot 的复测 [#40629907241](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907241) **SUCCESS**，但 G1 仍待实体设备和用户确认。
+- S2 仅执行 read-only import 关系核查（见 [来源耦合审计](docs/PRODUCT_RECOVERY_S2_S3_SOURCE_DEPENDENCY_AUDIT_20261027.md)），还未达到 `NEW-MOD-01`、`NEW-SRC-01` 的 CI/产物验收。保持 Draft、正式 main、发布和 OTA 不变。
+
+---
+
 ## 最新执行回执｜2026-10-27 深度开发续轮（精确证据）
 
 当前 Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 继续保留 `main` `095d6910` / Stable v0.5.0 / OTA / 用户生产数据不变。**G1 用户验收、G2 真正来源外置、G3 正式升级回退、G4 发布仍 OPEN**。下列成果不代表完整 S1 或 S5 验收。

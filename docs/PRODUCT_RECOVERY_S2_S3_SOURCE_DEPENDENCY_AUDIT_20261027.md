@@ -1,3 +1,21 @@
+## S2-A 静态实际依赖边记录（2026-10-27，未改变运行代码）
+
+本项仅按当前 Draft `e42919a` 实际源码读取 import 入口，作为 `S2-01 / NEW-MOD-01` 的**待实施依赖重排输入**。它不是生成/验证过的全库 AST import DAG，也不算纯核心安装通过。用户 G1 尚未验收，按既定顺序不提前执行外置来源运行时。
+
+| 实际文件与引用方向 | 当前已核实的边 | 模块化意义与下一个工程切口 |
+|---|---|---|
+| `src/services/online-reader-service.ts` | `../reader/progress-writes`、`../types`、`p-limit`、`node:crypto`；**无 SDK/账号/具体 Provider import** | 已有 `OnlineReaderSource / OnlineReaderCache / OnlineReaderState` 注入端口值得直接复用；下一步把 Reader 的 `Buffer` 传输压缩为进程边界可验证的能力/媒体句柄，不写入来源凭据 |
+| `src/services/provider-service.ts` | 直接 import `../sdk`、`../providers/{pica,eh,jm}-provider`、`ProviderRegistry` 及 `source-policy` | **当前应用组合层强耦合三来源**。下一阶段先保持旧账号/收藏/章节行为，把具体适配器构造移到受控组合入口；禁止把源构造下沉到 Reader |
+| `src/desktop/main.ts` | 直接 import `../sdk`、`../services/pica-account`、`./eh-web-login`、`../library/server` 等 | 桌面启动入口仍会编译具体来源代码；纯 Core Desktop 不成立。需在运行组合/白名单工件验收里证明无源码协议执行而非只看配置开关 |
+| `src/services/reader-service.ts` | `../library/database`、`../local-library/types`、`./external-reader-adapter` | 本地 Reader 有独立路径，但该外部适配器引用 `node:child_process`；需核实外部文件工具和来源 SDK 属于不同权限/生命周期，避免误砍本地打开文件能力 |
+| `src/providers/types.ts` | `ProviderId='pica'\|'eh'\|'jm'`，`SearchRequest` 含 E-H 专属过滤字段，媒体返回 Node `Buffer` | 现有 `ComicProvider` 不是跨进程 ABI；应新增版本化、边界独立的 DTO/错误/能力数据模型，**保留旧 Provider 接口作为内部适配层**，迁移不能直接序列化 SDK 对象 |
+| `src/modules/contracts.ts` + `runtime-composition.ts` | 已有 `library/reader/sources/tags/recommendation/sync/update` API 版本契约，但 runtime 构成只能表示 `jm` 是否带入 | 当前 runtime 组合不等于可独立升级全部来源；不得用其现有成功替代 S3 真正来源生命周期 |
+| `mobile/android-alpha2/app/build.gradle` | `implementation jmcomic-core`、`jmcomic-android-support`；还包含共享 `source-jvm` 编译路径 | 安卓所谓核心包物理上仍带有来源 SDK；将来必须分别验纯核心 APK 依赖图、功能入口、离线 Reader，且留有旧用户索引和下载数据兼容 |
+
+**边界冻结原则**：维护同一身份、缓存、Reader 进度通道；继续使用 `ProviderRegistry.forPageForComic` 和真实 `OnlineReaderService.picture` 的 cache-hit 前校验，不允许引入不受控 JS/JAR 任意执行；可选 Suwayomi 不是本地/网盘 Reader 的必经依赖。此批只完成部分代码的真实 import 摘要，不给 `NEW-MOD-01` 写 PASS。下一步在 S1/G1 获得用户认可后写完整依赖 DAG 与 CI 反向引用拒绝，并完成无源离线读取真流程。
+
+---
+
 # S2/S3：来源外置的源码耦合证据与最小迁移顺序（2026-10-27）
 
 ## S2-01 新增源码薄片：身份绑定的图片路由（2026-10-27）

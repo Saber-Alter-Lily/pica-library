@@ -1,4 +1,18 @@
 # Pica Library Development Task Log
+## 最新执行回执｜2026-10-27 深度开发续轮（精确证据）
+
+当前 Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 继续保留 `main` `095d6910` / Stable v0.5.0 / OTA / 用户生产数据不变。**G1 用户验收、G2 真正来源外置、G3 正式升级回退、G4 发布仍 OPEN**。下列成果不代表完整 S1 或 S5 验收。
+
+- **8章实页引导通过**：`b5e134f` 的 [Android 35模拟器 #40622970105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105) **SUCCESS**，18/18 Instrumentation 正常、40 张原始 PNG（中/浅/360dp，100%和150%字号）。画风最后一章确实显示5个目标，逐步可见与跳过无模型操作已验证，短期工件 [#12788940746](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105/artifacts/12788940746)。实际下载并检查两张字体汇总图，未自动给出全部语言/主题/OEM 的 PASS。
+- **Robolectric 停滞收口**：旧5组中3 SUCCESS、2因持续动画进入测试周期而 CANCELLED（不是FAIL断言）。`7b5cbcc` 使测试生命周期只观察已消费 one-shot 引导后状态，另保留真机模拟器对动画的验收。[隔离矩阵 #40629290421](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629290421) **5/5组 SUCCESS 且独立 JUnit 文件存在**。整套 Android 全量 CI 仍须独立验证。
+- **新增多语言/主题/屏宽真实图任务**：`a0f2d9a`+`061b2c1` 加入9组交叉模拟器测试，六页×九组目标54张原始PNG；英文/日文、深色、393/480dp、130%字号首次进入真实截图流程。原始 #40629554559 被后续新 SHA 触发的同组并发策略 CANCELLED，**不能计为测试失败/通过**；需看最新 #40629907105 的结果。9组仅为代表性，不是3×3×3×2全排列。
+- **S0 数据持久性候选修复**：`c9e31e9`+`8e581ea` 将 `PhoneDownloadStore` JSON 索引改为 AtomicFile 原子提交；读取损坏/旧 `.tmp` 时 UI 警示并阻止任何保存/删除/目录重算，防止隐式将错误空索引写回；显式删除正文移至索引保存成功之后。保留旧 JSON v1 schema 和路径，增加5个纯合成 Robolectric 测试：损坏保护、兼容写、备份恢复、旧 `.tmp`、禁止误删本地正文。**尚未经这些新测试完整运行，不等于真实迁移/用户数据安全验收**，更不意味着已触及生产目录。
+- **完整 CI 可观测性**：本轮给 Android 测试设置明确 step/job 超时，`--info` 输出测试运行细节，并在失败/超时上传有效 JUnit，避免再把无限停滞当作全量通过。Web/Desktop 与发布过程未删改。
+
+近期应以新 SHA 的 Android focused/locale-matrix/CI 运行结果为依据继续修复，S1 完成物理手机验收前不进入正式 S6 发布。
+
+---
+
 ## S1 最新执行回执｜2026-10-27，7章真实聚光及大字号缺陷整改
 
 本段为后续推进的**当前权威状态快照**；不改写下文历史失败/中间运行和旧42+新增12条验收映射。生产正式版 `v0.5.0` / main `095d6910` / OTA / 用户真实数据保持不动；Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 未合并。

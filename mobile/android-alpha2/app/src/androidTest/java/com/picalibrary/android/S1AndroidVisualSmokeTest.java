@@ -145,47 +145,90 @@ public final class S1AndroidVisualSmokeTest {
         Intent intent=new Intent(context,AccountSourcesActivity.class)
             .putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,0);
         Log.i(TAG,"phase=spotlight-launch");
-        try(ActivityScenario<AccountSourcesActivity> scenario=ActivityScenario.launch(intent)){
+        Instrumentation inst=InstrumentationRegistry.getInstrumentation();
+        // ActivityScenario.launch waits for Espresso idleness. A live VSpot
+        // animation can prevent idleness, even though onResume already ran.
+        // Observe the real Activity through Android Instrumentation instead.
+        Instrumentation.ActivityMonitor monitor=inst.addMonitor(
+            AccountSourcesActivity.class.getName(),null,false);
+        AccountSourcesActivity activity=null;
+        try{
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            Log.i(TAG,"phase=spotlight-start-requested");
+            Activity observed=monitor.waitForActivityWithTimeout(20000);
+            assertNotNull("Source Activity never started",observed);
+            assertTrue("Incorrect source Activity",observed instanceof AccountSourcesActivity);
+            activity=(AccountSourcesActivity)observed;
+            final AccountSourcesActivity screen=activity;
+            Log.i(TAG,"phase=spotlight-activity-observed");
+
             AtomicReference<VSpotView> current=new AtomicReference<>();
-            for(int attempt=0;attempt<45;attempt++){
-                scenario.onActivity(activity->{
-                    ViewGroup decor=(ViewGroup)activity.getWindow().getDecorView();
-                    for(int i=0;i<decor.getChildCount();i++){
-                        View child=decor.getChildAt(i);
+            for(int attempt=0;attempt<60;attempt++){
+                inst.runOnMainSync(()->{
+                    View decor=screen.getWindow().getDecorView();
+                    if(!(decor instanceof ViewGroup))return;
+                    ViewGroup group=(ViewGroup)decor;
+                    for(int i=0;i<group.getChildCount();i++){
+                        View child=group.getChildAt(i);
                         if(child instanceof VSpotView && ((VSpotView)child).isShowing())
                             current.set((VSpotView)child);
                     }
                 });
-                if(current.get()!=null && current.get().getCurrentStep()!=null)break;
+                if(current.get()!=null&&current.get().getCurrentStep()!=null)break;
                 SystemClock.sleep(150);
             }
             assertNotNull("Explicit source chapter must display a live VSpot overlay",current.get());
             Log.i(TAG,"phase=spotlight-visible step="+current.get().getCurrentIndex());
-            scenario.onActivity(activity->{
+
+            AtomicReference<String> firstTag=new AtomicReference<>();
+            AtomicReference<Integer> stepCount=new AtomicReference<>();
+            AtomicReference<Integer> firstIndex=new AtomicReference<>();
+            AtomicReference<Boolean> hostExists=new AtomicReference<>(false);
+            inst.runOnMainSync(()->{
                 VSpotView overlay=current.get();
-                assertEquals(2,overlay.getStepCount());
-                assertEquals(0,overlay.getCurrentIndex());
-                assertEquals(AndroidOnboarding.ADV_SOURCE_CHOICES,
-                    overlay.getCurrentTargetView().getTag());
-                assertNotNull(activity.getWindow().getDecorView()
-                    .findViewWithTag(AndroidOnboarding.ADV_SOURCE_HOST));
+                stepCount.set(overlay.getStepCount());
+                firstIndex.set(overlay.getCurrentIndex());
+                View target=overlay.getCurrentTargetView();
+                firstTag.set(target==null?null:String.valueOf(target.getTag()));
+                hostExists.set(screen.getWindow().getDecorView()
+                    .findViewWithTag(AndroidOnboarding.ADV_SOURCE_HOST)!=null);
             });
+            assertEquals(Integer.valueOf(2),stepCount.get());
+            assertEquals(Integer.valueOf(0),firstIndex.get());
+            assertEquals(AndroidOnboarding.ADV_SOURCE_CHOICES,firstTag.get());
+            assertTrue("Missing actual Host option",hostExists.get());
+            assertTrue("Guide must remain passive after onPostResume consumed the extra",
+                activity.isGuidePreview());
+
             SystemClock.sleep(240);
             saveSpotlightImage(context,"source-spotlight-1");
-            scenario.onActivity(activity->{
+            AtomicReference<String> nextTag=new AtomicReference<>();
+            AtomicReference<Integer> nextIndex=new AtomicReference<>();
+            inst.runOnMainSync(()->{
                 current.get().next();
-                assertEquals(1,current.get().getCurrentIndex());
-                assertEquals(AndroidOnboarding.ADV_SOURCE_HOST,
-                    current.get().getCurrentTargetView().getTag());
+                nextIndex.set(current.get().getCurrentIndex());
+                View target=current.get().getCurrentTargetView();
+                nextTag.set(target==null?null:String.valueOf(target.getTag()));
             });
+            assertEquals(Integer.valueOf(1),nextIndex.get());
+            assertEquals(AndroidOnboarding.ADV_SOURCE_HOST,nextTag.get());
             Log.i(TAG,"phase=spotlight-next");
             SystemClock.sleep(240);
             saveSpotlightImage(context,"source-spotlight-2");
-            scenario.onActivity(activity->current.get().dismiss());
-            SystemClock.sleep(380);
+            inst.runOnMainSync(()->current.get().dismiss());
+            SystemClock.sleep(480);
             assertFalse("Skip cannot mark this chapter read",
                 OnboardingStore.advancedRead(context).contains("0"));
+            assertTrue("Skip must not convert the guide into a probing account visit",
+                activity.isGuidePreview());
             Log.i(TAG,"phase=spotlight-skip-no-write");
+        }finally{
+            inst.removeMonitor(monitor);
+            if(activity!=null){
+                AccountSourcesActivity closing=activity;
+                inst.runOnMainSync(()->{if(!closing.isFinishing())closing.finish();});
+            }
         }
     }
 

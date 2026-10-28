@@ -10,8 +10,10 @@ on:
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/DownloadsActivityUiTest.java'
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/AdvancedSpotlightTargetTest.java'
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/DualOnboardingTest.java'
+      - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/SettingsRowNarrowLayoutTest.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AccountSourcesActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsRow.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AndroidOnboarding.java'
       - 'mobile/android-alpha2/app/src/main/res/**/phone_downloads_strings.xml'
       - 'mobile/android-alpha2/app/src/main/res/**/account_sources_strings.xml'
@@ -27,8 +29,24 @@ concurrency:
 jobs:
   focused-regression:
     if: github.repository == 'Saber-Alter-Lily/pica-library'
+    # Isolate a possible Robolectric hang by class instead of cancelling one
+    # opaque aggregate task with no JUnit XML.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - key: account-preview
+            testClass: com.picalibrary.android.AccountSourcesGuidePreviewTest
+          - key: downloads-layout
+            testClass: com.picalibrary.android.DownloadsActivityUiTest
+          - key: spotlight-target
+            testClass: com.picalibrary.android.AdvancedSpotlightTargetTest
+          - key: dual-onboarding
+            testClass: com.picalibrary.android.DualOnboardingTest
+          - key: settings-row
+            testClass: com.picalibrary.android.SettingsRowNarrowLayoutTest
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -42,19 +60,16 @@ jobs:
         with:
           gradle-version: '8.9'
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - name: Run actual S1 Robolectric regressions with bounded job duration
+      - name: Execute one real Robolectric class with bounded job duration
         working-directory: mobile/android-alpha2
         run: |
-          gradle :app:testDebugUnitTest --no-daemon --stacktrace \
-            --tests com.picalibrary.android.AccountSourcesGuidePreviewTest \
-            --tests com.picalibrary.android.DownloadsActivityUiTest \
-            --tests com.picalibrary.android.AdvancedSpotlightTargetTest \
-            --tests com.picalibrary.android.DualOnboardingTest
+          gradle :app:testDebugUnitTest --no-daemon --stacktrace --info --max-workers=2 \
+            --tests '${{ matrix.testClass }}'
       - name: Upload focused JUnit evidence, including failures
         if: always() && github.event.repository.private == false
         uses: actions/upload-artifact@v4
         with:
-          name: s1-android-focused-unit-${{ github.sha }}
+          name: s1-android-focused-unit-${{ matrix.key }}-${{ github.sha }}
           path: mobile/android-alpha2/app/build/test-results/testDebugUnitTest/
           retention-days: 1
           if-no-files-found: warn

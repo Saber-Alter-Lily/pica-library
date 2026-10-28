@@ -1,3 +1,9 @@
+## S1-03 Android Robolectric 首轮定向测试卡住，诊断隔离（2026-10-27）
+
+- [定向 Android run #40621041603](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621041603) 源码 `b44b9f97` 为 **CANCELLED，而非通过/断言失败**。原始构建日志显示 Java 正常编译，`02:31:22` 进入 `:app:testDebugUnitTest` 后未完成并于 `02:48:31` 取消；最后仅上传极小 JUnit 归档（不能代表测试通过）。当前未能仅凭总任务日志区分哪个测试类、Robolectric/线程生命周期或外部环境导致阻塞。
+- 新的定向方案**保留原有4个测试类的全部测试**，并加入本次大字号 `SettingsRowNarrowLayoutTest`：共5个相互隔离的 Gradle job（`fail-fast:false`），每个 job 单独执行一个实际 Robolectric 类，12分钟上限，单独上传 JUnit、保留每个源 SHA；单个失联不阻止其他类得到结果。新增矩阵运行尚未得到真实 PASS，不用以前 Web/Desktop 成功作替代。
+- 此变更是测试定位基础设施，不改变用户数据、正式版或业务规则。即使每组独立 PASS，也须另行完成组合运行、真实模拟器视觉和实机 G1 验收。
+
 ## S1-04 第2章五步画风引导（新源码/未验收）
 
 - 七章真实聚光已通过：`eea0db58` / [Android35 #40621769915](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915)，16/16 Instrumentation PASS、30张PNG，100/150%字体、中文浅色360dp。第2章独立使用 `startDetailedOnboarding` 触发**五步** VSpot（推荐画像、人工调整、同步、Visual 接入模式、影响强度），不能由两步目标测试冒充。

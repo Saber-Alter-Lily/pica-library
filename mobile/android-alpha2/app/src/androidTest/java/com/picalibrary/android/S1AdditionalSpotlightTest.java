@@ -35,6 +35,21 @@ public final class S1AdditionalSpotlightTest {
             AndroidOnboarding.ADV_UPDATE_CHECK,"update");
     }
 
+    @Test public void preferenceTwoLiveControlsWithoutSaving() throws Exception {
+        verify(RecommendationControlActivity.class,1,AndroidOnboarding.ADV_PREFERENCE_TAGS,
+            AndroidOnboarding.ADV_PREFERENCE_SAVE,"preferences");
+    }
+
+    @Test public void webdavTwoLiveControlsWithoutConnecting() throws Exception {
+        verify(RemoteStorageActivity.class,4,AndroidOnboarding.ADV_REMOTE_TARGET,
+            AndroidOnboarding.ADV_REMOTE_VENDOR,"webdav");
+    }
+
+    @Test public void profileTwoLiveControlsWithoutRebuilding() throws Exception {
+        verify(RecommendationProfileActivity.class,6,AndroidOnboarding.ADV_PROFILE_RUNTIME,
+            AndroidOnboarding.ADV_PROFILE_EVIDENCE,"profile");
+    }
+
     private void verify(Class<? extends Activity> target,int chapter,
             String expectedFirst,String expectedSecond,String prefix) throws Exception {
         Instrumentation inst=InstrumentationRegistry.getInstrumentation();
@@ -103,6 +118,15 @@ public final class S1AdditionalSpotlightTest {
             assertEquals(Integer.valueOf(0),index.get());
             assertEquals(expectedFirst,first.get());
             assertTrue("Missing visible second control",secondVisible.get());
+            if(chapter==1){
+                AtomicReference<Boolean> saveEnabled=new AtomicReference<>(true);
+                inst.runOnMainSync(()->{
+                    View save=screen.getWindow().getDecorView()
+                        .findViewWithTag(AndroidOnboarding.ADV_PREFERENCE_SAVE);
+                    saveEnabled.set(save!=null&&save.isEnabled());
+                });
+                assertFalse("Guide cannot turn on Save without any manual edits",saveEnabled.get());
+            }
             if(chapter==7)assertEquals("Guide must be read-only",
                 screen.getString(R.string.advanced_guide_update_preview),updateStatus.get());
             Log.i(TAG,"phase="+prefix+"-first-visible");
@@ -125,6 +149,15 @@ public final class S1AdditionalSpotlightTest {
             SystemClock.sleep(480);
             assertFalse("Skip must not mark guide read",
                 OnboardingStore.advancedRead(app).contains(String.valueOf(chapter)));
+            if(chapter==1){
+                AtomicReference<Boolean> saveEnabled=new AtomicReference<>(true);
+                inst.runOnMainSync(()->{
+                    View save=screen.getWindow().getDecorView()
+                        .findViewWithTag(AndroidOnboarding.ADV_PREFERENCE_SAVE);
+                    saveEnabled.set(save!=null&&save.isEnabled());
+                });
+                assertFalse("Skipping cannot save any preference",saveEnabled.get());
+            }
             if(chapter==7){
                 AtomicReference<String> after=new AtomicReference<>();
                 inst.runOnMainSync(()->{

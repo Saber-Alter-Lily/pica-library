@@ -100,7 +100,9 @@ for scale in 1.0 1.5; do
         test -s "s1-visual-evidence/$folder/$proof"
     done
     # Stages 4/5: real passive pairing/update VSpot, without scanning, pairing or checking updates.
-    for spec in "pairingTwoLiveControlsWithoutPairing:pairing" "updateTwoLiveControlsWithoutCheckingUpdates:update"; do
+    for spec in "pairingTwoLiveControlsWithoutPairing:pairing" "updateTwoLiveControlsWithoutCheckingUpdates:update" \
+        "preferenceTwoLiveControlsWithoutSaving:preferences" "webdavTwoLiveControlsWithoutConnecting:webdav" \
+        "profileTwoLiveControlsWithoutRebuilding:profile"; do
         method=$(printf '%s' "$spec" | cut -d: -f1)
         page=$(printf '%s' "$spec" | cut -d: -f2)
         log="s1-visual-evidence/$folder-$page-instrumentation.txt"
@@ -127,6 +129,6 @@ for scale in 1.0 1.5; do
             test -s "s1-visual-evidence/$folder/$proof"
         done
     done
-    printf 'stage=guide-source-downloads-pairing-update-vspot font_scale=%s captured=9 source_sha=%s\n' \
+    printf 'stage=guide-source-downloads-pairing-update-preferences-webdav-profile-vspot font_scale=%s captured=15 source_sha=%s\n' \
         "$scale" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
 done

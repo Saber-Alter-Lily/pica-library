@@ -185,6 +185,15 @@ export function moduleBoundaryViolations(edges: DependencyEdge[]): string[] {
                 'src/source-extensions/trusted-process.ts'
             ].includes(to))
             reason = 'Signed worker catalog must not import app SDKs or user data'
+        if (from === 'src/source-extensions/signed-reader-errors.ts')
+            reason = 'Signed Reader HTTP error contract must remain import free'
+        if (from === 'src/library/server.ts' && !edge.typeOnly &&
+            [
+                'src/desktop/signed-source-reader.ts',
+                'src/source-extensions/signed-worker-store.ts',
+                'src/source-extensions/trusted-process.ts'
+            ].includes(to))
+            reason = 'Default Desktop server must not eagerly load signed worker execution'
         if ((from.startsWith('src/tags/') || from.startsWith('src/modules/')) &&
             to.startsWith('src/') &&
             !to.startsWith(from.startsWith('src/tags/') ? 'src/tags/' : 'src/modules/'))

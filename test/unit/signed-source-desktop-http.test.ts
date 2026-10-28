@@ -116,6 +116,38 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
     const get = (path: string, extra: Record<string, string> = {}) =>
         fetch(baseUrl + path, { headers: { ...authorized(), ...extra } })
 
+    it('keeps signed endpoints unavailable in an ordinary Desktop server without an injected controller', async () => {
+        const ordinary = await startLibraryServer({
+            database: db,
+            service: new LibraryService(db, dir),
+            host: '127.0.0.1',
+            port: 0
+        })
+        try {
+            const command = await fetch(ordinary.url + endpoint, {
+                method: 'POST',
+                headers: {
+                    origin: ordinary.url,
+                    'content-type': 'application/json',
+                    'x-pica-csrf': token
+                },
+                body: JSON.stringify({ operation: 'connect', sourceId: 'demo' })
+            })
+            expect(command.status).toBe(403)
+            const page = await fetch(ordinary.url + endpoint +
+                '/00000000-0000-0000-0000-000000000000/progress', {
+                    headers: { origin: ordinary.url, 'x-pica-csrf': token }
+                })
+            expect(page.status).toBe(403)
+            // Disallowed access must not alter the approved source state.
+            expect(store.state('demo').activeVersion).toBeNull()
+        } finally {
+            await new Promise<void>((resolve) =>
+                ordinary.server.close(() => resolve())
+            )
+        }
+    })
+
     it('has an explicitly installed generation but no implicitly running source', async () => {
         const status = await post(endpoint, { operation: 'status', sourceId: 'demo' })
         expect(status.status).toBe(200)

@@ -155,6 +155,7 @@ export function moduleBoundaryViolations(edges: DependencyEdge[]): string[] {
             to === 'src/sdk.ts' || to.startsWith('src/desktop/') ||
             to.startsWith('src/source-hosts/') ||
             to === 'src/source-extensions/trusted-process.ts' ||
+            to === 'src/source-extensions/signed-worker-store.ts' ||
             to === 'src/services/provider-service.ts'
         let reason: string | undefined
 
@@ -177,6 +178,13 @@ export function moduleBoundaryViolations(edges: DependencyEdge[]): string[] {
             if (!allowed.includes(to))
                 reason = 'Reader binding must not load source SDK, database or process'
         }
+        if (from === 'src/source-extensions/signed-worker-store.ts' &&
+            ![
+                'node:fs', 'node:path', 'node:crypto',
+                'src/source-extensions/reader-contract.ts',
+                'src/source-extensions/trusted-process.ts'
+            ].includes(to))
+            reason = 'Signed worker catalog must not import app SDKs or user data'
         if ((from.startsWith('src/tags/') || from.startsWith('src/modules/')) &&
             to.startsWith('src/') &&
             !to.startsWith(from.startsWith('src/tags/') ? 'src/tags/' : 'src/modules/'))

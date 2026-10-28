@@ -53,3 +53,15 @@ The isolated [S2 graph workflow #40677952242](https://github.com/Saber-Alter-Lil
 The next Draft commits introduced `src/providers/compiled-composition.ts` as a **single explicit legacy construction entry** and changed `ProviderService` to request the existing trio from this entry. The constructor's public argument order, optional EH/JM instance injection, Pica legacy namespace, original provider routing and source-access lease configuration are preserved. A new regression test checks this behavior and the real AST gate now refuses new runtime `ProviderService` imports of the three concrete provider classes. The full application still transitively bundles those source implementations: this change does **not** satisfy NEW-SRC-01 or G2.
 
 These later commits must pass their own **exact-head** unit, TypeScript, Android, packaged app and source-boundary gates; the earlier `383c89e5` green workflow cannot verify the new composition root. Real Android transport/IPC and user source installation remain NOT_IMPLEMENTED.
+
+
+## S2 local Reader shell separation (2026-10-28 follow-up)
+
+The original import graph showed a genuine unwanted core dependency:
+`src/services/reader-service.ts` -> `src/services/external-reader-adapter.ts` -> `node:child_process` + `src/desktop/child-process.ts`. This means even purely local/CBZ reading indirectly pulled in the Windows native-shell launcher.
+
+The isolated Draft now removes that import from `ReaderService` and defines a minimal `ExternalFileOpener` port. The existing Windows HTTP desktop server supplies `new ExternalReaderAdapter()` explicitly; the mobile bridge and local-reader core need not instantiate or import any shell process. This does not change authorized Windows open-file behavior because the same existing adapter is injected at the existing launch endpoint. Without an injected opener, core Reader fails closed instead of silently spawning an OS process.
+
+Regression tests check both the missing-opener failure and unchanged injected file-open action; the actual TypeScript import graph must prove the **entire runtime closure** of local `ReaderService`, `OnlineReaderService`, and the new trusted source bridge excludes `src/providers/*`, `src/sdk.ts`, Desktop shell, source-hosts and concrete provider service. This is a stricter S2 dependency gate, not proof of full installed package source removal.
+
+**Status:** IMPLEMENTED_IN_ISOLATED_DRAFT / NEW_EXACT_HEAD_CI_PENDING; the earlier green source graph does not attest this later refactor. No source SDK packaging, real credentials, persistent schema or signed production files were altered.

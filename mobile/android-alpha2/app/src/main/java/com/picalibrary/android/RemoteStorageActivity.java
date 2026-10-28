@@ -18,32 +18,40 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
 
     @Override public void onCreate(Bundle b){super.onCreate(b);Ui.applyWindow(this);render();}
     private Button button(String text){return Ui.button(this,text,v->{},false);}
+    private String t(String zh,String en,String ja){return LocalizedText.ui(this,zh,en,ja);}
 
     private void render(){
         ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(Ui.BG);scroll.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
         LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setBackgroundColor(Ui.BG);p.setPadding(Ui.dp(this,16),Ui.dp(this,14),Ui.dp(this,16),Ui.dp(this,24));scroll.addView(p);
-        p.addView(Ui.text(this,"远程存储",27,Ui.TEXT,true));p.addView(Ui.text(this,"可保存多个 WebDAV 网盘。手机一次使用一个“当前网盘”，切换后书库、封面、阅读和进度都会读取所选目标。",12,Ui.MUTED,false));Ui.gap(p,this,12);
+        TextView heading=Ui.text(this,t("远程存储","Remote storage","リモートストレージ"),27,Ui.TEXT,true);
+        heading.setTag("remote-storage-heading");
+        p.addView(heading);
+        p.addView(Ui.text(this,t("可保存多个 WebDAV 网盘。手机一次使用一个“当前网盘”，切换后书库、封面、阅读和进度都会读取所选目标。",
+            "Save multiple WebDAV connections. Your phone uses one active storage at a time; switching changes the selected library, covers, reading and progress.",
+            "複数の WebDAV 接続を保存できます。端末で使う保存先は一度に一つで、切り替えると書庫・表紙・閲覧・進捗の参照先が変わります。"),12,Ui.MUTED,false));Ui.gap(p,this,12);
 
-        p.addView(Ui.text(this,"已配置网盘",13,Ui.TEXT,true));targetSpinner=new Spinner(this);
+        p.addView(Ui.text(this,t("已配置网盘","Configured storage","設定済みストレージ"),13,Ui.TEXT,true));targetSpinner=new Spinner(this);
         targetSpinner.setTag(AndroidOnboarding.ADV_REMOTE_TARGET);
         p.addView(targetSpinner);Ui.gap(p,this,8);
-        LinearLayout targetActions=new LinearLayout(this);Button add=button("＋ 新增网盘"),remove=button("删除当前");targetActions.addView(add,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(targetActions,this,8);targetActions.addView(remove,new LinearLayout.LayoutParams(0,-2,1));p.addView(targetActions);Ui.gap(p,this,10);
+        LinearLayout targetActions=new LinearLayout(this);Button add=button(t("＋ 新增网盘","＋ Add storage","＋ 保存先を追加")),remove=button(t("删除当前","Remove selected","選択中を削除"));targetActions.addView(add,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(targetActions,this,8);targetActions.addView(remove,new LinearLayout.LayoutParams(0,-2,1));p.addView(targetActions);Ui.gap(p,this,10);
 
-        p.addView(Ui.text(this,"网盘类型",13,Ui.TEXT,true));vendorSpinner=new Spinner(this);
+        p.addView(Ui.text(this,t("网盘类型","Storage type","保存先の種類"),13,Ui.TEXT,true));vendorSpinner=new Spinner(this);
         vendorSpinner.setTag(AndroidOnboarding.ADV_REMOTE_VENDOR);
         p.addView(vendorSpinner);Ui.gap(p,this,8);
-        label=field(p,"显示名称","","例如：我的 123 云盘");
-        url=field(p,"WebDAV 地址","","https://dav.example.com/path");
-        root=field(p,"根目录","PicaLibrary","PicaLibrary");
-        user=field(p,"用户名","","留空则保留已保存用户名");
-        password=field(p,"密码 / App Password","","留空则保留已保存密码");password.setInputType(0x00000081);
-        providerNote=Ui.text(this,"",12,Ui.MUTED,false);providerNote.setPadding(0,0,0,Ui.dp(this,8));p.addView(providerNote);
+        label=field(p,t("显示名称","Display name","表示名"),"",t("例如：我的 123 云盘","e.g. My storage","例：自分のクラウド"));
+        url=field(p,t("WebDAV 地址","WebDAV address","WebDAV アドレス"),"","https://dav.example.com/path");
+        root=field(p,t("根目录","Root directory","ルートフォルダー"),"PicaLibrary","PicaLibrary");
+        user=field(p,t("用户名","Username","ユーザー名"),"",t("留空则保留已保存用户名","Leave blank to keep saved username","空欄なら保存済みのユーザー名を保持"));
+        password=field(p,t("密码 / App Password","Password / app password","パスワード / アプリ用パスワード"),"",t("留空则保留已保存密码","Leave blank to keep saved password","空欄なら保存済みのパスワードを保持"));password.setInputType(0x00000081);
+        providerNote=Ui.text(this,"",12,Ui.MUTED,false);providerNote.setTag("remote-storage-provider-note");providerNote.setPadding(0,0,0,Ui.dp(this,8));p.addView(providerNote);
         status=Ui.text(this,"",13,Ui.MUTED,false);status.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,8));p.addView(status);
 
-        LinearLayout actions=new LinearLayout(this);Button test=button("测试连接"),save=button("保存并设为当前");
+        LinearLayout actions=new LinearLayout(this);Button test=button(t("测试连接","Test connection","接続をテスト")),save=button(t("保存并设为当前","Save and make active","保存して使用する"));
         test.setTag(AndroidOnboarding.ADV_REMOTE_TEST);actions.addView(test,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(actions,this,8);actions.addView(save,new LinearLayout.LayoutParams(0,-2,1));p.addView(actions);
-        Button refresh=button("刷新当前网盘状态");refresh.setOnClickListener(v->refreshPortableState());p.addView(refresh);
-        p.addView(Ui.text(this,"切换网盘只改变手机当前使用的远程来源，不会删除其他网盘里的漫画，也不会把数据自动复制到所有网盘。",12,Ui.MUTED,false));
+        Button refresh=button(t("刷新当前网盘状态","Refresh active storage","現在の保存先を更新"));refresh.setOnClickListener(v->refreshPortableState());p.addView(refresh);
+        p.addView(Ui.text(this,t("切换网盘只改变手机当前使用的远程来源，不会删除其他网盘里的漫画，也不会把数据自动复制到所有网盘。",
+            "Switching storage changes only this phone's active source. It does not delete other cloud files or copy the library to every connection.",
+            "保存先の切り替えは端末の参照先だけを変更します。他のクラウド内の作品を削除せず、すべての保存先へ自動コピーもしません。"),12,Ui.MUTED,false));
 
         setContentView(scroll);scroll.requestApplyInsets();
         add.setOnClickListener(v->beginNew());remove.setOnClickListener(v->deleteCurrent());test.setOnClickListener(v->test(false));save.setOnClickListener(v->test(true));
@@ -54,9 +62,9 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
 
     private void loadUi(String preferred){
         binding=true;targets=new ArrayList<>(RemoteConfigStore.targets(this));presets=new ArrayList<>(RemoteConfigStore.presets());
-        List<String> targetNames=new ArrayList<>();if(targets.isEmpty())targetNames.add("尚未配置");else for(RemoteConfigStore.Config c:targets)targetNames.add(c.label+" · "+RemoteConfigStore.preset(c.vendor).label);
-        targetSpinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,targetNames));
-        List<String> vendorNames=new ArrayList<>();for(RemoteConfigStore.Preset preset:presets)vendorNames.add(preset.label);vendorSpinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,vendorNames));
+        List<String> targetNames=new ArrayList<>();if(targets.isEmpty())targetNames.add(t("尚未配置","Not configured","未設定"));else for(RemoteConfigStore.Config c:targets)targetNames.add(c.label+" · "+RemoteStoragePresetUi.forPreset(this,RemoteConfigStore.preset(c.vendor)).label);
+        targetSpinner.setAdapter(Ui.spinnerAdapter(this,targetNames));
+        List<String> vendorNames=new ArrayList<>();for(RemoteConfigStore.Preset preset:presets)vendorNames.add(RemoteStoragePresetUi.forPreset(this,preset).label);vendorSpinner.setAdapter(Ui.spinnerAdapter(this,vendorNames));
         int index=0;if(preferred!=null&&!preferred.isEmpty())for(int i=0;i<targets.size();i++)if(preferred.equals(targets.get(i).id)){index=i;break;}
         if(!targets.isEmpty()){targetSpinner.setSelection(index,false);fill(targets.get(index));}else beginNewInternal();
         binding=false;
@@ -71,7 +79,17 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
     private void fill(RemoteConfigStore.Config c){creating=false;selectedId=c.id;label.setText(c.label);url.setText(c.baseUrl);root.setText(c.root);user.setText("");password.setText("");selectVendor(c.vendor);applyPreset(false);}
     private void selectVendor(String vendor){for(int i=0;i<presets.size();i++)if(presets.get(i).vendor.equals(vendor)){vendorSpinner.setSelection(i,false);return;}vendorSpinner.setSelection(0,false);}
     private RemoteConfigStore.Preset currentPreset(){int i=vendorSpinner.getSelectedItemPosition();return i>=0&&i<presets.size()?presets.get(i):RemoteConfigStore.preset("generic");}
-    private void applyPreset(boolean forceUrl){RemoteConfigStore.Preset preset=currentPreset();if(forceUrl&&!preset.defaultBaseUrl.isEmpty())url.setText(preset.defaultBaseUrl);url.setHint(preset.urlHint);user.setHint(preset.usernameHint+LocalizedText.ui(" · 留空沿用已保存值"));password.setHint(preset.passwordHint+LocalizedText.ui(" · 留空沿用已保存值"));providerNote.setText(preset.note);if(creating&&label.getText().toString().trim().isEmpty())label.setText(preset.label);}
+    private void applyPreset(boolean forceUrl){
+        RemoteConfigStore.Preset preset=currentPreset();
+        RemoteStoragePresetUi.Copy copy=RemoteStoragePresetUi.forPreset(this,preset);
+        if(forceUrl&&!preset.defaultBaseUrl.isEmpty())url.setText(preset.defaultBaseUrl);
+        url.setHint(copy.urlHint);
+        String suffix=t(" · 留空沿用已保存值"," · blank keeps saved value"," · 空欄で保存済みの値を保持");
+        user.setHint(copy.usernameHint+suffix);
+        password.setHint(copy.passwordHint+suffix);
+        providerNote.setText(copy.note);
+        if(creating&&label.getText().toString().trim().isEmpty())label.setText(copy.label);
+    }
 
     private void beginNew(){binding=true;beginNewInternal();binding=false;status.setText(LocalizedText.ui("正在新增网盘配置；保存成功后才会切换当前来源。"));}
     private void beginNewInternal(){creating=true;selectedId="";label.setText("");url.setText("");root.setText("PicaLibrary");user.setText("");password.setText("");selectVendor("generic");applyPreset(false);}

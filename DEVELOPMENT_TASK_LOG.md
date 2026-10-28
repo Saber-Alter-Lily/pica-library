@@ -1,5 +1,17 @@
 # Pica Library Development Task Log
 
+## S2-01/S2-02 续修回执｜2026-10-28 · 已验证依赖图与内置来源构造入口抽离
+
+- **首轮独立架构 CI 实证**：[S2 run #40677952242](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40677952242) 于 `383c89e5` SUCCESS，生成并下载 `module-graph.json`：实际分析 **239 个 TypeScript 源文件、1,079 条静态依赖边、0 个 TypeScript runtime SCC 循环、0 条受保护 Reader 反向依赖违规**；旧 `ProviderService` 直连 Pica/E-H/JM 类、ProviderRegistry 的边均如实留在该基线证据中，不代表 Android/Windows 纯核心包已经去掉 SDK。
+- **下一功能薄片已经提交**：将默认 Pica/E-H/JM 的 `new`、权限 lease 注入、registry 组装从 `src/services/provider-service.ts` 集中移至 `src/providers/compiled-composition.ts`，`ProviderService` 改经组合入口取对象。保持原构造参数顺序、EH/JM 测试注入、旧 Pica 无前缀 ID 与 EH/JM 路由；未更改推荐规则、来源账号/下载/数据结构。
+- **CI 约束**：`moduleBoundaryViolations` 新增禁止 `ProviderService` 对三个具体类建立运行时 import，`test/unit/compiled-source-composition.test.ts` 逐项核对旧三源路由、零主动联网、注入同一实例和真实导入方向。独立架构工作流也纳入此测试和源文件。
+- **精确阶段结论**：上述构造入口重构仍等待其自己的精确 SHA 架构与完整 CI，不能借用旧 `383c89e5` SUCCESS 宣称已验收。当前 `S2-01=IN_PROGRESS`、`S2-02=IN_PROGRESS`、`S3-01/02=NOT_IMPLEMENTED`、`G2=OPEN`。保留 v0.5.0/main、Release、账号/用户数据库及所有 S1/G1 和后续 S5/G3 阻断。
+
+完整工程记录：`docs/S2_SOURCE_BOUNDARY_20261028.md`，Draft [PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219)。
+
+---
+
+
 ## 2026-10-28 | S2/S3 主线启动：核心依赖图 + 可撤销来源 Reader 端口（PR #219，未发布）
 
 **最新优先级授权**：用户明确同意暂不继续反复调整 S1 截图测试，将开发主力切至 S2 模块维护边界和 S3 漫画源真正外置。此授权仅支持隔离 Draft 研发，**不视为 G1 已通过，不允许合并 main / Release / OTA / 生产迁移**。旧42+新增12案例继续保留；Android 真机 UI 测试仍为 G1 阻断项。

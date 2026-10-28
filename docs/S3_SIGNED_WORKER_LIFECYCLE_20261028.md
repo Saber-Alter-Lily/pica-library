@@ -25,14 +25,14 @@
 
 `test/unit/signed-worker-lifecycle.test.ts` 使用运行时一次性生成的 Ed25519 密钥，私钥不提交仓库、不写入测试工件，受控 worker 完全是原有无账号、无网络的 `test/fixtures/s3-trusted-worker.cjs`。
 
-验收覆盖：未签名/伪造签名/其他公钥拒绝、加密哈希损坏、恶意路径/非法版本、追加文件/悬空 symlink、安装不启用、固定版本不可覆盖、显式启用→完整 Reader 章节/图片/进度链、真实 worker 关闭/挂起图片撤销、旧版回滚、过期修订拒绝、跨进程实例重读状态、模拟激活重命名失败仍保留旧状态、Windows 只读文件/进程句柄清理。独立 Linux+Windows 工作流及全量 CI 按 **精确源码 SHA** 判断，未得到新源码双平台成功前状态为 **PENDING**，不得引用 PR #220 的通过代替本批。
+验收覆盖：未签名/伪造签名/其他公钥拒绝、加密哈希损坏、恶意路径/非法版本、追加文件/悬空 symlink、安装不启用、固定版本不可覆盖、显式启用→完整 Reader 章节/图片/进度链、真实 worker 关闭/挂起图片撤销、旧版回滚、过期修订拒绝、跨进程实例重读状态、模拟激活重命名失败仍保留旧状态、Windows 只读文件/进程句柄清理。独立 Linux/Windows [S3 签名组件专项 CI #40695633671](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40695633671) 已按精确代码 SHA `8a476400` **SUCCESS（Linux 43/43；Windows 18/18）**；包含真实 worker 和 Reader 测试、Ed25519 验签、启停、回滚及负向安全用例。完整项目 [CI #40695640938](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40695640938) 在本次记载时 **IN_PROGRESS / NOT_VERIFIED**，不能把专项通过等同于完整 CI 或 G2。
 
 | 出口 | 状态与后续工作 |
 |---|---|
-| S3-SIGN-01：清单公钥与 Ed25519 验签 | Draft 已实现；待精确 CI |
-| S3-LIFE-01：分代安装、不自动启用 | Draft 已实现；待精确 CI |
-| S3-LIFE-02：启停、挂起取消、回滚 | Draft 已实现；待精确 CI |
-| S3-LIFE-03：Linux/Windows 真实 worker 测试 | Draft CI 在运行；待双平台结果 |
+| S3-SIGN-01：清单公钥与 Ed25519 验签 | 双平台专项 PASS（8a476400）；正式公钥分发未验收 |
+| S3-LIFE-01：分代安装、不自动启用 | 双平台专项 PASS（8a476400） |
+| S3-LIFE-02：启停、挂起取消、回滚 | 双平台专项 PASS（8a476400） |
+| S3-LIFE-03：Linux/Windows 真实 worker 测试 | 43/43 + 18/18 PASS；完整 CI 待复核 |
 | S3-PKG-01：正式 Windows 私有安装根、权限和签名公钥轮换 | **NOT_IMPLEMENTED** |
 | S3-SANDBOX-01：OS 子进程权限隔离及恶意 worker 的安全证明 | **NOT_IMPLEMENTED** |
 | S3-AND-01：Android Binder/AIDL 与来源运行权限隔离 | **NOT_IMPLEMENTED** |

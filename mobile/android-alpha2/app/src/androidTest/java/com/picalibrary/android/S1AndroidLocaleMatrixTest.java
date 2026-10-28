@@ -46,6 +46,19 @@ public final class S1AndroidLocaleMatrixTest {
         assertTrue("Invalid app theme",ThemeStore.MODE_LIGHT.equals(theme)||ThemeStore.MODE_DARK.equals(theme));
         assertTrue("Unexpected device width",width==360||width==393||width==480);
         assertEquals("Font scaling not applied",font,app.getResources().getConfiguration().fontScale,0.07f);
+        // This is a pixel-evidence gate, not merely an Activity/layout test.
+        // Both AOSP-ATD black surfaces and empty white transitions must fail
+        // even if the app still owns Android's focused accessibility window.
+        Bitmap blank=Bitmap.createBitmap(720,1280,Bitmap.Config.ARGB_8888);
+        try{
+            for(int color:new int[]{android.graphics.Color.BLACK,android.graphics.Color.WHITE}){
+                blank.eraseColor(color);
+                assertFalse("Blank black/white screen accepted as light UI",
+                    looksPainted(blank,ThemeStore.MODE_LIGHT));
+                assertFalse("Blank black/white screen accepted as dark UI",
+                    looksPainted(blank,ThemeStore.MODE_DARK));
+            }
+        }finally{blank.recycle();}
 
         app.getSharedPreferences("pica-disclaimer-v1",Context.MODE_PRIVATE)
             .edit().putString("accepted_version","1").commit();
@@ -196,15 +209,25 @@ public final class S1AndroidLocaleMatrixTest {
         int outer=image.getPixel(4,height/2);
         int outerLight=(android.graphics.Color.red(outer)+
             android.graphics.Color.green(outer)+android.graphics.Color.blue(outer))/3;
-        if(dark&&outerLight>145)return false;
-        int ink=0;
-        for(int y=80;y<Math.min(height-80,420);y+=4)
+        // A flat black capture used to pass the *light* branch merely because
+        // black pixels were counted as ink. Match the actual requested theme
+        // and demand BOTH readable text/controls and a contrasting background.
+        if(dark?outerLight>145:outerLight<145)return false;
+        int darkSamples=0,lightSamples=0,edges=0;
+        for(int y=80;y<Math.min(height-80,420);y+=4){
+            int previousLight=-1;
             for(int x=20;x<width-20;x+=4){
                 int pixel=image.getPixel(x,y);
                 int light=(android.graphics.Color.red(pixel)+
                     android.graphics.Color.green(pixel)+android.graphics.Color.blue(pixel))/3;
-                if(dark?light>140:light<145)ink++;
+                if(light<105)darkSamples++;
+                if(light>165)lightSamples++;
+                if(previousLight>=0&&Math.abs(previousLight-light)>55)edges++;
+                previousLight=light;
             }
-        return ink>=130;
+        }
+        // A real guide/form has a background AND visible text/button edges.
+        // A single-color display, wallpaper or undrawn transition cannot pass.
+        return darkSamples>=80&&lightSamples>=80&&edges>=8;
     }
 }

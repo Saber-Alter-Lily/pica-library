@@ -8,6 +8,7 @@
     <string name="phone_downloads_storage_settings">Storage settings</string>
     <string name="phone_downloads_chapter_page_count">%1$d chapters · %2$d pages</string>
     <string name="phone_downloads_open">Open</string>
+    <string name="phone_downloads_cancel">Cancel</string>
     <string name="phone_downloads_delete">Delete</string>
     <string name="phone_downloads_delete_title">Delete this phone download?</string>
     <string name="phone_downloads_delete_failed">Unable to delete download</string>

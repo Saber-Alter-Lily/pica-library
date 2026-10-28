@@ -8,6 +8,7 @@
     <string name="phone_downloads_storage_settings">保存先の設定</string>
     <string name="phone_downloads_chapter_page_count">%1$d 章 · %2$d ページ</string>
     <string name="phone_downloads_open">開く</string>
+    <string name="phone_downloads_cancel">キャンセル</string>
     <string name="phone_downloads_delete">削除</string>
     <string name="phone_downloads_delete_title">端末内のダウンロードを削除しますか？</string>
     <string name="phone_downloads_delete_failed">ダウンロードを削除できません</string>

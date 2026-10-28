@@ -8,6 +8,7 @@
     <string name="phone_downloads_storage_settings">存储设置</string>
     <string name="phone_downloads_chapter_page_count">%1$d 章 · %2$d 页</string>
     <string name="phone_downloads_open">打开</string>
+    <string name="phone_downloads_cancel">取消</string>
     <string name="phone_downloads_delete">删除</string>
     <string name="phone_downloads_delete_title">删除手机下载？</string>
     <string name="phone_downloads_delete_failed">删除失败</string>

@@ -96,7 +96,7 @@ public final class DownloadsActivity extends LocaleAwareActivity {
         new AlertDialog.Builder(this)
             .setTitle(R.string.phone_downloads_delete_title)
             .setMessage(getString(R.string.phone_download_delete_scope))
-            .setNegativeButton(R.string.jm_source_dismiss,null)
+            .setNegativeButton(R.string.phone_downloads_cancel,null)
             .setPositiveButton(R.string.phone_downloads_delete,(d,w)->deleteDownload(comic.id))
             .show();
     }

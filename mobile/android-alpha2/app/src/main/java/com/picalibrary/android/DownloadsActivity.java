@@ -50,7 +50,7 @@ public final class DownloadsActivity extends LocaleAwareActivity {
 
     private DownloadState readDownloads(){
         PhoneDownloadStore.Snapshot snapshot=PhoneDownloadStore.load(this);
-        return new DownloadState(snapshot,PhoneDownloadStore.estimatedBytes(this,snapshot));
+        return new DownloadState(snapshot,snapshot.readError?0:PhoneDownloadStore.estimatedBytes(this,snapshot));
     }
 
     private void loadDownloads(){
@@ -69,6 +69,11 @@ public final class DownloadsActivity extends LocaleAwareActivity {
         if(content==null)return;
         PhoneDownloadStore.Snapshot snapshot=state.snapshot;
         content.removeAllViews();
+        if(snapshot.readError){
+            content.addView(Ui.text(this,getString(R.string.phone_downloads_index_error),14,Ui.BAD,true));
+            // No Delete/Refresh actions that could mask a recoverable index.
+            return;
+        }
         content.addView(Ui.text(this,getString(R.string.phone_downloads_note,format(state.bytes)),12,Ui.MUTED,false));
         LinearLayout actions=new LinearLayout(this);
         actions.setGravity(Gravity.CENTER_VERTICAL);

@@ -11,5 +11,6 @@
     <string name="phone_downloads_cancel">Cancel</string>
     <string name="phone_downloads_delete">Delete</string>
     <string name="phone_downloads_delete_title">Delete this phone download?</string>
+    <string name="phone_downloads_index_error">Download index could not be read. Its original file is preserved; changes are disabled until recovery.</string>
     <string name="phone_downloads_delete_failed">Unable to delete download</string>
 </resources>

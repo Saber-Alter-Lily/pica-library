@@ -11,5 +11,6 @@
     <string name="phone_downloads_cancel">キャンセル</string>
     <string name="phone_downloads_delete">削除</string>
     <string name="phone_downloads_delete_title">端末内のダウンロードを削除しますか？</string>
+    <string name="phone_downloads_index_error">ダウンロード索引を読み込めません。元のファイルは保持され、復旧まで変更を停止します。</string>
     <string name="phone_downloads_delete_failed">ダウンロードを削除できません</string>
 </resources>

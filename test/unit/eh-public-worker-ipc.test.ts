@@ -64,7 +64,7 @@ describe('S3 E-H existing Provider bundled in a real signed child process', () =
             const payload = {
                 schemaVersion: 1 as const,
                 sourceId: EH_PUBLIC_WORKER_ID,
-                version: '0.0.1-qa',
+                version: '0.0.1',
                 size: bytes.length,
                 sha256: createHash('sha256').update(bytes).digest('hex')
             }
@@ -101,7 +101,7 @@ describe('S3 E-H existing Provider bundled in a real signed child process', () =
             })).rejects.toThrow('disabled')
             await controller.command({
                 operation: 'activate', sourceId: EH_PUBLIC_WORKER_ID,
-                version: '0.0.1-qa', expectedRevision: 0
+                version: '0.0.1', expectedRevision: 0
             })
             const session = await controller.command({
                 operation: 'connect', sourceId: EH_PUBLIC_WORKER_ID

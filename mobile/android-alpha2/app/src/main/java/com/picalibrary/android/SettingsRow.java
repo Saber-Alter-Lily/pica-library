@@ -14,13 +14,28 @@ final class SettingsRow {
         LinearLayout row=container(c,false,action);row.setGravity(Gravity.CENTER_VERTICAL);
         boolean hasStatus=status!=null&&!status.isEmpty();
         TextView name=Ui.text(c,title,16,Ui.TEXT,true);
-        // Both columns receive bounded widths. A long translated status must wrap, not squeeze the title off-screen.
-        row.addView(name,new LinearLayout.LayoutParams(0,-2,hasStatus?1.15f:1f));
-        if(hasStatus){
+        // Stacking at enlarged system fonts prevents orphaned CJK title glyphs
+        // in the 360dp source/settings hub while preserving the normal compact rows.
+        final android.content.res.Configuration configuration=c.getResources().getConfiguration();
+        boolean stackStatus=hasStatus&&configuration.fontScale>=1.3f
+            &&configuration.screenWidthDp>0&&configuration.screenWidthDp<=480;
+        if(stackStatus){
+            LinearLayout labels=new LinearLayout(c);
+            labels.setOrientation(LinearLayout.VERTICAL);
+            labels.addView(name,new LinearLayout.LayoutParams(-1,-2));
             TextView state=Ui.text(c,status,13,statusColor(status),false);
-            state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
-
-            row.addView(state,new LinearLayout.LayoutParams(0,-2,1f));
+            state.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+            state.setPadding(0,Ui.dp(c,4),0,0);
+            labels.addView(state,new LinearLayout.LayoutParams(-1,-2));
+            row.addView(labels,new LinearLayout.LayoutParams(0,-2,1f));
+        }else{
+            // With normal font sizes, retain bounded side-by-side columns.
+            row.addView(name,new LinearLayout.LayoutParams(0,-2,hasStatus?1.15f:1f));
+            if(hasStatus){
+                TextView state=Ui.text(c,status,13,statusColor(status),false);
+                state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
+                row.addView(state,new LinearLayout.LayoutParams(0,-2,1f));
+            }
         }
         if(action!=null){TextView arrow=Ui.text(c,"›",24,Ui.MUTED,false);arrow.setPadding(Ui.dp(c,10),0,0,0);row.addView(arrow);}
         return row;

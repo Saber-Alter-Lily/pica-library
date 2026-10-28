@@ -3,6 +3,8 @@ package com.picalibrary.android;
 import static org.junit.Assert.*;
 
 import android.app.Application;
+import android.content.Context;
+import android.content.res.Configuration;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -42,6 +44,46 @@ public class SettingsRowNarrowLayoutTest {
         assertTrue(status.getRight()<=arrow.getLeft());
         assertTrue(arrow.getRight()<=width-row.getPaddingRight());
         assertTrue(row.getMeasuredHeight()>=Ui.dp(app,56));
+    }
+
+    @Test public void largeFontNarrowSourceRowStacksInsteadOfOrphaningCjkTitle(){
+        Application app=RuntimeEnvironment.getApplication();
+        Configuration config=new Configuration(app.getResources().getConfiguration());
+        config.screenWidthDp=360;
+        config.fontScale=1.5f;
+        Context enlarged=app.createConfigurationContext(config);
+        Ui.applyTheme(enlarged);
+        LinearLayout row=SettingsRow.row(enlarged,
+            "本机外部漫画源","独立选择 Pica / E-H / JM，不改变电脑设置",v->{});
+        assertEquals("Stacked label group and arrow only",2,row.getChildCount());
+        assertTrue(row.getChildAt(0) instanceof LinearLayout);
+        LinearLayout labels=(LinearLayout)row.getChildAt(0);
+        assertEquals(LinearLayout.VERTICAL,labels.getOrientation());
+        assertEquals(2,labels.getChildCount());
+        TextView title=(TextView)labels.getChildAt(0);
+        TextView status=(TextView)labels.getChildAt(1);
+        TextView arrow=(TextView)row.getChildAt(1);
+        int width=Ui.dp(enlarged,320);
+        row.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(Ui.dp(enlarged,600),View.MeasureSpec.AT_MOST));
+        row.layout(0,0,width,row.getMeasuredHeight());
+        assertTrue("Title gets full label width",title.getMeasuredWidth()>Ui.dp(enlarged,215));
+        assertEquals("Status aligned below title, not squeezed into right column",
+            android.view.Gravity.START|android.view.Gravity.CENTER_VERTICAL,status.getGravity());
+        assertEquals(title.getMeasuredWidth(),status.getMeasuredWidth());
+        assertTrue("Arrow must stay within row",arrow.getRight()<=width-row.getPaddingRight());
+    }
+
+    @Test public void largeFontWideRowKeepsOriginalHorizontalLayout(){
+        Application app=RuntimeEnvironment.getApplication();
+        Configuration config=new Configuration(app.getResources().getConfiguration());
+        config.screenWidthDp=600;
+        config.fontScale=1.5f;
+        Context enlarged=app.createConfigurationContext(config);
+        LinearLayout row=SettingsRow.row(enlarged,"来源","已同步",v->{});
+        assertEquals("600dp is not a narrow layout",3,row.getChildCount());
+        assertTrue(row.getChildAt(0) instanceof TextView);
+        assertTrue(row.getChildAt(1) instanceof TextView);
     }
 
     @Test public void statusLineAlsoBoundsBothColumns(){

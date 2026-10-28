@@ -158,6 +158,11 @@ export function moduleBoundaryViolations(edges: DependencyEdge[]): string[] {
 
         if (isCoreReader && (isConcreteSource || to === '<runtime-loader>'))
             reason = 'Reader must not depend on concrete sources'
+        if (from === 'src/services/provider-service.ts' && !edge.typeOnly &&
+            ['src/providers/pica-provider.ts',
+                'src/providers/eh-provider.ts',
+                'src/providers/jm-provider.ts'].includes(to))
+            reason = 'Concrete source constructors belong in compiled composition'
         if (from === 'src/source-extensions/reader-contract.ts')
             reason = 'Portable source contract must have zero imports'
         if (from === 'src/source-extensions/desktop-reader-adapter.ts') {

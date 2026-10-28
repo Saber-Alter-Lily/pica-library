@@ -1307,7 +1307,11 @@ readingLibraryPanel = installReadingLibrary({
     query: (value, signal) => api('/api/v1/desktop/reading-library/query', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': desktop?.csrfToken || '' }, body: JSON.stringify(value), signal }),
     hostSession: currentHostedLibrarySession,
     openReader: (comicId, online) => openReaderComic(comicId, online),
-    openHosted: resumeHostedLibraryComic
+    openHosted: resumeHostedLibraryComic,
+    openSigned: (comicId, sessionId) =>
+        openReaderComic(comicId, true, null, {
+            sessionId, csrfToken: desktop?.csrfToken || ''
+        })
 })
 hostedDownloadsPanel = installHostedDownloadProjection({
     target: $('#host-downloads'), boundaryNote: $('#downloads .info-tip'),
@@ -2988,6 +2992,7 @@ let readerChapterRequest = 0
 let readerComicRequest = 0
 const readerViewportTracker = createReaderViewportTracker({ window, document, onPage: queueReaderProgress })
 function readerApiRoot() {
+    if (state.reader.signedSessionId) return '/api/v1/desktop/signed-reader/' + state.reader.signedSessionId
     if (state.reader.hostedSessionId) return '/api/v1/desktop/host-reader/' + state.reader.hostedSessionId
     return state.reader.online ? '/api/v1/online-reader' : '/api/v1/reader'
 }
@@ -3092,17 +3097,21 @@ async function flushReaderProgress(keepalive = false) {
     if (!snapshot) return true
     const { payload, owner: reader } = snapshot
     const root = readerApiRoot()
+    const scoped = Boolean(reader.hostedSessionId || reader.signedSessionId)
+    const scopedToken = reader.hostedSessionId
+        ? reader.hostedCsrfToken || desktop?.csrfToken || ''
+        : reader.signedCsrfToken || desktop?.csrfToken || ''
     try {
         if (keepalive) {
             const response = await fetch(`${root}/progress`, {
                 method: 'POST',
-                headers: { 'content-type': 'application/json', ...(reader.hostedSessionId ? { 'x-pica-csrf': reader.hostedCsrfToken || desktop?.csrfToken || '' } : {}) },
+                headers: { 'content-type': 'application/json', ...(scoped ? { 'x-pica-csrf': scopedToken } : {}) },
                 body: JSON.stringify(payload),
                 keepalive: true
             })
             if (!response.ok) throw new Error('Progress not saved')
         }
-        else if (reader.hostedSessionId) await api(`${root}/progress`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': reader.hostedCsrfToken || desktop?.csrfToken || '' }, body: JSON.stringify(payload) })
+        else if (scoped) await api(`${root}/progress`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': scopedToken }, body: JSON.stringify(payload) })
         else await post(`${root}/progress`, payload)
         acknowledgeReaderProgress(state.reader, snapshot)
         if (activeView === 'library') void readingLibraryPanel?.refresh()
@@ -3122,7 +3131,10 @@ async function openReaderChapter(episodeId) {
     $('#reader-message').textContent = t('reader.loadingChapter')
     try {
     const chapter = await api(
-        `${readerApiRoot()}/comics/${encodeURIComponent(state.reader.comicId)}/chapters/${encodeURIComponent(episodeId)}`
+        `${readerApiRoot()}/comics/${encodeURIComponent(state.reader.comicId)}/chapters/${encodeURIComponent(episodeId)}`,
+        state.reader.signedSessionId ? { headers: {
+            'x-pica-csrf': state.reader.signedCsrfToken || desktop?.csrfToken || ''
+        } } : undefined
     )
     if (requestId !== readerChapterRequest) return
     state.reader.episodeId = episodeId
@@ -3158,12 +3170,17 @@ function renderReaderChapterHeading() {
             : '')
 }
 
-async function openReaderComic(comicId, online = false, hosted = null) {
+async function openReaderComic(comicId, online = false, hosted = null, signed = null) {
+    if (hosted && signed) return
     if (hosted && (!/^[0-9a-f-]{36}$/.test(hosted.sessionId || '') || !/^hosted:[0-9a-f-]{36}:[0-9a-f]{64}$/.test(comicId))) return
-    if (!hosted && String(comicId).startsWith('hosted:')) return
+    if (signed && (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(signed.sessionId || '') ||
+        !/^[a-z][a-z0-9-]{2,31}:[A-Za-z0-9_-]{1,128}$/.test(comicId))) return
+    if (!hosted && !signed && String(comicId).startsWith('hosted:')) return
     const hostedSessionId = hosted?.sessionId || null
     const hostedCsrfToken = hosted?.csrfToken || null
-    if (hostedSessionId) online = true
+    const signedSessionId = signed?.sessionId || null
+    const signedCsrfToken = signed?.csrfToken || null
+    if (hostedSessionId || signedSessionId) online = true
     online = online && !String(comicId).startsWith('local:')
     const requestId = ++readerComicRequest
     readerChapterRequest++
@@ -3173,7 +3190,7 @@ async function openReaderComic(comicId, online = false, hosted = null) {
         if (requestId !== readerComicRequest) return
         resetReaderViewportTracking()
         const originView = activeView === 'reader' ? state.reader.originView : activeView
-        state.reader = { comicId, online, hostedSessionId, hostedCsrfToken, episodeId: null, dirty: false, originView }
+        state.reader = { comicId, online, hostedSessionId, hostedCsrfToken, signedSessionId, signedCsrfToken, episodeId: null, dirty: false, originView }
         const root = readerApiRoot()
         activateView('reader')
         document.body.classList.add('reader-active')
@@ -3183,11 +3200,15 @@ async function openReaderComic(comicId, online = false, hosted = null) {
         $('#reader-message').textContent = t('reader.loadingChapters')
         $('#reader-export-zip').hidden = online
         $('#reader-export-cbz').hidden = online
+        const signedReadOptions = signedSessionId ? { headers: {
+            'x-pica-csrf': signedCsrfToken || desktop?.csrfToken || ''
+        } } : undefined
         const [chapters, recentProgress] = await Promise.all([
             api(
-                `${root}/comics/${encodeURIComponent(comicId)}/chapters`
+                `${root}/comics/${encodeURIComponent(comicId)}/chapters`,
+                signedReadOptions
             ),
-            api(`${root}/progress`)
+            api(`${root}/progress`, signedReadOptions)
         ])
         if (requestId !== readerComicRequest) return
         const readable = chapters.filter((item) => online || item.downloadedPictures > 0)
@@ -3202,6 +3223,8 @@ async function openReaderComic(comicId, online = false, hosted = null) {
             online,
             hostedSessionId,
             hostedCsrfToken,
+            signedSessionId,
+            signedCsrfToken,
             episodeId: null,
             pageIndex: 0,
             chapters,
@@ -3210,7 +3233,7 @@ async function openReaderComic(comicId, online = false, hosted = null) {
             dirty: false
         }
         const comic = state.records.find((item) => item.comicId === comicId)
-        $('#reader-title').textContent = hosted?.title || comic?.title || t('reader.title')
+        $('#reader-title').textContent = hosted?.title || signed?.title || comic?.title || t('reader.title')
         $('#reader-chapters').innerHTML = chapters
             .map(
                 (chapter) =>

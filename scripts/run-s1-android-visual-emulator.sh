@@ -129,6 +129,30 @@ for scale in 1.0 1.5; do
             test -s "s1-visual-evidence/$folder/$proof"
         done
     done
-    printf 'stage=guide-source-downloads-pairing-update-preferences-webdav-profile-vspot font_scale=%s captured=15 source_sha=%s\n' \
+    # Chapter 2: actual five-step Visual guide, without executing or changing any model.
+    visual_log="s1-visual-evidence/$folder-visual-instrumentation.txt"
+    visual_trace="s1-visual-evidence/$folder-visual-logcat.txt"
+    adb logcat -c || true
+    set +e
+    timeout --signal=TERM --kill-after=10s 150s adb shell am instrument -w -r \
+        -e expectedFontScale "$scale" \
+        -e class com.picalibrary.android.S1AdditionalSpotlightTest#fiveVisualStepsHaveVisibleLiveTargetsWithoutStartingRecommendation \
+        com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner > "$visual_log" 2>&1
+    visual_exit=$?
+    set -e
+    adb logcat -d -s S1_VISUAL:I AndroidRuntime:E > "$visual_trace" || true
+    cat "$visual_log"
+    grep "S1_VISUAL" "$visual_trace" || true
+    if [[ "$visual_exit" -ne 0 ]] || ! grep -Fq 'OK (1 test)' "$visual_log"; then
+        echo "::error::S1 five-step Visual spotlight failed/timeout ($folder exit=$visual_exit)" >&2
+        exit 1
+    fi
+    for step in 1 2 3 4 5; do
+        proof="zhCN-light-visual-spotlight-$step.png"
+        adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$proof" \
+            > "s1-visual-evidence/$folder/$proof"
+        test -s "s1-visual-evidence/$folder/$proof"
+    done
+    printf 'stage=all-eight-guide-chapters font_scale=%s captured=20 source_sha=%s\n' \
         "$scale" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
 done

@@ -323,7 +323,10 @@ final class AndroidOnboarding {
     static void startRecommendationStyleTour(RecommendationStyleActivity activity){
         View profile=target(activity,REC_PROFILE),adjust=target(activity,REC_ADJUST),sync=target(activity,REC_SYNC),visualMode=target(activity,REC_VISUAL_MODE),visualStrength=target(activity,REC_VISUAL_STRENGTH);
         if(!awaitTargets(activity,()->startRecommendationStyleTour(activity),true,profile,adjust,sync,visualMode,visualStrength))return;
-        new VSpotView.Builder(activity)
+        // The five-step Visual guide traverses a long ScrollView. Move each
+        // target into view before moving the existing VSpot cutout.
+        final VSpotView[] activeTour=new VSpotView[1];
+        VSpotView tour=new VSpotView.Builder(activity)
             .setStyle(style(activity))
             .setDismissType(VSpotView.DismissType.NONE)
             .addStep(profile,activity.getString(R.string.tour_profile_title),activity.getString(R.string.tour_profile_body))
@@ -332,6 +335,9 @@ final class AndroidOnboarding {
             .addStep(visualMode,activity.getString(R.string.tour_visual_mode_title),activity.getString(R.string.tour_visual_mode_body))
             .addStep(visualStrength,activity.getString(R.string.tour_visual_strength_title),activity.getString(R.string.tour_visual_strength_body))
             .setCallback(new VSpotView.Callback(){
+                @Override public void onStepChanged(View target,int index,VSpotView.Step step){
+                    revealAdvancedTarget(target,activeTour[0]);
+                }
                 @Override public void onDismiss(View last,boolean completed,int index){
                     if(activity.isFinishing()||activity.isDestroyed())return;
                     if(completed){
@@ -340,7 +346,9 @@ final class AndroidOnboarding {
                         new AlertDialog.Builder(activity).setTitle(R.string.advanced_guide_title).setMessage(R.string.advanced_guide_spotlight_done).setPositiveButton(R.string.common_ok,null).show();
                     }else handleSkip(activity,true);
                 }
-            }).build().show();
+            }).build();
+        activeTour[0]=tour;
+        tour.show();
     }
 
     private static void handleSkip(Activity activity){

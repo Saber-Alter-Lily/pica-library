@@ -1,3 +1,9 @@
+## S1-04 第2章五步画风引导（新源码/未验收）
+
+- 七章真实聚光已通过：`eea0db58` / [Android35 #40621769915](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915)，16/16 Instrumentation PASS、30张PNG，100/150%字体、中文浅色360dp。第2章独立使用 `startDetailedOnboarding` 触发**五步** VSpot（推荐画像、人工调整、同步、Visual 接入模式、影响强度），不能由两步目标测试冒充。
+- 补上现有 `AndroidOnboarding.startRecommendationStyleTour` 缺失的每次切步 scroll-to-target，仍复用 `VSpotView` 与 `revealAdvancedTarget`，并添加原生 Instrumentation：核对五个标签、五次视口可见/截图、跳过不记已读、未启动新推荐周期。**当前新源码未运行**；若通过每档增加5张，合计目标40张真实截图。
+- 此前已发现的 150% 字体窄屏 SettingsRow/画像卡片问题已纳入前一提交，需精确新版截图复拍。八章模拟器成功也不是完整 G1（其他设备/中英日/深色/手势/真正用户感受还未证明）。
+
 ## 150% 字体第二项真实视觉缺陷及有限修复（2026-10-27，未复拍）
 
 - 已实际读取并逐图核查 [7章30张真实图 #12787068908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915/artifacts/12787068908)：`eea0db58` Android 35 工作流 terminal SUCCESS，16/16 Instrumentation PASS（7个章节各两步 + 指南目录，双字体档），30 个 PNG。至此 0/1/3/4/5/6/7 章在中文浅色 360dp 的真实控件聚光得到模拟器支持；只有 2 画风五步、其他语言/主题/尺寸、实体设备未测。

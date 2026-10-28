@@ -179,6 +179,95 @@ public final class S1AdditionalSpotlightTest {
         }
     }
 
+
+    @Test public void fiveVisualStepsHaveVisibleLiveTargetsWithoutStartingRecommendation() throws Exception {
+        Instrumentation inst=InstrumentationRegistry.getInstrumentation();
+        Context app=inst.getTargetContext().getApplicationContext();
+        app.getSharedPreferences("pica-disclaimer-v1",Context.MODE_PRIVATE)
+            .edit().putString("accepted_version","1").commit();
+        OnboardingStore.setAutoShow(app,false);
+        LocaleStore.set(app,LocaleStore.ZH_CN);
+        app.getSharedPreferences("appearance-v1",Context.MODE_PRIVATE)
+            .edit().putString("mode",ThemeStore.MODE_LIGHT).commit();
+        String font=InstrumentationRegistry.getArguments().getString("expectedFontScale","1.0");
+        assertEquals(Float.parseFloat(font),app.getResources().getConfiguration().fontScale,0.08f);
+        String beforeCycle=NativeRecommendationStore.load(app).cycleId;
+        Instrumentation.ActivityMonitor monitor=inst.addMonitor(
+            RecommendationStyleActivity.class.getName(),null,false);
+        RecommendationStyleActivity activity=null;
+        try{
+            Intent intent=new Intent(app,RecommendationStyleActivity.class)
+                .putExtra("startDetailedOnboarding",true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            Log.i(TAG,"phase=visual-five-launch");
+            app.startActivity(intent);
+            Activity opened=monitor.waitForActivityWithTimeout(20000);
+            assertNotNull("Actual Visual settings did not open",opened);
+            assertTrue(opened instanceof RecommendationStyleActivity);
+            activity=(RecommendationStyleActivity)opened;
+            final RecommendationStyleActivity screen=activity;
+            AtomicReference<VSpotView> overlay=new AtomicReference<>();
+            for(int attempt=0;attempt<60;attempt++){
+                inst.runOnMainSync(()->{
+                    View root=screen.getWindow().getDecorView();
+                    if(!(root instanceof ViewGroup))return;
+                    ViewGroup group=(ViewGroup)root;
+                    for(int i=0;i<group.getChildCount();i++){
+                        View child=group.getChildAt(i);
+                        if(child instanceof VSpotView&&((VSpotView)child).isShowing())
+                            overlay.set((VSpotView)child);
+                    }
+                });
+                if(overlay.get()!=null&&overlay.get().getCurrentStep()!=null)break;
+                SystemClock.sleep(150);
+            }
+            assertNotNull("Original five-step Visual VSpot not shown",overlay.get());
+            String[] expected={
+                AndroidOnboarding.REC_PROFILE,AndroidOnboarding.REC_ADJUST,
+                AndroidOnboarding.REC_SYNC,AndroidOnboarding.REC_VISUAL_MODE,
+                AndroidOnboarding.REC_VISUAL_STRENGTH
+            };
+            AtomicReference<Integer> count=new AtomicReference<>();
+            inst.runOnMainSync(()->count.set(overlay.get().getStepCount()));
+            assertEquals(5,(int)count.get());
+            for(int step=0;step<expected.length;step++){
+                final int index=step;
+                if(step>0)inst.runOnMainSync(()->overlay.get().next());
+                SystemClock.sleep(320);
+                AtomicReference<Integer> actualStep=new AtomicReference<>();
+                AtomicReference<String> tag=new AtomicReference<>();
+                AtomicReference<Boolean> visible=new AtomicReference<>(false);
+                inst.runOnMainSync(()->{
+                    VSpotView tour=overlay.get();
+                    actualStep.set(tour.getCurrentIndex());
+                    View target=tour.getCurrentTargetView();
+                    tag.set(target==null?null:String.valueOf(target.getTag()));
+                    android.graphics.Rect rect=new android.graphics.Rect();
+                    visible.set(target!=null&&target.isShown()&&target.getGlobalVisibleRect(rect)
+                        &&rect.width()>0&&rect.height()>0);
+                });
+                assertEquals(index,(int)actualStep.get());
+                assertEquals(expected[index],tag.get());
+                assertTrue("Visual target must be in viewport: "+expected[index],visible.get());
+                image(inst,app,font,"visual-spotlight-"+(index+1));
+                Log.i(TAG,"phase=visual-five-step-"+index);
+            }
+            inst.runOnMainSync(()->overlay.get().dismiss());
+            SystemClock.sleep(480);
+            assertFalse("Skipping cannot mark Visual chapter read",
+                OnboardingStore.advancedRead(app).contains("2"));
+            assertEquals("Guide must not create a recommendation cycle",
+                beforeCycle,NativeRecommendationStore.load(app).cycleId);
+            Log.i(TAG,"phase=visual-five-skip-no-model");
+        }finally{
+            inst.removeMonitor(monitor);
+            if(activity!=null){
+                RecommendationStyleActivity close=activity;
+                inst.runOnMainSync(()->{if(!close.isFinishing())close.finish();});
+            }
+        }
+    }
+
     private static void image(Instrumentation inst,Context app,String font,String name) throws Exception {
         String folder=Float.parseFloat(font)>=1.3f?"f150":"f100";
         File dir=new File(app.getFilesDir(),"s1-visual-"+folder);

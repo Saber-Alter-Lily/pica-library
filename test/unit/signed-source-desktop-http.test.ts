@@ -257,4 +257,63 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
         const cannotConnect = await post(endpoint, { operation: 'connect', sourceId: 'demo' })
         expect(cannotConnect.status).toBe(409)
     })
+
+    it('cleans up a crashed worker without automatic restart, then reconnects only on explicit command', async () => {
+        const initial = await post(endpoint, { operation: 'status', sourceId: 'demo' })
+        expect(initial.status).toBe(200)
+        const state = await initial.json() as {
+            revision: number; activeVersion: string | null
+        }
+        expect(state.activeVersion).toBeNull()
+        const selected = await post(endpoint, {
+            operation: 'activate',
+            sourceId: 'demo', version: '1.0.0',
+            expectedRevision: state.revision
+        })
+        expect(selected.status).toBe(200)
+        const current = await selected.json() as { revision: number }
+        const joined = await post(endpoint, { operation: 'connect', sourceId: 'demo' })
+        expect(joined.status).toBe(200)
+        const { sessionId } = await joined.json() as { sessionId: string }
+        const root = endpoint + '/' + sessionId
+        const chapter = await get(root + '/comics/demo%3Abook1/chapters/chapter-1')
+        expect(chapter.status).toBe(200)
+        const page = await chapter.json() as {
+            pages: Array<{ url: string }>
+        }
+
+        // Selecting exactly the same signed version must not disconnect
+        // an already healthy session or misreport connected=false.
+        const noop = await post(endpoint, {
+            operation: 'activate', sourceId: 'demo',
+            version: '1.0.0', expectedRevision: current.revision
+        })
+        expect(noop.status).toBe(200)
+        expect(await noop.json()).toMatchObject({
+            revision: current.revision, connected: true
+        })
+        expect((await get(page.pages[0].url)).status).toBe(200)
+
+        // The fixture's fourth page exits the child process deliberately.
+        expect((await get(page.pages[3].url)).status).toBe(409)
+        const inactive = await post(endpoint, { operation: 'status', sourceId: 'demo' })
+        expect(inactive.status).toBe(200)
+        expect(await inactive.json()).toMatchObject({
+            revision: current.revision, connected: false
+        })
+        // Reconnect is never automatic. Old URLs are invalid.
+        expect((await get(page.pages[0].url)).status).toBe(409)
+        const rejoin = await post(endpoint, { operation: 'connect', sourceId: 'demo' })
+        expect(rejoin.status).toBe(200)
+        const fresh = await rejoin.json() as { sessionId: string }
+        expect(fresh.sessionId).not.toBe(sessionId)
+        const chapters = await get(endpoint + '/' + fresh.sessionId +
+            '/comics/demo%3Abook1/chapters')
+        expect(chapters.status).toBe(200)
+        expect((await post(endpoint, {
+            operation: 'disable', sourceId: 'demo',
+            expectedRevision: current.revision
+        })).status).toBe(200)
+        expect((await get(endpoint + '/' + fresh.sessionId + '/progress')).status).toBe(409)
+    })
 })

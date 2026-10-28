@@ -157,7 +157,9 @@ export class TrustedSourceProcess implements ExternalReaderTransport, ExternalRe
         child.once('exit', () => this.fail(new Error('Source worker exited')))
         child.once('disconnect', () => this.fail(new Error('Source worker disconnected')))
         try {
-            const response = await this.sendRequest('hello', {})
+            // Worker startup can be slower than a normal page request (notably on Windows).
+            // A bounded four-second handshake does not weaken per-request timeouts.
+            const response = await this.sendRequest('hello', {}, 4000)
             if (!record(response) || Object.keys(response).sort().join(',') !==
                 'apiVersion,sourceId' ||
                 response.apiVersion !== 1 ||
@@ -215,7 +217,7 @@ export class TrustedSourceProcess implements ExternalReaderTransport, ExternalRe
         }
     }
 
-    private sendRequest(operation: Operation, params: Partial<Request>) {
+    private sendRequest(operation: Operation, params: Partial<Request>, timeoutMs?: number) {
         if (this.revoked || !this.child?.connected ||
             (operation !== 'hello' && !this.ready))
             return Promise.reject(new Error('Source process is disabled'))
@@ -234,7 +236,7 @@ export class TrustedSourceProcess implements ExternalReaderTransport, ExternalRe
         return new Promise<unknown>((resolve, reject) => {
             const timer = setTimeout(() => {
                 this.fail(new Error('Source worker request timed out'))
-            }, this.timeoutMs)
+            }, timeoutMs ?? this.timeoutMs)
             this.pending.set(id, { resolve, reject, timer })
             this.child!.send(packet, (error) => {
                 if (error) this.fail(new Error('Source worker IPC send failed'))

@@ -401,6 +401,13 @@ export async function startLibraryServer(options: {
                         catalogueReadingPort('local', () => options.database.recentReadingProgress(100), options.database, id => options.service.sources.isEnabled(id)),
                         catalogueReadingPort('online', () => onlineReader.recentProgress(), options.database, id => options.service.sources.isEnabled(id))
                     ]
+                    if (options.desktop.signedSourceReader) {
+                        const signed = options.desktop.signedSourceReader
+                        ports.push({
+                            id: 'signed-source-reader',
+                            snapshot: () => signed.readingLibraryRows()
+                        })
+                    }
                     if (typeof input.hostSessionId === 'string') {
                         const sessionId = input.hostSessionId
                         ports.push({ id: 'selected-host', snapshot: () => {

@@ -428,7 +428,19 @@ export async function startLibraryServer(options: {
                 // Session-owned image tags additionally have a tightly scoped
                 // same-origin, image-only allowance; no install/upload route.
                 const peer = request.socket.remoteAddress ?? ''
-                const expectedOrigin = `http://${request.headers.host}`
+                // Do not trust arbitrary Host as the origin authority. A
+                // browser on a DNS-rebinding domain can be same-origin with
+                // its own forged Host/Referer while connecting to loopback.
+                // Keep this image-only CSRF exception on the actual local
+                // listener, never on attacker-controlled hostnames.
+                const port = request.socket.localPort
+                const hostHeader = request.headers.host?.toLowerCase() ?? ''
+                const trustedHost = port !== undefined && [
+                    `127.0.0.1:${port}`,
+                    `localhost:${port}`,
+                    `[::1]:${port}`
+                ].includes(hostHeader)
+                const expectedOrigin = trustedHost ? `http://${hostHeader}` : ''
                 let referrerOrigin = ''
                 try {
                     referrerOrigin = new URL(
@@ -454,6 +466,7 @@ export async function startLibraryServer(options: {
                     request.headers['sec-fetch-dest'] === 'image' &&
                     referrerOrigin === expectedOrigin
                 const authorized =
+                    trustedHost &&
                     Boolean(options.desktop?.signedSourceReader) &&
                     Boolean(options.desktop?.configured()) &&
                     options.desktop?.status().startupReady !== false &&

@@ -27,8 +27,17 @@ public final class DownloadsActivity extends LocaleAwareActivity {
 
     private void render(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
-        LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));bar.addView(Ui.text(this,"手机下载",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));Button tasks=Ui.button(this,"任务",v->startActivity(new Intent(this,TaskCenterActivity.class)),true);
-        tasks.setTag(AndroidOnboarding.ADV_DOWNLOAD_TASKS);bar.addView(tasks);root.addView(bar);
+        LinearLayout bar=new LinearLayout(this);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(Ui.dp(this,6),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));
+        bar.addView(Ui.button(this,getString(R.string.common_back),v->finish(),true));
+        TextView heading=Ui.text(this,getString(R.string.phone_downloads_title),22,Ui.TEXT,true);
+        heading.setTag("phone-downloads-heading");
+        heading.setMaxLines(2);
+        bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+        Button tasks=Ui.button(this,getString(R.string.phone_downloads_tasks_short),v->startActivity(new Intent(this,TaskCenterActivity.class)),true);
+        tasks.setTag(AndroidOnboarding.ADV_DOWNLOAD_TASKS);
+        bar.addView(tasks);root.addView(bar);
         ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(Ui.BG);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,12),Ui.dp(this,6),Ui.dp(this,12),Ui.dp(this,24));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();renderLoading();
     }
 
@@ -36,7 +45,7 @@ public final class DownloadsActivity extends LocaleAwareActivity {
         if(content==null)return;
         content.removeAllViews();
         ProgressBar progress=new ProgressBar(this);content.addView(progress);
-        TextView text=Ui.text(this,LocalizedText.ui("正在读取手机下载…"),13,Ui.MUTED,false);text.setPadding(0,Ui.dp(this,8),0,0);content.addView(text);
+        TextView text=Ui.text(this,getString(R.string.phone_downloads_loading),13,Ui.MUTED,false);text.setPadding(0,Ui.dp(this,8),0,0);content.addView(text);
     }
 
     private DownloadState readDownloads(){
@@ -60,14 +69,24 @@ public final class DownloadsActivity extends LocaleAwareActivity {
         if(content==null)return;
         PhoneDownloadStore.Snapshot snapshot=state.snapshot;
         content.removeAllViews();
-        content.addView(Ui.text(this,"主动下载是持久正文，不受阅读/封面缓存上限或 LRU 清理影响。当前约 "+format(state.bytes)+"。",12,Ui.MUTED,false));
-        LinearLayout actions=new LinearLayout(this);actions.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,8));actions.addView(button("后台任务",v->startActivity(new Intent(this,TaskCenterActivity.class))),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(actions,this,8);Button storage=button("存储设置",v->startActivity(new Intent(this,StorageSettingsActivity.class)));
+        content.addView(Ui.text(this,getString(R.string.phone_downloads_note,format(state.bytes)),12,Ui.MUTED,false));
+        LinearLayout actions=new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        actions.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,8));
+        Button background=button(getString(R.string.phone_downloads_background_tasks),
+            v->startActivity(new Intent(this,TaskCenterActivity.class)));
+        background.setTag("phone-downloads-background-tasks");
+        actions.addView(background,new LinearLayout.LayoutParams(0,-2,1));
+        Ui.gap(actions,this,8);
+        Button storage=button(getString(R.string.phone_downloads_storage_settings),
+            v->startActivity(new Intent(this,StorageSettingsActivity.class)));
         storage.setTag(AndroidOnboarding.ADV_DOWNLOAD_STORAGE);
-        actions.addView(storage,new LinearLayout.LayoutParams(0,-2,1));content.addView(actions);
+        actions.addView(storage,new LinearLayout.LayoutParams(0,-2,1));
+        content.addView(actions);
         if(snapshot.comics.isEmpty()){content.addView(Ui.text(this,getString(R.string.phone_download_empty_sources),14,Ui.MUTED,false));return;}
         for(PhoneDownloadStore.Comic comic:snapshot.comics.values()){
-            LinearLayout card=Ui.card(this);card.addView(Ui.text(this,comic.title,17,Ui.TEXT,true));card.addView(Ui.text(this,comic.author+" · "+comic.chapters.size()+" 章 · "+comic.pages()+" 页",12,Ui.MUTED,false));
-            LinearLayout row=new LinearLayout(this);row.setPadding(0,Ui.dp(this,8),0,0);row.addView(button("打开",v->open(comic)),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(row,this,8);row.addView(button("删除",v->confirmDelete(comic)),new LinearLayout.LayoutParams(0,-2,1));card.addView(row);content.addView(card);
+            LinearLayout card=Ui.card(this);card.addView(Ui.text(this,comic.title,17,Ui.TEXT,true));card.addView(Ui.text(this,comic.author+" · "+getString(R.string.phone_downloads_chapter_page_count,comic.chapters.size(),comic.pages()),12,Ui.MUTED,false));
+            LinearLayout row=new LinearLayout(this);row.setPadding(0,Ui.dp(this,8),0,0);row.addView(button(getString(R.string.phone_downloads_open),v->open(comic)),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(row,this,8);row.addView(button(getString(R.string.phone_downloads_delete),v->confirmDelete(comic)),new LinearLayout.LayoutParams(0,-2,1));card.addView(row);content.addView(card);
         }
     }
 
@@ -75,10 +94,10 @@ public final class DownloadsActivity extends LocaleAwareActivity {
 
     private void confirmDelete(PhoneDownloadStore.Comic comic){
         new AlertDialog.Builder(this)
-            .setTitle(LocalizedText.ui("删除手机下载？"))
+            .setTitle(R.string.phone_downloads_delete_title)
             .setMessage(getString(R.string.phone_download_delete_scope))
-            .setNegativeButton(LocalizedText.ui("取消"),null)
-            .setPositiveButton(LocalizedText.ui("删除"),(d,w)->deleteDownload(comic.id))
+            .setNegativeButton(R.string.jm_source_dismiss,null)
+            .setPositiveButton(R.string.phone_downloads_delete,(d,w)->deleteDownload(comic.id))
             .show();
     }
 
@@ -100,7 +119,7 @@ public final class DownloadsActivity extends LocaleAwareActivity {
             }catch(Exception error){
                 runOnUiThread(()->{
                     if(destroyed||generation!=loadGeneration)return;
-                    Toast.makeText(this,error.getMessage()==null?LocalizedText.ui("删除失败"):error.getMessage(),Toast.LENGTH_LONG).show();
+                    Toast.makeText(this,error.getMessage()==null?getString(R.string.phone_downloads_delete_failed):error.getMessage(),Toast.LENGTH_LONG).show();
                     loadDownloads();
                 });
             }

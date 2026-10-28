@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_downloads_title">Phone downloads</string>
+    <string name="phone_downloads_tasks_short">Tasks</string>
+    <string name="phone_downloads_loading">Loading phone downloads…</string>
+    <string name="phone_downloads_note">Downloaded chapters are kept outside temporary reader and cover caches (approximately %1$s).</string>
+    <string name="phone_downloads_background_tasks">Background tasks</string>
+    <string name="phone_downloads_storage_settings">Storage settings</string>
+    <string name="phone_downloads_chapter_page_count">%1$d chapters · %2$d pages</string>
+    <string name="phone_downloads_open">Open</string>
+    <string name="phone_downloads_delete">Delete</string>
+    <string name="phone_downloads_delete_title">Delete this phone download?</string>
+    <string name="phone_downloads_delete_failed">Unable to delete download</string>
+</resources>

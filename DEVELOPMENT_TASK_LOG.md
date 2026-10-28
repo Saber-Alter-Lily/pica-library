@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## S3 安全及 CI 续接｜2026-10-28（HEAD 2e3bcf3）
+
+- **实际基线**：当前开发树的最后一项运行代码提交为 `2e3bcf32fba43c041009099afa3d7de6f2296c91`，位于未合并 Draft [PR #222](https://github.com/Saber-Alter-Lily/pica-library/pull/222)，继承 #221 → #220 → #219 → #218；正式 main 与 v0.5.0、用户数据/账号、签名 APK、OTA、安装包未修改。此日志更新是文档提交，不可把旧源码测试伪装成文档 HEAD 的独立通过。
+- **首轮真实失败（已诊断）**：[完整 CI #40715568582](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40715568582) 对 `4a13b65d` 实际 **FAIL**，其中 Android PASS，Web/Desktop 的 340 个测试文件中 2 文件失败，4 项失败/2684 项通过/14 跳过。根因为两份旧契约测试仍逐字检查 `api(`${root}/progress`)`，新共用 Reader 实际使用 `api(`${root}/progress`, signedReadOptions)`（带签名源会话/CSRF 参数）；不能仅凭此断言推出实际阅读流程损坏。
+- **修复且保留回归门禁**：`8f743563` 修复 `test/unit/dev2-web-contract.test.ts` 三个用例共用的过时字符串检查；`debeebe3` 修复 `test/unit/v020-product-contracts.test.ts` 的另一个相同断言。新断言必须维持旧本地/online URL、signed-session 读参数和 scoped CSRF，而非简单删测；现有 `web-reader-progress.test.ts` 继续覆盖本地、Host、signed 实际保存/ACK 调用。
+- **新增真实安全缺口与阻断**：签名图片的原生 `<img>` 无法附加 CSRF，之前在 loopback TCP + 无 CSRF 图片例外里依据客户端自报 HTTP Host 构造允许的 Origin/Referer，可能对 DNS rebinding 的攻击者同源网址形成许可混淆。`38a6a8c` 要求 Host 为 `127.0.0.1` / `localhost` / `[::1]` 并匹配 HTTP Server **实际 socket 监听端口**；所有 signed API 受此门禁；`2e3bcf3` 对伪造外域 Host + 同源 Referer 与错误本机端口增加真实 Node HTTP 负向测试，仍应允许有效同源原生图片、拒绝无 CSRF 的 JSON/进度请求。
+- **精确新代码验证**：[S3 双系统专项 #40728398018](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40728398018)、[全项目 CI #40728408056](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40728408056) 在本次日志写入时尚在队列/进行中，结果 **NOT_VERIFIED**；旧 #40715552549 Linux87/87、Windows61/61 是安全补丁之前的专项通过，不得继承为新 HEAD 通过。如新 CI 失败，应按真实日志修复并再次以新 SHA 判定。
+- **当前尚未实现**：真正 Pica/E-H/JM 源协议在隔离进程/Android Binder 内运行、发行者公钥与受保护安装根、多进程安全与官方签名/安装、两端纯 Core 安装包物理无源 SDK、账号/收藏/下载/历史进度兼容、旧 v0.5.0 原地升级/回滚。下一切口应选一个真实 Provider 逐项梳理旧 ID、凭据作用域、实际请求和书库/Reader 对应，避免重复制造仅会返回合成图片的 worker。G1–G4 仍 OPEN。
+- **待核查**：本提交之后分别检查专项 CI 和完整 CI 的精确源 SHA，真实 Android/Windows 设备与用户视觉验收不得以 CI 全绿代替；继续保留旧 42 + 新 12 案例的各项阻断记录。
+
 ## S3 PR #222 接续验收｜2026-10-28：安全隔离与真正阅读 UI 路由
 
 - **历史基线已经精确核实**：旧源码 `dd03822e` 的 [签名来源双平台专项 #40712630322](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712630322) 和 [完整 CI #40712643773](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712643773) 均 SUCCESS；这两项不能直接覆盖后续 UI 修改。

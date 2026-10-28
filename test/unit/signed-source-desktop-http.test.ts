@@ -264,6 +264,36 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
         expect(db.listReaderEpisodes('demo:book1')).toEqual([])
         expect(db.getComic('demo:book1')).toBeUndefined()
 
+        // The existing unified ReadingLibrary sees the signed source's
+        // read-only progress without catalog import or provider credentials.
+        const unified = await post('/api/v1/desktop/reading-library/query', {
+            query: { sourceKey: 'signed-source:demo' }
+        })
+        expect(unified.status).toBe(200)
+        const unifiedBody = await unified.json() as {
+            total: number
+            items: Array<{
+                comicId: string
+                title: string | null
+                source: { key: string }
+                routes: Array<{
+                    channel: string
+                    available: boolean
+                    progress: { pageIndex: number }
+                }>
+            }>
+        }
+        expect(unifiedBody.total).toBe(1)
+        expect(unifiedBody.items[0]).toMatchObject({
+            comicId: 'demo:book1',
+            title: null,
+            source: { key: 'signed-source:demo' },
+            routes: [{
+                channel: 'online', available: true,
+                progress: { pageIndex: 1 }
+            }]
+        })
+
         const foreign = await get(root + '/comics/pica-work/chapters')
         expect(foreign.status).not.toBe(200)
         const deniedPage = await get(chapter.pages[0].url, {
@@ -288,6 +318,13 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
         expect(disable.status).toBe(200)
         const cannotConnect = await post(endpoint, { operation: 'connect', sourceId: 'demo' })
         expect(cannotConnect.status).toBe(409)
+        const afterDisable = await post(
+            '/api/v1/desktop/reading-library/query',
+            { query: { sourceKey: 'signed-source:demo' } }
+        )
+        expect(afterDisable.status).toBe(200)
+        expect((await afterDisable.json()).total).toBe(0)
+        expect(db.getAppState('signed-source-progress-v1:demo')).toBeDefined()
     })
 
     it('cleans up a crashed worker without automatic restart, then reconnects only on explicit command', async () => {

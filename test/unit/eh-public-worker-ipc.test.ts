@@ -55,10 +55,21 @@ describe('S3 E-H existing Provider bundled in a real signed child process', () =
                 platform: 'node',
                 format: 'cjs',
                 target: 'node22',
+                metafile: true,
                 banner: { js: fixtureBanner },
                 logLevel: 'silent'
             })
             expect(built.errors).toHaveLength(0)
+            const inputs = Object.keys(built.metafile?.inputs ?? {})
+            expect(inputs.some(name => name.endsWith('src/providers/eh-provider.ts')))
+                .toBe(true)
+            // Actual protocol implementation ships only in the optional
+            // worker. Do not pull legacy Pica SDK/Desktop bootstrap into it.
+            expect(inputs.some(name =>
+                name.endsWith('src/sdk.ts') ||
+                name.endsWith('src/desktop/main.ts') ||
+                name.endsWith('src/providers/pica-provider.ts')
+            )).toBe(false)
             const bytes = fs.readFileSync(outfile)
             expect(bytes.length).toBeGreaterThan(1000)
             expect(bytes.length).toBeLessThan(1024 * 1024)

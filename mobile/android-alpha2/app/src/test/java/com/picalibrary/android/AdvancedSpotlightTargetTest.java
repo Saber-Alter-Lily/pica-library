@@ -77,8 +77,13 @@ public class AdvancedSpotlightTargetTest {
             Intent intent=new Intent(app,UpdateActivity.class)
                 .putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,7);
             try(ActivityController<UpdateActivity> c=
-                    Robolectric.buildActivity(UpdateActivity.class,intent).create().start().resume().visible()){
+                    Robolectric.buildActivity(UpdateActivity.class,intent).create()){
                 UpdateActivity screen=c.get();
+                // Keep the guidePreview state, but do not launch the endless
+                // animation in Robolectric. The live VSpot is independently
+                // verified by the actual Android emulator screenshot suite.
+                screen.getIntent().removeExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER);
+                c.start().resume().visible();
                 TextView label=(TextView)screen.getWindow().getDecorView()
                     .findViewWithTag(AndroidOnboarding.ADV_UPDATE_STATUS);
                 assertNotNull(label);

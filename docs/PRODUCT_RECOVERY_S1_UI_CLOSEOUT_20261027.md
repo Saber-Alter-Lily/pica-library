@@ -1,3 +1,10 @@
+## S1 Robolectric 精确卡点修复候选（2026-10-27）
+
+- 现已从 [`b5e134f` Android 35模拟器 #40622970105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105) **核实八章18/18 Instrumentation PASS，40 张真实 PNG**，五步画风逐步验证目标可见、跳过无行为；工件 [#12788940746](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105/artifacts/12788940746) 已下载并实际核对两档字体截图。这个成功仅证明中文浅色 360dp 模拟器的聚光行为，不是 G1 真机/用户/多语言验收。
+- **隔离 Robolectric 的真实结果**：[matrix #40623273814](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40623273814) 中 `DownloadsActivityUiTest`、`SettingsRowNarrowLayoutTest` 和 `DualOnboardingTest` 逐个 **SUCCESS**；`AdvancedSpotlightTargetTest` 和 `AccountSourcesGuidePreviewTest` 均在 `:app:testDebugUnitTest` 期间持续运行至12分钟上限，最终 **CANCELLED，非断言 FAIL 或 PASS**。原始日志确认编译正常，无这两类的有效成功 XML。
+- 两类测试中，前者特定单测和后者生命周期单测会通过 `ActivityController.resume().visible()` 在 Robolectric 环境触发 `LocaleAwareActivity.onPostResume`，实际启动持续动画的 VSpot；将这些**仅验证生命周期/只读状态**的测试改为在 `onCreate` 捕获 guidePreview 后先模拟 one-shot extra 已消费，再进入 `resume`，从而不启动聚光动画。真实 VSpot 的启动、实际高亮、跳过不写入由前述 18/18 模拟器证据独立验证，**不删除原有单测断言、不改生产 Activity**。
+- 以上只是有根据的阻塞原因候选，需严格复测同两类并核对 JUnit；若仍卡住，应进一步细分每种方法/检查其他主线程任务，不能直接宣布问题解决。
+
 ## S1-03 Android Robolectric 首轮定向测试卡住，诊断隔离（2026-10-27）
 
 - [定向 Android run #40621041603](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621041603) 源码 `b44b9f97` 为 **CANCELLED，而非通过/断言失败**。原始构建日志显示 Java 正常编译，`02:31:22` 进入 `:app:testDebugUnitTest` 后未完成并于 `02:48:31` 取消；最后仅上传极小 JUnit 归档（不能代表测试通过）。当前未能仅凭总任务日志区分哪个测试类、Robolectric/线程生命周期或外部环境导致阻塞。

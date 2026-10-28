@@ -12,10 +12,12 @@ on:
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/DualOnboardingTest.java'
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/SettingsRowNarrowLayoutTest.java'
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/PhoneDownloadStoreAtomicTest.java'
+      - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/TagParticipationActivityTest.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PhoneDownloadStore.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AccountSourcesActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsRow.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/TagParticipationActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AndroidOnboarding.java'
       - 'mobile/android-alpha2/app/src/main/res/**/phone_downloads_strings.xml'
       - 'mobile/android-alpha2/app/src/main/res/**/account_sources_strings.xml'
@@ -49,6 +51,8 @@ jobs:
             testClass: com.picalibrary.android.SettingsRowNarrowLayoutTest
           - key: download-index-atomic
             testClass: com.picalibrary.android.PhoneDownloadStoreAtomicTest
+          - key: tag-header-and-state
+            testClass: com.picalibrary.android.TagParticipationActivityTest
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

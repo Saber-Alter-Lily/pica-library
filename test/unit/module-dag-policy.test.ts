@@ -82,7 +82,8 @@ describe('S2 actual TypeScript module ownership graph', () => {
                 file === 'src/sdk.ts' ||
                 file === 'src/services/provider-service.ts' ||
                 file === 'src/services/external-reader-adapter.ts' ||
-                file === 'src/source-extensions/trusted-process.ts'
+                file === 'src/source-extensions/trusted-process.ts' ||
+                file === 'src/source-extensions/signed-worker-store.ts'
             )
             expect(forbidden, entry + ' runtime dependency closure').toEqual([])
         }
@@ -106,6 +107,27 @@ describe('S2 actual TypeScript module ownership graph', () => {
             edge.from === 'src/services/online-reader-service.ts'
         ).some((edge) =>
             edge.to === 'src/source-extensions/trusted-process.ts'
+        )).toBe(false)
+    })
+
+    it('keeps the signed lifecycle store restricted to Node crypto/filesystem and source ports', () => {
+        const graph = collectSourceModuleGraph()
+        expect(graph.nodes).toContain('src/source-extensions/signed-worker-store.ts')
+        const runtime = graph.edges.filter(edge =>
+            edge.from === 'src/source-extensions/signed-worker-store.ts' &&
+            !edge.typeOnly
+        ).map(edge => edge.to).sort()
+        expect(runtime).toEqual([
+            'node:crypto',
+            'node:fs',
+            'node:path',
+            'src/source-extensions/reader-contract.ts',
+            'src/source-extensions/trusted-process.ts'
+        ])
+        expect(graph.edges.some(edge =>
+            (edge.from === 'src/services/reader-service.ts' ||
+                edge.from === 'src/services/online-reader-service.ts') &&
+            edge.to === 'src/source-extensions/signed-worker-store.ts'
         )).toBe(false)
     })
 
@@ -144,9 +166,19 @@ describe('S2 actual TypeScript module ownership graph', () => {
                 from: 'src/services/online-reader-service.ts',
                 to: 'src/source-extensions/trusted-process.ts',
                 typeOnly: false
+            },
+            {
+                from: 'src/services/reader-service.ts',
+                to: 'src/source-extensions/signed-worker-store.ts',
+                typeOnly: false
+            },
+            {
+                from: 'src/source-extensions/signed-worker-store.ts',
+                to: 'src/sdk.ts',
+                typeOnly: false
             }
         ]
-        expect(moduleBoundaryViolations(illegal)).toHaveLength(8)
+        expect(moduleBoundaryViolations(illegal)).toHaveLength(10)
     })
 
     it('permits only the explicit benign dependency direction for the new bridge', () => {

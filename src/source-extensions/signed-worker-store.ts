@@ -95,6 +95,7 @@ function parseRelease(value: unknown, key: KeyObject): SignedSourceWorkerRelease
         'schemaVersion', 'sourceId', 'version', 'size', 'sha256', 'signature'
     ]) || value.schemaVersion !== 1 ||
         typeof value.signature !== 'string' ||
+        value.signature.length !== 88 ||
         !signatureRe.test(value.signature))
         throw new Error('Invalid signed worker release')
     const release = value as unknown as SignedSourceWorkerRelease
@@ -213,7 +214,9 @@ export class SignedWorkerStore {
             throw new Error('Signed worker payload does not match release')
         const parent = this.versionsFolder(release.sourceId, true)
         const destination = path.join(parent, release.version)
-        if (fs.existsSync(destination)) {
+        // lstat detects even a dangling symlink; existsSync would treat it
+        // as absent and could allow a hostile directory entry to be reused.
+        if (fs.lstatSync(destination, { throwIfNoEntry: false })) {
             this.readInstalled(release.sourceId, release.version)
             const existing = readJson(path.join(destination, 'release.json'))
             if (JSON.stringify(existing) !== JSON.stringify(release))
@@ -252,7 +255,9 @@ export class SignedWorkerStore {
     state(id: string): SourceWorkerState {
         const folder = this.sourceFolder(id)
         const location = path.join(folder, 'active.json')
-        return fs.existsSync(location)
+        // A broken activation symlink must fail closed, never look like a
+        // fresh revision-zero state.
+        return fs.lstatSync(location, { throwIfNoEntry: false })
             ? parseState(readJson(location))
             : { schemaVersion: 1, revision: 0, activeVersion: null }
     }

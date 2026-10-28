@@ -8,6 +8,8 @@ on:
       - '.github/workflows/s3-trusted-source-process.yml'
       - 'src/source-extensions/**'
       - 'test/unit/trusted-source-process.test.ts'
+      - 'test/unit/module-dag-policy.test.ts'
+      - 'test/unit/compiled-source-composition.test.ts'
       - 'test/fixtures/s3-trusted-worker.cjs'
       - 'scripts/audit-modules.ts'
   workflow_dispatch:

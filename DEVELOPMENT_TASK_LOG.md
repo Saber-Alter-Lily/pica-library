@@ -4,14 +4,14 @@
 
 **最新优先级授权**：用户明确同意暂不继续反复调整 S1 截图测试，将开发主力切至 S2 模块维护边界和 S3 漫画源真正外置。此授权仅支持隔离 Draft 研发，**不视为 G1 已通过，不允许合并 main / Release / OTA / 生产迁移**。旧42+新增12案例继续保留；Android 真机 UI 测试仍为 G1 阻断项。
 
-- **工作分支隔离**：\`codex/s2-source-contract-20261028\` 从 PR #218 的 \`6e5c1a4a\` 分出；[Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) 以 PR #218 为 base，不直接改 \`main\` / 正式 \`v0.5.0\`。
-- **S2-01 架构依赖门禁**：\`scripts/audit-modules.ts\` 复用已有 TypeScript 编译器 AST/解析器和 \`ts.resolveModuleName\`，枚举真实 \`src\` import 边、type-only 关系和已有 runtime cycles；\`test/unit/module-dag-policy.test.ts\` 把 Reader、来源契约、受控 Desktop 适配桥的反向依赖变成单测失败，针对人为注入的 SDK 引用/动态加载进行负向测试。它不会宣称全仓已经无循环，更不会隐瞒 \`ProviderService\` → 具体 SDK 的旧依赖。
-- **S2-02 有实际调用的 Reader 无源对接**：\`src/source-extensions/reader-contract.ts\` 限定版本化 manifest、来源 ID/作品归属、章节/页 ID、媒体大小与安全 MIME，不提供任何 JS/JAR/APK 安装入口；\`desktop-reader-adapter.ts\` 将**应用显式提供的可信 transport**接入原 \`OnlineReaderService\` 的真实章节/页面/媒体/进度链，缓存 scope 随 source epoch 变化，禁用与迟到回复失效闭锁，禁止未知来源和裸 HTTP 路由回退。
-- **实际测试任务**：\`test/unit/external-reader-boundary.test.ts\` 在无账号、无 Host、无网络数据的受控 fixture 中执行章节→图片→进度、跨作品访问拒绝、缓存后的撤销拒绝、来源 epoch 变更、超限媒体/非法 MIME/章节重复键、打包依赖闭包。**源码已提交；测试必须以后续 PR #219 精确 SHA 的完整 CI 才能宣称 PASS**。
+- **工作分支隔离**：`codex/s2-source-contract-20261028` 从 PR #218 的 `6e5c1a4a` 分出；[Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) 以 PR #218 为 base，不直接改 `main` / 正式 `v0.5.0`。
+- **S2-01 架构依赖门禁**：`scripts/audit-modules.ts` 复用已有 TypeScript 编译器 AST/解析器和 `ts.resolveModuleName`，枚举真实 `src` import 边、type-only 关系和已有 runtime cycles；`test/unit/module-dag-policy.test.ts` 把 Reader、来源契约、受控 Desktop 适配桥的反向依赖变成单测失败，针对人为注入的 SDK 引用/动态加载进行负向测试。它不会宣称全仓已经无循环，更不会隐瞒 `ProviderService` → 具体 SDK 的旧依赖。
+- **S2-02 有实际调用的 Reader 无源对接**：`src/source-extensions/reader-contract.ts` 限定版本化 manifest、来源 ID/作品归属、章节/页 ID、媒体大小与安全 MIME，不提供任何 JS/JAR/APK 安装入口；`desktop-reader-adapter.ts` 将**应用显式提供的可信 transport**接入原 `OnlineReaderService` 的真实章节/页面/媒体/进度链，缓存 scope 随 source epoch 变化，禁用与迟到回复失效闭锁，禁止未知来源和裸 HTTP 路由回退。
+- **实际测试任务**：`test/unit/external-reader-boundary.test.ts` 在无账号、无 Host、无网络数据的受控 fixture 中执行章节→图片→进度、跨作品访问拒绝、缓存后的撤销拒绝、来源 epoch 变更、超限媒体/非法 MIME/章节重复键、打包依赖闭包。**源码已提交；测试必须以后续 PR #219 精确 SHA 的完整 CI 才能宣称 PASS**。
 - **参考和执行限制**：以 Mihon bring-your-own-content 和 Suwayomi 可选 Host 作为边界设计参考；不导入其可执行插件或代码资产，不提供任何来源绕过法律/权限审查的保证。该批不是 S3 独立安装/升级/签名来源，更不是双端纯 Core 已通过。
 - **下一步**：拿到完整 CI 与真实 AST 图后修复失败，继续把来源构造移动到明确的 composition root，并测现有内置来源与 Reader/数据身份兼容；另行验证 Android 受控服务 + Windows 独立进程的实际 IPC、签名与隔离，最后才进行包内 SDK 的物理抽离和老用户迁移/回滚。
 
-权威实施和验收边界：\`docs/S2_SOURCE_BOUNDARY_20261028.md\`。
+权威实施和验收边界：`docs/S2_SOURCE_BOUNDARY_20261028.md`。
 
 ---
 

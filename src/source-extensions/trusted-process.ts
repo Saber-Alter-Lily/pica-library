@@ -149,7 +149,6 @@ export class TrustedSourceProcess implements ExternalReaderTransport, ExternalRe
             execArgv: [],
             env,
             stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
-            windowsHide: true,
             detached: false
         })
         this.child = child

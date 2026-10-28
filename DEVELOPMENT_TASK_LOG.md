@@ -1,5 +1,22 @@
 # Pica Library Development Task Log
 
+## 2026-10-28｜S3 受控签名源 → 桌面实际 UI/Reader 接续（Draft PR #222）
+
+**这次不再继续做纯隔离 mock 原型，而是把已通过真实 IPC / Ed25519 的组件接入现有 Desktop 服务和统一书库，保障用户点击能打开**。来源执行/管理必须来自应用显式可信组合入口，尚不能让第三方普通资源包/来源清单自行执行代码。全部仍为 Draft，不修改 main、正式 v0.5.0、Release、OTA、个人收藏/凭证/下载。
+
+- **上轮真实通过**：[Linux + Windows 签名源 HTTP 专项 #40712630322](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712630322) SUCCESS；[完整 CI #40712643773](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712643773) SUCCESS，均对应 `dd03822e` 的前一批业务代码。
+- **修复默认应用的特权导入倒灌**：`SignedReaderInputError` 从特权签名来源控制器独立为零依赖模块，默认 `src/library/server.ts` 只引用类型签名控制器 + 纯错误类，不允许默认 HTTP 服务器传递导入 `TrustedSourceProcess` / `SignedWorkerStore`。真实 TypeScript 依赖图/传递闭包测试检测其新增运行时导入并拒绝 CI。
+- **管理/会话安全**：崩溃/超时工作进程的 signed session 能被清理，旧链接失效；查状态不自动启动，连接须明确用户授权。对同一个已签名版本进行 no-op 激活不触发无意义断开。原有修订号 CAS、来源撤销和无安装/公钥/代码注入的 HTTP 接口不变。
+- **禁止来源身份误路由**：原来签名来源投影曾使用通用 `online`，会导致统一书库按钮错误调用旧 `ProviderService`。现改为带可验证易失 sessionId 的独立 `signed` channel，`reading-library.js` 使用 `openSigned` 专属 callback（中/英/日），`web/app.js` 把它接到现有 Reader UI 的章节/图片/进度和导航；不重新发明 Reader、不覆盖旧进度。停用来源后仍保留独立 `signed-source-progress-v1:<id>`，已失效链接不可访问。
+- **浏览器图片权限细化**：自有 `<img>` 不可发送 CSRF，仅对准确 `/desktop/signed-reader/<uuid>/.../pages/<n>` 路径开放严格的同源 Referrer + Fetch Metadata image 限定 GET；所有管理、进度与元数据仍使用 loopback + Origin/CSRF，跨域与错误 Fetch Dest 失败闭锁。
+- **真实测试补充**：默认无 SignedSourceDesktopReader 的 Desktop HTTP 拒绝访问；真实子进程 crash 后新连接必须显式执行、旧图片 URL 409；完整 HTTP → 阅读页 → 统一进度投影；阅读书库 route `signed` 不得假装普通 online；用户页面点击应携带源 sessionId；进度写入沿用旧 Reader 纪律。新的 `S3` 工作流纳入 Linux/Windows 平台测试及 UI/进度回归，结果必须以该批代码精确 SHA 的 Actions 状态判定。
+- **没有通过的产品关口**：正式应用未提供生产级固定公钥与不可被同用户进程篡改的安装根；工作进程仍不是 OS 沙箱；Pica/E-H/JM SDK 仍物理捆绑，Android Service/Binder 尚未实现；没有真实源的独立安装、升级与兼容、旧 v0.5.0 数据无损迁移或实体双端发布，G1–G4 继续 OPEN。
+
+详细技术/验收表：`docs/S3_SIGNED_DESKTOP_READER_20261028.md`；[PR #222](https://github.com/Saber-Alter-Lily/pica-library/pull/222) 保留 Draft，禁止因自动化测试变绿而直接合并/发布。
+
+---
+
+
 ## 2026-10-28｜S3 受控签名组件生命周期：实际安装/启停/回滚工程薄片（Draft PR #221）
 
 **授权与分支边界**：用户要求按计划继续将来源从漫画阅读器本体解耦。项目依赖链保持 [S1 #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) → [S2 #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) → [S3 进程 #220](https://github.com/Saber-Alter-Lily/pica-library/pull/220) → [S3 签名生命周期 #221](https://github.com/Saber-Alter-Lily/pica-library/pull/221)。全部 Draft、未合并，生产 `main`/Release/OTA/用户账号与库数据未修改。S1 真机 G1、核心源外置 G2、迁移 G3、发布 G4 均未验收。

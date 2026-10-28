@@ -26,6 +26,8 @@ import {
 import { ReaderService } from '../services/reader-service'
 import { ExternalReaderAdapter } from '../services/external-reader-adapter'
 import { OnlineReaderService } from '../services/online-reader-service'
+import type { SignedSourceDesktopReader } from '../desktop/signed-source-reader'
+import { SignedReaderInputError } from '../desktop/signed-source-reader'
 import type { UserEventInput, V3EventType } from '../recommendation-v3/types'
 import { CycleCoordinatorV3 } from '../recommendation-v3/cycle-coordinator-v3'
 import { FINAL_PROFILE_VERSION } from '../recommendation-v3/final-profile'
@@ -45,6 +47,8 @@ import { RUNTIME_CHOICE_ROUTES, runtimeChoiceAuthority, runtimeChoiceCommand } f
 export interface DesktopServerController {
     csrfToken: string
     hostedReader?: HostedLibraryReader
+    /** Signed worker QA integration is absent in production without a pinned publisher. */
+    signedSourceReader?: SignedSourceDesktopReader
     inspectSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
     sourceHostConnections?: (input: Record<string, unknown>) => unknown
     inspectSavedSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
@@ -409,6 +413,99 @@ export async function startLibraryServer(options: {
                     response.setHeader('connection', 'close')
                     return json(response, 400, { error: 'Invalid reading library query' })
                 }
+            }
+            if (url.pathname === '/api/v1/desktop/signed-reader' ||
+                url.pathname.startsWith('/api/v1/desktop/signed-reader/')) {
+                // This optional app-supplied port is not enabled by a source
+                // manifest or a browser. Always require local origin + CSRF,
+                // including binary page reads; no direct script/install upload.
+                const peer = request.socket.remoteAddress ?? ''
+                const expectedOrigin = `http://${request.headers.host}`
+                const authorized =
+                    Boolean(options.desktop?.signedSourceReader) &&
+                    Boolean(options.desktop?.configured()) &&
+                    options.desktop?.status().startupReady !== false &&
+                    /^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) &&
+                    origin === expectedOrigin &&
+                    request.headers['x-pica-csrf'] === options.desktop?.csrfToken
+                if (!authorized)
+                    return json(response, 403, { error: 'Signed source Desktop authority required' })
+                if (url.search || !['GET', 'POST'].includes(request.method ?? ''))
+                    return json(response, 400, { error: 'INVALID_SIGNED_READER' })
+                const controller = options.desktop!.signedSourceReader!
+                try {
+                    const readCommand = async () => {
+                        if (!/^application\/json(?:\s*;|$)/i.test(
+                            request.headers['content-type'] ?? ''
+                        )) throw new SignedReaderInputError()
+                        const deadline = setTimeout(() => request.destroy(), 5000)
+                        try { return await body(request, 2048) }
+                        finally { clearTimeout(deadline) }
+                    }
+                    if (url.pathname === '/api/v1/desktop/signed-reader') {
+                        if (request.method !== 'POST')
+                            return json(response, 405, { error: 'Explicit signed reader command required' })
+                        return json(response, 200,
+                            await controller.command(await readCommand()))
+                    }
+                    const match = url.pathname.match(
+                        /^\/api\/v1\/desktop\/signed-reader\/([0-9a-f-]{36})\/(?:progress|comics\/([^/]+)\/chapters(?:\/([^/]+)(?:\/pages\/(\d+))?)?)$/
+                    )
+                    if (!match) throw new SignedReaderInputError()
+                    const [, sessionId, rawComic, rawChapter, page] = match
+                    if (!rawComic) {
+                        if (request.method === 'GET')
+                            return json(response, 200,
+                                await controller.read(sessionId, 'progress', {}))
+                        const input = await readCommand()
+                        if (!input || Array.isArray(input) ||
+                            Object.keys(input).sort().join(',') !==
+                            'comicId,episodeId,pageIndex')
+                            throw new SignedReaderInputError()
+                        return json(response, 200, await controller.read(
+                            sessionId, 'save-progress', {
+                                comicId: String(input.comicId ?? ''),
+                                episodeId: String(input.episodeId ?? ''),
+                                pageIndex: input.pageIndex as number
+                            }
+                        ))
+                    }
+                    if (request.method !== 'GET')
+                        return json(response, 405, { error: 'Signed reader pages are read-only' })
+                    const comicId = decodeURIComponent(rawComic)
+                    if (!rawChapter)
+                        return json(response, 200, await controller.read(
+                            sessionId, 'chapters', { comicId }
+                        ))
+                    const episodeId = decodeURIComponent(rawChapter)
+                    if (page === undefined)
+                        return json(response, 200, await controller.read(
+                            sessionId, 'chapter', { comicId, episodeId }
+                        ))
+                    const image = await controller.read(sessionId, 'picture', {
+                        comicId, episodeId, pageIndex: Number(page)
+                    }) as { data: Buffer; contentType: string }
+                    if (!response.destroyed) {
+                        response.writeHead(200, {
+                            'content-type': image.contentType,
+                            'cache-control': 'private, no-store',
+                            'x-content-type-options': 'nosniff',
+                            'cross-origin-resource-policy': 'same-origin',
+                            'referrer-policy': 'no-referrer'
+                        })
+                        response.end(image.data)
+                    }
+                    return
+                } catch (error) {
+                    const code = error instanceof SignedReaderInputError ||
+                        error instanceof URIError
+                        ? 'INVALID_SIGNED_READER'
+                        : 'SIGNED_SOURCE_UNAVAILABLE'
+                    if (!response.destroyed) return json(response,
+                        code === 'INVALID_SIGNED_READER' ? 400 : 409,
+                        { error: code })
+                }
+                return
             }
             if (url.pathname === '/api/v1/desktop/host-reader' || url.pathname.startsWith('/api/v1/desktop/host-reader/')) {
                 const peer = request.socket.remoteAddress ?? '', expectedOrigin = `http://${request.headers.host}`

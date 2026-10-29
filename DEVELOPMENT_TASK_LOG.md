@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+### 2026-10-29 CORE-LIB-04b-01 完整 CI 回归与纠正（PR #238，保持 Draft）
+
+- [原可执行代码完整 CI #40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) **FAIL**：其原 `reading-library-shell.test.ts`（全量共 2,793 PASS、1 FAIL）证明当原 Desktop status 读取成功、但 capabilities 读取失败时，新的 `loadDesktop()` fallback 错误地重复请求了 capabilities。这会违反旧版明确的 fail-closed 读取资格，不能因为单独 Linux/Windows 新专项先前成功就声称完整验收通过。
+- 在 `a40d8e821f53a64460cd246311705aba4a4a54e9` 修改真实 `web/app.js`：增加 `desktopHostReached` 边界。只有 **Desktop host status 本身不可用** 时，才尝试由无来源 Core 独立读取 capabilities；正常 Desktop host 已经响应且其能力读取失败时，立即保留 `desktop=null/state.capabilities=null`，不重试、不伪造可用功能。
+- 专项工作流增加原 `test/unit/reading-library-shell.test.ts`，使以后兼顾“无 Desktop host、但可读 Core”和“已联系 Desktop、但能力获取失败必须拒绝”的双重行为。修复后代码和门禁 HEAD `94a4221aecf01ce7ac1656db2a7e6a055b219dac` 的 [Linux/Windows 专项 #40861065013](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861065013) 与 [Android/Web/Desktop 完整 #40861072267](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861072267) 此时仍 **QUEUED / NOT_VERIFIED**。不得复用旧 #40860567748 的成功替代新 HEAD。
+- 保持 PR #238 为 Draft；下一优先级依然是原完整 Web/index 静态图、真实 Chromium 和生产无源启动组合，而不是继续创建独立迷你 UI。G1–G4 继续 OPEN。
+
+
 ## S3 PR #238｜原正式 Web 首页无源启动：能力驱动关闭在线推荐请求（CORE-LIB-04b-01，2026-10-29）
 
 - 在 [Draft #238](https://github.com/Saber-Alter-Lily/pica-library/pull/238) 继续依赖 [#237](https://github.com/Saber-Alter-Lily/pica-library/pull/237) 真正已复用的 `status/authors/capabilities`，直接修改**原正式** `web/app.js` 的 `loadDesktop/detect`；来源无关 Core 没有 Desktop 主机状态时单独恢复 `/api/v1/capabilities`。明确 `features.recommendationSessions === false` 时保留原本地作品、作者、分面查询和渲染，但**不得请求在线推荐反馈/session/自动启动**，UI 解释为何功能不可用。兼容旧正式 Desktop 在缺字段或为 true 时的既有推荐行为，无第二套 UI/算法。

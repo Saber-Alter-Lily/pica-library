@@ -10,6 +10,7 @@ on:
       - codex/s3-core-library-read-20261029
       - codex/s3-core-shelf-routes-20261029
       - codex/s3-core-local-import-20261029
+      - codex/s3-core-bootstrap-20261029
     paths:
       - '.github/workflows/s3-offline-core-qa.yml'
       - 'src/offline-core/**'
@@ -22,6 +23,9 @@ on:
       - 'src/reader/local-http-read.ts'
       - 'src/library/server.ts'
       - 'src/library/core-catalog-read.ts'
+      - 'src/library/core-bootstrap-read.ts'
+      - 'src/app-capabilities.ts'
+      - 'test/unit/core-bootstrap-read.test.ts'
       - 'src/library/core-shelf-routes.ts'
       - 'src/library/core-local-import.ts'
       - 'src/services/shelf-service.ts'
@@ -73,7 +77,7 @@ jobs:
       - name: Typecheck all offline-core ports and tests
         run: pnpm type:check
       - name: Real standalone bundle, local CBZ/folder, Reader and protected-root tests
-        run: pnpm exec vitest run test/unit/core-local-import.test.ts test/unit/core-shelf-routes.test.ts test/unit/local-library-http.test.ts test/unit/user-event-batch-p2d7b.test.ts test/unit/shelf-query.test.ts test/unit/core-catalog-read.test.ts test/unit/offline-core-web-stage.test.ts test/unit/offline-core-http-ui.test.ts test/unit/offline-core-candidate.test.ts test/unit/local-reader-http-read.test.ts test/unit/local-library-ingestion.test.ts test/unit/reader-service.test.ts test/unit/module-dag-policy.test.ts
+        run: pnpm exec vitest run test/unit/core-bootstrap-read.test.ts test/unit/core-local-import.test.ts test/unit/core-shelf-routes.test.ts test/unit/local-library-http.test.ts test/unit/user-event-batch-p2d7b.test.ts test/unit/shelf-query.test.ts test/unit/core-catalog-read.test.ts test/unit/offline-core-web-stage.test.ts test/unit/offline-core-http-ui.test.ts test/unit/offline-core-candidate.test.ts test/unit/local-reader-http-read.test.ts test/unit/local-library-ingestion.test.ts test/unit/reader-service.test.ts test/unit/module-dag-policy.test.ts
       - name: Produce SHA/inventory evidence only; NEVER publish runnable bytes
         shell: bash
         run: |

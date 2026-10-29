@@ -7,6 +7,7 @@ on:
       - codex/s3-core-library-read-20261029
       - codex/s3-core-shelf-routes-20261029
       - codex/s3-core-local-import-20261029
+      - codex/s3-core-bootstrap-20261029
     paths:
       - '.github/workflows/s3-windows-offline-portable-qa.yml'
       - 'scripts/build-windows-offline-portable-qa.ts'
@@ -17,6 +18,9 @@ on:
       - 'src/offline-core/**'
       - 'src/reader/local-http-read.ts'
       - 'src/library/core-catalog-read.ts'
+      - 'src/library/core-bootstrap-read.ts'
+      - 'src/app-capabilities.ts'
+      - 'test/unit/core-bootstrap-read.test.ts'
       - 'src/library/core-shelf-routes.ts'
       - 'src/library/core-local-import.ts'
       - 'src/services/shelf-service.ts'

@@ -69,7 +69,7 @@ function actualWebReader() {
         language: 'en'
     }
     const fn = vm.runInNewContext(
-        '(' + readerFunction.getText(parsed) + ')', context
+        '(' + readerFunction!.getText(parsed) + ')', context
     ) as (comicId: string, online: boolean, hosted: null,
         signed: { sessionId: string; csrfToken: string }) => Promise<void>
     return { fn, context, api, chapter, $, state }

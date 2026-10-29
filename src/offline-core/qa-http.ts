@@ -6,6 +6,7 @@ import http, {
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from '../library/core-catalog-read'
+import { coreBootstrapStatus, coreBootstrapAuthors, coreBootstrapCapabilities } from '../library/core-bootstrap-read'
 import { coreShelfMatch, coreShelfExecute } from '../library/core-shelf-routes'
 import { ShelfService } from '../services/shelf-service'
 import { LibraryQueryService } from '../services/library-query-service'
@@ -240,6 +241,18 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             return json(response, 400, { error: 'Invalid shelf URL' })
         }
         if (request.method === 'GET') {
+            // These are the exact original Desktop bootstrap read ports,
+            // with no ProviderService/online module in this physical binary.
+            if (url.pathname === '/api/v1/status')
+                return json(response, 200, coreBootstrapStatus(
+                    options.database, null
+                ))
+            if (url.pathname === '/api/v1/capabilities')
+                return json(response, 200, coreBootstrapCapabilities({
+                    kind: 'source-free'
+                }))
+            if (url.pathname === '/api/v1/authors')
+                return json(response, 200, coreBootstrapAuthors(options.database))
             const asset = url.pathname.slice(1)
             if ((SCRIPT_ASSETS.has(asset) || STYLE_ASSETS.has(asset) ||
                 IMAGE_ASSETS.has(asset)) && url.pathname === '/' + asset) {

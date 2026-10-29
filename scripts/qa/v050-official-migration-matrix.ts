@@ -26,6 +26,8 @@ const { DatabaseSync } = createRequire(import.meta.url)(
 ) as typeof import('node:sqlite')
 
 const starts = [5, 11, 13] as const
+let activePhase = 'INIT'
+let activeVersion = 0
 const when = '2026-01-01T00:00:00.000Z'
 type ReleaseMigrations = {
     migrations: Array<{version: number; name: string; up: string}>
@@ -158,7 +160,9 @@ function seed(db: InstanceType<typeof DatabaseSync>, version: number,
 }
 
 async function main() {
+    activePhase = 'VERIFY_RELEASE'
     const source = verifyPinnedV050Checkout()
+    activePhase = 'LOAD_RELEASE_MODULES'
     const migrationModule = await import(pathToFileURL(path.join(source,
         'src/storage/sqlite/migrations.ts')).href) as unknown as ReleaseMigrations
     const configModule = await import(pathToFileURL(path.join(source,
@@ -173,6 +177,8 @@ async function main() {
 
     let passed = 0
     for (const version of starts) {
+        activeVersion = version
+        activePhase = 'CREATE_SYNTHETIC_SANDBOX'
         const sandbox = fs.mkdtempSync(path.join(os.tmpdir(),
             'pica-v050-history-qa-'))
         try {
@@ -194,12 +200,15 @@ async function main() {
             fs.writeFileSync(pic,png,{flag:'wx',mode:0o600})
             const mediaSha = digest(png)
             const dbFile = path.join(data,'library.db')
+            activePhase = 'CREATE_PARTIAL_SCHEMA'
             const legacy = new DatabaseSync(dbFile)
             try {
                 legacy.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE')
                 migrationModule.runMigrations(legacy,
                     migrationModule.migrations.filter(x=>x.version<=version))
+                activePhase = 'SEED_HISTORY'
                 seed(legacy,version,pic)
+                activePhase = 'VERIFY_OLD_ROWS'
                 knownRows(legacy,version)
             } finally {legacy.close()}
             noSqliteSidecars(dbFile)
@@ -210,6 +219,7 @@ async function main() {
             })
             configModule.saveConfig(configFile,releaseConfig.config)
             const originalConfig = fs.readFileSync(configFile)
+            activePhase = 'PREUPGRADE_GATE'
             result(sandbox,'REVIEW_REQUIRED','SCHEMA_MIGRATIONS_UNEXPECTED')
             requireCondition(
                 inventoryV050OwnedMediaSyntheticReadOnly(sandbox).status
@@ -218,24 +228,29 @@ async function main() {
 
             // Explicitly call the *tagged release constructor* to run its
             // real backupBeforeMigration + runMigrations lifecycle.
+            activePhase = 'ORIGINAL_RELEASE_UPGRADE'
             const actualOld = new libraryModule.LibraryDatabase(dbFile)
             actualOld.close()
             noSqliteSidecars(dbFile)
             const preMigrationBackup = dbFile + '.pre-migration-v14.bak'
             requireCondition(fs.existsSync(preMigrationBackup),
                 'OFFICIAL_PRE_MIGRATION_BACKUP_ABSENT')
+            activePhase = 'VERIFY_RELEASE_BACKUP'
             const backup = readOnlyDb(preMigrationBackup)
             try {knownRows(backup,version)} finally {backup.close()}
+            activePhase = 'VERIFY_UPGRADED_ROWS'
             const finalDb = readOnlyDb(dbFile)
             try {
                 const history = knownRows(finalDb,14)
                 requireCondition(history[13]?.name ===
                     'post_v0411_index_bundle','TARGET_RELEASE_SCHEMA_NOT_REACHED')
             } finally { finalDb.close() }
+            activePhase = 'POSTUPGRADE_GATE'
             const qualified = result(sandbox,
                 'QUALIFIED_SYNTHETIC_RELEASE_LAYOUT')
             requireCondition(qualified.expectedSchemaVersion === 14,
                 'CURRENT_GATE_DID_NOT_ACCEPT_OFFICIAL_MIGRATION')
+            activePhase = 'MEDIA_INVENTORY'
             const mediaInventory =
                 inventoryV050OwnedMediaSyntheticReadOnly(sandbox)
             requireCondition(mediaInventory.status ===
@@ -245,6 +260,7 @@ async function main() {
                 mediaInventory.crossFileAtomicityProven === false &&
                 mediaInventory.productionMigrationAuthorized === false,
                 'MEDIA_INVENTORY_NOT_SAFE')
+            activePhase = 'PRESERVATION_HASHES'
             requireCondition(
                 fs.readFileSync(configFile).equals(originalConfig) &&
                 digest(fs.readFileSync(pic))===mediaSha,
@@ -269,7 +285,17 @@ async function main() {
         artifactsPublished:false
     })+'\n')
 }
-main().catch(() => {
-    process.stderr.write('OFFICIAL_RELEASE_HISTORICAL_MIGRATION_MATRIX_FAIL\n')
-    process.exitCode=1
+main().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : ''
+    const own = /^V050_MIGRATION_QA_[A-Z0-9_]+$/.test(message)
+        ? message : ''
+    const code = error && typeof error === 'object' && 'code' in error &&
+        typeof error.code === 'string' &&
+        /^(?:SQLITE_|ERR_SQLITE_)/.test(error.code)
+        ? error.code : 'NO_PUBLIC_CODE'
+    // Only the synthetic test stage and a vetted error class are printed.
+    process.stderr.write('OFFICIAL_RELEASE_HISTORICAL_MIGRATION_MATRIX_FAIL' +
+        ' version=' + activeVersion + ' phase=' + activePhase +
+        ' check=' + (own || code) + '\\n')
+    process.exitCode = 1
 })

@@ -41,7 +41,7 @@ export function coreRemoteStorageStatus(manager?: CoreRemoteStoragePort | null) 
 
 export type CoreRemoteDispatch =
     | { handled: false }
-    | { handled: true; value: unknown }
+    | { handled: true; value: Record<string, unknown> }
 
 /**
  * Preserve the original Desktop save dispatch and all manager validation.

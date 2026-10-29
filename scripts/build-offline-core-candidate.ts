@@ -44,11 +44,15 @@ export async function buildOfflineCoreCandidate(): Promise<OfflineCoreCandidate>
     const compiled = await build({
         absWorkingDir: ROOT,
         entryPoints: [ENTRY],
-        outfile: path.join(ROOT, '.s3-offline-core-qa', 'core.cjs'),
+        outfile: path.join(ROOT, '.s3-offline-core-qa', 'core.mjs'),
         bundle: true,
         platform: 'node',
         target: 'node24',
-        format: 'cjs',
+        format: 'esm',
+        // Existing LibraryDatabase uses createRequire(import.meta.url) for
+        // node:sqlite. The bundled AdmZip CommonJS shim also needs a trusted
+        // Node builtin require in the ESM entry (not a source/plugin loader).
+        banner: { js: "import { createRequire as __coreRequire } from 'node:module'; const require = __coreRequire(import.meta.url);" },
         write: false,
         metafile: true,
         logLevel: 'silent',

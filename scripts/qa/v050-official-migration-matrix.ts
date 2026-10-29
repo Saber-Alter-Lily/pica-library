@@ -88,7 +88,7 @@ function knownRows(db: InstanceType<typeof DatabaseSync>, version: number) {
     requireCondition(comic?.title === 'Historical Synthetic Work' &&
         comic?.is_favorite === 1 &&
         progress?.page_index === 1 && shelf?.n === 1 &&
-        pic?.byte_size === 67 && typeof pic?.local_path === 'string' &&
+        pic?.byte_size === 68 && typeof pic?.local_path === 'string' &&
         job?.status === 'DRAFT', 'HISTORICAL_USER_ROWS_CHANGED')
     requireCondition(
         (db.prepare('PRAGMA integrity_check').all() as
@@ -124,7 +124,7 @@ function seed(db: InstanceType<typeof DatabaseSync>, version: number,
         (id, comic_id, episode_id, position, original_name, media_path,
          file_server, local_path, byte_size, status, first_seen_at, last_seen_at)
         VALUES (?, ?, ?, 1, 'synthetic.png', 'synthetic/1', 'invalid.example',
-                ?, 67, 'completed', ?, ?)`
+                ?, 68, 'completed', ?, ?)`
     ).run('historical:picture','historical:work','historical:episode',media,when,when)
     db.prepare(`INSERT INTO shelves
         (id, name, normalized_name, created_at, updated_at)

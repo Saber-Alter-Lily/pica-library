@@ -22,7 +22,7 @@ function previewRoot(argv: string[]) {
         throw new Error('Explicit owned temporary root and preview-only consent required')
     return assertTemporaryCorePreviewRoot(argv[1])
 }
-export async function runCoreDesktopPreview(
+async function runCoreDesktopPreview(
     argv: string[] = process.argv.slice(2),
     entryFile: string = process.argv[1]
 ) {

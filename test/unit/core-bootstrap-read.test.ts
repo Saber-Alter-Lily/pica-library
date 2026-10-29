@@ -13,7 +13,7 @@ describe('original Desktop read-only bootstrap shared with source-free core', ()
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-bootstrap-core-'))
         const db = new LibraryDatabase(path.join(root, 'library.db'))
         try {
-            db.importCatalog([{
+            db.importFavorites([{
                 comicId: 'fixture-comic', title: 'Local fixture',
                 author: 'Fixture author', tags: [], categories: [], finished: true
             }])

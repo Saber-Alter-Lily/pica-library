@@ -224,8 +224,26 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         // reject all other query strings and ambiguous request targets.
         const validImageRevision = /^\/api\/v1\/reader\/pictures\/[^/]+$/.test(url.pathname) &&
             /^\?v=[a-f0-9]{64}$/.test(url.search)
+        // The real full Web homepage asks for up to 5000 LOCAL-only catalogue
+        // rows on startup; allow only these reviewed GET parameters, not query
+        // strings for arbitrary API or user-selected Host/source routes.
+        const validFullCatalogueQuery = Boolean(fullWeb) &&
+            request.method === 'GET' &&
+            url.pathname === '/api/v1/comics' &&
+            url.search.length <= 512 &&
+            [...url.searchParams].every(([key, value]) =>
+                ['q', 'author', 'tags', 'categories', 'finished', 'sort',
+                    'limit', 'offset'].includes(key) && value.length <= 200
+            ) &&
+            ['limit', 'offset'].every(key =>
+                !url.searchParams.has(key) ||
+                /^(0|[1-9][0-9]{0,3})$/.test(
+                    url.searchParams.get(key) ?? ''
+                )
+            )
         if (url.origin !== origin || url.hash ||
-            (url.search !== '' && !validImageRevision))
+            (url.search !== '' && !validImageRevision &&
+                !validFullCatalogueQuery))
             return json(response, 400, { error: 'Invalid QA request target' })
         if (request.method === 'GET' &&
             url.pathname === '/qa/' + secret) {
@@ -367,8 +385,15 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             !['/api/v1/reader/progress', '/api/v1/library/query']
                 .includes(url.pathname)))
             return json(response, 405, { error: 'Unsupported QA operation' })
+        // The original full app uses x-pica-csrf for Desktop actions, while
+        // this QA core already uses x-pica-qa-csrf for Reader/shelf writes.
+        // Accept either only inside the same authenticated loopback session.
+        const csrfHeader = fullWeb &&
+            request.headers['x-pica-csrf'] !== undefined
+                ? String(request.headers['x-pica-csrf'])
+                : String(request.headers['x-pica-qa-csrf'] ?? '')
         if (request.headers.origin !== origin ||
-            !secureEqual(String(request.headers['x-pica-qa-csrf'] ?? ''), csrf))
+            !secureEqual(csrfHeader, csrf))
             return json(response, 403, { error: 'QA CSRF rejected' })
         try {
             if (shelfRoute) {

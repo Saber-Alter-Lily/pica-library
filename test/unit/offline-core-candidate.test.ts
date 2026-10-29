@@ -73,7 +73,15 @@ describe('S3 actual isolated local-only core file and process', () => {
             name.startsWith('src/source-extensions/') ||
             name === 'src/sdk.ts'
         )).toBe(false)
+        expect(first.sourceInputs).toEqual(expect.arrayContaining([
+            'src/library/core-bootstrap-read.ts',
+            'src/app-capabilities.ts',
+            'src/version.ts',
+            'src/modules/contracts.ts'
+        ]))
+        expect(first.packageInputs).toContain('package.json')
         expect(first.packageInputs.every(name =>
+            name === 'package.json' ||
             name.includes('node_modules/adm-zip/'))).toBe(true)
         expect(first.externalImports.every(name =>
             name.startsWith('node:') ||

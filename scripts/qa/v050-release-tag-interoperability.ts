@@ -221,7 +221,6 @@ async function main() {
         })
         releaseConfig.saveConfig(configFile, oldProxy.config)
         resultStatus(sandbox, 'QUALIFIED_SYNTHETIC_RELEASE_LAYOUT')
-        fs.writeFileSync(configFile, fs.readFileSync(configFile))
         // The normal baseline must be restored before the negative cases.
         releaseConfig.saveConfig(configFile, build.config)
 

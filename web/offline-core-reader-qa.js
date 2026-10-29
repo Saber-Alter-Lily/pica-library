@@ -237,11 +237,29 @@ async function openBook(id) {
     }
 }
 async function loadBooks() {
+    const search = byId('qa-library-search').value.trim()
+    if (search.length > 200) return []
+    libraryStatus.textContent = '正在查询本地书库…'
     try {
-        const { comics, sourceCount } =
-            await readJson('/api/v1/offline-qa/library')
-        if (sourceCount !== 0 || !Array.isArray(comics) ||
-            comics.length > 100) throw new Error('Unexpected QA catalogue')
+        // The very same LibraryQueryService powers the old Desktop library
+        // filters. Only the existing local records are visible to this QA.
+        const value = await readJson('/api/v1/library/query', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-pica-qa-csrf': csrf
+            },
+            body: JSON.stringify({
+                scope: 'library', text: search,
+                providerIds: ['local'], sort: 'title', limit: 100
+            })
+        })
+        const comics = value.items
+        if (!Array.isArray(comics) ||
+            !Number.isSafeInteger(value.total) ||
+            value.total < 0 || comics.length > 100 ||
+            comics.some(row => row.providerId !== 'local'))
+            throw new Error('Unexpected offline catalogue')
         bookSelect.replaceChildren()
         for (const comic of comics) {
             assertLocalBook(comic.comicId)
@@ -252,8 +270,8 @@ async function loadBooks() {
         }
         byId('qa-open').disabled = !comics.length
         libraryStatus.textContent = comics.length ?
-            comics.length + ' 本本地作品 · Local books' :
-            '此隔离目录尚无作品，请先使用 QA 导入指令。'
+            value.total + ' 本本地作品 · Local books' :
+            '无匹配作品 · No local matches'
         return comics
     } catch {
         libraryStatus.textContent = '本地书库暂不可读取。'
@@ -261,6 +279,14 @@ async function loadBooks() {
         return []
     }
 }
+byId('qa-library-search-button').addEventListener('click',
+    () => void loadBooks())
+byId('qa-library-search').addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+        event.preventDefault()
+        void loadBooks()
+    }
+})
 byId('qa-open').addEventListener('click', async () => {
     const id = bookSelect.value
     if (!id) return

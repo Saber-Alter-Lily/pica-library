@@ -272,6 +272,38 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         const get = (pathname: string) => fetch(origin + pathname, {
             headers: { cookie }
         })
+        // This is the original production catalogue/facet API implemented
+        // by the common source-neutral LibraryQueryService, not a parallel
+        // in-memory QA filter. All source identities remain local-only.
+        const books = await (await get('/api/v1/comics')).json() as any[]
+        if (books.length !== 1 || books[0].comicId !== book.comicId)
+            throw new Error('Portable original catalogue route failed')
+        const search = await fetch(origin + '/api/v1/library/query', {
+            method: 'POST',
+            headers: {
+                cookie, origin, 'content-type': 'application/json',
+                'x-pica-qa-csrf': /"csrf":"([0-9a-f]{64})"/.exec(html)?.[1] ?? ''
+            },
+            body: JSON.stringify({ scope: 'library', providerIds: ['local'],
+                text: 'source-images', limit: 100 })
+        })
+        if (search.status !== 200)
+            throw new Error('Portable shared catalogue query not accessible')
+        const searchValue = await search.json() as any
+        if (searchValue.total !== 1 ||
+            searchValue.items[0]?.comicId !== book.comicId ||
+            searchValue.query?.providerIds?.[0] !== 'local')
+            throw new Error('Portable shared catalogue query was not local-only')
+        const refused = await fetch(origin + '/api/v1/library/query', {
+            method: 'POST',
+            headers: {
+                cookie, origin, 'content-type': 'application/json',
+                'x-pica-qa-csrf': /"csrf":"([0-9a-f]{64})"/.exec(html)?.[1] ?? ''
+            },
+            body: JSON.stringify({ scope: 'all', providerIds: ['eh'] })
+        })
+        if (refused.status !== 400)
+            throw new Error('Portable catalogue accepted a foreign source')
         const asset = await get('/offline-core-reader-qa.js')
         if (asset.status !== 200 || !(await asset.text()).includes(
             'createReaderViewportTracker'))

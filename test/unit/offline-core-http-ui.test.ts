@@ -175,6 +175,40 @@ describe('S3 real protected loopback HTTP with existing Web Reader markup', () =
             expect(collection.sourceCount).toBe(0)
             expect(collection.comics).toHaveLength(1)
             expect(collection.comics[0].comicId).toBe(comicId)
+            expect((await get('/api/v1/comics')).status).toBe(200)
+            expect((await (await get('/api/v1/comics/' +
+                encodeURIComponent(comicId))).json()).comicId).toBe(comicId)
+            expect((await get('/api/v1/comics/' +
+                encodeURIComponent('eh:123:abcdef1234'))).status).toBe(404)
+            const query = async (body: unknown, headers: Record<string, string> = {
+                origin: base, 'x-pica-qa-csrf': csrf
+            }) => fetch(base + '/api/v1/library/query', {
+                method: 'POST',
+                headers: {
+                    cookie: cookie!, 'content-type': 'application/json',
+                    ...headers
+                },
+                body: JSON.stringify(body)
+            })
+            expect((await query({ scope: 'library' }, {})).status).toBe(403)
+            expect((await query({ scope: 'library' }, {
+                origin: 'https://other.example', 'x-pica-qa-csrf': csrf
+            })).status).toBe(403)
+            const filteredResponse = await query({
+                scope: 'library', providerIds: ['local'], limit: 100
+            })
+            expect(filteredResponse.status).toBe(200)
+            const filtered = await filteredResponse.json() as Record<string, any>
+            expect(filtered.total).toBe(1)
+            expect(filtered.items[0].comicId).toBe(comicId)
+            expect(filtered.query.providerIds).toEqual(['local'])
+            const missing = await query({
+                scope: 'library', text: 'missing title'
+            })
+            expect((await missing.json() as Record<string, any>).total).toBe(0)
+            expect((await query({
+                scope: 'all', providerIds: ['eh']
+            })).status).toBe(400)
 
             const chaptersResponse = await get('/api/v1/reader/comics/' +
                 encodeURIComponent(comicId) + '/chapters')

@@ -25,6 +25,7 @@ import {
 } from '../recommendation-v4/visual-style'
 import { ReaderService } from '../services/reader-service'
 import { localReaderGet } from '../reader/local-http-read'
+import { coreCatalogueGet, coreCatalogueQuery } from './core-catalog-read'
 import { ExternalReaderAdapter } from '../services/external-reader-adapter'
 import { OnlineReaderService } from '../services/online-reader-service'
 import type { SignedSourceDesktopReader } from '../desktop/signed-source-reader'
@@ -2093,28 +2094,20 @@ export async function startLibraryServer(options: {
                     options.service.favoritesSyncProgress()
                 )
             }
-            if (
-                url.pathname === '/api/v1/downloaded' &&
-                request.method === 'GET'
-            ) {
-                return json(
-                    response,
-                    200,
-                    options.database.listDownloadedComics()
-                )
-            }
+            // Shared with the physically source-free local core; the normal
+            // Desktop still exposes the exact original catalogue and facets.
+            const catalogueRead = request.method === 'GET'
+                ? coreCatalogueGet(url, options.database) : null
+            if (catalogueRead)
+                return json(response, catalogueRead.status, catalogueRead.value)
             if (
                 url.pathname === '/api/v1/library/query' &&
                 request.method === 'POST'
-            ) {
-                return json(
-                    response,
-                    200,
-                    libraryQueries.query(
-                        (await body(request)) as LibraryFacetQuery
-                    )
-                )
-            }
+            )
+                return json(response, 200, coreCatalogueQuery(
+                    (await body(request)) as LibraryFacetQuery,
+                    libraryQueries
+                ))
             if (url.pathname === '/api/v1/shelves' && request.method === 'GET')
                 return json(response, 200, shelfService.list())
             if (
@@ -2527,41 +2520,6 @@ export async function startLibraryServer(options: {
                     readerService.openDefault(String(input.path ?? ''))
                 )
             }
-            if (url.pathname === '/api/v1/comics' && request.method === 'GET') {
-                return json(
-                    response,
-                    200,
-                    options.database.listComics({
-                        text: url.searchParams.get('q') ?? undefined,
-                        author: url.searchParams.get('author') ?? undefined,
-                        tags: stringList(url.searchParams.get('tags')),
-                        categories: stringList(
-                            url.searchParams.get('categories')
-                        ),
-                        finished: url.searchParams.has('finished')
-                            ? url.searchParams.get('finished') === 'true'
-                            : undefined,
-                        sort: (url.searchParams.get('sort') ??
-                            'latest') as SortMode,
-                        limit: Number(url.searchParams.get('limit') ?? 100),
-                        offset: Number(url.searchParams.get('offset') ?? 0)
-                    })
-                )
-            }
-            const comicDetailRequest = url.pathname.match(
-                /^\/api\/v1\/comics\/([^/]+)$/
-            )
-            if (comicDetailRequest && request.method === 'GET') {
-                const comic = options.database.getComic(
-                    decodeURIComponent(comicDetailRequest[1])
-                )
-                return json(
-                    response,
-                    comic ? 200 : 404,
-                    comic ?? { error: 'Comic not found' }
-                )
-            }
-
             const workVariantsRequest = url.pathname.match(
                 /^\/api\/v1\/comics\/([^/]+)\/work-variants$/
             )

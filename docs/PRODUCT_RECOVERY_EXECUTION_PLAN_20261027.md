@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 推进｜从独立 QA 小阅读器进入正式 Desktop 书库 API 抽离
+
+- [Draft PR #231](https://github.com/Saber-Alter-Lily/pica-library/pull/231) 首次把**真实正式 Windows/Desktop HTTP 服务中的书库主路径**抽成共用的来源无关业务端口：漫画列表、单本详情、下载列表与原 `LibraryQueryService` 分面查询。同时让既有已验证纯核心/Windows Portable QA 复用它，仅施加 local-only 保护，绝不重复实现 SQLite、书库筛选或 Reader。
+- 精确源码 `e698f66a` 的 [S3 Linux/Windows+Chromium #40842187533](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842187533) **51/51 + 51/51 + Chromium 1/1 SUCCESS**；[Windows Portable 官方 Node ZIP #40842196837](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842196837) **SUCCESS**，严格拒绝非本地 Provider 访问。全量 CI 结果单独以实际作业状态为准。
+- 下一切口固定为**旧 ShelfService CRUD/批量操作与行为事件解耦**、无源设置/本地导入/WebDAV 端口、完整 Web UI 接线，之后才是 Windows/Android 真正主程序 SDK 剥离与生产信任根、v0.5.0 数据保护升级。纯 Core QA 已能从 ZIP 启动，不能再重复做小型演示当作 G2 完成。详见 [本轮端口审计](S3_CORE_LIBRARY_READ_20261029.md)。
+- G1（Android UX/引导）、G2（真实来源外置）、G3（正式无痛升级/回滚）、G4（发布）全部 OPEN，原42+新增12个用例不豁免。
+
+---
 ## 2026-10-29 S3 续进｜Windows x64 官方 Node＋纯核心 ZIP 实体打包验收
 
 - [Draft PR #230](https://github.com/Saber-Alter-Lily/pica-library/pull/230)：首次把独立 `core.mjs` + 10 Reader 资源和 **Node 24.15.0 Windows x64 官方运行时**组装成临时完整 Portable ZIP，附 Node/AdmZip/project 许可证、21 条目闭包、逐文件 SHA-256 和明确的 QA 启动器；真实下载运行时 ZIP 并按官方 SHASUMS256 + 额外固定 SHA256 `cc5149...` 双重确认。

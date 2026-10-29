@@ -110,14 +110,15 @@ function requiredAsset(webRoot: string, name: string) {
 function existingReaderMarkup(webRoot: string) {
     const start = '<section id="reader" class="view reader-view">'
     const fragment = path.join(webRoot, 'reader-fragment.html')
-    const html = fs.existsSync(fragment)
+    const staged = fs.existsSync(fragment)
+    const html = staged
         ? fs.readFileSync(requiredAsset(webRoot, 'reader-fragment.html'), 'utf8')
         : fs.readFileSync(requiredAsset(webRoot, 'index.html'), 'utf8')
     const at = html.indexOf(start)
     const end = html.indexOf('</section>', at)
     if (at < 0 || end < 0 ||
         html.indexOf(start, at + start.length) >= 0 ||
-        html.slice(end + '</section>'.length).trim())
+        (staged && html.slice(end + '</section>'.length).trim()))
         throw new Error('Existing Reader markup is missing or ambiguous')
     const section = html.slice(at, end + '</section>'.length)
     for (const expected of [

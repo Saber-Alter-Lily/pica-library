@@ -54,9 +54,9 @@ describe('CORE-LIB-04c shared real runtime composition', () => {
         expect(core.shelfService.add(shelf.id, [imported.comicId]))
             .toMatchObject({ added: 1 })
         expect(core.shelfService.contents(shelf.id))
-            .toMatchObject({ items: [expect.objectContaining({
+            .toMatchObject([expect.objectContaining({
                 comicId: imported.comicId
-            })] })
+            })])
         expect(core.libraryQueries.query({
             scope: 'catalog', providerIds: ['local'], limit: 50
         }).items).toMatchObject([expect.objectContaining({

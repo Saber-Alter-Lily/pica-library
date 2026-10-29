@@ -4,12 +4,54 @@ import path from 'node:path'
 import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { buildEhPublicWorkerCandidate } from '../../scripts/build-eh-public-worker-candidate'
+import { collectSourceModuleGraph } from '../../scripts/audit-modules'
 import {
     SignedWorkerStore,
     sourceWorkerSignaturePayload
 } from '../../src/source-extensions/signed-worker-store'
 
 describe('S3 isolated E-H source package candidate (never publicly signed)', () => {
+    it('keeps the optional source worker outside the default Desktop/Reader dependency closure', () => {
+        const graph = collectSourceModuleGraph()
+        const adjacency = new Map<string, string[]>()
+        for (const edge of graph.edges) {
+            if (edge.typeOnly || !edge.to.startsWith('src/')) continue
+            const targets = adjacency.get(edge.from) ?? []
+            targets.push(edge.to)
+            adjacency.set(edge.from, targets)
+        }
+        const closure = (entry: string) => {
+            const visited = new Set<string>([entry])
+            for (const from of visited) {
+                for (const dependency of adjacency.get(from) ?? []) {
+                    if (visited.has(dependency)) continue
+                    visited.add(dependency)
+                }
+            }
+            return visited
+        }
+        for (const entry of [
+            'src/desktop/main.ts',
+            'src/library/server.ts',
+            'src/services/reader-service.ts',
+            'src/services/online-reader-service.ts'
+        ]) {
+            const reachable = closure(entry)
+            for (const optional of [
+                'src/source-extensions/workers/eh-public-worker.ts',
+                'src/source-extensions/eh-public-reader-transport.ts',
+                'src/source-extensions/eh-public-bridge.ts'
+            ]) {
+                expect(reachable.has(optional),
+                    'Default ' + entry + ' must not bundle ' + optional).toBe(false)
+            }
+        }
+        // Explicit evidence of the outstanding physical source-free blocker:
+        // this legacy Desktop app STILL includes concrete providers.
+        expect(closure('src/desktop/main.ts').has('src/providers/eh-provider.ts'))
+            .toBe(true)
+    })
+
     it('builds deterministic single-file worker bytes with an audited, source-only dependency graph', async () => {
         const first = await buildEhPublicWorkerCandidate()
         const second = await buildEhPublicWorkerCandidate()

@@ -126,7 +126,12 @@ async function verifyOriginalNativeLauncherCorePreview(
             '--source-free-preview',
             '--owned-temp-root', root, '--explicit-preview-only'
         ], {
-            cwd: folder, windowsHide: true, encoding: 'utf8',
+            // The GUI Launcher starts Node and exits immediately. If capture
+            // pipes are used, the Node grandchild can inherit them, causing
+            // spawnSync to wait for the long-lived server and orphan it on
+            // timeout. Only this exact native QA launch uses inherited-null
+            // stdio; its identity is recovered from the owned InstanceLock.
+            cwd: folder, windowsHide: true, stdio: 'ignore',
             timeout: 15000
         })
         if (start.error || start.status !== 0)
@@ -173,6 +178,19 @@ async function verifyOriginalNativeLauncherCorePreview(
         // Windows may force-terminate Node without dispatching SIGTERM. The
         // existing InstanceLock handles verified dead-PID recovery; this
         // disposable temp fixture is deleted, never a real profile.
+        // Even a partial startup can publish its owned PID before a test
+        // assertion fails. Never leave an orphan holding the extracted Node.
+        if (ownedPid === undefined && fs.existsSync(infoFile)) {
+            try {
+                const candidate = readJson(fs.readFileSync(infoFile))
+                if (Number.isSafeInteger(candidate.pid) && candidate.pid > 0 &&
+                    typeof candidate.url === 'string' &&
+                    /^http:\/\/127\.0\.0\.1:\d+\/qa\/[a-f0-9]{64}$/.test(candidate.url))
+                    ownedPid = candidate.pid
+            } catch {
+                // No valid owned instance identity is available to terminate.
+            }
+        }
         if (ownedPid !== undefined) {
             const killed = spawnSync('taskkill.exe', [
                 '/PID', String(ownedPid), '/T', '/F'

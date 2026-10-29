@@ -38,7 +38,7 @@ async function runCoreDesktopPreview(
     const lock = new InstanceLock(
         path.join(root, 'runtime-state', 'core-preview.lock'),
         path.join(root, 'runtime-state', 'core-preview-instance.json'),
-        { recoverStale: false }
+        { recoverStale: true }
     )
     if (!lock.acquire())
         throw new Error('Another owned core-only preview is already running')

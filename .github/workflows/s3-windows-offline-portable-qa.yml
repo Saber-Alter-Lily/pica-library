@@ -126,7 +126,7 @@ jobs:
           & pnpm exec tsx scripts/verify-windows-offline-portable-qa.ts --zip $env:S3_PORTABLE_ZIP --source-sha $env:GITHUB_SHA | Set-Content -LiteralPath $verification -Encoding utf8
           if($LASTEXITCODE -ne 0){ throw 'Extracted Windows source-free QA ZIP execution failed' }
           $result=Get-Content -Raw -LiteralPath $verification | ConvertFrom-Json
-          if($result.status -ne 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS' -or $result.sourceCount -ne 0 -or $result.publishAuthorized -or -not $result.verifiedProgressRestart){
+          if($result.status -ne 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS' -or $result.sourceCount -ne 0 -or $result.publishAuthorized -or -not $result.verifiedProgressRestart -or -not $result.verifiedShelfRestart){
             throw 'Source-free portable ZIP acceptance did not pass'
           }
           "S3_PORTABLE_VERIFY_REPORT=$verification" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8

@@ -85,7 +85,11 @@ describe('CORE-LIB-04c shared real runtime composition', () => {
         })
         expect(trusted.readerService.openDefault(owned))
             .toEqual({ opened: true })
-        expect(opener.openDefault).toHaveBeenCalledWith(owned)
+        // ReaderService deliberately canonicalizes Windows 8.3 aliases via
+        // realpath.native before handing an owned file to the OS opener.
+        expect(opener.openDefault).toHaveBeenCalledWith(
+            fs.realpathSync.native(owned)
+        )
         expect(() => trusted.readerService.openDefault('/not-owned/secret'))
             .toThrow()
     })

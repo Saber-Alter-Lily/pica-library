@@ -85,22 +85,30 @@ describe('P2 D7B transactional user-event batching', () => {
         database.close()
     })
 
-    it('keeps shelf add/remove event granularity while removing route-level loops', () => {
+    it('keeps batch event granularity through the extracted source-neutral shelf route', () => {
         const server = fs.readFileSync('src/library/server.ts', 'utf8')
-        const start = server.indexOf('const shelfItemsRoute =')
+        const shared = fs.readFileSync('src/library/core-shelf-routes.ts', 'utf8')
+        const start = server.indexOf('if (isCoreShelfRoute(')
         const end = server.indexOf(
             "\n            if (\n                url.pathname === '/api/v1/recommendation-sessions'",
             start
         )
-        const shelfRoutes = server.slice(start, end)
+        expect(start).toBeGreaterThan(0)
+        expect(end).toBeGreaterThan(start)
+        const shelfAdapter = server.slice(start, end)
 
-        expect(shelfRoutes).toContain('recordUserEvents(')
-        expect(shelfRoutes).toContain("eventType: 'shelf_add'")
-        expect(shelfRoutes).toContain("eventType: 'shelf_remove'")
-        expect(shelfRoutes).toContain('comicIds.map(')
-        expect(shelfRoutes).not.toContain(
-            'options.database.recordUserEvent({'
-        )
+        // Core does not write recommendation events or import provider code.
+        // It returns the original per-comic mutation evidence to the trusted
+        // Desktop HTTP layer, which writes one SQLite transaction per batch.
+        expect(shared).toContain("eventType: 'shelf_add'")
+        expect(shared).toContain("eventType: 'shelf_remove'")
+        expect(shared).toContain('comicIds')
+        expect(shelfAdapter).toContain('coreShelfRoute(')
+        expect(shelfAdapter).toContain('recordUserEvents(')
+        expect(shelfAdapter).toContain('change.comicIds.map(')
+        expect(shelfAdapter).toContain('eventType: change.eventType')
+        expect(shelfAdapter).toContain('metadata: { shelfId: change.shelfId }')
+        expect(shelfAdapter).not.toContain('options.database.recordUserEvent({')
     })
 
     it('uses one explicit SQLite transaction around the existing event recorder', () => {

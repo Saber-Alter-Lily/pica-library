@@ -1,5 +1,14 @@
 # Pica Library Development Task Log
 
+## S3 PR #240｜原正式 Desktop 和无源 Core 复用同一业务运行组合（CORE-LIB-04c-01，2026-10-29）
+
+- 在正式原 `src/library/server.ts` 与已验证 Windows Full-Web Core 共用代码上新增 [Draft PR #240](https://github.com/Saber-Alter-Lily/pica-library/pull/240)，加入 `src/library/core-runtime-composition.ts` 并**真实替换**原 Desktop 的 `LibraryQueryService`、`ShelfService`、`ReaderService`、`LocalLibraryIngestion` 分散初始化。原服务/SQLite/Reader/HTTP/用户事件语义不变，可信 Desktop 的 `ExternalReaderAdapter` 仍显式注入，来源插件不能获得 OS 文件打开能力；源中立 Core 不导入 `LibraryService/ProviderService` 或 Pica/E-H/JM SDK。
+- 物理 `src/offline-core/qa-cli.ts` 与 `qa-http.ts` 也使用**同一** `createCoreLocalRuntime/createCoreLibraryPorts`，旧本地 Reader 片段及原完整网页、书架/导入、同一 SQLite 均未复制实现；实体 `esbuild` 必须包含此工厂且继续拒绝具体 Provider/Host。
+- 新 `test/unit/core-runtime-composition.test.ts` 通过真实临时 SQLite 和原 LocalLibraryIngestion 跑图片导入、书架 CRUD、Reader 原章节与分面，验证无 OS opener 默认拒绝及可信注入后仍必须是当前 Library 所拥有的文件。第一轮 Windows 新用例对原 Reader 规范化路径误判（Windows RUNNER~1 vs runneradmin），在 `d77a422cca1a7c116f80b5821eea2a37f3db0cec` 改为对照 `fs.realpathSync.native`，不放宽原安全路径保护或跳过任何用例。
+- 修后精确源码 [Linux/Windows 源无关实体 ESM+Chromium #40872173707](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173707) **SUCCESS**；[原完整 Web Linux/Windows+真实 Chromium #40872173639](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173639) **3/3 SUCCESS**；[Windows x64 官方 Node Reader/Full-Web 双 ZIP #40872173806](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173806) **2/2 SUCCESS**。Android/Web/Desktop 全量 [CI #40872182323](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872182323) 本轮初记时尚在运行，不能提前给全量 PASS。[本轮工程审计](docs/S3_CORE_RUNTIME_COMPOSITION_20261029.md)。
+- **下一阶段 CORE-LIB-04c-02**：让真正正式 `src/desktop/main.ts` / `src/library/server.ts` 可选择性完全不创建 `LibraryService/ProviderService`，保留旧完整 UI/SQLite/书架/Reader/本地设置/WebDAV、可靠任务生命周期；必须验证最终正式可执行闭包确实零具体 SDK。之后是插件可信签名安装/停用/升级/撤销、Android Service/Binder 和 source-free APK、原 v0.5.0 用户数据/下载/偏好无损一键更新回滚、Android 真机 G1。原 42+12 案例与 G1–G4 全部 OPEN；未合并 main/签名/Release/OTA。#232/#233 分叉书架方案仍需选版。
+
+
 ## S3 PR #239｜正式完整网页可在无来源物理 Core 和 Windows x64 ZIP 内运行（CORE-LIB-04b-02/03，2026-10-29）
 
 - 基于已完成原 Web 初始化门禁的 Draft #238，建立 [Draft PR #239](https://github.com/Saber-Alter-Lily/pica-library/pull/239)，直接复用**原** `web/index.html`、`web/app.js`、CSS/语言模块、SQLite/Reader/书架与真实 HTTP。新增 `scripts/stage-offline-full-web-qa.ts` 以 TypeScript AST 审核 ES module 闭包、拷贝到全新 OS Temp、哈希清单/原五视图回读，明确排除 Pica/E-H/JM 站点登录的独立顶层入口、重复 Host Library 初始化及非必要 Worker。原画风推理改为仅在用户主动开始分析时按需导入，正常书库启动不强制加载模型。

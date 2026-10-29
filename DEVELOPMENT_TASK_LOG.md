@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+## S3 PR #235｜WebDAV 业务控制器从 Desktop 来源组合剥离（CORE-LIB-03b，2026-10-29）
+
+- 在 [Draft #235](https://github.com/Saber-Alter-Lily/pica-library/pull/235) 直接修改正式 `src/desktop/main.ts` 原 `desktop.save` 与 `desktop.status.remoteStorage`，将原 WebDAV `save/sync/pause-sync/resume-sync/cancel-sync/delete-remote` 调度统一复用来源无关 `src/remote-storage/core-action-port.ts`，**仅 type import** 原 `RemoteStorageDesktopManager`，不复制 WebDAV Provider、SQLite、凭据/远端 generation/scope 保护或后台同步控制。旧 HTTP/CSRF、真实管理器全部原样执行，未知动作保留原普通设置回退。
+- 新增 Linux+Windows `s3-core-storage-qa.yml` 和真实临时 SQLite/MemoryCredentialStore、目标配置机密隔离、6类动作与取消、确认删除、错误传播测试；4个文件共29项已在 [修复后 S3 专项 #40853863903](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853863903) **双平台 SUCCESS**。
+- 首轮 [专项 #40853704332](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853704332) 曾因返回类型写成 `unknown` 触发 TS2322；在 `ab4137b4` 恢复原 `Record<string,unknown>` 类型后重新通过，未绕过完整型检查。全 Android/Web/Desktop [CI #40853872527](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853872527) 在写入本条时仍需核实最后结果，不提前写 PASS。
+- 下一切口固定 CORE-LIB-03c 旧 Desktop 本地设置/系统文件夹入口与受限 OS 能力，然后 CORE-LIB-04 将完整 Windows 页面/同一数据库脱离 `LibraryService/ProviderService` 的强制启动。Android 纯核心 APK + Service/Binder、可信来源签名/更新和 v0.5.0 老库无痛升级/回滚、G1–G4 全部 OPEN。见 [技术审计](docs/S3_CORE_REMOTE_STORAGE_20261029.md)。
+
+
 ## S3 PR #234｜正式 Desktop 本地文件导入抽离（CORE-LIB-03a，2026-10-29）
 
 - 基于源无关书架 Draft #233 新建 [Draft PR #234](https://github.com/Saber-Alter-Lily/pica-library/pull/234)，**实际修改生产** `src/library/server.ts` 的 `POST /api/v1/desktop/local-import/preview|confirm|cancel`，提取 `CoreLocalImportController` 为不含来源/Host/旧业务服务运行时 import 的共用控制器。复用原 `LocalLibraryIngestion`，没有再做一套 CBZ/SQLite/Reader。

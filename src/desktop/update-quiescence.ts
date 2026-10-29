@@ -70,7 +70,10 @@ export function collectDesktopUpgradeWorkLeases(
         !Array.isArray(resourceInput.waiting))
         return fail()
     const statuses = diagnosticInput.tasks as unknown[]
-    const cleanStates = new Set(['idle', 'complete', 'cancelled'])
+    // Failed is terminal when there is no held/waiting resource lease.
+    // A past failed task is not itself an active writer and must not
+    // permanently disable future updates.
+    const cleanStates = new Set(['idle', 'complete', 'cancelled', 'failed'])
     const knownStates = new Set([
         ...cleanStates, 'waiting', 'running', 'pausing', 'paused',
         'cancelling', 'failed', 'unknown'

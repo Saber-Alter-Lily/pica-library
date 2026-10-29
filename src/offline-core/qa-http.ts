@@ -192,7 +192,13 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         } catch {
             return json(response, 400, { error: 'Invalid QA path' })
         }
-        if (url.origin !== origin || url.search || url.hash)
+        // The existing local Reader appends a SHA-256 ?v= revision only to
+        // owned page URLs. Preserve that exact cache-busting contract, but
+        // reject all other query strings and ambiguous request targets.
+        const validImageRevision = /^\/api\/v1\/reader\/pictures\/[^/]+$/.test(url.pathname) &&
+            /^\?v=[a-f0-9]{64}$/.test(url.search)
+        if (url.origin !== origin || url.hash ||
+            (url.search !== '' && !validImageRevision))
             return json(response, 400, { error: 'Invalid QA request target' })
         if (request.method === 'GET' &&
             url.pathname === '/qa/' + secret) {

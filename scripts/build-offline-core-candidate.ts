@@ -46,6 +46,11 @@ export async function buildOfflineCoreCandidate(): Promise<OfflineCoreCandidate>
         entryPoints: [ENTRY],
         outfile: path.join(ROOT, '.s3-offline-core-qa', 'core.mjs'),
         bundle: true,
+        // AdmZip's optional Electron-only require('original-fs') is not a
+        // Node builtin. This QA executable is Node-only: map that single
+        // optional compatibility hook to the audited native fs module.
+        // Do not ignore or wholesale externalize unknown dependencies.
+        alias: { 'original-fs': 'node:fs' },
         platform: 'node',
         target: 'node24',
         format: 'esm',

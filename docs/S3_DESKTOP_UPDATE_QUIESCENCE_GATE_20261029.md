@@ -16,10 +16,10 @@ Avoided: a new database engine, separate process monitor, custom scheduling fram
 
 ## Real implementation
 
-- Add `src/desktop/update-quiescence.ts`: synchronous `requireDesktopUpgradeQuiescence` checks owned real Desktop instance, initialized engine/database/LibraryService, not already stopping, and zero active work leases. Any invalid/unknown snapshot is rejected; active leases produce a single safe user-facing error, never echo private task names or credentials.
+- Add `src/desktop/update-quiescence.ts`: synchronous `requireDesktopUpgradeQuiescence` checks owned real Desktop instance, initialized engine/database/LibraryService, not already stopping, and zero active work leases. A follow-on audit found that the idle-browser collector alone can miss maintenance/organize/v5-shadow/work-identity tasks and waiting resource queues. `collectDesktopUpgradeWorkLeases` therefore merges it with the ORIGINAL `LibraryService.runtimeTaskDiagnostics()` and `runtimeResourceProfile()`, not an invented second status store. Missing, unknown or malformed task snapshots fail closed; running/waiting/paused/cancelling tasks and active/waiting resource acquisitions block the helper. A terminal `failed` task with `active=false` and no resource lease may proceed; a failed task that still holds resources does not. No task names, paths or credentials appear in user-facing errors.
 - Extend original `src/desktop/update-command.ts` with an optional `preflight` callback invoked before `UpdateManager.apply`. On refusal, no helper handoff and no scheduled shutdown. Earlier callers without the hook remain behavior-compatible.
 - Wire the hook to **real** `src/desktop/main.ts` `applyUpdate` using the actual `instance`, `engineReady/stopping/database/service` values and the existing `activeDesktopWorkLeases` function.
-- New `test/unit/desktop-update-quiescence.test.ts` uses the existing `InstanceLock` against a disposable OS Temp directory, tests active/paused/unknown statuses, owner loss on both checks, missing services, helper not called on refusal, retry after error, duplicate apply and original code wiring. Existing update-command and instance lock tests retained.
+- New `test/unit/desktop-update-quiescence.test.ts` uses the existing `InstanceLock` against a disposable OS Temp directory, tests active/paused/unknown statuses, owner loss on both checks, missing services, helper not called on refusal, retry after error, duplicate apply and original code wiring. Added explicit checks for the *real* diagnostic states of maintenance/organize/identity tasks, pending resource acquisition, missing or malformed diagnostic snapshots and terminal failed tasks. Existing update-command and instance lock tests retained.
 - New `.github/workflows/s3-desktop-update-quiescence.yml` runs pinned Node 24.15 on Linux and Windows, full TypeScript check, focused tests plus historical admission regressions.
 
 ## What this does NOT yet solve
@@ -39,3 +39,11 @@ This Draft is not released and does not authorize real profile access, backups, 
 The first [Linux/Windows dedicated run #40974599032](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974599032) found a **test-only event-count mismatch**: the second `assertHeld` call is the third trace entry because activity snapshot was recorded between. Corrected test to count actual assert calls, rather than loosen runtime guard.
 
 [Corrected exact-source dedicated CI #40974706377](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974706377) and [full project CI #40974712298](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974712298) require terminal readback before marking PASS. Past failures remain failures.
+
+## 2026-10-29 follow-on source gap and exact-head QA
+
+A later read-only audit of `LibraryService.runtimeTaskDiagnostics()` showed additional **maintenance-update**, **maintenance-repair**, **library-organize**, **recommendation-v5-shadow** and **work-identity-evidence** states that can remain busy before the runtime coordinator has granted an active lease. The first successful 57/57 CI on `eb61cd748` proved the original collector but not these omitted states; the widened collector is a functional change and must pass separate CI.
+
+The corrected implementation also treats `failed` as terminal **only when `active=false` and `resourceState=none`**; permanent refusal after an old failed scan would be a usability regression. A failed status combined with an active/waiting lease remains refused.
+
+[Expanded Linux/Windows dedicated run #40975511400](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975511400) and [expanded full CI #40975519327](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975519327) must be read back at exact executable SHA before a new PASS. All earlier CI failures/cancellations remain recorded. This still does not stop new tasks from beginning *after* helper admission.

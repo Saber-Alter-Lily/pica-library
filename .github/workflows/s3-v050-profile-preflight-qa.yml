@@ -1,0 +1,42 @@
+name: S3 v0.5 read-only profile inventory QA (no migration)
+
+on:
+  push:
+    branches:
+      - codex/s3-v050-readonly-profile-audit-20261029
+    paths:
+      - '.github/workflows/s3-v050-profile-preflight-qa.yml'
+      - 'src/desktop/legacy-profile-preflight.ts'
+      - 'test/unit/legacy-profile-preflight.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-v050-readonly-profile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  legacy-read-only-inventory:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck existing Windows Desktop and legacy read-only audit
+        run: pnpm type:check
+      - name: Verify closed synthetic legacy SQLite, config, lock, WAL and zero-write evidence
+        run: pnpm exec vitest run test/unit/legacy-profile-preflight.test.ts test/unit/desktop-config.test.ts test/unit/desktop-instance-lock.test.ts

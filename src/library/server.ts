@@ -27,6 +27,7 @@ import { ReaderService } from '../services/reader-service'
 import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from './core-catalog-read'
 import { coreShelfMatch, coreShelfExecute } from './core-shelf-routes'
+import { coreLocalPlatformMatch, coreLocalPlatformExecute } from './core-local-platform'
 import { ExternalReaderAdapter } from '../services/external-reader-adapter'
 import { OnlineReaderService } from '../services/online-reader-service'
 import type { SignedSourceDesktopReader } from '../desktop/signed-source-reader'
@@ -1969,14 +1970,14 @@ export async function startLibraryServer(options: {
                 )
                 return json(response, reply.status, reply.value)
             }
-            if (
-                url.pathname === '/api/v1/desktop/choose-folder' &&
-                request.method === 'POST' &&
-                options.desktop
-            ) {
-                return json(response, 200, {
-                    path: await options.desktop.chooseFolder()
-                })
+            const localPlatformAction = coreLocalPlatformMatch(
+                request.method ?? '', url.pathname
+            )
+            if (localPlatformAction === 'choose-folder' && options.desktop) {
+                const reply = await coreLocalPlatformExecute(
+                    localPlatformAction, options.desktop
+                )
+                return json(response, reply.status, reply.value)
             }
             if (
                 url.pathname ===
@@ -2027,14 +2028,11 @@ export async function startLibraryServer(options: {
                 await options.desktop.openBrowserLite()
                 return json(response, 200, { success: true })
             }
-            if (
-                url.pathname === '/api/v1/desktop/open-directory' &&
-                request.method === 'POST' &&
-                options.desktop
-            ) {
-                const input = await body(request)
-                await options.desktop.openDirectory(String(input.kind ?? ''))
-                return json(response, 200, { success: true })
+            if (localPlatformAction === 'open-directory' && options.desktop) {
+                const reply = await coreLocalPlatformExecute(
+                    localPlatformAction, options.desktop, await body(request, 4096)
+                )
+                return json(response, reply.status, reply.value)
             }
             if (
                 url.pathname === '/api/v1/desktop/browser-session' &&

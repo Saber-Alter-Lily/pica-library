@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 CORE-LIB-04c-01｜真正原 Desktop 与无源 Reader/书库共用运行组合
+
+- 新建 [Draft #240](https://github.com/Saber-Alter-Lily/pica-library/pull/240) 以旧 Desktop 正式 `src/library/server.ts` 和已实体运行的 source-free Core 为共同调用端，提取同一 `createCoreLocalRuntime({database,dataDir,externalFileOpener?})`：真正旧 `LibraryQueryService/ShelfService/ReaderService/LocalLibraryIngestion` 保持同一 SQLite，不再两个启动入口分别创建本地服务。只有 Desktop 可注入可信 `ExternalReaderAdapter`，无源模式默认拒绝 OS 文件打开。新增真实 SQLite、Reader、安全路径和 AST 闭包验收。
+- Windows 8.3 文件别名导致新测试路径文本误判，精确 `d77a422cca1a7c116f80b5821eea2a37f3db0cec` 调整为和旧 Reader 一样以 `fs.realpathSync.native` 判定，**未**放宽读取目录保护。修后 [Linux/Windows 物理 Core #40872173707](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173707) SUCCESS、[原完整 Web Chromium #40872173639](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173639) 3/3 SUCCESS、[Windows Reader/Full-Web 双 Portable #40872173806](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173806) 2/2 SUCCESS。完整 Android/Web/Desktop [#40872182323](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872182323) 尚需核对最终状态。
+- 下一 **CORE-LIB-04c-02** 为最后的正式主程序模块化硬关口：从 `src/desktop/main.ts` / `src/library/server.ts` 中让 `ProviderService/LibraryService` 成为**可选受控来源 runtime**，而非任何本地书库启动的前置条件；保留原网页/API、本地持久化、受限 OS 服务、可靠 WebDAV/下载与变更日志。真正的 Windows APK/installer 依赖图和信任根、v0.5.0 无痛数据/旧账户升级回滚、Android source-free Service/Binder/签名和 G1 实体 UX 全部待做。**G1–G4 全 OPEN**，不可直接发布或合并。[本轮审计](S3_CORE_RUNTIME_COMPOSITION_20261029.md)。
+
+---
+
 ## 2026-10-29 S3 CORE-LIB-04b-02/03｜原完整网页 + Windows x64 实体无源 QA
 
 - [Draft PR #239](https://github.com/Saber-Alter-Lily/pica-library/pull/239)：真实旧 `web/index.html`、`app.js`、样式/翻译/Reader 通过 TS AST 真实资源闭包装配，排除独立在线来源登录启动与非必要 AI 模型；仍复用同一 SQLite/书架/Reader/HTTP，并对全部文件做来源白名单/SHA。原 Web 的 `post()` 仅在拥有测试核心随机同源 token 时送 `x-pica-qa-csrf`，不改变旧 Desktop。解决无源核心真实网页所需的原书库最多5000项查询，不能读取任意外源 ID。

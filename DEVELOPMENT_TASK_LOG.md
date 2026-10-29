@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+## S3 PR #227｜统一本地 Reader 的 HTTP GET 路由（2026-10-28）
+
+- 在 #226 已验证的来源中立本地 CLI 上创建 [Draft PR #227](https://github.com/Saber-Alter-Lily/pica-library/pull/227)，从**实际旧** src/library/server.ts 抽出本地 Reader 的章节/单章/页图片/进度 GET 分派到 src/reader/local-http-read.ts。旧 Desktop Server 保留原 HTTP 安全校验/headers/输出以及 POST 保存进度、用户事件、导出和外部文件打开；同时让零来源实体 QA 候选调用同一 GET 路由，不造第二个 Reader。
+- 新增 URL/百分号解码、缓存头、本地与旧下载图片、未知 Host/在线来源不误接管、依赖图双调用方门禁；源闭包验证要求这个共享文件进入 source-free CLI 打包。
+- **精确源码 34b5705030d69e3b13db483ba2c3654bd1ea1d95** 的 [S3 双系统 #40821561989](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821561989) **SUCCESS**：Linux 30/30、Windows 30/30，两端 TypeScript PASS，仍保留前轮的本地 folder+CBZ 跨进程物理验证。新代码 [完整 CI #40821583070](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821583070) 当时仍在运行，未先行判 PASS。
+- 详见 [S3 CORE-HTTP 验收边界](docs/S3_SHARED_LOCAL_READER_HTTP_20261028.md)。现有 Desktop Server、Windows 正式发行物仍携带 Pica/E-H/JM，Android/旧版升级/真机验收未解决，G1–G4 持续 OPEN。
+
 ## S3 PR #226｜本地纯核心真实独立进程候选（2026-10-28）
 
 - 从已确认 #225 完整 CI SUCCESS 的开发线新建 [Draft PR #226](https://github.com/Saber-Alter-Lily/pica-library/pull/226)，仅加入 src/offline-core/qa-cli.ts、build-offline-core-candidate.ts、专项回归与 CI。直接复用旧 LibraryDatabase、LocalLibraryIngestion、ReaderService，真实 esbuild ESM 物理打包并检查站点 SDK 不在单文件依赖闭包；临时 QA root 与用户 v0.5.0 数据隔离。

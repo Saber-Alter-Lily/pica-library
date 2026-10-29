@@ -4,9 +4,13 @@ on:
   push:
     branches:
       - codex/s3-offline-core-candidate-20261028
+      - codex/s3-shared-local-http-20261028
     paths:
       - '.github/workflows/s3-offline-core-qa.yml'
       - 'src/offline-core/**'
+      - 'src/reader/local-http-read.ts'
+      - 'src/library/server.ts'
+      - 'test/unit/local-reader-http-read.test.ts'
       - 'src/library/database.ts'
       - 'src/local-library/**'
       - 'src/services/reader-service.ts'
@@ -43,7 +47,7 @@ jobs:
       - name: Typecheck all offline-core ports and tests
         run: pnpm type:check
       - name: Real standalone bundle, local CBZ/folder, Reader and protected-root tests
-        run: pnpm exec vitest run test/unit/offline-core-candidate.test.ts test/unit/local-library-ingestion.test.ts test/unit/reader-service.test.ts test/unit/module-dag-policy.test.ts
+        run: pnpm exec vitest run test/unit/offline-core-candidate.test.ts test/unit/local-reader-http-read.test.ts test/unit/local-library-ingestion.test.ts test/unit/reader-service.test.ts test/unit/module-dag-policy.test.ts
       - name: Produce SHA/inventory evidence only; NEVER publish runnable bytes
         shell: bash
         run: |

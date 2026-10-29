@@ -24,6 +24,7 @@ import {
     type VisualSamplingMode
 } from '../recommendation-v4/visual-style'
 import { ReaderService } from '../services/reader-service'
+import { localReaderGet } from '../reader/local-http-read'
 import { ExternalReaderAdapter } from '../services/external-reader-adapter'
 import { OnlineReaderService } from '../services/online-reader-service'
 import type { SignedSourceDesktopReader } from '../desktop/signed-source-reader'
@@ -2445,50 +2446,21 @@ export async function startLibraryServer(options: {
                     return json(response, 200, await onlineReader.saveProgress(String(input.comicId ?? ''), String(input.episodeId ?? ''), Number(input.pageIndex)))
                 }
             }
-            const readerChapters = url.pathname.match(
-                /^\/api\/v1\/reader\/comics\/([^/]+)\/chapters$/
-            )
-            if (readerChapters && request.method === 'GET')
-                return json(
-                    response,
-                    200,
-                    readerService.chapters(
-                        decodeURIComponent(readerChapters[1])
-                    )
-                )
-            const readerChapter = url.pathname.match(
-                /^\/api\/v1\/reader\/comics\/([^/]+)\/chapters\/([^/]+)$/
-            )
-            if (readerChapter && request.method === 'GET')
-                return json(
-                    response,
-                    200,
-                    readerService.chapter(
-                        decodeURIComponent(readerChapter[1]),
-                        decodeURIComponent(readerChapter[2])
-                    )
-                )
-            const readerPicture = url.pathname.match(
-                /^\/api\/v1\/reader\/pictures\/([^/]+)$/
-            )
-            if (readerPicture && request.method === 'GET') {
-                const image = readerService.picture(
-                    decodeURIComponent(readerPicture[1])
-                )
-                response.writeHead(200, {
-                    'content-type': image.contentType,
-                    'content-length': String(image.data.byteLength),
-                    'cache-control': decodeURIComponent(readerPicture[1]).startsWith('local:') ? 'private, no-store' : 'private, max-age=3600',
-                    'x-content-type-options': 'nosniff'
-                })
-                response.end(image.data)
-                return
+            const offlineRead = request.method === 'GET'
+                ? localReaderGet(url.pathname, readerService) : null
+            if (offlineRead) {
+                if (offlineRead.kind === 'image') {
+                    response.writeHead(200, {
+                        'content-type': offlineRead.contentType,
+                        'content-length': String(offlineRead.data.byteLength),
+                        'cache-control': offlineRead.cacheControl,
+                        'x-content-type-options': 'nosniff'
+                    })
+                    response.end(offlineRead.data)
+                    return
+                }
+                return json(response, 200, offlineRead.value)
             }
-            if (
-                url.pathname === '/api/v1/reader/progress' &&
-                request.method === 'GET'
-            )
-                return json(response, 200, readerService.recentProgress())
             if (
                 url.pathname === '/api/v1/reader/progress' &&
                 request.method === 'POST'

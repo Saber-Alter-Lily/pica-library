@@ -1,6 +1,17 @@
 # Pica Library Development Task Log
 
 
+### S3 2026-10-29｜CORE-LIB-04c-02b-03b-02 官方历史迁移与媒体边界（Draft PR #246）
+
+- 新建 [Draft #246](https://github.com/Saber-Alter-Lily/pica-library/pull/246)，叠加 #245，未合并 main/Release/OTA。两个工作簿共用新增 `scripts/qa/v050-release-identity.ts` 固定官方 `v0.5.0` commit `bec7f9f` 与五项 blob 身份，避免重复造仓库资格校验。
+- `scripts/qa/v050-official-migration-matrix.ts` 通过真实发布版 `runMigrations` 生成 schema 5/11/13 的合成 SQLite 和合成旧收藏/书架/章节/阅读/下载记录；随后实际调用发布版 `LibraryDatabase` 的原 `backupBeforeMigration` 与 `runMigrations` 升至 schema14，核查升级前 `.pre-migration-v14.bak`、前后原本存在的行、SQLite 完整性及外键与新只读预检。不会因为 schema5 原本不存在 schema6/8/12 的业务行而错误要求凭空出现。
+- `src/desktop/v050-owned-media-inventory-qa.ts` 为**QA-only 元数据检查**：必须先通过历史合成结构门禁，仅扫描 OS Temp sentinel 内拥有权明确的 `data` 与可选 `cache`；限制文件数/递归深度/尺寸，分列原 SQLite 备份与漫画媒体；对外置引用只做词法资格判断不读取，拒绝硬链接/符号链接/目录联接及字节大小不匹配、缺失正文。**不读取媒体内容、不宣称哈希已验或 SQLite+媒体跨文件原子性**。
+- 新 `test/unit/v050-owned-media-inventory-qa.test.ts` 与 [双平台独立门禁](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/s3-v050-historical-schema-media-qa.yml) 覆盖正常/外置/缺文件/大小不符/硬链接/目录联接/超限/锁/禁止写入；未安装新框架。开源复用：原生 SQLite Backup+integrity/foreign_key_check、Room MigrationTestHelper“旧版生成→新版验证”方法、微软 NTFS reparse 说明；没有引入 Litestream 进程或重写备份引擎。独立审计：[S3_V050_HISTORICAL_SCHEMA_MEDIA_QA_20261029.md](docs/S3_V050_HISTORICAL_SCHEMA_MEDIA_QA_20261029.md)。
+- 实际失败保留：[#40921581059](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40921581059) 首轮发现旧 schema5 测试把后世才存在的业务行当作必须保留；后续运行的媒体测试发现无效测试 comicID `synthetic:`（项目明确只允许 pica/eh/jm/local）以及原 SQLite 迁移备份误算漫画文件。分别修正为来源中立 `local:`、按起始 schema 验证、原 SQLite 辅助备份单独登记。最新精确业务/测试代码 `80ded46b5` [#40922700787](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922700787) **待最终结果，不能提前宣称通过**。
+- 本轮仅合成 OS Temp 数据，不读取个人下载、凭据、书库，未迁移正式库，未触碰更新助手、签名或生产目录；G1 Android 视觉、G2 真来源外置、G3 生产一致性/恢复、G4 双端人工验收均 OPEN。后续先按精确 SHA 核实专项+完整 CI，随后做 NTFS 特殊 reparse、外置媒体用户单独授权/大规模资料真实工序和应用全局冻结/失败注入；禁止用 QA 成功替代正式升级验收。
+
+
+
 ### 2026-10-29｜CORE-LIB-04c-02b-03b-01：真实 v0.5.0 正式源码生成历史测试资料（Draft #245）
 
 - 新建 [Draft #245](https://github.com/Saber-Alter-Lily/pica-library/pull/245)，以 #244 的真实只读历史检查器为基础，**没有变更 main、正式 v0.5.0、用户资料或 OTA**。新增 `scripts/qa/v050-release-tag-interoperability.ts`，单独 checkout 真实官方发布提交 `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`（同时固定原 `LibraryDatabase/config/types/paths/migrations` 五个 Git blob），**真正执行该发布源码**生成合成资料，不再由现行数据库实现冒充历史版本。

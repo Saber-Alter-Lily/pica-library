@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/s3-windows-portable-qa-20261029
+      - codex/s3-core-library-read-20261029
     paths:
       - '.github/workflows/s3-windows-offline-portable-qa.yml'
       - 'scripts/build-windows-offline-portable-qa.ts'
@@ -13,6 +14,10 @@ on:
       - 'scripts/stage-offline-reader-assets-qa.ts'
       - 'src/offline-core/**'
       - 'src/reader/local-http-read.ts'
+      - 'src/library/core-catalog-read.ts'
+      - 'src/library/server.ts'
+      - 'src/services/library-query-service.ts'
+      - 'test/unit/core-catalog-read.test.ts'
       - 'web/offline-core-reader-qa.js'
       - 'web/reader-input.js'
       - 'web/reader-progress.js'

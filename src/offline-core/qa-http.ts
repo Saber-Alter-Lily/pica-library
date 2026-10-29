@@ -156,6 +156,9 @@ function page(markup: string, csrf: string) {
 <section id="qa-library" class="panel">
 <h2>本地书库 · Offline books</h2>
 <p>隔离测试目录，仅限本地文件夹和 CBZ。无账号、来源或推荐功能。</p>
+<label for="qa-library-search">查找本地书库 · Find local books</label>
+<input id="qa-library-search" type="search" maxlength="200" autocomplete="off">
+<button id="qa-library-search-button" type="button">查找 · Search</button>
 <label for="qa-book">选择本地作品</label>
 <select id="qa-book"></select>
 <button id="qa-open" type="button">进入阅读</button>

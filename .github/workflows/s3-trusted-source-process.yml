@@ -7,6 +7,7 @@ on:
       - codex/s3-signed-worker-lifecycle-20261028
       - codex/s3-desktop-signed-reader-20261028
       - codex/s3-eh-public-reader-20261028
+      - codex/s3-eh-worker-package-20261028
     paths:
       - '.github/workflows/s3-trusted-source-process.yml'
       - 'src/source-extensions/**'
@@ -20,6 +21,8 @@ on:
       - 'test/unit/signed-source-desktop-http.test.ts'
       - 'test/unit/eh-public-reader-migration.test.ts'
       - 'test/unit/eh-public-worker-ipc.test.ts'
+      - 'test/unit/eh-public-worker-package.test.ts'
+      - 'scripts/build-eh-public-worker-candidate.ts'
       - 'test/unit/reading-library.test.ts'
       - 'test/unit/reading-library-ui.test.ts'
       - 'test/unit/web-reader-progress.test.ts'
@@ -61,6 +64,7 @@ jobs:
             test/unit/signed-source-desktop-http.test.ts \
             test/unit/eh-public-reader-migration.test.ts \
             test/unit/eh-public-worker-ipc.test.ts \
+            test/unit/eh-public-worker-package.test.ts \
             test/unit/reading-library.test.ts \
             test/unit/reading-library-ui.test.ts \
             test/unit/web-reader-progress.test.ts \
@@ -72,12 +76,15 @@ jobs:
         run: |
           mkdir -p s3-source-evidence
           pnpm exec tsx scripts/audit-modules.ts --output=s3-source-evidence/import-graph.json
+          pnpm exec tsx scripts/build-eh-public-worker-candidate.ts > s3-source-evidence/eh-worker-candidate.json
       - name: Retain bounded synthetic-only evidence
         if: always() && github.event.repository.private == false
         uses: actions/upload-artifact@v4
         with:
           name: s3-source-process-graph-${{ github.sha }}
-          path: s3-source-evidence/import-graph.json
+          path: |
+            s3-source-evidence/import-graph.json
+            s3-source-evidence/eh-worker-candidate.json
           retention-days: 1
           if-no-files-found: ignore
 
@@ -98,4 +105,4 @@ jobs:
       - name: Check actual Windows Node worker types
         run: pnpm type:check
       - name: Test pinned worker launch, IPC, revoke and timeout on Windows
-        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts test/unit/signed-worker-lifecycle.test.ts test/unit/signed-source-desktop-http.test.ts test/unit/eh-public-reader-migration.test.ts test/unit/eh-public-worker-ipc.test.ts test/unit/reading-library.test.ts test/unit/reading-library-ui.test.ts test/unit/web-reader-progress.test.ts
+        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts test/unit/signed-worker-lifecycle.test.ts test/unit/signed-source-desktop-http.test.ts test/unit/eh-public-reader-migration.test.ts test/unit/eh-public-worker-ipc.test.ts test/unit/eh-public-worker-package.test.ts test/unit/reading-library.test.ts test/unit/reading-library-ui.test.ts test/unit/web-reader-progress.test.ts

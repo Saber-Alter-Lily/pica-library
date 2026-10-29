@@ -13,6 +13,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
+import { pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite'
 
@@ -341,7 +342,18 @@ export async function snapshotLegacyFixtureProfile(
         }
         const destination = path.join(target, 'data', 'library.db')
         fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 })
-        const src = new DatabaseSync(databasePath, {
+        // For a checkpointed source with no WAL file, immutable=1 prevents
+        // SQLite from creating even an empty -wal/-shm sidecar in the original
+        // profile. For a genuinely pending WAL, immutable would IGNORE the
+        // committed WAL frames; use read-only SQLite online backup instead.
+        const sourceLocation = originalWal === null
+            ? (() => {
+                const uri = pathToFileURL(databasePath)
+                uri.searchParams.set('immutable', '1')
+                return uri
+            })()
+            : databasePath
+        const src = new DatabaseSync(sourceLocation, {
             readOnly: true, allowExtension: false
         })
         try {
@@ -353,7 +365,12 @@ export async function snapshotLegacyFixtureProfile(
         const copiedDb = digestFile(destination)
         entries.push({ path: 'data/library.db', kind: 'sqlite', ...copiedDb })
         const afterDb = digestFile(databasePath)
-        const afterWal = status(walFile) ? digestFile(walFile) : null
+        const laterWal = status(walFile)
+        // A newly-created empty WAL is still a source-profile mutation and
+        // must NOT be ignored or reported as an unchanged original.
+        if (Boolean(laterWal) !== Boolean(originalWal))
+            throw new Error('SOURCE_SQLITE_SIDECARS_CHANGED_DURING_SNAPSHOT')
+        const afterWal = laterWal ? digestFile(walFile) : null
         if (afterDb.sha256 !== originalDb.sha256 ||
             afterDb.bytes !== originalDb.bytes ||
             JSON.stringify(afterWal) !== JSON.stringify(originalWal))

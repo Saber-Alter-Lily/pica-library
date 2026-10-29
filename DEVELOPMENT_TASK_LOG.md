@@ -1,5 +1,14 @@
 # Pica Library Development Task Log
 
+## S3 PR #236｜真实 Windows 本地配置及原生文件夹接口来源无关化（CORE-LIB-03c，2026-10-29）
+
+- 新建 [Draft #236](https://github.com/Saber-Alter-Lily/pica-library/pull/236)，在 #235 的已验收 WebDAV 端口基础上，直接重构**正式生产** `src/desktop/config.ts`、`src/desktop/main.ts` 和 `src/library/server.ts`，新增 `src/library/core-local-config.ts` 与 `core-local-platform.ts`。不是新的 QA 阅读器；复用旧 `config.json`、Reader 设置、SQLite VFS 校验、原生文件选择器、受控目录打开与完整旧 HTTP API。
+- 纯本地设置模块只有 Node/pure Reader settings/SQLite-path 的运行时 import，原旧 Desktop wrapper 继续处理 `sourcePolicyForConfig` 兼容性、账号/代理凭据和 `externalSources` 校验，**没有更改正式用户配置路径及账户记录**。受限原生平台接口只接受 data/logs/personalization/packs/browser-lite-export 五类固定用途，Web 不可给 Shell 提供绝对路径/命令或来源参数；原 Host/Origin/CSRF 保持。
+- 新增旧 Desktop 配置 golden 对照、真实临时文件机密拒绝/原子写、异常 Reader 设置、无自动数据库创建、目录用途/原型键/路径注入及原生产 HTTP 请求回归。Linux/Windows 两平台 [CORE-LIB-03c 专项 #40857679928](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857679928) **SUCCESS**，含 TypeScript、原生选择器及真实 API 集成。全 Android/Web/Desktop [#40857731995](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857731995) 在最初登记时仍待最终判定。
+- **继续任务 CORE-LIB-04a：** 盘点原 Windows 完整网页 UI 与旧 `src/library/server.ts` 的真实启动/HTTP/JS 依赖，优先让书库、书架、Reader、设置、WebDAV 可在没有旧 `LibraryService/ProviderService` 的核心组合中运行；保留原 UI，不继续堆 QA 小页面。#232/#233 为互斥书架分支需专门选版再集成。
+- Android 可拆卸来源 Service/Binder、可信签名/运行隔离、正式 Windows 纯核心安装包、v0.5.0 老用户无痛升级及回滚、真实手机 G1 UX 和 G1–G4 均 **OPEN**，没有合并 main/Release/OTA。技术证据见 [本轮审计](docs/S3_CORE_LOCAL_PLATFORM_20261029.md)。
+
+
 ## S3 PR #235｜WebDAV 业务控制器从 Desktop 来源组合剥离（CORE-LIB-03b，2026-10-29）
 
 - 在 [Draft #235](https://github.com/Saber-Alter-Lily/pica-library/pull/235) 直接修改正式 `src/desktop/main.ts` 原 `desktop.save` 与 `desktop.status.remoteStorage`，将原 WebDAV `save/sync/pause-sync/resume-sync/cancel-sync/delete-remote` 调度统一复用来源无关 `src/remote-storage/core-action-port.ts`，**仅 type import** 原 `RemoteStorageDesktopManager`，不复制 WebDAV Provider、SQLite、凭据/远端 generation/scope 保护或后台同步控制。旧 HTTP/CSRF、真实管理器全部原样执行，未知动作保留原普通设置回退。

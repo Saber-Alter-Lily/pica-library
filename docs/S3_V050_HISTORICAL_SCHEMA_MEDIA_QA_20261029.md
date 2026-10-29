@@ -34,7 +34,16 @@ Initial [workflow #40921581059](https://github.com/Saber-Alter-Lily/pica-library
 
 The new exact-head dual-OS and Android/Web/Desktop jobs must be checked independently before a PASS classification. A synthetic fixture can never authorize a real user migration, a production backup/restore, or an in-place upgrade.
 
-## 5. Explicit open risks / next steps
+## 5. Exact-source CI closeout — 2026-10-29
+
+- The first [CI #40921581059](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40921581059) failed because the test expected post-v5 app-state/event/identity **rows** that could not yet exist. The code now checks row preservation against the actual origin schema while independently requiring the final version 14.
+- Initial new media unit tests used a non-supported synthetic catalog source `synthetic:`; the actual core requires `pica/eh/jm/local`. Switched the synthetic work to `local:` without changing core source routing.
+- Subsequent [CI #40922375797](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922375797) had one remaining data-classification failure: the original `LibraryDatabase` creates a `library.db.pre-migration-v14.bak` on initialization. This is **auxiliary SQLite data**, not a manga image. The bounded inventory now records known original SQLite backups separately (`auxiliarySqliteBackupFileCount/Bytes`) while retaining the same total budget; it neither removes, reads, nor silently excludes them.
+- **Exact executable and test source SHA: `80ded46b5ce46b42d361180588228e84638ff138`.** [Linux+Windows historical-schema/media CI #40922700787](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922700787): **2/2 SUCCESS**. Both jobs' raw logs include `OFFICIAL_RELEASE_HISTORICAL_5_11_13_TO_14_PASS` with three paths, official source backup usage, preserved rows, `productionMigrationAuthorized:false`; each independently ran **28/28** unit regressions, including metadata-only media tests. Earlier failures remain in Actions history.
+- Exact-source [Android/Web/Desktop CI #40922712429](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922712429) must be checked separately for terminal status. Later documentation-only commits do not represent new executable test coverage.
+- No original/user credentials were read, no real library root was scanned, no installer or OTA was modified and no production restore was authorized. All G1–G4 remain **OPEN**.
+
+## 6. Explicit open risks / next steps
 
 1. The owner-hash/metadata inventory is **not a snapshot**. File contents have not been SHA-verified; TOCTOU, open files, missing runtime freeze, Windows nonstandard reparse tags, volume boundaries and large libraries still require separate tests.
 2. Original external or custom library references remain **REVIEW_REQUIRED**, not scanned. Actual user opt-in and independent external-volume ownership checks are absent.

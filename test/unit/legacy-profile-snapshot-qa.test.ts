@@ -79,6 +79,7 @@ async function fixture() {
     fs.writeFileSync(path.join(packs, 'edition-map.json'),
         '{"fixture":"opaque"}')
     fs.writeFileSync(path.join(cache, 'cover.webp'), png)
+    fs.writeFileSync(path.join(cache, 'empty-placeholder.flag'), Buffer.alloc(0))
     fs.writeFileSync(path.join(logs, 'old-log.txt'),
         'NOT_IN_ROLLBACK_BACKUP')
     fs.writeFileSync(path.join(updater, 'old-updater.exe'),
@@ -108,7 +109,9 @@ describe('v0.5.0 synthetic consistency snapshot and rollback rehearsal', () => {
         const manifest = JSON.parse(fs.readFileSync(
             path.join(f.sandbox, 'snapshot', 'manifest.json'), 'utf8'))
         expect(manifest).toMatchObject({
-            secretsParsed: false, sourceModified: false,
+            secretsParsed: false,
+            sourceDatabaseAndWalVerifiedUnchanged: true,
+            crossFileAtomicityProven: false,
             productionRestoreAuthorized: false,
             sqliteOnlineBackup: true,
             excludedNonUserState: expect.arrayContaining([
@@ -120,7 +123,8 @@ describe('v0.5.0 synthetic consistency snapshot and rollback rehearsal', () => {
             'config/config.json', 'config/credentials.dat',
             'config/remote-storage.json', 'config/source-hosts.json',
             'data/library.db', 'runtime-state/personalization/taste.json',
-            'packs/edition-map.json', 'cache/cover.webp'
+            'packs/edition-map.json', 'cache/cover.webp',
+            'cache/empty-placeholder.flag'
         ]) expect(list).toContain(file)
         expect(list).not.toContain('logs/old-log.txt')
         expect(list).not.toContain('runtime-state/upgrade-assistant/old-updater.exe')
@@ -136,6 +140,10 @@ describe('v0.5.0 synthetic consistency snapshot and rollback rehearsal', () => {
         })
         expect(restored.fileCount).toBe(snapshot.fileCount)
         expect(fs.readFileSync(f.dbFile)).toEqual(beforeDb)
+        expect(fs.existsSync(f.dbFile + '-wal')).toBe(false)
+        expect(fs.existsSync(f.dbFile + '-shm')).toBe(false)
+        expect(fs.statSync(path.join(restoredRoot, 'cache',
+            'empty-placeholder.flag')).size).toBe(0)
         expect(fs.readFileSync(path.join(f.config, 'config.json')))
             .toEqual(beforeConfig)
         expect(fs.readFileSync(path.join(f.config, 'credentials.dat')))
@@ -220,6 +228,22 @@ describe('v0.5.0 synthetic consistency snapshot and rollback rehearsal', () => {
         const restoredSample = fs.readFileSync(path.join(f.profile,
             'packs', 'edition-map.json'), 'utf8')
         expect(restoredSample).toBe('{"fixture":"opaque"}')
+    }, 60000)
+
+    it('rejects a symlinked directory inserted under the staged snapshot before any restore', async () => {
+        const f = await fixture()
+        const snapshot = await snapshotLegacyFixtureProfile(f.sandbox)
+        if (process.platform !== 'win32') {
+            const folder = path.join(f.sandbox, 'snapshot', 'packs')
+            const moved = path.join(f.sandbox, 'snapshot', 'packs.saved')
+            fs.renameSync(folder, moved)
+            fs.symlinkSync(moved, folder, 'dir')
+            expect(() => restoreLegacyFixtureSnapshot(
+                f.sandbox, snapshot.manifestSha256
+            )).toThrow('SYNTHETIC_QA_DIRECTORY_UNSAFE')
+            expect(fs.existsSync(path.join(f.sandbox, 'restored')))
+                .toBe(false)
+        }
     }, 60000)
 
     it('fails closed for active app lock, external library, symlink and arbitrary non-temp directory', async () => {

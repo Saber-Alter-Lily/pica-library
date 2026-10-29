@@ -221,9 +221,16 @@ export function qualifyV050HistoricalFixtureReadOnly(
         // This comparison never probes the supplied external path. The
         // explicitly created data/ directory was already realpath-verified.
         const configured = path.resolve(config.libraryDirectory)
-        const sameLexicalLocation = process.platform === 'win32'
-            ? configured.toLowerCase() === data.toLowerCase()
-            : configured === data
+        // On Windows the OS-temp root can be returned through either its
+        // original/8.3 spelling or its canonical long name. Both candidates
+        // refer exclusively to the already-verified sandbox-owned data folder.
+        // No file-system operation is performed on the config-supplied path.
+        const expectedSpelling = path.resolve(
+            requestedSandbox, 'profile', 'data')
+        const sameLexicalLocation = [expectedSpelling, data].some(expected =>
+            process.platform === 'win32'
+                ? configured.toLowerCase() === expected.toLowerCase()
+                : configured === expected)
         if (!sameLexicalLocation)
             return deny('REVIEW_REQUIRED', 'LIBRARY_REFERENCE_REQUIRES_CONSENT')
 

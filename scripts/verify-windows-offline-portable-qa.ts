@@ -47,19 +47,22 @@ function succeeded(binary: string, core: string, command: string,
 function readJson(bytes: Uint8Array) {
     return JSON.parse(Buffer.from(bytes).toString('utf8')) as Record<string, any>
 }
-async function startServer(runtime: string, core: string, root: string,
-    cwd: string) {
-    const child = spawn(runtime,
-        [core, 'serve', '--root', root], {
-            cwd, windowsHide: true, env: env(),
-            stdio: ['ignore', 'pipe', 'pipe']
-        })
+async function startServerThroughPortableLauncher(
+    launcher: string, root: string, cwd: string
+) {
+    // Execute the real packaged .cmd instead of reconstructing its runtime
+    // invocation in the test harness. The official Node runtime was already
+    // version-checked directly before this call.
+    const child = spawn('cmd.exe', ['/d', '/c', launcher, root], {
+        cwd, windowsHide: true, env: env(),
+        stdio: ['ignore', 'pipe', 'pipe']
+    })
     let errors = ''
     child.stderr.on('data', part => { errors += String(part).slice(0, 1400) })
     const state = await new Promise<{ url: string }>((resolve, reject) => {
         let emitted = '', done = false
         const timeout = setTimeout(() =>
-            finish(new Error('Portable QA local HTTP timed out ' + errors)), 20_000)
+            finish(new Error('Portable launcher HTTP timed out ' + errors)), 20_000)
         const finish = (error?: Error, value?: { url: string }) => {
             if (done) return
             done = true
@@ -72,21 +75,21 @@ async function startServer(runtime: string, core: string, root: string,
             const end = emitted.indexOf('\n')
             if (end < 0) return
             try {
-                const response = JSON.parse(emitted.slice(0, end))
+                const response = JSON.parse(emitted.slice(0, end).trim())
                 if (response.status !== 'OFFLINE_HTTP_QA_ONLY' ||
                     typeof response.url !== 'string' ||
                     !/^http:\/\/127\.0\.0\.1:\d+\/qa\/[a-f0-9]{64}$/.test(response.url))
-                    throw new Error('Unexpected portable QA listener')
+                    throw new Error('Unexpected portable launcher listener')
                 finish(undefined, { url: response.url })
             } catch (e) { finish(e as Error) }
         })
         child.once('error', error => finish(error))
         child.once('exit', code => finish(new Error(
-            'Portable core unexpectedly exited ' + code + ': ' + errors)))
+            'Portable launcher exited ' + code + ': ' + errors)))
     })
     const stop = async () => {
         if (child.exitCode !== null || child.signalCode !== null) return
-        await new Promise<void>(resolve => {
+        const awaitingExit = new Promise<void>(resolve => {
             const timer = setTimeout(() => {
                 child.kill('SIGKILL')
                 resolve()
@@ -95,11 +98,19 @@ async function startServer(runtime: string, core: string, root: string,
                 clearTimeout(timer)
                 resolve()
             })
-            child.kill('SIGTERM')
         })
+        // On Windows, killing only cmd.exe can orphan its node.exe child.
+        // Kill the complete ephemeral process tree and verify SQLite recovery
+        // with a NEW process afterward, never touching a real user database.
+        const kill = spawnSync('taskkill.exe', [
+            '/PID', String(child.pid), '/T', '/F'
+        ], { encoding: 'utf8', timeout: 10_000, windowsHide: true })
+        if (kill.error || kill.status !== 0) child.kill('SIGKILL')
+        await awaitingExit
     }
     return { state, stop }
 }
+
 async function forgedHost(host: string, port: number, cookie: string) {
     return await new Promise<number>((resolve, reject) => {
         const request = http.request({
@@ -241,7 +252,7 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         ])
         if (pages.pages?.length !== 2)
             throw new Error('Portable Reader did not reconstruct owned pages')
-        running = await startServer(runtime, core, root, temp)
+        running = await startServerThroughPortableLauncher(launcher, root, temp)
         const entry = new URL(running.state.url)
         const origin = entry.origin
         if (entry.hostname !== '127.0.0.1')

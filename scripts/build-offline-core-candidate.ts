@@ -19,6 +19,8 @@ const REQUIRE_SOURCE = [
     'src/local-library/ingestion.ts',
     'src/services/reader-service.ts',
     'src/reader/local-http-read.ts',
+    'src/library/core-catalog-read.ts',
+    'src/services/library-query-service.ts',
     'src/offline-core/qa-http.ts'
 ]
 const PROHIBITED = [

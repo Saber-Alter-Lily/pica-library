@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 CORE-LIB-03b｜生产 WebDAV 状态和命令使用来源无关端口
+
+- 新增 [Draft PR #235](https://github.com/Saber-Alter-Lily/pica-library/pull/235)：不重新发明 WebDAV，而是将旧正式 Windows `desktop.save` 的网盘设置/同步/暂停恢复取消/远端删除委托到仅 type-import 原 `RemoteStorageDesktopManager` 的 `coreRemoteStorageDispatch`；旧 status 同样委托，网络和密钥操作只有原业务实现负责，未自动启动在线动作。
+- 真实 Linux/Windows [S3 专项 #40853863903](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853863903) 各29项和类型检查 SUCCESS；最初 TS2322 失败已保留并修复于 `ab4137b4`；完整 Android/Web/Desktop [#40853872527](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853872527) 仍需核对最终状态。
+- 下一优先任务 CORE-LIB-03c 本机设置与原生文件夹/打开目录受控能力 → CORE-LIB-04 完整正式 Windows UI/core-only 进程组合 → 正式 Android Source Service/Binder、插件可信分发/升级撤销 → 真正 v0.5.0 无损升级/回滚与双端用户验收。不可继续用小型 QA 界面冒充 Windows 正式版。G1–G4 继续 OPEN。[审计](S3_CORE_REMOTE_STORAGE_20261029.md)。
+
+---
+
 ## 2026-10-29 S3 CORE-LIB-03a｜复用原正式本地文件导入与纯核心
 
 - 在 [Draft PR #234](https://github.com/Saber-Alter-Lily/pica-library/pull/234) 真实抽离原 Desktop `/api/v1/desktop/local-import` 的受信任文件选择器/预览/确认/取消逻辑为来源中立控制器，保留旧文件夹/CBZ `LocalLibraryIngestion`、原 SQLite 和进度，不重造功能。独立无源 CLI 也调用同一端口；物理 QA Core 的源码闭包门禁必须包含它。

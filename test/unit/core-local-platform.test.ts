@@ -38,8 +38,8 @@ describe('source-neutral Desktop local folder capabilities', () => {
             '', 'random', 'profile', '__proto__', 'constructor', 'toString',
             '../../etc', 'C:\\Windows', '/tmp', 'browser-lite-export'
         ]) {
-            expect(coreLocalDirectoryKind(kind)).toBe(false === (kind === 'browser-lite-export')
-                ? true : false)
+            expect(coreLocalDirectoryKind(kind))
+                .toBe(kind === 'browser-lite-export')
             expect(() => coreLocalDirectoryPath(kind, locations))
                 .toThrow('Unknown directory')
         }
@@ -72,7 +72,8 @@ describe('source-neutral Desktop local folder capabilities', () => {
         expect(await coreLocalPlatformExecute(
             'open-directory', host, { kind: 'logs' }
         )).toEqual({ status: 200, value: { success: true } })
-        expect(host.openDirectory).toHaveBeenCalledExactlyOnceWith('logs')
+        expect(host.openDirectory).toHaveBeenCalledTimes(1)
+        expect(host.openDirectory).toHaveBeenCalledWith('logs')
     })
     it('fails closed without a local host and propagates native selection/open failures', async () => {
         expect(await coreLocalPlatformExecute('choose-folder', null)).toMatchObject({

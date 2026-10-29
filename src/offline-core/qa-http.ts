@@ -203,7 +203,8 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         response.setHeader('content-security-policy',
             "default-src 'none'; script-src 'self'; style-src 'self'; " +
             "img-src 'self'; connect-src 'self'; base-uri 'none'; " +
-            "form-action 'none'; frame-ancestors 'none'")
+            (fullWeb ? "form-action 'self'; " : "form-action 'none'; ") +
+            "frame-ancestors 'none'")
         const ownPort = request.socket.localPort
         const origin = 'http://127.0.0.1:' + ownPort
         if (!ownPort || request.headers.host !== '127.0.0.1:' + ownPort ||

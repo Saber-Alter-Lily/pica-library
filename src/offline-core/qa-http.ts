@@ -127,7 +127,7 @@ function existingReaderMarkup(webRoot: string) {
 }
 function page(markup: string, csrf: string) {
     // csrf is random lowercase hexadecimal, never user-provided HTML.
-    return \`<!doctype html>
+    return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pica Library · Local Reader QA</title>
@@ -148,11 +148,11 @@ function page(markup: string, csrf: string) {
 <button id="qa-open" type="button">进入阅读</button>
 <p id="qa-library-status" role="status"></p>
 </section>
-\${markup}
+${markup}
 </main>
-<script id="offline-qa-bootstrap" type="application/json">{"csrf":"\${csrf}"}</script>
+<script id="offline-qa-bootstrap" type="application/json">{"csrf":"${csrf}"}</script>
 <script type="module" src="/offline-core-reader-qa.js"></script>
-</body></html>\`
+</body></html>`
 }
 export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
     url: string

@@ -9,8 +9,6 @@ import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
 import { PRODUCT_VERSION } from '../version'
 import { ProviderService } from '../services/provider-service'
-import { LibraryQueryService } from '../services/library-query-service'
-import { ShelfService } from '../services/shelf-service'
 import { RecommendationService } from '../services/recommendation-service'
 import { AdaptiveRecommendationSession } from '../recommendation-v3/adaptive-session'
 import { PreviewCacheManager } from '../services/preview-cache-manager'
@@ -22,7 +20,6 @@ import {
     VISUAL_SAMPLING_POLICY_VERSION,
     type VisualSamplingMode
 } from '../recommendation-v4/visual-style'
-import { ReaderService } from '../services/reader-service'
 import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from './core-catalog-read'
 import { coreBootstrapStatus, coreBootstrapAuthors, coreBootstrapCapabilities } from './core-bootstrap-read'
@@ -39,8 +36,8 @@ import { RANKER_ADAPTER_VERSION } from '../recommendation-v3/ranker-adapter-v3'
 import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 import { LocalHttpLatencyRegistry } from '../runtime/http-latency'
-import { LocalLibraryIngestion } from '../local-library/ingestion'
-import { CoreLocalImportController, coreLocalImportMatch, coreLocalImportReady } from './core-local-import'
+import { coreLocalImportMatch, coreLocalImportReady } from './core-local-import'
+import { createCoreLocalRuntime } from './core-runtime-composition'
 import { SourceDisabledError } from '../sources/source-policy'
 import { SourceHostError, type SourceHostInspection } from '../source-hosts/contract'
 import type { HostedLibraryReader } from '../source-hosts/library-reader'
@@ -262,14 +259,18 @@ export async function startLibraryServer(options: {
     cacheDir?: string
 }) {
     const root = webRoot()
-    const localImport = new CoreLocalImportController(
-        new LocalLibraryIngestion(options.database, options.service.dataDir)
-    )
+    // The existing Desktop and the physical no-source Core now instantiate
+    // the SAME original local library, shelf, Reader and import services.
+    // Only the trusted Desktop passes the native external-file opener.
+    const { localImport, libraryQueries, shelfService, readerService } =
+        createCoreLocalRuntime({
+            database: options.database,
+            dataDir: options.service.dataDir,
+            externalFileOpener: new ExternalReaderAdapter()
+        })
     const host = options.host ?? '127.0.0.1'
     const port = options.port ?? 4789
     const providerService = options.service.providerService()
-    const libraryQueries = new LibraryQueryService(options.database)
-    const shelfService = new ShelfService(options.database, libraryQueries)
     const recommendationService = new RecommendationService(
         options.database,
         (limit) => options.service.recommendations({ limit })
@@ -312,11 +313,6 @@ export async function startLibraryServer(options: {
             ),
             { maxBytes: 192 * 1024 * 1024, ttlMs: 6 * 60 * 60 * 1000 }
         )
-    )
-    const readerService = new ReaderService(
-        options.database,
-        options.service.dataDir,
-        new ExternalReaderAdapter()
     )
     const onlineReader = new OnlineReaderService(options.database, providerService,
         new PreviewCacheManager(path.join(options.cacheDir ?? options.service.dataDir, 'online-reader'), {

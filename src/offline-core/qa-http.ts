@@ -6,6 +6,8 @@ import http, {
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from '../library/core-catalog-read'
+import { coreShelfMatch, coreShelfExecute } from '../library/core-shelf-routes'
+import { ShelfService } from '../services/shelf-service'
 import { LibraryQueryService } from '../services/library-query-service'
 import type { LibraryFacetQuery } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
@@ -182,6 +184,7 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
     ]) requiredAsset(webRoot, asset)
 
     const libraryQueries = new LibraryQueryService(options.database)
+    const shelves = new ShelfService(options.database, libraryQueries)
     const secret = randomBytes(32).toString('hex')
     const csrf = randomBytes(32).toString('hex')
     const markup = existingReaderMarkup(webRoot)
@@ -230,6 +233,12 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         }
         if (!hasCookie(request, secret))
             return json(response, 403, { error: 'QA session missing' })
+        let shelfRoute: ReturnType<typeof coreShelfMatch>
+        try {
+            shelfRoute = coreShelfMatch(request.method ?? '', url.pathname)
+        } catch {
+            return json(response, 400, { error: 'Invalid shelf URL' })
+        }
         if (request.method === 'GET') {
             const asset = url.pathname.slice(1)
             if ((SCRIPT_ASSETS.has(asset) || STYLE_ASSETS.has(asset) ||
@@ -243,6 +252,16 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                 })
                 fs.createReadStream(file).pipe(response)
                 return
+            }
+            if (shelfRoute) {
+                try {
+                    return json(response, 200, coreShelfExecute(
+                        shelfRoute, shelves, {}, { localOnly: true }
+                    ))
+                } catch {
+                    return json(response, 400,
+                        { error: 'Invalid local shelf request' })
+                }
             }
             const catalogueRead = coreCatalogueGet(
                 url, options.database, { localOnly: true }
@@ -278,14 +297,27 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             }
             return json(response, 404, { error: 'No source routes in offline QA' })
         }
-        if (request.method !== 'POST' ||
+        if (!shelfRoute && (request.method !== 'POST' ||
             !['/api/v1/reader/progress', '/api/v1/library/query']
-                .includes(url.pathname))
+                .includes(url.pathname)))
             return json(response, 405, { error: 'Unsupported QA operation' })
         if (request.headers.origin !== origin ||
             !secureEqual(String(request.headers['x-pica-qa-csrf'] ?? ''), csrf))
             return json(response, 403, { error: 'QA CSRF rejected' })
         try {
+            if (shelfRoute) {
+                const input = shelfRoute.needsBody
+                    ? await readJsonObject(request) : {}
+                return json(response, 200, coreShelfExecute(
+                    shelfRoute, shelves, input, {
+                        localOnly: true,
+                        // All QA shelf mutations remain in the sentinel-owned
+                        // ephemeral SQLite. Never activate any provider.
+                        recordUserEvents: events =>
+                            options.database.recordUserEvents(events)
+                    }
+                ))
+            }
             if (url.pathname === '/api/v1/library/query') {
                 const input = await readJsonObject(request)
                 return json(response, 200, coreCatalogueQuery(
@@ -299,7 +331,7 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                 input.comicId, input.episodeId, input.pageIndex
             ))
         } catch {
-            return json(response, 400, { error: 'Invalid local QA progress' })
+            return json(response, 400, { error: 'Invalid local QA mutation' })
         }
     })
     server.requestTimeout = 10_000

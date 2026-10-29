@@ -100,6 +100,31 @@ describe('actual reading-panel JavaScript with inert DOM/query ports only', () =
         expect(f.openReader).not.toHaveBeenCalled()
     })
 
+    it('routes a saved legacy E-H catalogue item through its connected signed session', async () => {
+        const f = fixture()
+        const sessionId = '64d223e0-5d29-4320-babb-5a2da654d345'
+        f.query.mockResolvedValueOnce(response([{
+            ...book('Old E-H gallery'),
+            comicId: 'eh:123:abcdef1234',
+            source: { key: 'catalogue:eh', label: 'E-H / ExH' },
+            routes: [
+                { channel: 'online', available: false },
+                { channel: 'signed', available: true, sessionId,
+                    progress: { pageIndex: 2 } }
+            ]
+        }]))
+        await f.panel.refresh()
+        const signedButton = f.target.querySelectorAll('button').find(
+            element => element.textContent.startsWith('Read from signed source')
+        )!
+        expect(signedButton.disabled).toBe(false)
+        expect(signedButton.textContent).toContain('3')
+        await signedButton.click()
+        expect(f.openSigned).toHaveBeenCalledWith('eh:123:abcdef1234', sessionId)
+        expect(f.openReader).not.toHaveBeenCalled()
+        expect(f.openHosted).not.toHaveBeenCalled()
+    })
+
     it('keeps an already displayed local Read button usable after a failed refresh', async () => {
         const f = fixture(); await f.panel.refresh()
         const button = f.target.querySelectorAll('button').find(node => node.textContent.startsWith('Read locally'))!

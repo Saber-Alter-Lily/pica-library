@@ -12,6 +12,7 @@ import { installRuntimeChoice } from './runtime-choice.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { installLocalImport } from './local-import.js'
 import { installReadingLibrary } from './reading-library.js'
+import { isSignedReaderComicId } from './signed-reader-route.js'
 import { currentHostedLibrarySession, resumeHostedLibraryComic, currentHostedDownloadSession, queryHostedLocalDownloads, cancelHostedLocalDownload } from './host-library.js'
 import { installHostedDownloadProjection } from './host-downloads.js'
 import { readerKeyboardAction, readerPageIndex } from './reader-input.js'
@@ -3173,8 +3174,12 @@ function renderReaderChapterHeading() {
 async function openReaderComic(comicId, online = false, hosted = null, signed = null) {
     if (hosted && signed) return
     if (hosted && (!/^[0-9a-f-]{36}$/.test(hosted.sessionId || '') || !/^hosted:[0-9a-f-]{36}:[0-9a-f]{64}$/.test(comicId))) return
+    // The UI does not decide work ownership. It only rejects unsafe route
+    // syntax; the signed Desktop session and its trusted identity bridge do
+    // the authoritative validation. Legacy catalogue IDs may have 2 colons.
     if (signed && (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(signed.sessionId || '') ||
-        !/^[a-z][a-z0-9-]{2,31}:[A-Za-z0-9_-]{1,128}$/.test(comicId))) return
+        !isSignedReaderComicId(comicId)))
+        throw new Error('Invalid signed reading route')
     if (!hosted && !signed && String(comicId).startsWith('hosted:')) return
     const hostedSessionId = hosted?.sessionId || null
     const hostedCsrfToken = hosted?.csrfToken || null

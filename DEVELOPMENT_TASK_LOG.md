@@ -1,5 +1,11 @@
 # Pica Library Development Task Log
 
+## S3 PR #225｜修复 E-H 旧 ID 点击签名来源无反应（2026-10-28）
+
+- 实际发现 Web 入口 openReaderComic 的单冒号限制与已有 EhPublicIdentityBridge 保持旧 eh:gid:token 的计划矛盾：统一书库会显示已连接的签名阅读按钮，但点击旧作品 ID 静默返回。新增来源中立 Web signed-route 语法校验（两段/三段标识，无 URL、路径和 local/hosted），并将无效会话改为显式错误反馈。沿用唯一 Reader、既有 SignedSourceDesktopReader、独立 CSRF、同一数据库作品身份与保存进度。
+- 新增实际 AST 提取的 Web Reader 函数调用测试、已有 ReadingLibrary 真 DOM 模拟按钮点击回归和 Linux/Windows S3 CI 门禁。旧源码 1043285 的 [专项 #40811134919](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40811134919) 因新测试 TS18048 失败（两系统）；在 066f105f 修复。新源码 [专项 #40811216292](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40811216292) **SUCCESS**：Linux 125/125、Windows 99/99 和两系统类型检查通过；[完整 CI #40811220694](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40811220694) 尚待最终判定。
+- 详见 [签名旧 ID Web Reader 修复审计](docs/S3_SIGNED_LEGACY_WEB_ROUTE_20261028.md)；不合并 main/发布，G1–G4 保持开放，Android 纯核心、OS 隔离、真实来源签名分发与 v0.5.0 无痛升级尚未完成。
+
 ## S3 PR #224｜E-H worker 独立可重复构建与待签名清单（2026-10-28）
 
 - 基于 #223 新建 [Draft PR #224](https://github.com/Saber-Alter-Lily/pica-library/pull/224)，未发布、未合并 main。用项目已有 esbuild 构建真实 EhProvider 的可选 worker，内存生成固定入口、固定单文件、上限 1MiB 的未签名候选，CLI 只输出 SHA/大小/真实依赖清单，不发布 worker 或私钥。

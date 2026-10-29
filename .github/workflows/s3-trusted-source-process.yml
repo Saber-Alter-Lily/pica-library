@@ -8,6 +8,7 @@ on:
       - codex/s3-desktop-signed-reader-20261028
       - codex/s3-eh-public-reader-20261028
       - codex/s3-eh-worker-package-20261028
+      - codex/s3-reader-id-web-20261028
     paths:
       - '.github/workflows/s3-trusted-source-process.yml'
       - 'src/source-extensions/**'
@@ -25,6 +26,9 @@ on:
       - 'scripts/build-eh-public-worker-candidate.ts'
       - 'test/unit/reading-library.test.ts'
       - 'test/unit/reading-library-ui.test.ts'
+      - 'test/unit/signed-reader-web-routing.test.ts'
+      - 'web/signed-reader-route.js'
+      - 'web/signed-reader-route.d.ts'
       - 'test/unit/web-reader-progress.test.ts'
       - 'test/unit/module-dag-policy.test.ts'
       - 'test/unit/compiled-source-composition.test.ts'
@@ -67,6 +71,7 @@ jobs:
             test/unit/eh-public-worker-package.test.ts \
             test/unit/reading-library.test.ts \
             test/unit/reading-library-ui.test.ts \
+            test/unit/signed-reader-web-routing.test.ts \
             test/unit/web-reader-progress.test.ts \
             test/unit/external-reader-boundary.test.ts \
             test/unit/module-dag-policy.test.ts \
@@ -105,4 +110,4 @@ jobs:
       - name: Check actual Windows Node worker types
         run: pnpm type:check
       - name: Test pinned worker launch, IPC, revoke and timeout on Windows
-        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts test/unit/signed-worker-lifecycle.test.ts test/unit/signed-source-desktop-http.test.ts test/unit/eh-public-reader-migration.test.ts test/unit/eh-public-worker-ipc.test.ts test/unit/eh-public-worker-package.test.ts test/unit/reading-library.test.ts test/unit/reading-library-ui.test.ts test/unit/web-reader-progress.test.ts
+        run: pnpm exec vitest run test/unit/trusted-source-process.test.ts test/unit/signed-worker-lifecycle.test.ts test/unit/signed-source-desktop-http.test.ts test/unit/eh-public-reader-migration.test.ts test/unit/eh-public-worker-ipc.test.ts test/unit/eh-public-worker-package.test.ts test/unit/reading-library.test.ts test/unit/reading-library-ui.test.ts test/unit/signed-reader-web-routing.test.ts test/unit/web-reader-progress.test.ts

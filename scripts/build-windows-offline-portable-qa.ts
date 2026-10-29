@@ -66,21 +66,34 @@ const README = [
 function sha256(data: Uint8Array) {
     return createHash('sha256').update(data).digest('hex')
 }
-function checkedFile(file: string, limit: number) {
+function checkedFile(file: string, limit: number, allowHardlink = false) {
     if (!path.isAbsolute(file)) throw new Error('QA runtime input must be absolute')
     const info = fs.lstatSync(file)
-    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 ||
+    if (!info.isFile() || info.isSymbolicLink() ||
+        (!allowHardlink && info.nlink !== 1) ||
         info.size < 1 || info.size > limit)
-        throw new Error('Invalid or linked QA runtime input')
+        throw new Error('Unsafe QA file ' + JSON.stringify({
+            name: path.basename(file), bytes: info.size,
+            hardlinks: info.nlink, expectedMax: limit
+        }))
     return fs.readFileSync(file)
 }
 function admZipLicense() {
     const folder = fs.realpathSync.native(path.join(ROOT, 'node_modules', 'adm-zip'))
+    const metadata = JSON.parse(
+        checkedFile(path.join(folder, 'package.json'), 100_000, true).toString('utf8')
+    ) as { name?: unknown; license?: unknown }
+    if (metadata.name !== 'adm-zip' || metadata.license !== 'MIT')
+        throw new Error('Bundled AdmZip license metadata changed')
     const names = fs.readdirSync(folder).filter(name =>
         /^licen[sc]e(?:\..+)?$/i.test(name))
     if (names.length !== 1)
         throw new Error('AdmZip license requires manual inventory review')
-    return checkedFile(path.join(folder, names[0]), 1024 * 1024)
+    // pnpm intentionally hard-links audited package files into its virtual
+    // store. A hard-linked license inside the exactly verified ADM-Zip package
+    // is safe to COPY; this exception never applies to Node.exe, archive
+    // credentials, project files or an executable payload.
+    return checkedFile(path.join(folder, names[0]), 1024 * 1024, true)
 }
 
 export interface WindowsOfflinePortableInput {

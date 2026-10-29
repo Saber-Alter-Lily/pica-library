@@ -260,7 +260,7 @@ describe('actual Desktop update helper handoff preflight, no production migratio
         const source = fs.readFileSync('src/desktop/main.ts', 'utf8')
         expect(source).toContain('requireDesktopUpgradeQuiescence')
         expect(source).toMatch(/applyUpdate:[\s\S]{0,550}ownership: instance/)
-        expect(source).toMatch(/applyUpdate:[\s\S]{0,850}activeWorkLeases: \\([\\s\\S]{0,250}collectDesktopUpgradeWorkLeases/)
+        expect(source).toContain('activeWorkLeases: () => collectDesktopUpgradeWorkLeases(')
         expect(source).toContain('service?.quiesceLocalDownloads()')
         const preflight = fs.readFileSync(
             'src/desktop/update-quiescence.ts','utf8')

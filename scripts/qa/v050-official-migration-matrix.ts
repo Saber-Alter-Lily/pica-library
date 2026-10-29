@@ -71,7 +71,8 @@ function result(root: string, expectedStatus: string, reason?: string) {
     requireCondition(!JSON.stringify(gate).includes(root), 'PRIVATE_PATH_LEAK')
     return gate
 }
-function knownRows(db: InstanceType<typeof DatabaseSync>, version: number) {
+function knownRows(db: InstanceType<typeof DatabaseSync>, version: number,
+    seededAtVersion = version) {
     const row = (sql: string) => db.prepare(sql).get() as Record<string, unknown>
     const present = (table: string) => Boolean(db.prepare(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"
@@ -97,15 +98,15 @@ function knownRows(db: InstanceType<typeof DatabaseSync>, version: number) {
             Array<{integrity_check: string}>).every(x => x.integrity_check === 'ok') &&
         db.prepare('PRAGMA foreign_key_check').all().length === 0,
         'SQLITE_INTEGRITY_OR_FOREIGN_KEY')
-    if (version >= 6)
+    if (seededAtVersion >= 6)
         requireCondition(present('app_state') &&
             row("SELECT value_json FROM app_state WHERE key = 'history'")?.value_json ===
                 '{"synthetic":true}', 'APP_STATE_NOT_PRESERVED')
-    if (version >= 8)
+    if (seededAtVersion >= 8)
         requireCondition(present('user_events') &&
             row("SELECT event_type FROM user_events WHERE id='historical:event'")?.event_type
             === 'fixture', 'EVENT_NOT_PRESERVED')
-    if (version >= 12)
+    if (seededAtVersion >= 12)
         requireCondition(present('canonical_works') &&
             row("SELECT preferred_title FROM canonical_works WHERE id='historical:canonical'")?.preferred_title
             === 'Historical Synthetic Work', 'WORK_IDENTITY_NOT_PRESERVED')
@@ -241,7 +242,9 @@ async function main() {
             activePhase = 'VERIFY_UPGRADED_ROWS'
             const finalDb = readOnlyDb(dbFile)
             try {
-                const history = knownRows(finalDb,14)
+                // Only assert preserved rows that actually existed before
+                // the upgrade; schema 14 is independently verified by gate.
+                const history = knownRows(finalDb,14,version)
                 requireCondition(history[13]?.name ===
                     'post_v0411_index_bundle','TARGET_RELEASE_SCHEMA_NOT_REACHED')
             } finally { finalDb.close() }

@@ -1,5 +1,11 @@
 # Pica Library Development Task Log
 
+## S3 PR #232 补充回归｜旧批量事件静态门禁迁移（2026-10-29）
+
+- 在正式书架 HTTP 代码抽出后，[全项目 CI #40843755448](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40843755448) 发现旧 `test/unit/user-event-batch-p2d7b.test.ts` 将 `server.ts` 中 `const shelfItemsRoute` 作为固定代码截取起点，导致已移至 `core-shelf-routes.ts` 的实现被误判为缺失。**原生产 `recordUserEvents()` 本身仍调用**，且新增实际 HTTP 事件 spy 已通过；失败不是用户事件被删除。
+- 更新该旧回归：从 `if (isCoreShelfRoute(` 截取真实生产适配器，同时检查 `core-shelf-routes.ts` 明确返回 `shelf_add/shelf_remove`、`change.comicIds.map`、batch `recordUserEvents`、`shelfId` 元数据和旧数据库 BEGIN/COMMIT/ROLLBACK 事务；并纳入 S3 Linux+Windows 专项，不跳过测试或恢复旧耦合结构。
+- 修复代码最终精确 SHA **37b05c44d421ca6ac270056cf56b30a0612dd83e**，[新 S3 #40844313896](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40844313896) 已通过 **Linux 60/60 和 Windows 60/60**，真实 Chromium 正在验收；[新全项目 CI #40844319505](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40844319505) 登记时仍运行中，**NOT_VERIFIED**。此前 [Windows ZIP #40843746744](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40843746744) 验证通过。G1–G4 保持 OPEN，正式 main/v0.5.0/OTA 未修改。
+
 ## S3 PR #232｜正式 ShelfService HTTP 与行为事件脱离 ProviderService（2026-10-29）
 
 - 继 #231 的正式 Catalogue 端口后，新建 [Draft PR #232](https://github.com/Saber-Alter-Lily/pica-library/pull/232)：从实际 `src/library/server.ts` 抽出全部旧书架 CRUD/加入/移除/筛选加入操作到 `src/library/core-shelf-routes.ts`，仍只使用原 ShelfService/LibraryQueryService，旧路由和返回形状不变。生产在适配端继续调用 `recordUserEvents`，保留 `shelf_add/shelf_remove`、shelfId、appSessionId/contextId 的真实事件负载，不影响推荐行为证据。

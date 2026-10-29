@@ -31,3 +31,9 @@
 | G1/G2/G3/G4 正式关口 | **全部 OPEN** |
 
 **下一主线切口**：继续直接抽离当前正式 Server 的本地导入、设备设置、WebDAV 与安全配置相关核心 HTTP 端口，减少 `LibraryService` 对完整浏览器 UI 的启动依赖。不要制作第二套数据库、Reader 或仅用于展示的新 QA 页面。可信来源生产签名、OS 保护根、Android 对等机制和老用户升级需独立逐项验收，不能依赖单机同用户 Node 子进程冒充沙箱。
+
+## 追加回归证据（2026-10-29）
+
+旧全项目 CI [#40843755448](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40843755448) 仅在 `user-event-batch-p2d7b` 的静态源码定位检查失败：它要求旧 Server 出现 `const shelfItemsRoute`，该位置已被共用业务路由取代，因而无法读取后续 `recordUserEvents`。这不是实际用户行为事件丢失；已由原 Desktop HTTP 的真实事件 spy 测试验证事件不变。
+
+精确源码 `37b05c44d421ca6ac270056cf56b30a0612dd83e` 更新旧测试以识别 `isCoreShelfRoute` 与独立 `core-shelf-routes.ts` 的事件模型，同时强制验证 `recordUserEvents(change.comicIds.map(...))`、`shelf_add/shelf_remove` 和数据库单事务完整性。修复后的 [S3 专项 #40844313896](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40844313896) Linux **60/60**、Windows **60/60** PASS；真实浏览器和 [Android/Web 全 CI #40844319505](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40844319505) 登记时仍运行中，不能提前认定整体通过。所有失败历史保留，未回退模块化，也未修改正式版用户资料。

@@ -105,6 +105,61 @@ describe('local import HTTP and paired Reader boundary', () => {
         const imported = await post('confirm', { token: preview.token }).then(
             (r) => r.json()
         )
+        // Exercise the PRODUCTION HTTP server after its shelf route was
+        // extracted into the same neutral core controller. Old event
+        // attribution must survive, not merely the direct ShelfService calls.
+        const createShelf = await fetch(server.url + '/api/v1/shelves', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                origin: server.url
+            },
+            body: JSON.stringify({ name: 'Read locally' })
+        })
+        expect(createShelf.status).toBe(200)
+        const shelf = await createShelf.json() as { id: string; name: string }
+        expect(shelf.name).toBe('Read locally')
+        const shelfUrl = server.url + '/api/v1/shelves/' + shelf.id
+        const member = await fetch(shelfUrl + '/items', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                origin: server.url,
+                'x-pica-app-session': 'production-shelf-http',
+                'x-pica-context-id': 'local-reader-session'
+            },
+            body: JSON.stringify({ comicIds: [imported.comicId] })
+        })
+        expect(member.status).toBe(200)
+        expect(await member.json()).toMatchObject({ added: 1, total: 1 })
+        expect((await (await fetch(shelfUrl)).json() as any).items)
+            .toMatchObject([{ comicId: imported.comicId }])
+        expect(db.listUserEvents({ eventType: 'shelf_add' })).toMatchObject([{
+            comicId: imported.comicId, source: 'shelf',
+            appSessionId: 'production-shelf-http',
+            contextId: 'local-reader-session'
+        }])
+        const shelfRemoved = await fetch(shelfUrl + '/remove', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                origin: server.url
+            },
+            body: JSON.stringify({ comicIds: [imported.comicId] })
+        })
+        expect(shelfRemoved.status).toBe(200)
+        expect((await shelfRemoved.json() as any).removed).toBe(1)
+        expect(db.listUserEvents({ eventType: 'shelf_remove' }))
+            .toMatchObject([{ comicId: imported.comicId, source: 'shelf' }])
+        const shelfDeleted = await fetch(shelfUrl, {
+            method: 'DELETE', headers: { origin: server.url }
+        })
+        expect(shelfDeleted.status).toBe(200)
+        expect((await shelfDeleted.json() as any).deleted).toBe(true)
+        // The source-free shelf refactor must preserve the original import,
+        // files and local Reader despite membership changes.
+        expect(db.getComic(imported.comicId)?.providerId).toBe('local')
+
         const id = encodeURIComponent(imported.comicId)
         const cover = await fetch(server.url + '/api/v1/covers/' + id)
         expect(cover.headers.get('cache-control')).toBe('private, no-store')

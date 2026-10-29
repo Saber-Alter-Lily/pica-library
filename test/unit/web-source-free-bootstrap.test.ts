@@ -80,7 +80,7 @@ function simulateDetect(capabilities: Capabilities | null) {
             ehAccount: { configured: false } };
         let activeView = 'home';
         return (${actualFunction('detect')});
-    `) as (context: typeof context) => () => Promise<void>
+    `) as (injected: typeof context) => () => Promise<void>
     return {
         run: factory(context), requests, posts,
         state, nodes, queries, render, recommendationFeedback
@@ -142,7 +142,7 @@ describe('real full Web application source-free bootstrap gate', () => {
                 run: (${actualFunction('loadDesktop')}),
                 getDesktop: () => desktop
             };
-        `) as (state: typeof state, api: typeof api) => {
+        `) as (injectedState: typeof state, invokeApi: typeof api) => {
             run(): Promise<void>
             getDesktop(): unknown
         }

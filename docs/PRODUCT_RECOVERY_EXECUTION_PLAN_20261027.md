@@ -1,5 +1,20 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+
+### 2026-10-29 CORE-LIB-04c-02b-02｜双平台备份与回滚最终门禁
+
+- [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 精确可执行/测试代码 `87a20359396f67ba30b54f39c1e8958ee4760569` 的 [Linux/Windows 专项 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) **SUCCESS**、[Android/Web/Desktop 完整 #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471) **SUCCESS**；所有测试仅使用合成 OS Temp profile，没有真实用户数据、发布或 OTA 变更。真实 v0.5.0 Release 中 migrations.ts、desktop/paths.ts blob 与当前一致，其他 Desktop 类型/配置存在演进，不能据此宣布实际历史 profile 迁移通过。
+- 下一切口 **04c-02b-03**：收集官方 v0.5.0 release 的只读、可复现结构证据及用户配置边缘形态，完成 SQLite/媒体完整事务冻结、可信独立备份/加密/签名、恢复失败注入和外置目录选择，再进行升级助手与实际旧版本用户资料隔离验收。G1–G4 仍 OPEN。
+
+## 2026-10-29 S3 CORE-LIB-04c-02b-02｜v0.5.0 WAL 一致性备份/回滚演练（仅合成临时资料）
+
+- [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 只在显式 `OS Temp/pica-v050-rollback-qa-*` sentinel 中运行；新增 `legacy-profile-snapshot-qa.ts`，使用**项目现有 Node 24** `node:sqlite.backup`，使未 checkpoint 的 WAL 提交记录进入独立 SQLite 备份。无 WAL 时 immutable readonly 连接不应新建原始 sidecar。原 DB/WAL 的 SHA 在备份前后核实；目标数据库转 `journal_mode=DELETE` 后执行完整 `PRAGMA integrity_check`。
+- 同一合成测试文件树覆盖旧版配置、书架/阅读状态/下载页、虚拟不透明账号文件、WebDAV、画风/偏好、packs 与缓存。排除运行锁/日志/升级助手；所有备份使用原本地业务文件，不复制实现新 Reader。逐文件 SHA/尺寸、零字节保留、禁止软链接/覆盖或跨源根；校验完 manifest 及全部输入才向全新的 `restored/` 演练回滚，始终保留旧 `profile/`。
+- 首次 CI 发现 Vite5 的 `node:sqlite` import 需要旧项目的 `createRequire` 桥，第二轮发现可能产生空 WAL sidecar，均按严谨门禁修复。基础版本 [双平台 #40895318054](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895318054) 2/2 SUCCESS；硬化后精确 [双平台 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) 和 [全 CI #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471) 写入时仍待最后判定。
+- 明确 `crossFileAtomicityProven:false`：SQLite 备份自身可一致，但用户全部媒体/下载目录与 DB 的统一事务、真实 v0.5.0 Schema、DPAPI 生产密钥、加密备份/恢复、外置书库以及原地升级失败回滚**仍未验收**，不能用合成备份直接升级用户。下一步 04c-02b-03 做真实历史资格/兼容/恢复契约，再决定正式迁移与一键升级、Android 原生核心和可信来源插件。G1–G4 仍 OPEN；禁止 main merge / Release / OTA。[详见审计](S3_V050_WAL_SNAPSHOT_ROLLBACK_QA_20261029.md)。
+
+---
+
 ## 2026-10-29 S3 CORE-LIB-04c-02a｜无源 Desktop 独立二进制与原生 Launcher 路由
 
 - [Draft #241](https://github.com/Saber-Alter-Lily/pica-library/pull/241)：用旧 createCoreLocalRuntime/Reader/SQLite/原完整 Web、InstanceLock，独立打包 desktop-core-preview.mjs；静态物理依赖只允许本地服务和原单实例组件，禁止具体漫画源 SDK/Provider/Host。原 C# Launcher 保留默认旧 desktop.js，仅明确 --source-free-preview 才选择独立可执行，且必须使用显式授权、OS Temp owned sentinel 的资料目录。没有修改任何真实旧版本用户数据。

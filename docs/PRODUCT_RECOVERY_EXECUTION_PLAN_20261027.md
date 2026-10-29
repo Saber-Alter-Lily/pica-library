@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 续进｜Windows x64 官方 Node＋纯核心 ZIP 实体打包验收
+
+- [Draft PR #230](https://github.com/Saber-Alter-Lily/pica-library/pull/230)：首次把独立 `core.mjs` + 10 Reader 资源和 **Node 24.15.0 Windows x64 官方运行时**组装成临时完整 Portable ZIP，附 Node/AdmZip/project 许可证、21 条目闭包、逐文件 SHA-256 和明确的 QA 启动器；真实下载运行时 ZIP 并按官方 SHASUMS256 + 额外固定 SHA256 `cc5149...` 双重确认。
+- 精确源码 `0ca6f6e8` 的 [Windows 实际 ZIP＋CMD 启动 #40838638638](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838638638) **SUCCESS**：从 ZIP 解压包启动随包 Node/`.cmd`，HTTP 会话与 CSRF、图片读取、本地导入、进度在临时子进程树退出后重启恢复；完整 ZIP 在 CI 删除，只上传 1 天元数据，非正式用户安装包。
+- **G2/G3/G4 仍 OPEN**：QA 包只含本地阅读，而不是完整版 Windows 首页、推荐、书库管理和升级器；旧正式 Windows/Android 主程序仍含来源 SDK。生产签名/OS 保护目录、真实旧 v0.5.0 数据迁移、Android Binder、终端 UI/升级全验收均未做。下一阶段必须围绕**正式完整 Web/Windows UI 与来源业务服务解耦**，不能继续以 QA 小功能包代替正式主线。见 [完整 Windows Portable 审计](S3_WINDOWS_OFFLINE_PORTABLE_QA_20261029.md)。
+
+---
 ## 2026-10-28 S3 续进｜QA Reader 资产不再依赖 Git 工作目录
 
 - [Draft PR #229](https://github.com/Saber-Alter-Lily/pica-library/pull/229) 实现从现有正式 Web DOM 提取原 Reader 片段、9 个已审计 JS/CSS/图片资源的独立临时装配，拒绝复制整个首页、账号/来源和推荐脚本，计算 SHA-256 并可回读；纯 Core HTTP 和 Chromium 改从 `core.mjs` 旁的资源运行，不再要求源码仓库作为运行 CWD。

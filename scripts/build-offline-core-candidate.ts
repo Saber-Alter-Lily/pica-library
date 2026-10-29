@@ -20,7 +20,9 @@ const REQUIRE_SOURCE = [
     'src/services/reader-service.ts',
     'src/reader/local-http-read.ts',
     'src/library/core-catalog-read.ts',
+    'src/library/core-shelf-routes.ts',
     'src/services/library-query-service.ts',
+    'src/services/shelf-service.ts',
     'src/offline-core/qa-http.ts'
 ]
 const PROHIBITED = [

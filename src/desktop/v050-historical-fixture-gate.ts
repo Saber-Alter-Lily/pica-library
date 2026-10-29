@@ -216,7 +216,15 @@ export function qualifyV050HistoricalFixtureReadOnly(
 
         // Compare the *lexical* reference before any stat/realpath/open. Never
         // even inspect a custom/external library until there is separate consent.
-        if (path.resolve(config.libraryDirectory) !== data)
+        // The Windows temp fixture can differ by drive/directory case after
+        // fs.realpathSync.native(), while referring to the same lexical path.
+        // This comparison never probes the supplied external path. The
+        // explicitly created data/ directory was already realpath-verified.
+        const configured = path.resolve(config.libraryDirectory)
+        const sameLexicalLocation = process.platform === 'win32'
+            ? configured.toLowerCase() === data.toLowerCase()
+            : configured === data
+        if (!sameLexicalLocation)
             return deny('REVIEW_REQUIRED', 'LIBRARY_REFERENCE_REQUIRES_CONSENT')
 
         const databaseFile = path.join(data, 'library.db')

@@ -3,6 +3,14 @@
 
 ### 2026-10-29｜CORE-LIB-04c-02c-01｜真实 Desktop 更新入口的活动/锁所有权门禁（Draft #247）
 
+#### 2026-10-29 追加工程审计｜原 idle-browser 任务占用表不足以证明更新安全
+
+- 复查真实 `LibraryService.runtimeTaskDiagnostics()` 发现维护更新/修复、书库整理、Recommendation V5 shadow 和 Work Identity 证据刷新不一定出现在原 `activeDesktopWorkLeases()` 的专有条目中，且 `RuntimeResourceCoordinator.waiting` 可能存在未获 lease 的待运行写任务。继续只用旧列表将出现**漏判**。
+- 将原 Collector 与服务已有完整任务诊断 + 活动及等待资源快照合并到同一纯函数 `collectDesktopUpgradeWorkLeases`，并在原 `main.ts` update handler 接线。拒绝 active/waiting/running/pausing/paused/cancelling/unknown 状态及无效诊断；`failed` 仅在不活跃且未持资源时视为已终止，避免一个历史失败任务永久阻止正常升级。不新造任务存储系统；UI 只返回统一错误，不泄漏任务名称和隐私。
+- 新增真实任务诊断和资源队列的回归测试，期间修正了一次夹具 TypeScript readonly 参数及断言括号错误。**这属于真实功能代码更新，前述 `eb61cd748` 57/57 绿色结果不能代表最新版本。** 最新精确业务/测试源码为 `572d6758bf95d21c58244123b23bf43e290d5e59`，其 [Linux/Windows 专项 #40975511400](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975511400) 与 [完整 Android/Web/Desktop CI #40975519327](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975519327) **待实际终态验证**。所有 PR 仍 Draft，G1–G4 OPEN。
+
+
+
 - 新建 [Draft #247](https://github.com/Saber-Alter-Lily/pica-library/pull/247)，基于 #246；不是 main/Release/OTA。此前 #246 完整 Android/Web/Desktop [CI #40922712429](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922712429) 已核实 Android + Web/Desktop **SUCCESS**，补齐上一轮未完成的报告状态。
 - **改动原应用而非 QA 小产品**：增加 `src/desktop/update-quiescence.ts`，要求真实 `InstanceLock.assertHeld()` 先后两次通过、实际 Desktop engine/database/service 就绪、非停止状态、原 `activeDesktopWorkLeases()` 返回零活动任务。下载、本地书库操作、远端同步、来源检查、推荐/收藏同步、移动配对、资源租约等仍使用**原来用于自动退出判断的同一批业务状态**，不额外发明进程扫描器或第二套任务队列。
 - 修改原 `src/desktop/update-command.ts` 增加可选同步预检，在旧 `UpdateManager.apply` 及 helper startup **之前**拒绝活跃任务，拒绝情况下不启动 helper、不触发延迟退出；原去重/ACK/超时逻辑保留。原正式 `src/desktop/main.ts` 的 `applyUpdate` 现真实绑定此门禁，未改正常 Reader/Provider 行为。

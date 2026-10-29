@@ -101,7 +101,9 @@ export function coreCatalogueGet(
 }
 
 /** Strict QA policy. The production server invokes the original query unchanged. */
-export function offlineLocalFacetQuery(input: unknown): LibraryFacetQuery {
+export function offlineLocalFacetQuery(
+    input: unknown, maxLimit: 100 | 5000 = 100
+): LibraryFacetQuery {
     if (!input || typeof input !== 'object' || Array.isArray(input))
         throw new Error('Invalid local catalogue query')
     const data = input as Record<string, unknown>
@@ -125,7 +127,7 @@ export function offlineLocalFacetQuery(input: unknown): LibraryFacetQuery {
         data.download !== undefined && !downloads.has(String(data.download)) ||
         data.sort !== undefined && !sortModes.has(String(data.sort)) ||
         data.limit !== undefined && (!Number.isSafeInteger(data.limit) ||
-            Number(data.limit) < 1 || Number(data.limit) > 100) ||
+            Number(data.limit) < 1 || Number(data.limit) > maxLimit) ||
         data.offset !== undefined && (!Number.isSafeInteger(data.offset) ||
             Number(data.offset) < 0 || Number(data.offset) > 5000) ||
         data.providerIds !== undefined &&
@@ -143,9 +145,11 @@ export function offlineLocalFacetQuery(input: unknown): LibraryFacetQuery {
 export function coreCatalogueQuery(
     input: LibraryFacetQuery,
     queries: CoreFacetsPort,
-    options: { localOnly?: boolean } = {}
+    options: { localOnly?: boolean; fullWebQa?: boolean } = {}
 ) {
     return queries.query(
-        options.localOnly ? offlineLocalFacetQuery(input) : input
+        options.localOnly
+            ? offlineLocalFacetQuery(input, options.fullWebQa ? 5000 : 100)
+            : input
     )
 }

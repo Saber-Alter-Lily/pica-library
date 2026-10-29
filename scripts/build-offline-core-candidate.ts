@@ -17,7 +17,8 @@ const REQUIRE_SOURCE = [
     ENTRY,
     'src/library/database.ts',
     'src/local-library/ingestion.ts',
-    'src/services/reader-service.ts'
+    'src/services/reader-service.ts',
+    'src/reader/local-http-read.ts'
 ]
 const PROHIBITED = [
     /^src\/sdk(?:\/|\.ts$)/,

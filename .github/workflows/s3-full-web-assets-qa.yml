@@ -1,0 +1,46 @@
+name: S3 actual original full Web source-neutral assets QA (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s3-full-web-assets-20261029
+    paths:
+      - '.github/workflows/s3-full-web-assets-qa.yml'
+      - 'scripts/stage-offline-full-web-qa.ts'
+      - 'test/unit/offline-full-web-asset-stage.test.ts'
+      - 'src/offline-core/**'
+      - 'web/**'
+      - 'test/unit/offline-full-web-http.test.ts'
+      - 'test/e2e/offline-full-web.spec.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-original-full-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-original-html-assets:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck existing full app, core and original Web assets
+        run: pnpm type:check
+      - name: Reproduce protected full HTML and audited module import graph
+        run: pnpm exec vitest run test/unit/offline-full-web-asset-stage.test.ts

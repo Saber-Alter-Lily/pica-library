@@ -25,6 +25,12 @@ const SOURCES_EXCLUDED = new Set([
     'alpha8-update-ui.js', 'onboarding-v1.js',
     'vendor/qrcode.min.js', 'vendor/driverjs/driver.js.iife.js'
 ])
+// Host library is already imported by the real app.js, but must not run a
+// second independent top-level initializer in the core-only browser. Preserve
+// its shared UI functions via the original app.js dependency graph.
+const OPTIONAL_TOP_LEVEL_EXCLUDED = new Set([
+    ...SOURCES_EXCLUDED, 'host-library.js', 'ecosystem-pack-v1.js'
+])
 // This is a deliberately small set of ORIGINAL top-level UI entrypoints.
 // app.js' own static/dynamic dependency closure is discovered, not guessed.
 export const FULL_WEB_CORE_ENTRIES = Object.freeze([
@@ -100,7 +106,7 @@ function fullHtml(source: Buffer) {
             scripts.push(file)
             return tag
         }
-        if (!SOURCES_EXCLUDED.has(file))
+        if (!OPTIONAL_TOP_LEVEL_EXCLUDED.has(file))
             throw new Error('New unreviewed full Web top-level script: ' + file)
         return ''
     })

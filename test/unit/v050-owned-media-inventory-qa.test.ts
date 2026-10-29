@@ -90,7 +90,11 @@ describe('v0.5 synthetic owned media inventory — no source files read/written'
             mediaFileCount:2,
             referencedDownloadedPictures:1,
             metadataTotalBytes:f.mediaBytes.length +
-                Buffer.byteLength('SYNTHETIC_COVER')
+                Buffer.byteLength('SYNTHETIC_COVER'),
+            // Original LibraryDatabase owns its pre-migration SQLite backup.
+            // It must be tracked as auxiliary DB data, never as comic media.
+            auxiliarySqliteBackupFileCount:1,
+            auxiliarySqliteBackupBytes:expect.any(Number)
         })
         expect(fs.readFileSync(f.mediaFile)).toEqual(before)
         expect(JSON.stringify(result)).not.toContain(f.sandbox)

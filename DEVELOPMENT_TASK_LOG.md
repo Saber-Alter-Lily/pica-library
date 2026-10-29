@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+## S3 PR #224｜E-H worker 独立可重复构建与待签名清单（2026-10-28）
+
+- 基于 #223 新建 [Draft PR #224](https://github.com/Saber-Alter-Lily/pica-library/pull/224)，未发布、未合并 main。用项目已有 esbuild 构建真实 EhProvider 的可选 worker，内存生成固定入口、固定单文件、上限 1MiB 的未签名候选，CLI 只输出 SHA/大小/真实依赖清单，不发布 worker 或私钥。
+- 严格 9 文件源码 allowlist 与 Node 内置依赖约束，阻止未经审计的具体 SDK/第三方代码被悄悄带入。回归实际做两次字节确定性检查、临时 Ed25519 验签安装前拒绝、签名后默认禁用、字节变更拒绝；模块 DAG 明确证明可选 worker 没有进入默认 Desktop/Reader，同时旧 Desktop 仍然含 EhProvider（NEW-SRC-01/G2 未通过）。
+- 精确代码 70521297 的 [S3 双平台专项 #40810352619](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40810352619) **SUCCESS**：Linux 98/98、Windows 72/72，双系统 TypeScript PASS。完整 [CI #40810412798](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40810412798) 记录时尚未结束，不可提前认定全绿。
+- 不含可安装签名来源包、真实站点联网、账号/下载、Android Binder、Windows OS 沙箱/生产信任根、纯 Core 物理拆包、v0.5.0 原地升级/回滚和真机验收。G1–G4 均继续开放。详细审计见 [S3-EH-PKG 说明](docs/S3_EH_UNSIGNED_CANDIDATE_20261028.md)。
+
 ## S3 PR #223｜E-H 真实来源协议独立进程首片（2026-10-28）
 
 - 新建 [Draft PR #223](https://github.com/Saber-Alter-Lily/pica-library/pull/223)，叠加 #222 而不合并正式 main。复用原有 EhProvider，抽出匿名公开的真实来源解析，在可选工作进程执行，旧 eh:gid:token 身份和旧书库记录不改，原 Reader 复用而非复制。新增可选 identity bridge、HMAC 页面 token、受限 IPC 和签名 CJS worker。

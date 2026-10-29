@@ -1,5 +1,20 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### CORE-LIB-04b-01 完整回归纠正（2026-10-29）
+
+- 旧完整 CI [#40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) 暴露原 `reading-library-shell` 失败：有 Desktop status，但 caps 失败时不应通过第二次请求尝试取得权限。精确 `a40d8e82` 修复状态区分，无源 Core 缺失 Desktop host 仍可恢复正确 caps。专项加入该历史安全回归，不削弱原有限制。
+- 新精确代码/门禁 `94a4221aecf01ce7ac1656db2a7e6a055b219dac`，新 [S3 双平台 #40861065013](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861065013)、[全 Android/Web/Desktop CI #40861072267](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861072267) 本段撰写时 **QUEUED，尚未验收**。当前计划不推进 main、Release/OTA。
+- 后续继续 CORE-LIB-04b-02 原完整 `web/index.html` / 全资源 / 真 Chromium 无源启用，而后 CORE-LIB-04c 生产服务强制 Provider 构造拆分。G1–G4 全部 OPEN。
+
+
+## 2026-10-29 CORE-LIB-04b-01｜原正式 Web app 在纯 Core 能力下安全初始化
+
+- [Draft #238](https://github.com/Saber-Alter-Lily/pica-library/pull/238) 真正修原 `web/app.js` `loadDesktop/detect`：无 `desktop/status` 时仍可读已有 source-free `/capabilities`；明确禁用 `recommendationSessions` 的后端，保留原本地漫画列表/作者/分面与 `renderAll`，不再主动获取在线推荐反馈、session 或发起构建；旧有正常 Desktop 不受影响。中英日翻译完善。未创建另一套前端。
+- 实际 AST 提取的**生产函数**正负模式单元运行测试，Linux/Windows 专项首轮 TS2502 测试类型失败已修复，修后 [#40860567748](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860567748) **SUCCESS**；全 Android/Web/Desktop [#40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) 仍待确认。
+- 进入 **CORE-LIB-04b-02**：原正式 `index.html/app.js` 全量资源/import 图核查并受控装配，实际 Core-only 本机 HTTP 加载**完整旧首页**，真实 Chromium/Windows Portable 进行书库、书架、Reader、设置和 WebDAV 适配测试；不可用在线源/推荐 UI 必须显式禁用并保留数据。04c 再从正式 `desktop/main.ts`/server 移除 `LibraryService/ProviderService` 强制构造，后续 Android 纯核心、可信来源签名与升级撤销、v0.5.0 真实迁移和 G1–G4 最终用户验收依旧 OPEN。详见 [完整审计](S3_FULL_WEB_SOURCE_FREE_BOOTSTRAP_20261029.md)。
+
+---
+
 ## 2026-10-29 S3 CORE-LIB-04a｜旧正式 Windows UI 启动基础接口开始迁入无源核心
 
 - 新 [Draft #237](https://github.com/Saber-Alter-Lily/pica-library/pull/237)：真实旧 `src/library/server.ts` 的 `GET /status`、`GET /authors`、`GET /capabilities` 三项 API 改为来源无关 `coreBootstrapRead`，**旧生产 Provider 完整状态/历史字段保持不变**；独立无源实体 Core 使用同一 API，但明确关闭根本不存在的站点来源/收藏修改/在线推荐能力，仍需持有本机随机 QA 会话 Cookie 才可访问。

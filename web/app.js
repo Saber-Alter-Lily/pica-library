@@ -811,8 +811,10 @@ function closeDesktopBrowserSession() {
 
 async function loadDesktop() {
     const settingsVersion = readerSettingsEditVersion
+    let desktopHostReached = false
     try {
         desktop = await api('/api/v1/desktop/status')
+        desktopHostReached = true
         state.capabilities = await api('/api/v1/capabilities')
         document.dispatchEvent(new Event('pica-local-import-refresh'))
         $('#settings-nav').hidden = false
@@ -840,6 +842,18 @@ async function loadDesktop() {
         }
     } catch {
         desktop = null
+        // An existing Desktop host with a failed capabilities request must
+        // stay fail-closed and must not retry or partially advertise features.
+        // Only a missing Desktop host can fall back to the source-free core's
+        // independent capabilities endpoint.
+        state.capabilities = null
+        if (!desktopHostReached) {
+            try {
+                state.capabilities = await api('/api/v1/capabilities')
+            } catch {
+                state.capabilities = null
+            }
+        }
     }
 }
 
@@ -5332,7 +5346,13 @@ async function detect() {
     try {
         const status = await api('/api/v1/status')
         state.mode = 'connected'
-        await loadRecommendationFeedback()
+        // An explicit false capability is authoritative: do not request
+        // provider recommendation feedback from a source-free core. Unknown
+        // legacy capabilities preserve the existing Desktop behavior.
+        const recommendationSessionsAvailable =
+            state.capabilities?.features?.recommendationSessions !== false
+        if (recommendationSessionsAvailable)
+            await loadRecommendationFeedback()
         $('#mode').textContent = t('mode.connected')
         state.records = await api('/api/v1/comics?limit=5000')
         state.authors = await api('/api/v1/authors')
@@ -5345,27 +5365,34 @@ async function detect() {
             offset: 0
         })
         renderAll(status.summary)
-        let recommendation = await api(
-            '/api/v1/recommendation-sessions/status?mode=final'
-        )
-        const autoOnlineRecommendation = !desktop || desktop.picaAccount?.configured !== false || desktop.ehAccount?.configured === true
-        if (!recommendation.activeCycleId && !recommendation.buildingCycleId && autoOnlineRecommendation) {
-            recommendation = await post('/api/v1/recommendation-sessions', {
-                engine: 'v3',
-                action: 'resume_or_create',
-                requestId: recommendationRequestId('initial'),
-                appSessionId: state.appSessionId
-            })
-        }
-        if (recommendation.activeCycleId) {
-            const current = await post('/api/v1/recommendations', {
-                action: 'current',
-                appSessionId: state.appSessionId
-            })
-            applyManagedRecommendationBatch(current)
-            if (state.recommendations.length) renderPreparedRecommendations()
-        } else if (recommendation.buildingCycleId) {
-            $('#recommend-message').textContent = t('recommend.preparing')
+        if (!recommendationSessionsAvailable) {
+            // The same production UI can display an owned local catalogue,
+            // authors and shelves without manufacturing a recommendation
+            // session or showing a spurious "optional module failed" warning.
+            $('#recommend-message').textContent = t('message.coreOnlyRecommendations')
+        } else {
+            let recommendation = await api(
+                '/api/v1/recommendation-sessions/status?mode=final'
+            )
+            const autoOnlineRecommendation = !desktop || desktop.picaAccount?.configured !== false || desktop.ehAccount?.configured === true
+            if (!recommendation.activeCycleId && !recommendation.buildingCycleId && autoOnlineRecommendation) {
+                recommendation = await post('/api/v1/recommendation-sessions', {
+                    engine: 'v3',
+                    action: 'resume_or_create',
+                    requestId: recommendationRequestId('initial'),
+                    appSessionId: state.appSessionId
+                })
+            }
+            if (recommendation.activeCycleId) {
+                const current = await post('/api/v1/recommendations', {
+                    action: 'current',
+                    appSessionId: state.appSessionId
+                })
+                applyManagedRecommendationBatch(current)
+                if (state.recommendations.length) renderPreparedRecommendations()
+            } else if (recommendation.buildingCycleId) {
+                $('#recommend-message').textContent = t('recommend.preparing')
+            }
         }
     } catch (error) {
         if (await ensureConnectedEngine(true)) {

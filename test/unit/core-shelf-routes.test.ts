@@ -1,8 +1,11 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
+import { LibraryService } from '../../src/library/service'
+import { startLibraryServer } from '../../src/library/server'
+import { enabledFixtureSources } from '../helpers/source-runtime-fixture'
 import { LocalLibraryIngestion } from '../../src/local-library/ingestion'
 import { LibraryQueryService } from '../../src/services/library-query-service'
 import { ShelfService } from '../../src/services/shelf-service'
@@ -119,6 +122,66 @@ describe('actual Desktop shelf CRUD now a reusable source-neutral core route', (
                 {}, f.shelves, true)).toThrow('Invalid local shelf ID')
         } finally { f.close() }
     })
+    it('executes actual preexisting Desktop HTTP shelf routes and preserves recommendation behavior-event payload', async () => {
+        const f = await fixture()
+        const service = new LibraryService(
+            f.db, path.dirname(f.db.file), undefined, undefined, undefined,
+            enabledFixtureSources()
+        )
+        service.sources.apply({ schemaVersion: 1, revision: 1, enabled: [] })
+        const recorded = vi.spyOn(f.db, 'recordUserEvents')
+        const server = await startLibraryServer({
+            database: f.db, service, port: 0
+        })
+        try {
+            const session = '64d223e0-5d29-4320-babb-5a2da654d345'
+            const context = 's3-test-shelf-context'
+            const post = async (url: string, input: unknown) => {
+                const response = await fetch(server.url + url, {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json',
+                        origin: server.url,
+                        'x-pica-app-session': session,
+                        'x-pica-context-id': context
+                    },
+                    body: JSON.stringify(input)
+                })
+                expect(response.status).toBe(200)
+                return response.json() as Promise<any>
+            }
+            const shelf = await post('/api/v1/shelves', {
+                name: 'Saved work'
+            })
+            const route = '/api/v1/shelves/' + encodeURIComponent(shelf.id)
+            expect((await fetch(server.url + '/api/v1/shelves')
+                .then(r => r.json()))[0].id).toBe(shelf.id)
+            await post(route + '/items', { comicIds: [f.localId] })
+            expect(recorded).toHaveBeenCalledWith([{
+                eventType: 'shelf_add',
+                comicId: f.localId, source: 'shelf',
+                appSessionId: session, contextId: context,
+                metadata: { shelfId: shelf.id }
+            }])
+            await post(route + '/remove', { comicIds: [f.localId] })
+            expect(recorded).toHaveBeenCalledWith([{
+                eventType: 'shelf_remove',
+                comicId: f.localId, source: 'shelf',
+                appSessionId: session, contextId: context,
+                metadata: { shelfId: shelf.id }
+            }])
+            expect((await fetch(server.url + route)
+                .then(r => r.json())).items).toEqual([])
+            expect(f.db.getComic(f.localId)).toBeDefined()
+        } finally {
+            vi.restoreAllMocks()
+            await new Promise<void>((resolve, reject) =>
+                server.server.close(error => error ? reject(error) : resolve())
+            )
+            f.close()
+        }
+    })
+
     it('never accepts unknown operations as write permissions', () => {
         for (const [url, method] of [
             ['/api/v1/shelves', 'DELETE'],

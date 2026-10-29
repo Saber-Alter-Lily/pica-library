@@ -51,13 +51,13 @@ describe('S3 actual source-free offline Web Reader asset stage', () => {
                 'source-hosts.js', 'recommendation-v5.js'
             ])
                 expect(fs.existsSync(path.join(first, name))).toBe(false)
-            const allowedJs = new Set(OFFLINE_READER_ASSETS.filter(name =>
+            const allowedJs = new Set<string>(OFFLINE_READER_ASSETS.filter(name =>
                 name.endsWith('.js')))
             for (const name of allowedJs) {
                 const text = fs.readFileSync(path.join(first, name), 'utf8')
                 const imports = [...text.matchAll(/\bfrom\s+['"]\.\/([^'"]+)['"]/g)]
                     .map(row => row[1])
-                expect(imports.every(input => allowedJs.has(input as typeof OFFLINE_READER_ASSETS[number]))).toBe(true)
+                expect(imports.every(input => allowedJs.has(input))).toBe(true)
             }
         } finally {
             fs.rmSync(home, { recursive: true, force: true })

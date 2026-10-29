@@ -34,14 +34,17 @@ The release checkout must be clean. Its original `src/library/database.ts` and `
 3. Create a shelf, add the work, and save reader progress.
 4. Close the legacy database, assert no WAL/SHM/journal sidecars, hash config/DB/credential/media bytes.
 5. Ask the new `qualifyV050HistoricalFixtureReadOnly` gate to verify the old SQLite and release-shaped config. Test exact migrations, selected table/column shape, integrity, secret-free sanitized status and no file changes.
-6. As separate **mutated synthetic config** negative scenarios, reject an unconsented nonexistent external library path *without accessing it*, and reject later `externalSources` source-policy fields in a purported v0.5.0 config. Restore original config and verify positive admission again.
-7. Remove only the temporary fixture in `finally`. The synthetic fixture is not uploaded as a CI artifact; nothing executes an updater, source plugin, login, DPAPI method, or live data migration.
+6. Reuse the *release's own* `buildConfig` for conservative / balanced / fast and optional proxy settings, checking three original download-profile shapes plus proxy admission against the current gate.
+7. As deliberate mutated synthetic negative cases, reject an unconsented nonexistent external library path **without inspecting it**, reject post-release `externalSources` fields, and classify a config with omitted `openBrowser` / `preferredPort` as REVIEW_REQUIRED even though the release's own `loadConfig` accepts it. This omission is now an explicit future compatibility decision, not silently converted.
+8. Refuse synthetic old instance-lock and WAL marker without deletion, and verify the final original config/DB SHA-256 is preserved. Total **nine** source-built/negative admission scenarios.
+9. Remove only the temporary fixture in `finally`. No artifact, updater, source plugin, login, DPAPI call or live-data migration.
 
 The combined workflow also runs prior historical read-only and WAL backup tests. It uses pinned Node 24.15.0, `pnpm@11.16.0`, separate Linux/Windows runner jobs and checkout SHA proofs.
 
 ## Test and evidence boundaries
 
-- Workflow: [official-release source-built fixture QA](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/s3-v050-official-release-fixture-qa.yml). The exact test SHA and final Linux/Windows conclusions must be read from the CI run before classifying PASS.
+- First source-built three-case run [#40914858557](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40914858557) passed **2/2 Linux/Windows**; both original job logs printed official tag SHA, actual historic module execution and 20/20 associated unit regressions.
+- Expanded final executable script `2abcc1f6ebff1508975aa6dc5b0cde82cafed491` passed [exact-head nine-case official-source CI #40915400620](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915400620): **Linux SUCCESS and Windows SUCCESS (2/2)**. Linux log independently confirms `scenarioCount=9`, `productionMigrationAuthorized=false`, `realUserProfileTouched=false`, `artifactPublished=false`. The run also passed the existing old read-only and SQLite WAL snapshot regressions. The executable script's test status must not be conflated with production migration readiness.
 - The original #244 synthetic gate had tested a modern `LibraryDatabase` with identical old migrations. This slice **eliminates that historical-runtime substitution** by executing the original `v0.5.0` implementation in its own pinned checkout.
 - A passing test proves only **synthetic tag-code compatibility with the new read-only gate**. It does **not** establish the complete diversity of existing user databases, real credentials, Windows installation roots, external library consent, crash-safe SQLite-plus-media snapshots, encrypted production backups, Android migration, or one-click upgrade/rollback.
 - PR #245 remains Draft, #244/#243 remain unmerged, main `095d691` and published `v0.5.0` / OTA remain unchanged.

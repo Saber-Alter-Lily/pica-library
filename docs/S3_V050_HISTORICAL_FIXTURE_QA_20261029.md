@@ -43,3 +43,11 @@ Dedicated `.github/workflows/s3-v050-historical-fixture-qa.yml` runs pinned Node
 5. Android source-free APK/Service/Binder, signed provider lifecycle, G1 multilingual layout/real-device acceptance, final 42+12 product cases and G1–G4 remain OPEN.
 
 A testable historical shape is not a production migration approval.
+
+
+## Exact-source CI results (verified 2026-10-29)
+
+- First Linux/Windows historical gate [#40908769301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40908769301) **FAIL** on Windows: the synthetic owned path was incorrectly compared only against a canonical Windows OS-temp spelling. Linux passed. Second case-folding fix [#40909082916](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909082916) remained **Windows FAIL**; both failures retained.
+- Latest functional source `06ae2c58e628dc5b6c06c930221a2cb756612777`: [Linux and Windows #40909355786](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909355786) **2/2 SUCCESS**. Its [Android/Web/Desktop full CI #40909365635](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909365635) **Android SUCCESS and Web/Desktop SUCCESS**.
+- A subsequently added test-only commit `079c2fc09783af34494668c705622f06d3c08ffb` asserts Windows original/canonical aliases are both accepted **only for the owned synthetic data directory**, while an identically shaped sibling outside the sandbox is rejected without access. [Linux and Windows exact-head focused #40909909799](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909909799) **2/2 SUCCESS**.
+- No result here is an actual tagged-binary install, genuine old profile migration, production restore, source package release, real Android UI acceptance or a G1–G4 closeout.

@@ -1,5 +1,18 @@
 # Pica Library Development Task Log
 
+## S3 PR #232 补充回归｜旧批量事件静态门禁迁移（2026-10-29）
+
+- 在正式书架 HTTP 代码抽出后，[全项目 CI #40843755448](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40843755448) 发现旧 `test/unit/user-event-batch-p2d7b.test.ts` 将 `server.ts` 中 `const shelfItemsRoute` 作为固定代码截取起点，导致已移至 `core-shelf-routes.ts` 的实现被误判为缺失。**原生产 `recordUserEvents()` 本身仍调用**，且新增实际 HTTP 事件 spy 已通过；失败不是用户事件被删除。
+- 更新该旧回归：从 `if (isCoreShelfRoute(` 截取真实生产适配器，同时检查 `core-shelf-routes.ts` 明确返回 `shelf_add/shelf_remove`、`change.comicIds.map`、batch `recordUserEvents`、`shelfId` 元数据和旧数据库 BEGIN/COMMIT/ROLLBACK 事务；并纳入 S3 Linux+Windows 专项，不跳过测试或恢复旧耦合结构。
+- 修复代码最终精确 SHA **37b05c44d421ca6ac270056cf56b30a0612dd83e**，[新 S3 #40844313896](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40844313896) 已通过 **Linux 60/60 和 Windows 60/60**，真实 Chromium 正在验收；[新全项目 CI #40844319505](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40844319505) 登记时仍运行中，**NOT_VERIFIED**。此前 [Windows ZIP #40843746744](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40843746744) 验证通过。G1–G4 保持 OPEN，正式 main/v0.5.0/OTA 未修改。
+
+## S3 PR #232｜正式 ShelfService HTTP 与行为事件脱离 ProviderService（2026-10-29）
+
+- 继 #231 的正式 Catalogue 端口后，新建 [Draft PR #232](https://github.com/Saber-Alter-Lily/pica-library/pull/232)：从实际 `src/library/server.ts` 抽出全部旧书架 CRUD/加入/移除/筛选加入操作到 `src/library/core-shelf-routes.ts`，仍只使用原 ShelfService/LibraryQueryService，旧路由和返回形状不变。生产在适配端继续调用 `recordUserEvents`，保留 `shelf_add/shelf_remove`、shelfId、appSessionId/contextId 的真实事件负载，不影响推荐行为证据。
+- 纯 Core/Portable QA 复用相同 ShelfService，但 local-only 严格禁止在线漫画 ID、任意 `records` 导入，筛选也强制 local；对已存在外源书架数据不返回其内容/计数。扩展真实 SQLite、原 Desktop 真实 HTTP+事件 spy、Windows ZIP 官方 Node 实际书架 API 测试，不造第二套书架。
+- 精确源码 `d0af6d1dec1d3a7f5a50c6360d5ca65a1944c473` 的 [S3 Linux/Windows #40843746890](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40843746890) **56/56 + 56/56 PASS**；[Windows Portable ZIP #40843746744](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40843746744) **SUCCESS**。Chromium 和完整 Android/Web CI 末态待核验；不先报 G1–G4 通过。
+- 接下来重点：正式 Desktop 的无源本地导入、WebDAV/设置/页面布局模块化和完整 Web UI 组合。仍未从正式 Windows/Android 主程序物理剥离具体来源 SDK，也没有验证 v0.5.0 用户数据升级；所有 PR 仅 Draft，无 Release/OTA。详见 [S3 CORE-SHELVES 审计](docs/S3_CORE_SHELVES_20261029.md)。
+
 ## S3 PR #231｜正式 Desktop 书库查询接口与纯 Core 共用（2026-10-29）
 
 - 新建 [Draft PR #231](https://github.com/Saber-Alter-Lily/pica-library/pull/231)。不再做重复的 QA Reader：实际修改生产 `src/library/server.ts`，原 `GET /comics`/作品详情/下载列表/`POST /library/query` 统一调用 `src/library/core-catalog-read.ts`。后者只引用已有 LibraryDatabase、LibraryQueryService 的 type-only ports，不依赖 Pica/E-H/JM SDK、Host、账号、来源激活，也不自写第二套搜索或缓存。原 Desktop 历史多来源数据完整保留，API 合约不改。

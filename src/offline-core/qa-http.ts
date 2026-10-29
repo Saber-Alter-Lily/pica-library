@@ -7,6 +7,8 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from '../library/core-catalog-read'
 import { LibraryQueryService } from '../services/library-query-service'
+import { ShelfService } from '../services/shelf-service'
+import { coreShelfRoute, isCoreShelfRoute } from '../library/core-shelf-routes'
 import type { LibraryFacetQuery } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
 import type { ReaderService } from '../services/reader-service'
@@ -182,6 +184,7 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
     ]) requiredAsset(webRoot, asset)
 
     const libraryQueries = new LibraryQueryService(options.database)
+    const shelves = new ShelfService(options.database, libraryQueries)
     const secret = randomBytes(32).toString('hex')
     const csrf = randomBytes(32).toString('hex')
     const markup = existingReaderMarkup(webRoot)
@@ -244,6 +247,11 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                 fs.createReadStream(file).pipe(response)
                 return
             }
+            const shelfRead = coreShelfRoute(
+                url.pathname, 'GET', {}, shelves, { localOnly: true }
+            )
+            if (shelfRead)
+                return json(response, 200, shelfRead.value)
             const catalogueRead = coreCatalogueGet(
                 url, options.database, { localOnly: true }
             )
@@ -278,14 +286,28 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             }
             return json(response, 404, { error: 'No source routes in offline QA' })
         }
-        if (request.method !== 'POST' ||
-            !['/api/v1/reader/progress', '/api/v1/library/query']
-                .includes(url.pathname))
+        const allowedShelfAction = isCoreShelfRoute(
+            url.pathname, request.method ?? ''
+        )
+        if (!allowedShelfAction &&
+            !(request.method === 'POST' &&
+                ['/api/v1/reader/progress', '/api/v1/library/query']
+                    .includes(url.pathname)))
             return json(response, 405, { error: 'Unsupported QA operation' })
         if (request.headers.origin !== origin ||
             !secureEqual(String(request.headers['x-pica-qa-csrf'] ?? ''), csrf))
             return json(response, 403, { error: 'QA CSRF rejected' })
         try {
+            if (allowedShelfAction) {
+                const input = request.method === 'DELETE'
+                    ? {} : await readJsonObject(request)
+                const result = coreShelfRoute(
+                    url.pathname, request.method ?? '', input, shelves,
+                    { localOnly: true }
+                )
+                if (!result) throw new Error('Unsupported local shelf operation')
+                return json(response, 200, result.value)
+            }
             if (url.pathname === '/api/v1/library/query') {
                 const input = await readJsonObject(request)
                 return json(response, 200, coreCatalogueQuery(

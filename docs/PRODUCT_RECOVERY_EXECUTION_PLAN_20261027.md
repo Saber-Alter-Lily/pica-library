@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 续进｜旧 Desktop 书库+书架接口归还无来源核心
+
+- [Draft PR #232](https://github.com/Saber-Alter-Lily/pica-library/pull/232)：在 #231 原 Catalogue/Facets 共享端口之后，将生产 Server 的实际 `ShelfService` 全部 CRUD/加入、移除、批量筛选加入抽出共用、无漫画站点 SDK 的核心业务端口；原生产 HTTP adapter 仍负责有行为价值的 `recordUserEvents` 与用户会话上下文，避免改造吞掉推荐证据。
+- 纯 Core 采用明确 local-only 权限，读写本地书架不连接 Pica/E-H/JM；真实 Windows Portable ZIP/Node、SQLite、本地 Browser HTTP 测试通过：[Linux/Windows #40843746890](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40843746890) 双端各56项 PASS，[Windows ZIP #40843746744](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40843746744) SUCCESS。Chrome/全 CI 以最终实际运行 SHA 为准。
+- **下一执行顺序**：正式本地导入/文档/设置→WebDAV 与能力边界→完整正式 Desktop Core runtime composition→生产 Windows 包物理 SDK 闭包→Android Service/Binder/纯 APK→真实 v0.5.0 更新助手、原书库/下载/会话保护与回滚。保留 S0/S1 手机引导视觉和 #199/#200 标签需求等后续 S4 任务，不以此 S3 工作取消或提前发布。
+- 门禁 G1–G4 和旧42+新增12测试继续 OPEN，具体差距见 [CORE-SHELVES 审计](S3_CORE_SHELVES_20261029.md)。
+
+---
 ## 2026-10-29 S3 推进｜从独立 QA 小阅读器进入正式 Desktop 书库 API 抽离
 
 - [Draft PR #231](https://github.com/Saber-Alter-Lily/pica-library/pull/231) 首次把**真实正式 Windows/Desktop HTTP 服务中的书库主路径**抽成共用的来源无关业务端口：漫画列表、单本详情、下载列表与原 `LibraryQueryService` 分面查询。同时让既有已验证纯核心/Windows Portable QA 复用它，仅施加 local-only 保护，绝不重复实现 SQLite、书库筛选或 Reader。

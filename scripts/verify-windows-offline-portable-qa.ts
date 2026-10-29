@@ -304,6 +304,36 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         })
         if (refused.status !== 400)
             throw new Error('Portable catalogue accepted a foreign source')
+        // Verify original ShelfService is also physically present in the
+        // same extracted source-free ZIP, with explicit local-only authority.
+        const shelfPost = async (path: string, input: Record<string, unknown>) =>
+            fetch(origin + path, {
+                method: 'POST',
+                headers: {
+                    cookie, origin, 'content-type': 'application/json',
+                    'x-pica-qa-csrf': /"csrf":"([0-9a-f]{64})"/.exec(html)?.[1] ?? ''
+                },
+                body: JSON.stringify(input)
+            })
+        const shelfCreated = await shelfPost('/api/v1/shelves', {
+            name: 'Owned portable shelf'
+        })
+        if (shelfCreated.status !== 200)
+            throw new Error('Bundled ShelfService cannot create local shelves')
+        const shelf = await shelfCreated.json() as { id: string }
+        const pathToShelf = '/api/v1/shelves/' + encodeURIComponent(shelf.id)
+        if ((await shelfPost(pathToShelf + '/items', {
+            comicIds: ['eh:123:abcdef1234']
+        })).status !== 400)
+            throw new Error('Bundled core shelf allowed foreign source identity')
+        if ((await shelfPost(pathToShelf + '/items', {
+            comicIds: [book.comicId]
+        })).status !== 200)
+            throw new Error('Bundled core shelf cannot add local work')
+        const shelfContents = await (await get(pathToShelf)).json() as any
+        if (shelfContents.items.length !== 1 ||
+            shelfContents.items[0].comicId !== book.comicId)
+            throw new Error('Bundled core shelf lost owned local work')
         const asset = await get('/offline-core-reader-qa.js')
         if (asset.status !== 200 || !(await asset.text()).includes(
             'createReaderViewportTracker'))

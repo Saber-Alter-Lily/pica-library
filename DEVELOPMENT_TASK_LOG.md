@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+## S3 PR #231｜正式 Desktop 书库查询接口与纯 Core 共用（2026-10-29）
+
+- 新建 [Draft PR #231](https://github.com/Saber-Alter-Lily/pica-library/pull/231)。不再做重复的 QA Reader：实际修改生产 `src/library/server.ts`，原 `GET /comics`/作品详情/下载列表/`POST /library/query` 统一调用 `src/library/core-catalog-read.ts`。后者只引用已有 LibraryDatabase、LibraryQueryService 的 type-only ports，不依赖 Pica/E-H/JM SDK、Host、账号、来源激活，也不自写第二套搜索或缓存。原 Desktop 历史多来源数据完整保留，API 合约不改。
+- 纯 Core 的 loopback HTTP 调用相同目录和分面查询服务，对 `localOnly` 请求强制 providerIds local 和 local:<64hex> 身份；Session/Origin/CSRF/类型及 4KiB 请求上限保持。新增本地作品搜索网页（沿用既有 Reader 页面）；源闭包强制包含原 LibraryQueryService，仍禁止 SDK。实际 ZIP 解压后的 Windows 自带 Node 测试增加旧 catalogue/分面 API 验证。
+- 精确源码 **e698f66a4648cda1954c7c1293a4812749301fa5** 的 [Linux/Windows/Chromium #40842187533](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842187533) **SUCCESS：51/51 + 51/51 + 1/1**；[Windows Portable ZIP #40842196837](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842196837) **SUCCESS**。完整 Android+Web/Desktop [CI #40842243847](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842243847) 登记时在运行中，不能先行判定全绿。
+- 下一阶段抽真实 ShelfService HTTP、行为事件，再处理无源设置、本地导入与 WebDAV 的正式启动组合；**生产 Desktop 仍依赖 LibraryService/ProviderService，正式 Windows/Android 还未完成物理 SDK 剥离**。G1-G4 OPEN。详细见 [S3 CORE-LIB-01 审计](docs/S3_CORE_LIBRARY_READ_20261029.md)。
+
 ## S3 PR #230｜Windows x64 纯 Core Portable QA 真实 ZIP 与启动器（2026-10-29）
 
 - 叠加 #229 创建 [Draft PR #230](https://github.com/Saber-Alter-Lily/pica-library/pull/230)。沿用现有 source-free `core.mjs`、Reader DOM+9资源，不造第二数据库/Reader；新建**只在 CI OS Temp 内**组装 ZIP（20 文件 + 清单）、官方 Node 24.15.0 x64 运行时和 LICENSE、AdmZip MIT 许可证、项目 MIT/NOTICES、只可启动 sentinel QA 目录的 `.cmd`。不上传可执行 ZIP，仅保留短期 SHA/源闭包/许可证/真实启动验收 JSON。

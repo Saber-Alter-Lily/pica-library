@@ -42,13 +42,13 @@ function fixture() {
     fs.writeFileSync(path.join(cache, 'cover.webp'),'SYNTHETIC_COVER')
     const db = new LibraryDatabase(dbFile)
     db.importFavorites([{
-        comicId:'synthetic:media-work',title:'Synthetic Media',
+        comicId:'local:media-work',title:'Synthetic Media',
         author:'Synthetic Creator',categories:['QA'], tags:['test'],
         finished:false,pagesCount:1,epsCount:1
     }], 'synthetic-import', true, true)
-    db.upsertEpisode({id:'synthetic:chapter',comicId:'synthetic:media-work',
+    db.upsertEpisode({id:'synthetic:chapter',comicId:'local:media-work',
         title:'Chapter 1', order:1})
-    db.upsertPicture({id:'synthetic:picture',comicId:'synthetic:media-work',
+    db.upsertPicture({id:'synthetic:picture',comicId:'local:media-work',
         episodeId:'synthetic:chapter',position:1,originalName:'one.png',
         mediaPath:'synthetic/image',fileServer:'invalid.example'})
     db.markPictureDownloaded('synthetic:picture',mediaFile,mediaBytes.length,

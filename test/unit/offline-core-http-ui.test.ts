@@ -227,12 +227,12 @@ describe('S3 real protected loopback HTTP with existing Web Reader markup', () =
             expect((await shelfWrite('POST', shelfUrl + '/add-filtered', {
                 query: { providerIds: ['eh'], scope: 'all' }
             })).status).toBe(400)
-            const filtered = await shelfWrite('POST',
+            const shelfFiltered = await shelfWrite('POST',
                 shelfUrl + '/add-filtered', {
                     query: { providerIds: ['local'], scope: 'catalog' }
                 })
-            expect(filtered.status).toBe(200)
-            expect((await filtered.json() as Record<string, any>).matched).toBe(1)
+            expect(shelfFiltered.status).toBe(200)
+            expect((await shelfFiltered.json() as Record<string, any>).matched).toBe(1)
             const removed = await shelfWrite('POST', shelfUrl + '/remove', {
                 comicIds: [comicId]
             })

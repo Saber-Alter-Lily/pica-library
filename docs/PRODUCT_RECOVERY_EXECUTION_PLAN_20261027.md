@@ -1,6 +1,14 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
 
+### 2026-10-29 CORE-LIB-04c-02b-03a｜v0.5.0 历史结构合成只读门禁
+
+- [Draft PR #244](https://github.com/Saber-Alter-Lily/pica-library/pull/244) 基于 #243：引用真实 v0.5.0 tag 的 migrations/paths Git blob 相同证明，单独记录旧 DesktopConfig 无 source-policy 等新字段；新增只允许带 sentinel、直接 OS Temp 子目录的历史结构 QA，使用原 SQLite 和只读预检，检查14条迁移、11类表/列、完整性，外置路径**未获同意绝不打开**。
+- 测试是暂存的合成 Config/SQLite，不是已保存的真实 v0.5.0 用户资料。首轮 Linux 通过但 Windows 因 temp 原始/8.3/canonical 路径别名被误认为外置库而失败；当前修正只接受已经认证的临时数据目录原写法和真实写法。新 [Linux/Windows QA #40909355786](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909355786) **待终态确认**；专项及完整 CI 均需按最新 SHA 判断。
+- 下一 **04c-02b-03b**：从真正正式 v0.5.0 实现构造历史兼容 fixture，扩展外置目录单独授权/媒体体量/停写事务、DPAPI 加密备份、失败回滚，再与旧升级助手受控集成。**没有正式迁移授权，G1–G4 OPEN**。[独立审计](S3_V050_HISTORICAL_FIXTURE_QA_20261029.md)。
+
+
+
 ### 2026-10-29 CORE-LIB-04c-02b-02｜双平台备份与回滚最终门禁
 
 - [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 精确可执行/测试代码 `87a20359396f67ba30b54f39c1e8958ee4760569` 的 [Linux/Windows 专项 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) **SUCCESS**、[Android/Web/Desktop 完整 #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471) **SUCCESS**；所有测试仅使用合成 OS Temp profile，没有真实用户数据、发布或 OTA 变更。真实 v0.5.0 Release 中 migrations.ts、desktop/paths.ts blob 与当前一致，其他 Desktop 类型/配置存在演进，不能据此宣布实际历史 profile 迁移通过。

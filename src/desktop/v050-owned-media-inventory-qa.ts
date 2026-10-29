@@ -44,6 +44,8 @@ export type V050SyntheticMediaInventoryResult = {
     mediaFileCount?: number
     referencedDownloadedPictures?: number
     metadataTotalBytes?: number
+    auxiliarySqliteBackupFileCount?: number
+    auxiliarySqliteBackupBytes?: number
     fileContentsVerified: false
     crossFileAtomicityProven: false
     externalMediaInspected: false
@@ -135,6 +137,9 @@ export function inventoryV050OwnedMediaSyntheticReadOnly(
         const media = new Map<string, number>()
         let dirs = 0
         let total = 0
+        let mediaBytes = 0
+        let backupFiles = 0
+        let backupBytes = 0
         function scan(root: string, prefix: string, depth: number) {
             if (depth > MAX_DEPTH || ++dirs > MAX_DIRS)
                 reject('REVIEW_REQUIRED', 'MEDIA_BUDGET_REQUIRES_REVIEW')
@@ -156,11 +161,25 @@ export function inventoryV050OwnedMediaSyntheticReadOnly(
                 }
                 assertRegular(file, st)
                 if (prefix === 'data/' && name === 'library.db')
-                    continue // SQLite was already checked by the historical gate.
-                if (media.size >= MAX_FILES ||
-                    total + st.size > MAX_TOTAL_BYTES)
+                    continue // Main SQLite verified by the historical gate.
+                // The *original release LibraryDatabase* writes its own
+                // pre-migration SQLite backup. Inventory its size separately,
+                // not as manga media, and never delete or open it. Unknown
+                // backup spellings remain unclassified and need review.
+                const taggedSqliteBackup = prefix === 'data/' &&
+                    (/^library\\.db\\.pre-migration-v[0-9]{1,3}\\.bak$/.test(name) ||
+                     name === 'library.db.pre-unreleased-schema-reconcile.bak')
+                if (total + st.size > MAX_TOTAL_BYTES)
                     reject('REVIEW_REQUIRED', 'MEDIA_BUDGET_REQUIRES_REVIEW')
                 total += st.size
+                if (taggedSqliteBackup) {
+                    backupFiles++
+                    backupBytes += st.size
+                    continue
+                }
+                if (media.size >= MAX_FILES)
+                    reject('REVIEW_REQUIRED', 'MEDIA_BUDGET_REQUIRES_REVIEW')
+                mediaBytes += st.size
                 media.set(key(prefix + name), st.size)
             }
         }
@@ -213,7 +232,9 @@ export function inventoryV050OwnedMediaSyntheticReadOnly(
             status: 'SYNTHETIC_MEDIA_METADATA_ONLY',
             mediaFileCount: media.size,
             referencedDownloadedPictures: referenced,
-            metadataTotalBytes: total
+            metadataTotalBytes: mediaBytes,
+            auxiliarySqliteBackupFileCount: backupFiles,
+            auxiliarySqliteBackupBytes: backupBytes
         }
     } catch (error) {
         if (error instanceof InventoryFailure)

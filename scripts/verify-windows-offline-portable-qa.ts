@@ -177,8 +177,31 @@ async function verifyOriginalNativeLauncherCorePreview(
             const killed = spawnSync('taskkill.exe', [
                 '/PID', String(ownedPid), '/T', '/F'
             ], { encoding: 'utf8', windowsHide: true, timeout: 10000 })
-            if (killed.error || killed.status !== 0)
-                throw new Error('Native core preview child cleanup failed')
+            // A terminated PID is not a cleanup error even if taskkill raced
+            // with the child's natural exit. The important condition is that
+            // our exact owned PID is no longer alive and holding node.exe.
+            let alive = true
+            for (let attempt = 0; attempt < 70; attempt++) {
+                try {
+                    process.kill(ownedPid, 0)
+                } catch (error) {
+                    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+                        alive = false
+                        break
+                    }
+                    throw error
+                }
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
+            if (alive)
+                throw new Error('Native core preview owned PID remained alive after cleanup: ' +
+                    JSON.stringify({
+                        pid: ownedPid,
+                        taskkillExit: killed.status,
+                        error: String(killed.error ?? '')
+                    }))
+            // Let Windows finish releasing the executable/SQLite handles.
+            await new Promise(resolve => setTimeout(resolve, 300))
         }
     }
 }
@@ -543,7 +566,7 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
     } finally {
         await running?.stop()
         fs.rmSync(temp, { recursive: true, force: true,
-            maxRetries: 20, retryDelay: 150 })
+            maxRetries: 40, retryDelay: 250 })
     }
 }
 async function main() {

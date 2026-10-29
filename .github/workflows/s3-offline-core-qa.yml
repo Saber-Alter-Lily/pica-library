@@ -19,6 +19,8 @@ on:
       - 'src/library/server.ts'
       - 'test/unit/local-reader-http-read.test.ts'
       - 'test/unit/offline-core-http-ui.test.ts'
+      - 'scripts/qa-offline-browser-harness.ts'
+      - 'test/e2e/offline-core-reader.spec.mjs'
       - 'src/library/database.ts'
       - 'src/local-library/**'
       - 'src/services/reader-service.ts'
@@ -67,5 +69,35 @@ jobs:
         with:
           name: s3-offline-core-metadata-${{ matrix.os }}-${{ github.sha }}
           path: s3-offline-core-evidence/manifest.json
+          retention-days: 1
+          if-no-files-found: ignore
+
+  browser-ui-qa:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    needs: source-free-real-process
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Reuse project's existing CI-only Playwright version
+        run: pnpm add -D '@playwright/test@1.63.0' --ignore-workspace-root-check
+      - name: Install actual Chromium for reader UI acceptance
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify existing Reader markup, local image and persisted page in Chromium
+        run: pnpm exec playwright test test/e2e/offline-core-reader.spec.mjs --config=playwright.smoke.config.mjs --workers=1 --reporter=line
+      - name: Keep failure diagnostics for synthetic disposable QA data only
+        if: failure() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-offline-chromium-qa-${{ github.sha }}
+          path: test-results/
           retention-days: 1
           if-no-files-found: ignore

@@ -34,3 +34,12 @@
 5. #232 和 #233 是不同书架实现分支，正式集成前需审查差异并选版。
 
 **G1、G2、G3、G4 均 OPEN；所有 PR 均 Draft，未合并正式 main、未发布/OTA、未操作真实用户资料。**
+
+## 精确代码最终验收回填（2026-10-29）
+
+- 真正加固后的可执行与测试源码 SHA：`87a20359396f67ba30b54f39c1e8958ee4760569`。
+- [Linux / Windows WAL 一致性快照专项 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435)：**SUCCESS，两平台均通过**。覆盖新建/已有临时备份拒绝、真实未检查点 WAL 行恢复、旧书架与阅读进度、虚拟加密凭据的仅字节回读、零字节文件、父目录软链接和 SHA 篡改拒绝。
+- [完整 Android / Web / Desktop CI #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471)：**SUCCESS，Android 与 Web/Desktop 两项均通过**（包括实际浏览器冒烟）。后续 GitHub 文档提交不包含新可执行代码，不使用文档 HEAD 冒充源码改动测试。
+- 原真实 `v0.5.0` Release tag `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf` 中 `src/storage/sqlite/migrations.ts` 的 blob SHA `4a98683fb29feec31970d3958385968f65af6365`、`src/desktop/paths.ts` 的 blob SHA `f4cf5e3f6bf3d5b9603dbbcc295d8ff58659ae8d`，均与当前研发分支相同；但旧 `src/desktop/types.ts` 与新版本不同，**真实老配置兼容和实际 Release 样本测试仍未完成**。
+
+本项**只标记 QA-only 数据一致性与恢复机制验收通过**，不标记正式 G3 通过。继续保持所有发布关口开放。

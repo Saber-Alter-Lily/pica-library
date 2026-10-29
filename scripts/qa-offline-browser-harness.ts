@@ -9,6 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { buildOfflineCoreCandidate } from './build-offline-core-candidate'
+import { stageOfflineReaderAssetsQa } from './stage-offline-reader-assets-qa'
 
 const png = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6FkwAAAAASUVORK5CYII=',
@@ -35,6 +36,9 @@ async function main() {
     const candidate = await buildOfflineCoreCandidate()
     const binary = path.join(home, 'core.mjs')
     fs.writeFileSync(binary, candidate.bytes, { flag: 'wx' })
+    const staged = stageOfflineReaderAssetsQa(path.join(home, 'web'))
+    if (staged.count !== 10 || staged.sources !== 0)
+        throw new Error('No-source Reader QA Web stage is incomplete')
     const root = path.join(home, 'qa-library')
     const source = path.join(home, 'original-pages')
     fs.mkdirSync(source)
@@ -47,7 +51,7 @@ async function main() {
     if (!/^local:[0-9a-f]{64}$/.test(imported.comicId) || imported.pages !== 2)
         throw new Error('Offline core browser fixture import failed')
     server = spawn(process.execPath, [binary, 'serve', '--root', root], {
-        cwd: process.cwd(), env, stdio: ['ignore', 'pipe', 'pipe']
+        cwd: home, env, stdio: ['ignore', 'pipe', 'pipe']
     })
     const started = await new Promise<{ url: string }>((resolve, reject) => {
         let pending = '', settled = false, stderr = ''

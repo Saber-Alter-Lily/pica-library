@@ -127,7 +127,7 @@ async function forgedHost(host: string, port: number, cookie: string) {
 }
 
 export async function verifyWindowsOfflinePortableQa(zipFile: string,
-    expectedSourceSha: string) {
+    expectedSourceSha: string, fullWebQa = false) {
     if (process.platform !== 'win32' || process.arch !== 'x64')
         throw new Error('This executable ZIP test requires Windows x64')
     if (!/^[0-9a-f]{40}$/.test(expectedSourceSha))
@@ -147,7 +147,9 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         throw new Error('Untrusted QA ZIP inventory')
     const manifest = readJson(contents.get('BUILD-MANIFEST.json')!)
     if (manifest.schemaVersion !== 1 ||
-        manifest.label !== 'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY' ||
+        manifest.label !== (fullWebQa
+            ? 'UNSIGNED_S3_WINDOWS_X64_FULL_WEB_QA_ONLY'
+            : 'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY') ||
         manifest.sourceSha !== expectedSourceSha ||
         manifest.runtimeVersion !== '24.15.0' ||
         manifest.sourceCount !== 0 ||
@@ -158,7 +160,8 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         manifest.otaChanged !== false ||
         !/^[0-9a-f]{64}$/.test(manifest.verifiedNodeArchiveSha256) ||
         !Array.isArray(manifest.files) ||
-        manifest.files.length !== 20 ||
+        (fullWebQa ? manifest.files.length < 30 :
+            manifest.files.length !== 20) ||
         contents.size !== manifest.files.length + 1)
         throw new Error('Unexpected source-free portable QA manifest')
     const seen = new Set<string>()
@@ -175,9 +178,12 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         throw new Error('Unaccounted executable bytes in QA ZIP')
     for (const forbidden of [
         'app/desktop.js', 'app/pica-library.js', 'web/index.html',
-        'app/web/app.js', 'app/web/eh-account.js',
+        'app/web/eh-account.js', 'app/web/source-hosts.js',
+        'app/web/source-choices.js',
         'app/web/jm-account.js', 'app/web/recommendation-v5.js',
-        'runtime/jm/bin/java.exe', '.env.local', 'library.db'
+        'runtime/jm/bin/java.exe', '.env.local', 'library.db',
+        ...(fullWebQa ? ['app/web/offline-core-reader-qa.js'] :
+            ['app/web/app.js'])
     ]) if (contents.has(forbidden))
         throw new Error('Legacy source or user content entered portable QA ZIP')
     for (const required of [
@@ -185,8 +191,11 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         'NOTICE.md', 'UPSTREAM.md', 'DISCLAIMER.md',
         'licenses/Node.js-LICENSE.txt', 'licenses/AdmZip-LICENSE.txt',
         'Start-Offline-Reader-QA.cmd', 'README-OFFLINE-QA.txt',
-        'app/web/reader-fragment.html',
-        'app/web/offline-core-reader-qa.js'
+        ...(fullWebQa
+            ? ['app/web/index.html', 'app/web/app.js',
+                'app/web/full-web-qa-manifest.json', 'app/web/alpha7-cloud.js']
+            : ['app/web/reader-fragment.html',
+                'app/web/offline-core-reader-qa.js'])
     ]) if (!contents.has(required))
         throw new Error('Mandatory source-free QA file missing: ' + required)
 
@@ -259,30 +268,52 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             throw new Error('Portable QA network escaped loopback')
         if ((await fetch(origin + '/api/v1/offline-qa/library')).status !== 403)
             throw new Error('Portable QA browser was not session-gated')
-        const opening = await fetch(entry)
-        if (opening.status !== 200)
+        const opening = await fetch(entry, fullWebQa
+            ? { redirect: 'manual' } : {})
+        if (opening.status !== (fullWebQa ? 303 : 200))
             throw new Error('Portable QA entry did not open')
         const cookie = opening.headers.get('set-cookie')?.split(';')[0]
-        const html = await opening.text()
-        if (!cookie || !/^pica_offline_qa=[0-9a-f]{64}$/.test(cookie) ||
-            !html.includes('id="reader-pages"') ||
-            html.includes('eh-account.js') ||
-            html.includes('setup-password'))
-            throw new Error('Portable Reader browser session or UI invalid')
+        if (!cookie || !/^pica_offline_qa=[0-9a-f]{64}$/.test(cookie))
+            throw new Error('Portable QA did not establish a secure session')
         const get = (pathname: string) => fetch(origin + pathname, {
             headers: { cookie }
         })
+        const htmlResponse = fullWebQa ? await get('/') : opening
+        const html = await htmlResponse.text()
+        if (htmlResponse.status !== 200 ||
+            !html.includes('id="reader-pages"') ||
+            html.includes('src="./eh-account.js"') ||
+            (!fullWebQa && html.includes('setup-password')))
+            throw new Error('Portable original Web/Reader UI invalid')
+        if (fullWebQa && (!html.includes('id="settings"') ||
+            !html.includes('id="shelves"') ||
+            !html.includes('src="./app.js"')))
+            throw new Error('Portable original full UI has missing pages')
         // This is the original production catalogue/facet API implemented
         // by the common source-neutral LibraryQueryService, not a parallel
         // in-memory QA filter. All source identities remain local-only.
         const books = await (await get('/api/v1/comics')).json() as any[]
         if (books.length !== 1 || books[0].comicId !== book.comicId)
             throw new Error('Portable original catalogue route failed')
+        const csrf = fullWebQa
+            ? /name="pica-core-qa-csrf" content="([0-9a-f]{64})"/.exec(html)?.[1]
+            : /"csrf":"([0-9a-f]{64})"/.exec(html)?.[1]
+        if (!csrf) throw new Error('Portable QA CSRF bootstrap missing')
+        if (fullWebQa) {
+            const caps = await (await get('/api/v1/capabilities')).json() as any
+            const status = await (await get('/api/v1/desktop/status')).json() as any
+            if (caps.features?.recommendationSessions !== false ||
+                caps.features?.shelves !== true || !status.coreOnly ||
+                status.csrfToken !== csrf)
+                throw new Error('Portable source-free full Web capability trust mismatch')
+            if ((await get('/api/v1/comics?limit=5000')).status !== 200)
+                throw new Error('Portable original full Web catalogue startup failed')
+        }
         const search = await fetch(origin + '/api/v1/library/query', {
             method: 'POST',
             headers: {
                 cookie, origin, 'content-type': 'application/json',
-                'x-pica-qa-csrf': /"csrf":"([0-9a-f]{64})"/.exec(html)?.[1] ?? ''
+                'x-pica-qa-csrf': csrf
             },
             body: JSON.stringify({ scope: 'library', providerIds: ['local'],
                 text: 'source-images', limit: 100 })
@@ -298,19 +329,21 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             method: 'POST',
             headers: {
                 cookie, origin, 'content-type': 'application/json',
-                'x-pica-qa-csrf': /"csrf":"([0-9a-f]{64})"/.exec(html)?.[1] ?? ''
+                'x-pica-qa-csrf': csrf
             },
             body: JSON.stringify({ scope: 'all', providerIds: ['eh'] })
         })
         if (refused.status !== 400)
             throw new Error('Portable catalogue accepted a foreign source')
-        const asset = await get('/offline-core-reader-qa.js')
+        const asset = await get(fullWebQa
+            ? '/app.js' : '/offline-core-reader-qa.js')
         if (asset.status !== 200 || !(await asset.text()).includes(
-            'createReaderViewportTracker'))
-            throw new Error('Portable Reader browser asset unavailable')
-        if ((await get('/app.js')).status !== 404 ||
+            fullWebQa ? 'loadDesktop' : 'createReaderViewportTracker'))
+            throw new Error('Portable original Web/Reader browser asset unavailable')
+        if ((await get(fullWebQa
+                ? '/source-hosts.js' : '/app.js')).status !== 404 ||
             (await get('/api/v1/online-reader/progress')).status !== 404)
-            throw new Error('Portable QA accidentally exposes online app routes')
+            throw new Error('Portable QA exposed online/source UI modules')
         const chaptersHttp = await get('/api/v1/reader/comics/' +
             encodeURIComponent(book.comicId) + '/chapters')
         if (chaptersHttp.status !== 200)
@@ -323,8 +356,6 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         if (image.status !== 200 ||
             !Buffer.from(await image.arrayBuffer()).equals(png))
             throw new Error('Portable QA image bytes differ from original')
-        const csrf = /"csrf":"([0-9a-f]{64})"/.exec(html)?.[1]
-        if (!csrf) throw new Error('Portable QA CSRF bootstrap missing')
         // The real extracted Windows CMD + bundled official Node must expose
         // the SAME original shelves API as Desktop, never a second shelf DB.
         const shelfWrite = (method: string, route: string,
@@ -390,9 +421,10 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         // same saved shelf, without reimporting any external catalogue.
         running = await startServerThroughPortableLauncher(launcher, root, temp)
         const resumedEntry = new URL(running.state.url)
-        const resumedOpen = await fetch(resumedEntry)
+        const resumedOpen = await fetch(resumedEntry, fullWebQa
+            ? { redirect: 'manual' } : {})
         const resumedCookie = resumedOpen.headers.get('set-cookie')?.split(';')[0]
-        if (resumedOpen.status !== 200 || !resumedCookie)
+        if (resumedOpen.status !== (fullWebQa ? 303 : 200) || !resumedCookie)
             throw new Error('Portable restarted session unavailable')
         const shelvesAfterRestart = await fetch(
             resumedEntry.origin + shelfUrl,
@@ -414,7 +446,10 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         if (!fs.readFileSync(path.join(originals, '01.png')).equals(png))
             throw new Error('Portable QA modified original page input')
         return {
-            status: 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS',
+            status: fullWebQa
+                ? 'WINDOWS_X64_EXTRACTED_FULL_WEB_QA_PASS'
+                : 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS',
+            verifiedFullWeb: fullWebQa,
             files: contents.size,
             zipSha256: digest(fs.readFileSync(zipFile)),
             runtimeVersion: manifest.runtimeVersion,
@@ -435,11 +470,12 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
 }
 async function main() {
     const args = process.argv.slice(2)
-    if (args.length !== 4 || args[0] !== '--zip' ||
-        args[2] !== '--source-sha')
+    const fullWebQa = args.length === 5 && args[4] === '--full-web'
+    if ((!fullWebQa && args.length !== 4) ||
+        args[0] !== '--zip' || args[2] !== '--source-sha')
         throw new Error('Expected fixed temporary ZIP and exact source SHA')
     process.stdout.write(JSON.stringify(
-        await verifyWindowsOfflinePortableQa(args[1], args[3]), null, 2
+        await verifyWindowsOfflinePortableQa(args[1], args[3], fullWebQa), null, 2
     ) + '\n')
 }
 if (process.argv[1] &&

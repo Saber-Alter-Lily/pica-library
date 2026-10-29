@@ -142,13 +142,13 @@ describe('v0.5.0 synthetic consistency snapshot and rollback rehearsal', () => {
         expect(fs.readFileSync(f.dbFile)).toEqual(beforeDb)
         expect(fs.existsSync(f.dbFile + '-wal')).toBe(false)
         expect(fs.existsSync(f.dbFile + '-shm')).toBe(false)
-        expect(fs.statSync(path.join(restoredRoot, 'cache',
-            'empty-placeholder.flag')).size).toBe(0)
         expect(fs.readFileSync(path.join(f.config, 'config.json')))
             .toEqual(beforeConfig)
         expect(fs.readFileSync(path.join(f.config, 'credentials.dat')))
             .toEqual(beforeCredentials)
         const restoredRoot = path.join(f.sandbox, 'restored')
+        expect(fs.statSync(path.join(restoredRoot, 'cache',
+            'empty-placeholder.flag')).size).toBe(0)
         expect(fs.readFileSync(path.join(restoredRoot, 'config',
             'credentials.dat'))).toEqual(f.opaque)
         expect(fs.readFileSync(path.join(restoredRoot, 'config',

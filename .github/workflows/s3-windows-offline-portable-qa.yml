@@ -5,6 +5,7 @@ on:
     branches:
       - codex/s3-windows-portable-qa-20261029
       - codex/s3-core-library-read-20261029
+      - codex/s3-core-shelf-routes-20261029
     paths:
       - '.github/workflows/s3-windows-offline-portable-qa.yml'
       - 'scripts/build-windows-offline-portable-qa.ts'
@@ -15,6 +16,9 @@ on:
       - 'src/offline-core/**'
       - 'src/reader/local-http-read.ts'
       - 'src/library/core-catalog-read.ts'
+      - 'src/library/core-shelf-routes.ts'
+      - 'src/services/shelf-service.ts'
+      - 'test/unit/core-shelf-routes.test.ts'
       - 'src/library/server.ts'
       - 'src/services/library-query-service.ts'
       - 'test/unit/core-catalog-read.test.ts'
@@ -122,7 +126,7 @@ jobs:
           & pnpm exec tsx scripts/verify-windows-offline-portable-qa.ts --zip $env:S3_PORTABLE_ZIP --source-sha $env:GITHUB_SHA | Set-Content -LiteralPath $verification -Encoding utf8
           if($LASTEXITCODE -ne 0){ throw 'Extracted Windows source-free QA ZIP execution failed' }
           $result=Get-Content -Raw -LiteralPath $verification | ConvertFrom-Json
-          if($result.status -ne 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS' -or $result.sourceCount -ne 0 -or $result.publishAuthorized -or -not $result.verifiedProgressRestart){
+          if($result.status -ne 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS' -or $result.sourceCount -ne 0 -or $result.publishAuthorized -or -not $result.verifiedProgressRestart -or -not $result.verifiedShelfRestart){
             throw 'Source-free portable ZIP acceptance did not pass'
           }
           "S3_PORTABLE_VERIFY_REPORT=$verification" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8

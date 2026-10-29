@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+## S3 PR #233｜正式桌面书架路由与纯 Core 共用（2026-10-29）
+
+- 在 [Draft PR #233](https://github.com/Saber-Alter-Lily/pica-library/pull/233) 抽出原 `src/library/server.ts` 书架 GET/POST/PATCH/DELETE 及 add/remove/add-filtered 路由为 `coreShelfMatch/coreShelfExecute`，直接沿用旧 `ShelfService/LibraryDatabase/LibraryQueryService`；正式 Desktop 的 HTTP 端点和 shelf_add/shelf_remove **逐作品事件批量事务、会话/上下文、搜索记录导入**均保留。实体纯 Core esbuild 必含新的共享 ShelfService，不允许旧 Pica/E-H/JM 源 SDK 导入。
+- QA Core 仅在一次性本机授权会话/CSRF 后允许 `local:<64hex>` 书架加入/移除，远端 `records`/来源扩大/未授权筛选一律拒绝，混合历史书架只显示本地作品。真实 SQLite 单测、正式 `startLibraryServer` HTTP 读写/事件，以及 Linux/Windows 独立 HTTP 回归已增加。
+- 真实 [Linux/Windows 专项 #40848142891](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40848142891) **各70/70 SUCCESS**， [Windows Portable ZIP #40848432952](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40848432952) **SUCCESS**，实际 CMD/Node 关闭并重启可恢复书架与阅读进度。首轮专项目视为 TS 变量同名失败已修。旧完整 CI 因曾在 `server.ts` 静态寻找内联书架事件而失败（原事件其实已经迁入共用控制器），已修订静态检查和增加正式 HTTP 动态回归，没有删除事务性测试。
+- **最新精确源码 c5bd6469** 的 [S3 全专项 #40849035242](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40849035242) 与 [全项目 CI #40849044107](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40849044107) 文件登记时仍待最终判定。G1–G4 依旧 OPEN，未合并 main、发布、触碰 OTA/用户资料。详见 [CORE-SHELF 审计文档](docs/S3_CORE_SHELF_20261029.md)。
+
 ## S3 PR #231｜正式 Desktop 书库查询接口与纯 Core 共用（2026-10-29）
 
 - 新建 [Draft PR #231](https://github.com/Saber-Alter-Lily/pica-library/pull/231)。不再做重复的 QA Reader：实际修改生产 `src/library/server.ts`，原 `GET /comics`/作品详情/下载列表/`POST /library/query` 统一调用 `src/library/core-catalog-read.ts`。后者只引用已有 LibraryDatabase、LibraryQueryService 的 type-only ports，不依赖 Pica/E-H/JM SDK、Host、账号、来源激活，也不自写第二套搜索或缓存。原 Desktop 历史多来源数据完整保留，API 合约不改。

@@ -26,6 +26,7 @@ import {
 import { ReaderService } from '../services/reader-service'
 import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from './core-catalog-read'
+import { coreShelfMatch, coreShelfExecute } from './core-shelf-routes'
 import { ExternalReaderAdapter } from '../services/external-reader-adapter'
 import { OnlineReaderService } from '../services/online-reader-service'
 import type { SignedSourceDesktopReader } from '../desktop/signed-source-reader'
@@ -2108,133 +2109,25 @@ export async function startLibraryServer(options: {
                     (await body(request)) as LibraryFacetQuery,
                     libraryQueries
                 ))
-            if (url.pathname === '/api/v1/shelves' && request.method === 'GET')
-                return json(response, 200, shelfService.list())
-            if (
-                url.pathname === '/api/v1/shelves' &&
-                request.method === 'POST'
-            ) {
-                const input = await body(request)
-                return json(
-                    response,
-                    200,
-                    shelfService.create(String(input.name ?? ''))
-                )
-            }
-            const shelfRoute = url.pathname.match(
-                /^\/api\/v1\/shelves\/([^/]+)$/
+            const shelfMatch = coreShelfMatch(
+                request.method ?? '', url.pathname
             )
-            if (shelfRoute && request.method === 'GET') {
-                const shelfId = decodeURIComponent(shelfRoute[1])
-                return json(response, 200, {
-                    shelf: shelfService
-                        .list()
-                        .find((item) => item.id === shelfId),
-                    items: shelfService.contents(shelfId)
-                })
-            }
-            if (shelfRoute && request.method === 'PATCH') {
-                const input = await body(request)
-                return json(
-                    response,
-                    200,
-                    shelfService.rename(
-                        decodeURIComponent(shelfRoute[1]),
-                        String(input.name ?? '')
-                    )
-                )
-            }
-            if (shelfRoute && request.method === 'DELETE')
-                return json(
-                    response,
-                    200,
-                    shelfService.delete(decodeURIComponent(shelfRoute[1]))
-                )
-            const shelfItemsRoute = url.pathname.match(
-                /^\/api\/v1\/shelves\/([^/]+)\/(items|remove|add-filtered)$/
-            )
-            if (shelfItemsRoute && request.method === 'POST') {
-                const shelfId = decodeURIComponent(shelfItemsRoute[1])
-                const input = await body(request)
-                if (shelfItemsRoute[2] === 'add-filtered')
-                    return json(
-                        response,
-                        200,
-                        shelfService.addFiltered(
-                            shelfId,
-                            (input.query ?? {}) as LibraryFacetQuery
-                        )
-                    )
-                if (shelfItemsRoute[2] === 'remove') {
-                    const comicIds = stringList(input.comicIds)
-                    const result = shelfService.remove(shelfId, comicIds)
-                    options.database.recordUserEvents(
-                        comicIds.map(
-                            (comicId) =>
-                                ({
-                                    eventType: 'shelf_remove',
-                                    comicId,
-                                    source: 'shelf',
-                                    appSessionId: request.headers[
-                                        'x-pica-app-session'
-                                    ]
-                                        ? String(
-                                              request.headers[
-                                                  'x-pica-app-session'
-                                              ]
-                                          )
-                                        : null,
-                                    contextId: request.headers[
-                                        'x-pica-context-id'
-                                    ]
-                                        ? String(
-                                              request.headers[
-                                                  'x-pica-context-id'
-                                              ]
-                                          )
-                                        : null,
-                                    metadata: { shelfId }
-                                }) satisfies UserEventInput
-                        )
-                    )
-                    return json(response, 200, result)
-                }
-                const comicIds = stringList(input.comicIds)
-                const result = shelfService.add(
-                    shelfId,
-                    comicIds,
-                    Array.isArray(input.records)
-                        ? (input.records as FavoriteRecord[])
-                        : []
-                )
-                options.database.recordUserEvents(
-                    comicIds.map(
-                        (comicId) =>
-                            ({
-                                eventType: 'shelf_add',
-                                comicId,
-                                source: 'shelf',
-                                appSessionId: request.headers[
-                                    'x-pica-app-session'
-                                ]
-                                    ? String(
-                                          request.headers[
-                                              'x-pica-app-session'
-                                          ]
-                                      )
-                                    : null,
-                                contextId: request.headers['x-pica-context-id']
-                                    ? String(
-                                          request.headers[
-                                              'x-pica-context-id'
-                                          ]
-                                      )
-                                    : null,
-                                metadata: { shelfId }
-                            }) satisfies UserEventInput
-                    )
-                )
-                return json(response, 200, result)
+            if (shelfMatch) {
+                const input = shelfMatch.needsBody ? await body(request) : {}
+                return json(response, 200, coreShelfExecute(
+                    shelfMatch, shelfService, input, {
+                        // Keep the original Desktop event attribution and
+                        // recorded ID order, including duplicates, intact.
+                        appSessionId: request.headers['x-pica-app-session']
+                            ? String(request.headers['x-pica-app-session'])
+                            : null,
+                        contextId: request.headers['x-pica-context-id']
+                            ? String(request.headers['x-pica-context-id'])
+                            : null,
+                        recordUserEvents: events =>
+                            options.database.recordUserEvents(events)
+                    }
+                ))
             }
             if (
                 url.pathname === '/api/v1/recommendation-sessions' &&

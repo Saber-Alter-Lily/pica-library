@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 续进｜生产书架 API/事件从含源 Server 剥离
+
+- 叠加上一轮完成原 Catalogue API 的 #231，新增 [Draft PR #233](https://github.com/Saber-Alter-Lily/pica-library/pull/233)：生产正式 `src/library/server.ts` 的所有书架 HTTP 动作迁入源中立 `coreShelfRoutes`，继续复用原 `ShelfService`、SQLite 和分面筛选及书架事件事务；不重写书库或推荐。仅在沙箱 QA 子入口运行本地 `local:<id>` 的同一路由，不允许跨源项目、records 或不受控筛选。
+- 实际 [S3 双系统 70/70 #40848142891](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40848142891) 与 [Windows x64 解压包＋.cmd 重启验收 #40848432952](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40848432952) 专项 SUCCESS。旧完整 CI 的事件检查静态定位失效已按新调用路径修订，原事件批量事务保证和生产 HTTP 行为测试未删除；最新完整 CI 需按当前 SHA 重新判定。
+- 下一阶段 **不要继续堆独立 QA 小 UI**：以原 Windows 完整首页/设置/书库/书架/本地文件/WebDAV 为目标逐步解耦其初始化依赖，达到不启动 `LibraryService/ProviderService` 也能完整管理本地作品。仍需发布可信签名插件/受保护 OS 安装根、Android 纯核心 APK + Service/Binder、v0.5.0 无痛升级/回滚和真机验收。G1–G4 均 OPEN。
+- [本轮 CORE-SHELF 技术及验收文档](S3_CORE_SHELF_20261029.md)。
+
+---
 ## 2026-10-29 S3 推进｜从独立 QA 小阅读器进入正式 Desktop 书库 API 抽离
 
 - [Draft PR #231](https://github.com/Saber-Alter-Lily/pica-library/pull/231) 首次把**真实正式 Windows/Desktop HTTP 服务中的书库主路径**抽成共用的来源无关业务端口：漫画列表、单本详情、下载列表与原 `LibraryQueryService` 分面查询。同时让既有已验证纯核心/Windows Portable QA 复用它，仅施加 local-only 保护，绝不重复实现 SQLite、书库筛选或 Reader。

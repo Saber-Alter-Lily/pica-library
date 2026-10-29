@@ -4,7 +4,7 @@
 ### 2026-10-29 CORE-LIB-04c-02b-03b-01｜官方 v0.5.0 代码生成历史资料并被新只读 Core 接受
 
 - [Draft #245](https://github.com/Saber-Alter-Lily/pica-library/pull/245) 基于 #244，以固定 SHA 双 checkout 形式执行真实 v0.5.0 `LibraryDatabase` 和 `desktop/config`，原始迁移/路径定义的 Git blob 均锁定；旧代码而非现行代码建立 SQLite 14、收藏、书架、阅读进度及合成下载媒体。仅 OS-temp sentinel 测试，无真实用户/加密凭据/网络访问和资料变更。
-- [#40914858557](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40914858557) **Linux+Windows 2/2 SUCCESS**；扩展 9 种正常/拒绝/复核形态后的 [精确代码 #40915400620](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915400620) **双平台 SUCCESS**；全 Android/Web/Desktop CI 单独依 [#40915411308](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915411308) 终态判定。正式标签未改变，G1–G4 全 OPEN。
+- [#40914858557](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40914858557) **Linux+Windows 2/2 SUCCESS**；扩展 9 种正常/拒绝/复核形态后的 [精确代码 #40915400620](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915400620) **双平台 SUCCESS**；[Android/Web/Desktop 完整 CI #40915411308](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915411308) **Android / Web+Desktop 两 job 均 SUCCESS**，对应精确可执行/测试 SHA `2abcc1f6`；后续仅有文档变更。正式标签未改变，G1–G4 全 OPEN。
 - OSS 参考和决策记录在 [技术审计](S3_V050_OFFICIAL_TAG_FIXTURE_QA_20261029.md)：SQLite 原生 Online Backup + Node 24 重用；Room 的旧库迁移方法借鉴；不引入 Litestream 服务。下一小项 **03b-02** 为官方迁移 5/11/13→14 的仅合成历史路径和外置书库/缺字段/媒体体量分类；真正用户备份、停写、失败恢复、可信独立来源和 Android UX 仍需各自验证。
 
 

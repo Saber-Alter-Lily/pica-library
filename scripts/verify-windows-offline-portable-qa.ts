@@ -325,6 +325,45 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             throw new Error('Portable QA image bytes differ from original')
         const csrf = /"csrf":"([0-9a-f]{64})"/.exec(html)?.[1]
         if (!csrf) throw new Error('Portable QA CSRF bootstrap missing')
+        // The real extracted Windows CMD + bundled official Node must expose
+        // the SAME original shelves API as Desktop, never a second shelf DB.
+        const shelfWrite = (method: string, route: string,
+            input?: unknown, validCsrf = csrf) => fetch(origin + route, {
+                method, headers: {
+                    cookie, origin,
+                    'x-pica-qa-csrf': validCsrf,
+                    ...(input === undefined ? {} :
+                        { 'content-type': 'application/json' })
+                },
+                ...(input === undefined ? {} : { body: JSON.stringify(input) })
+            })
+        const shelfNew = await shelfWrite('POST', '/api/v1/shelves',
+            { name: 'Portable Offline Shelf' })
+        if (shelfNew.status !== 200)
+            throw new Error('Portable cannot create an offline shelf')
+        const shelf = await shelfNew.json() as Record<string, any>
+        if (typeof shelf.id !== 'string' || !/^[0-9a-f-]{36}$/.test(shelf.id))
+            throw new Error('Portable shelf identity invalid')
+        const shelfUrl = '/api/v1/shelves/' + shelf.id
+        if ((await shelfWrite('POST', shelfUrl + '/items',
+            { comicIds: ['eh:123:abcdef1234'] })).status !== 400 ||
+            (await shelfWrite('POST', shelfUrl + '/items',
+                { comicIds: [book.comicId] }, '0'.repeat(64))).status !== 403)
+            throw new Error('Portable shelf source/CSRF isolation failed')
+        const added = await shelfWrite('POST', shelfUrl + '/items',
+            { comicIds: [book.comicId] })
+        if (added.status !== 200)
+            throw new Error('Portable local shelf membership failed')
+        const shelfContents = await (await get(shelfUrl)).json() as Record<string, any>
+        if (shelfContents.shelf?.count !== 1 ||
+            shelfContents.items?.length !== 1 ||
+            shelfContents.items[0].comicId !== book.comicId)
+            throw new Error('Portable shelf metadata differs from shared ShelfService')
+        const filtered = await shelfWrite('POST', shelfUrl + '/add-filtered',
+            { query: { providerIds: ['local'], scope: 'catalog' } })
+        if (filtered.status !== 200 ||
+            (await filtered.json() as any).matched !== 1)
+            throw new Error('Portable original shelf facet matching failed')
         const body = JSON.stringify({
             comicId: book.comicId, episodeId, pageIndex: 1
         })
@@ -347,6 +386,26 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             throw new Error('Portable loopback Host boundary failed')
         await running.stop()
         running = undefined
+        // The restarted launcher must recover both Reader progress and the
+        // same saved shelf, without reimporting any external catalogue.
+        running = await startServerThroughPortableLauncher(launcher, root, temp)
+        const resumedEntry = new URL(running.state.url)
+        const resumedOpen = await fetch(resumedEntry)
+        const resumedCookie = resumedOpen.headers.get('set-cookie')?.split(';')[0]
+        if (resumedOpen.status !== 200 || !resumedCookie)
+            throw new Error('Portable restarted session unavailable')
+        const shelvesAfterRestart = await fetch(
+            resumedEntry.origin + shelfUrl,
+            { headers: { cookie: resumedCookie } }
+        )
+        const recoveredShelf = await shelvesAfterRestart.json() as Record<string, any>
+        if (shelvesAfterRestart.status !== 200 ||
+            recoveredShelf.shelf?.count !== 1 ||
+            recoveredShelf.items?.length !== 1 ||
+            recoveredShelf.items[0].comicId !== book.comicId)
+            throw new Error('Portable original shelf was not persisted across restart')
+        await running.stop()
+        running = undefined
         const persisted = succeeded(runtime, core, 'chapter', root, [
             '--comic-id', book.comicId, '--episode-id', episodeId
         ])
@@ -363,6 +422,7 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             sourceCount: 0,
             actualOldReaderRoutes: true,
             verifiedProgressRestart: true,
+            verifiedShelfRestart: true,
             originalSourcePreserved: true,
             userInstallable: false,
             publishAuthorized: false

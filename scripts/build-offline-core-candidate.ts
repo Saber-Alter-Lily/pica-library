@@ -20,6 +20,8 @@ const REQUIRE_SOURCE = [
     'src/services/reader-service.ts',
     'src/reader/local-http-read.ts',
     'src/library/core-catalog-read.ts',
+    'src/library/core-bootstrap-read.ts',
+    'src/app-capabilities.ts',
     'src/services/library-query-service.ts',
     'src/library/core-shelf-routes.ts',
     'src/library/core-local-import.ts',

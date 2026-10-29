@@ -113,7 +113,8 @@ describe('real common Web Reader accepts signed source-neutral legacy IDs', () =
         )
         expect(h.api).toHaveBeenCalledWith(signedRoot + '/progress',
             { headers: { 'x-pica-csrf': 'owned-test-csrf' } })
-        expect(h.chapter).toHaveBeenCalledExactlyOnceWith('eh-123')
+        expect(h.chapter).toHaveBeenCalledTimes(1)
+        expect(h.chapter).toHaveBeenCalledWith('eh-123')
         expect((h.state.reader as any).comicId).toBe(legacyId)
         expect((h.state.reader as any).signedSessionId).toBe(session)
         expect(h.$('#reader-title').textContent).toBe('Saved E-H gallery')

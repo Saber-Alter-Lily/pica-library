@@ -18,6 +18,7 @@ import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
 import { installedRuntimeComposition } from '../runtime/installed-runtime-composition'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
+import { coreRemoteStorageDispatch, coreRemoteStorageStatus } from '../remote-storage/core-action-port'
 import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
 import { desktopRuntimeTaskDiagnostics } from '../runtime/desktop-task-diagnostics'
 import {
@@ -903,7 +904,7 @@ async function startEngine(preferredPort: number) {
                       webPwa: false,
                       activeWebSessions: 0
                   },
-            remoteStorage: remoteStorageManager?.status() ?? { configured: false, kind: 'webdav' },
+            remoteStorage: coreRemoteStorageStatus(remoteStorageManager),
             ehAccount: {
                 enabled: sources.isEnabled('eh'),
                 configured: Boolean(
@@ -1065,36 +1066,11 @@ async function startEngine(preferredPort: number) {
                     theme: personalization.themeDescriptor(String(input.themeId ?? ''))
                 }
             }
-            const remoteAction = String(input.remoteStorageAction ?? '')
-            if (remoteAction === 'save') {
-                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
-                return remoteStorageManager.save(input)
-            }
-            if (remoteAction === 'sync') {
-                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
-                return await remoteStorageManager.sync(input)
-            }
-            if (
-                remoteAction === 'pause-sync' ||
-                remoteAction === 'resume-sync' ||
-                remoteAction === 'cancel-sync'
-            ) {
-                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
-                return {
-                    success: true,
-                    syncProgress: remoteStorageManager.syncControl(
-                        remoteAction === 'pause-sync'
-                            ? 'pause'
-                            : remoteAction === 'resume-sync'
-                              ? 'resume'
-                              : 'cancel'
-                    )
-                }
-            }
-            if (remoteAction === 'delete-remote') {
-                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
-                return await remoteStorageManager.deleteCopies(input)
-            }
+            const remoteStorageCommand = await coreRemoteStorageDispatch(
+                input, remoteStorageManager
+            )
+            if (remoteStorageCommand.handled)
+                return remoteStorageCommand.value
             const personalizationAction = String(input.personalizationAction ?? '')
             if (personalizationAction === 'verify-star')
                 throw new Error('公开用户名 Star 验证已停用，请使用 GitHub 账号认证')

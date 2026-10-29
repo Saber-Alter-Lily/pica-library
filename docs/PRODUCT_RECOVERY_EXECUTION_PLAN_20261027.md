@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### CORE-LIB-04b-01 完整回归纠正（2026-10-29）
+
+- 旧完整 CI [#40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) 暴露原 `reading-library-shell` 失败：有 Desktop status，但 caps 失败时不应通过第二次请求尝试取得权限。精确 `a40d8e82` 修复状态区分，无源 Core 缺失 Desktop host 仍可恢复正确 caps。专项加入该历史安全回归，不削弱原有限制。
+- 新精确代码/门禁 `94a4221aecf01ce7ac1656db2a7e6a055b219dac`，新 [S3 双平台 #40861065013](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861065013)、[全 Android/Web/Desktop CI #40861072267](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861072267) 本段撰写时 **QUEUED，尚未验收**。当前计划不推进 main、Release/OTA。
+- 后续继续 CORE-LIB-04b-02 原完整 `web/index.html` / 全资源 / 真 Chromium 无源启用，而后 CORE-LIB-04c 生产服务强制 Provider 构造拆分。G1–G4 全部 OPEN。
+
+
 ## 2026-10-29 CORE-LIB-04b-01｜原正式 Web app 在纯 Core 能力下安全初始化
 
 - [Draft #238](https://github.com/Saber-Alter-Lily/pica-library/pull/238) 真正修原 `web/app.js` `loadDesktop/detect`：无 `desktop/status` 时仍可读已有 source-free `/capabilities`；明确禁用 `recommendationSessions` 的后端，保留原本地漫画列表/作者/分面与 `renderAll`，不再主动获取在线推荐反馈、session 或发起构建；旧有正常 Desktop 不受影响。中英日翻译完善。未创建另一套前端。

@@ -198,13 +198,15 @@ describe('actual Desktop update helper handoff preflight, no production migratio
                 state: 'running', active: true, resourceState: 'none'
             }]
         }
-        f.port.activeWorkLeases = () =>
-            collectDesktopUpgradeWorkLeases([], diagnostics, resources)
-        expect(() => requireDesktopUpgradeQuiescence(f.port))
+        const upgraded = { ...f.port,
+            activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
+                [], diagnostics, resources)
+        }
+        expect(() => requireDesktopUpgradeQuiescence(upgraded)
             .toThrow(DesktopUpgradeQuiescenceError)
         diagnostics.tasks[0].state = 'complete'
         diagnostics.tasks[0].active = false
-        expect(() => requireDesktopUpgradeQuiescence(f.port)).not.toThrow()
+        expect(() => requireDesktopUpgradeQuiescence(upgraded)).not.toThrow()
     })
 
     it.each([
@@ -230,9 +232,11 @@ describe('actual Desktop update helper handoff preflight, no production migratio
             taskKey: 'recommendation-v5-shadow',
             state: 'idle', active: false, resourceState: 'none'
         }]}
-        f.port.activeWorkLeases = () => collectDesktopUpgradeWorkLeases(
-            [], snapshot, { active: [], waiting: [{ownerId:'test'}] })
-        expect(() => requireDesktopUpgradeQuiescence(f.port))
+        const upgraded = { ...f.port,
+            activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
+                [], snapshot, { active: [], waiting: [{ownerId:'test'}] })
+        }
+        expect(() => requireDesktopUpgradeQuiescence(upgraded)
             .toThrow('Finish, pause and fully stop active work')
     })
 
@@ -245,14 +249,18 @@ describe('actual Desktop update helper handoff preflight, no production migratio
                 active:false,resourceState:'unrecognized'}]}
         ]
         for (const diagnostic of bad) {
-            f.port.activeWorkLeases = () => collectDesktopUpgradeWorkLeases(
-                [], diagnostic, {active:[],waiting:[]})
-            expect(() => requireDesktopUpgradeQuiescence(f.port))
+            expect(() => requireDesktopUpgradeQuiescence({
+                ...f.port,
+                activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
+                    [], diagnostic, {active:[],waiting:[]})
+            }))
                 .toThrow(DesktopUpgradeQuiescenceError)
         }
-        f.port.activeWorkLeases = () => collectDesktopUpgradeWorkLeases(
-            [], {schemaVersion:1,tasks:[]}, {active:[]})
-        expect(() => requireDesktopUpgradeQuiescence(f.port))
+        expect(() => requireDesktopUpgradeQuiescence({
+            ...f.port,
+            activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
+                [], {schemaVersion:1,tasks:[]}, {active:[]})
+        }))
             .toThrow(DesktopUpgradeQuiescenceError)
     })
 

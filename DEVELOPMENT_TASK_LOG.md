@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+## S3 PR #229｜Reader 静态资源从源码仓库真正拆出（2026-10-28）
+
+- 在 [Draft PR #229](https://github.com/Saber-Alter-Lily/pica-library/pull/229) 中，新增严格白名单资源装配器：只复制**当前原始 Reader section DOM** 和 9 项已有 Reader JS/CSS/图标，带 SHA-256/大小回读；不复制完整 `index.html`、`web/app.js`、Pica/E-H/JM 账号、来源 Host 或推荐脚本。只能装配到不存在的 OS Temp 子目录，不覆盖其他目录，不上传/发布任何可执行候选。
+- QA HTTP 优先从实体 `core.mjs` 旁 `web/reader-fragment.html` 读取已有 Reader 片段，真实子进程/Chromium 从非 Git cwd 启动，依旧复用同一 ReaderService/SQLite/CBZ 和 `/api/v1/reader` 及安全会话，避免复制第二 Reader。
+- 首轮 [S3 #40827089058](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40827089058) Linux 33/33 成功但 Windows 路径规范化失败；按 Windows native realpath 修正父目录包含关系且继续拒绝非临时路径/覆盖，旧失败如实保留。精确源码 **8ed7d80cf0cdb79a3571c13bc62d20fbc5269197** 的 [S3 #40827250488](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40827250488) **SUCCESS**：Linux33/33、Windows33/33、TS 双平台通过、真实 Chromium1/1；浏览器读回进度测试不依赖 Git 源码目录。
+- 对应 [完整 CI #40827256178](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40827256178) 记录时仍运行中，不预判。未完成生产签名 Windows 程序、正式 Node runtime/ZIP、全功能 Windows Web UI 纯 Core、Android、用户 v0.5.0 无痛升级/回滚，G1–G4 保持 OPEN。详细证据见 [`docs/S3_OFFLINE_READER_ASSET_STAGE_20261028.md`](docs/S3_OFFLINE_READER_ASSET_STAGE_20261028.md)。
+
 ## S3 PR #228｜无来源核心真实 HTTP＋Chromium 阅读界面（2026-10-28）
 
 - 新建 [Draft PR #228](https://github.com/Saber-Alter-Lily/pica-library/pull/228)，叠加 #227。在已具备真实源码无源 ESM 文件、旧 Reader GET 端口的基础上，新增只允许 disposable QA sentinel 目录的 `serve`，启动固定 127.0.0.1 随机端口 HTTP；复用原 Reader GET 路由、数据库、图片/进度逻辑。额外保护 256-bit 一次性入口、HttpOnly/SameSite Cookie、实际 Host/loopback、Origin+CSRF、CSP、静态资源白名单、no-store，拒绝其它来源和在线路由。

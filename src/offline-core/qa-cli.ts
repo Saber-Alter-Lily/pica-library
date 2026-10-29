@@ -117,9 +117,15 @@ async function run() {
         if (command === 'serve') {
             const http = await startOfflineCoreHttp({
                 database: db, reader,
-                // The QA build reads the repo's existing Web reader assets;
-                // it never accepts a remote or user-chosen HTML root.
-                webRoot: path.resolve(process.cwd(), 'web')
+                // A real staged QA candidate serves only its own reviewed
+                // Reader assets, independent of cwd/repository checkout.
+                // Unstaged developer fixtures may use the existing repo Web.
+                // Never accept a user/HTTP-selected asset root.
+                webRoot: fs.existsSync(path.join(
+                    path.dirname(path.resolve(process.argv[1])), 'web',
+                    'reader-fragment.html'))
+                    ? path.join(path.dirname(path.resolve(process.argv[1])), 'web')
+                    : path.resolve(process.cwd(), 'web')
             })
             process.stdout.write(JSON.stringify({
                 status: 'OFFLINE_HTTP_QA_ONLY', url: http.url,

@@ -5,6 +5,7 @@ import http from 'node:http'
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import { buildOfflineCoreCandidate } from '../../scripts/build-offline-core-candidate'
+import { stageOfflineReaderAssetsQa } from '../../scripts/stage-offline-reader-assets-qa'
 
 const png = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6FkwAAAAASUVORK5CYII=',
@@ -32,7 +33,7 @@ function run(binary: string, command: string, root: string,
 async function start(binary: string, root: string) {
     const child = spawn(process.execPath,
         [binary, 'serve', '--root', root], {
-            cwd: process.cwd(),
+            cwd: path.dirname(binary),
             env: environment(),
             stdio: ['ignore', 'pipe', 'pipe']
         })
@@ -110,6 +111,16 @@ describe('S3 real protected loopback HTTP with existing Web Reader markup', () =
             const candidate = await buildOfflineCoreCandidate()
             const binary = path.join(home, 'core.mjs')
             fs.writeFileSync(binary, candidate.bytes, { flag: 'wx' })
+            const staged = stageOfflineReaderAssetsQa(path.join(home, 'web'))
+            expect(staged).toMatchObject({
+                status: 'UNSIGNED_OFFLINE_READER_QA_ASSETS',
+                sources: 0, count: 10, runnableAppReleased: false
+            })
+            const listed = fs.readdirSync(path.join(home, 'web'))
+            expect(listed).toContain('reader-fragment.html')
+            expect(listed).not.toContain('index.html')
+            expect(listed).not.toContain('app.js')
+            expect(listed).not.toContain('eh-account.js')
             const root = path.join(home, 'qa-library')
             const originals = path.join(home, 'originals')
             fs.mkdirSync(originals)

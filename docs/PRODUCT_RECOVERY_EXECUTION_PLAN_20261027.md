@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-28 S3 续进｜QA Reader 资产不再依赖 Git 工作目录
+
+- [Draft PR #229](https://github.com/Saber-Alter-Lily/pica-library/pull/229) 实现从现有正式 Web DOM 提取原 Reader 片段、9 个已审计 JS/CSS/图片资源的独立临时装配，拒绝复制整个首页、账号/来源和推荐脚本，计算 SHA-256 并可回读；纯 Core HTTP 和 Chromium 改从 `core.mjs` 旁的资源运行，不再要求源码仓库作为运行 CWD。
+- 精确源码 `8ed7d80c` 的 [S3 Linux/Windows+Chromium #40827250488](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40827250488) **SUCCESS：33/33 + 33/33 + 真浏览器 1/1**，涵盖一次性数据库隔离、源代码禁入、目录覆盖拒绝及翻页/进度/刷新。第一轮 Windows Temp realpath 失败已修复，记录保留。
+- **G2 仍 OPEN**：当前仅测试目录内 Node ESM+Reader 静态资源，正式 Windows 主程序/完整 Web UI 及 Android APK 依旧编入旧来源 SDK；没有可信独立来源签名/安装根/正式 Launcher、老版本用户数据迁移/无痛升级与回滚。下一切口优先构建**不发布**的 Windows x64 Portable 安装候选并核对 Node 许可证、文件闭包和启动器，再改造完整桌面 UI 及 Android 服务隔离。
+- 详细记录见 [Reader 资源装配证据](S3_OFFLINE_READER_ASSET_STAGE_20261028.md)。既定 S0–S6 和原42+新12验收不变；完整 CI 精确源码最终结果需另外核查。
+
+---
 ## 2026-10-28 S3 新进展｜纯核心独立 HTTP + 原 Reader Chromium 真实操作
 
 - 在 [Draft PR #228](https://github.com/Saber-Alter-Lily/pica-library/pull/228) 中，已将纯本地 Node Core QA 候选提供为受控 `127.0.0.1` HTTP 服务，仍通过同一 `localReaderGet`/`ReaderService` 读取原 `/api/v1/reader` API。直接复用旧 Reader DOM、CSS、翻页/视口/进度和设置模块，不载入具体站点 SDK。

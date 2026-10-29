@@ -92,7 +92,8 @@ async function readSmallJson(request: IncomingMessage) {
 }
 function requiredAsset(webRoot: string, name: string) {
     if (!SCRIPT_ASSETS.has(name) && !STYLE_ASSETS.has(name) &&
-        !IMAGE_ASSETS.has(name) && name !== 'index.html')
+        !IMAGE_ASSETS.has(name) && name !== 'index.html' &&
+        name !== 'reader-fragment.html')
         throw new Error('Unexpected QA Web asset')
     const file = path.join(webRoot, name)
     const stat = fs.lstatSync(file)
@@ -107,11 +108,17 @@ function requiredAsset(webRoot: string, name: string) {
  * shell. No second set of Reader markup/styles or provider scripts is copied.
  */
 function existingReaderMarkup(webRoot: string) {
-    const html = fs.readFileSync(requiredAsset(webRoot, 'index.html'), 'utf8')
     const start = '<section id="reader" class="view reader-view">'
+    const fragment = path.join(webRoot, 'reader-fragment.html')
+    const staged = fs.existsSync(fragment)
+    const html = staged
+        ? fs.readFileSync(requiredAsset(webRoot, 'reader-fragment.html'), 'utf8')
+        : fs.readFileSync(requiredAsset(webRoot, 'index.html'), 'utf8')
     const at = html.indexOf(start)
     const end = html.indexOf('</section>', at)
-    if (at < 0 || end < 0 || html.indexOf(start, at + start.length) >= 0)
+    if (at < 0 || end < 0 ||
+        html.indexOf(start, at + start.length) >= 0 ||
+        (staged && html.slice(end + '</section>'.length).trim()))
         throw new Error('Existing Reader markup is missing or ambiguous')
     const section = html.slice(at, end + '</section>'.length)
     for (const expected of [
@@ -159,8 +166,10 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
     close(): Promise<void>
 }> {
     const webRoot = fs.realpathSync.native(options.webRoot)
+    const markupFile = fs.existsSync(path.join(webRoot, 'reader-fragment.html'))
+        ? 'reader-fragment.html' : 'index.html'
     for (const asset of [
-        'index.html', ...SCRIPT_ASSETS, ...STYLE_ASSETS, ...IMAGE_ASSETS
+        markupFile, ...SCRIPT_ASSETS, ...STYLE_ASSETS, ...IMAGE_ASSETS
     ]) requiredAsset(webRoot, asset)
 
     const secret = randomBytes(32).toString('hex')

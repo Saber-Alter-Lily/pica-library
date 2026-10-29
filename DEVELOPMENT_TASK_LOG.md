@@ -1,6 +1,16 @@
 # Pica Library Development Task Log
 
 
+### 2026-10-29｜CORE-LIB-04c-02b-03a 历史 v0.5.0 发行结构资格（Draft #244）
+
+- 已读取真实 `v0.5.0` 标签并核对源：`src/storage/sqlite/migrations.ts` 与 `src/desktop/paths.ts` Git blob 分别 `4a98683f`、`f4cf5e3f`，与当前叠加分支一致；旧 `src/desktop/types.ts` 则**不存在**新版 `externalSources/mobileBridgeEnabled/readerSettings`。这些是源码连续性证据，不是对真实用户数据的迁移验收。
+- 新建 [Draft #244](https://github.com/Saber-Alter-Lily/pica-library/pull/244)，基于仍未合并的 #243。加入 `src/desktop/v050-historical-fixture-gate.ts`：只接受带独立 sentinel 的 OS Temp 合成资料，复用旧只读预检，严格审查 release 型 Config、迁移 1–14 和 11 类核心表/列、只读 SQLite integrity/foreign key；外置/自定义目录、锁、WAL/SHM、软链接、未知字段一律拒绝或要求复核，绝不读凭据/运行迁移/扫描用户目录。
+- 新 `test/unit/v050-historical-fixture-gate.test.ts` 锁定发行 Git Blob SHA、真实暂存 SQLite、迁移历史错误、外置路径、锁/sidecar、配置异常及写入禁令。新 [Linux/Windows 独立门禁](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/s3-v050-historical-fixture-qa.yml) 与原 Android/Web/Desktop CI 分开。
+- 首轮 [#40908769301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40908769301)：Linux SUCCESS，Windows 47 PASS/3 FAIL；根因是 Windows temp 8.3/真实路径别名与检测器使用的 canonical 字符串不一致，新合成 fixture 被误判为外置引用。第二轮 [#40909082916](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909082916) 仍发生同项误判。已在 `06ae2c58` 采用仅对已认证临时根允许**原始和 canonical 两种路径写法**，不 stat/open 任何自定义/外置目标；新精确 [CI #40909355786](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909355786) 待最终回读，不能按旧测试报通过。
+- 不能提前关闭 `CORE-LIB-04c-02b-03`：真实发行版源码运行生成的历史 fixture、外置资料授权、应用冻结及跨文件一致性、DPAPI/加密备份、失败注入/原地回滚、签名升级器以及 Android G1/G2/G3/G4 全部 OPEN。未合并 main、未发布、未改 OTA 或真实资料。细见 [历史结构 QA 审计](docs/S3_V050_HISTORICAL_FIXTURE_QA_20261029.md)。
+
+
+
 ### CORE-LIB-04c-02b-02 最终质量回填｜2026-10-29
 
 - [#243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 加固代码 `87a20359396f67ba30b54f39c1e8958ee4760569` 已通过 [Linux+Windows 实体 WAL/回滚专项 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) 和 [Android/Web/Desktop 完整 CI #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471)，均 SUCCESS。最新仅文档 HEAD 不改变已测试的业务代码。正式 `v0.5.0` 标签中 migrations.ts、desktop/paths.ts 与研发分支 SHA 完全相同；types.ts 仍有后续差异，后续需独立历史结构验收。**QA 快照不是生产迁移/真实用户回滚授权，G1–G4 全 OPEN。**

@@ -1,0 +1,59 @@
+name: S3 physical source-free offline core QA (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s3-offline-core-candidate-20261028
+    paths:
+      - '.github/workflows/s3-offline-core-qa.yml'
+      - 'src/offline-core/**'
+      - 'src/library/database.ts'
+      - 'src/local-library/**'
+      - 'src/services/reader-service.ts'
+      - 'scripts/build-offline-core-candidate.ts'
+      - 'test/unit/offline-core-candidate.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-offline-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-free-real-process:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck all offline-core ports and tests
+        run: pnpm type:check
+      - name: Real standalone bundle, local CBZ/folder, Reader and protected-root tests
+        run: pnpm exec vitest run test/unit/offline-core-candidate.test.ts test/unit/local-library-ingestion.test.ts test/unit/reader-service.test.ts test/unit/module-dag-policy.test.ts
+      - name: Produce SHA/inventory evidence only; NEVER publish runnable bytes
+        shell: bash
+        run: |
+          mkdir -p s3-offline-core-evidence
+          pnpm exec tsx scripts/build-offline-core-candidate.ts > s3-offline-core-evidence/manifest.json
+      - name: Keep non-executable audit metadata only
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-offline-core-metadata-${{ matrix.os }}-${{ github.sha }}
+          path: s3-offline-core-evidence/manifest.json
+          retention-days: 1
+          if-no-files-found: ignore

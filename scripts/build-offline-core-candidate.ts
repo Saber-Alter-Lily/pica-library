@@ -27,6 +27,7 @@ const REQUIRE_SOURCE = [
     'src/services/library-query-service.ts',
     'src/library/core-shelf-routes.ts',
     'src/library/core-local-import.ts',
+    'src/library/core-runtime-composition.ts',
     'src/services/shelf-service.ts',
     'src/offline-core/qa-http.ts',
     'src/offline-core/full-web-qa-assets.ts'

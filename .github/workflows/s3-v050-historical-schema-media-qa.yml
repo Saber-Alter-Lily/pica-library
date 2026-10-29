@@ -1,0 +1,60 @@
+name: S3 official v0.5 historical schema and media boundary QA (synthetic only)
+
+on:
+  push:
+    branches:
+      - codex/s3-v050-historical-schema-media-20261029
+    paths:
+      - '.github/workflows/s3-v050-historical-schema-media-qa.yml'
+      - 'scripts/qa/v050-release-identity.ts'
+      - 'scripts/qa/v050-release-tag-interoperability.ts'
+      - 'scripts/qa/v050-official-migration-matrix.ts'
+      - 'src/desktop/v050-owned-media-inventory-qa.ts'
+      - 'test/unit/v050-owned-media-inventory-qa.test.ts'
+      - 'src/desktop/v050-historical-fixture-gate.ts'
+      - 'src/storage/sqlite/migrations.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-v050-historical-media-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-authored-migration-media:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout development candidate without credential persistence
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout exact official release code without credential persistence
+        uses: actions/checkout@v4
+        with:
+          ref: bec7f9f31828e8c57e0a2c103b6b1206c22c37cf
+          path: release-v050
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck production and new QA interfaces
+        run: pnpm type:check
+      - name: Original-release full-schema tagged implementation must still pass
+        run: pnpm exec tsx scripts/qa/v050-release-tag-interoperability.ts
+      - name: Original-release partial 5 11 13 to 14 migrations and read-only inventory
+        run: pnpm exec tsx scripts/qa/v050-official-migration-matrix.ts
+      - name: Verify media links budgets and safe references plus historical contracts
+        run: pnpm exec vitest run test/unit/v050-owned-media-inventory-qa.test.ts test/unit/v050-historical-fixture-gate.test.ts test/unit/legacy-profile-preflight.test.ts test/unit/legacy-profile-snapshot-qa.test.ts

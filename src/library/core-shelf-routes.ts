@@ -72,7 +72,13 @@ export function coreShelfRoute(
     const { root, shelf, items } = matches(pathname)
     if (!isCoreShelfRoute(pathname, method)) return null
     if (root) {
-        if (method === 'GET') return { value: shelves.list() }
+        if (method === 'GET') return {
+            value: options.localOnly ? shelves.list().map(row => ({
+                ...row,
+                count: shelves.contents(row.id).filter(comic =>
+                    LOCAL_ID.test(comic.comicId)).length
+            })) : shelves.list()
+        }
         if (options.localOnly) offlineBody(input, 'name')
         return { value: shelves.create(String(input.name ?? '')) }
     }

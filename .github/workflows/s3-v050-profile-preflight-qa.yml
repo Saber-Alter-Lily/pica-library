@@ -39,4 +39,4 @@ jobs:
       - name: Typecheck existing Windows Desktop and legacy read-only audit
         run: pnpm type:check
       - name: Verify closed synthetic legacy SQLite, config, lock, WAL and zero-write evidence
-        run: pnpm exec vitest run test/unit/legacy-profile-preflight.test.ts test/unit/desktop-config.test.ts test/unit/desktop-instance-lock.test.ts
+        run: pnpm exec vitest run test/unit/legacy-profile-preflight.test.ts test/unit/desktop-config.test.ts test/unit/desktop-instance-ownership.test.ts

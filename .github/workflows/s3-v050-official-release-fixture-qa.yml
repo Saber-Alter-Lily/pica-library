@@ -1,0 +1,54 @@
+name: S3 official v0.5.0 source-built fixture interoperability (synthetic only)
+
+on:
+  push:
+    branches:
+      - codex/s3-v050-official-release-fixture-20261029
+    paths:
+      - '.github/workflows/s3-v050-official-release-fixture-qa.yml'
+      - 'scripts/qa/v050-release-tag-interoperability.ts'
+      - 'src/desktop/v050-historical-fixture-gate.ts'
+      - 'src/desktop/legacy-profile-preflight.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-v050-official-tag-fixture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  official-release-fixture:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout current unpublished development branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout immutable actual v0.5.0 release implementation
+        uses: actions/checkout@v4
+        with:
+          ref: bec7f9f31828e8c57e0a2c103b6b1206c22c37cf
+          path: release-v050
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck current source and admission gates
+        run: pnpm type:check
+      - name: Execute original release LibraryDatabase and Desktop config only on disposable temp profile; qualify using new read-only gate
+        run: pnpm exec tsx scripts/qa/v050-release-tag-interoperability.ts
+      - name: Run independent read-only regression and native WAL snapshot contract
+        run: pnpm exec vitest run test/unit/v050-historical-fixture-gate.test.ts test/unit/legacy-profile-preflight.test.ts test/unit/legacy-profile-snapshot-qa.test.ts

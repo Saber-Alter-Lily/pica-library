@@ -1,6 +1,17 @@
 # Pica Library Development Task Log
 
 
+### 2026-10-29｜CORE-LIB-04c-02b-03b-01：真实 v0.5.0 正式源码生成历史测试资料（Draft #245）
+
+- 新建 [Draft #245](https://github.com/Saber-Alter-Lily/pica-library/pull/245)，以 #244 的真实只读历史检查器为基础，**没有变更 main、正式 v0.5.0、用户资料或 OTA**。新增 `scripts/qa/v050-release-tag-interoperability.ts`，单独 checkout 真实官方发布提交 `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`（同时固定原 `LibraryDatabase/config/types/paths/migrations` 五个 Git blob），**真正执行该发布源码**生成合成资料，不再由现行数据库实现冒充历史版本。
+- Open-source 方案复用：官方 SQLite Online Backup API + 既有 Node 24 `node:sqlite` 与 #243 WAL 验证；Android Room MigrationTestHelper 借用其“旧版生成→新版验证”方法；Litestream 仅调研持续 WAL 复制的局限，当前不引入后台复制守护进程、新库或额外迁移引擎。技术审计：[S3_V050_OFFICIAL_TAG_FIXTURE_QA_20261029.md](docs/S3_V050_OFFICIAL_TAG_FIXTURE_QA_20261029.md)。
+- 旧版发布 `buildConfig/saveConfig/LibraryDatabase` 依次生成真实 migration-14 SQLite、合成收藏/作者标签/章节、伪造下载页、书架和阅读进度；新检查器只读校验文件完整性、结构、旧 source-policy 字段缺失与非泄密结果。补充九个正常/异常资料场景：conservative/balanced/fast，旧代理、未授权外置路径、后发来源字段、旧版可读取但缺少 GUI 字段、实例锁、WAL 标记。旧版真实帐号/DPAPI/网络/外部目录均不触达。
+- 首轮 [Linux/Windows CI #40914858557](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40914858557) **2/2 SUCCESS**（3 个场景、两系统各20项原回归）；扩展精确源码 `2abcc1f6` 的 [九场景 Linux/Windows #40915400620](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915400620) **2/2 SUCCESS**，完整 [Android/Web/Desktop CI #40915411308](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915411308) **Android 与 Web/Desktop 两 job 均 SUCCESS**（精确可执行代码 `2abcc1f6`）；后续仅文档更新未改变可执行文件。此为合成工程验证，不是生产迁移。
+- **范围不扩大**：测试资料仅由临时 OS Temp mkdtemp 创建，凭据是不可解析合成字节，回包仅报告非敏感结构状态，退出仅删除自己的临时资料；不产出 Release/可执行包，不操作旧安装或真正用户目录。真实 v0.5.0 移动/外置资料、大库体量、应用停写、跨文件快照、DPAPI、加密备份和回滚、升级助手与 Android source-free APK 仍 OPEN；G1–G4 不能结案。
+- **下一项 CORE-LIB-04c-02b-03b-02**：基于官方发行版原 Migration 的 5/11/13→14 历史结构路径、带外置/缺字段的只读分类，严查媒体路径边界与体量、Windows 符号链接/硬链接/目录联接，保持“仅识别，不迁移”。再评估生产级停写/备份机制与许可协议，避免重复造轮子。
+
+
+
 ### 2026-10-29｜CORE-LIB-04c-02b-03a 历史 v0.5.0 发行结构资格（Draft #244）
 
 - 已读取真实 `v0.5.0` 标签并核对源：`src/storage/sqlite/migrations.ts` 与 `src/desktop/paths.ts` Git blob 分别 `4a98683f`、`f4cf5e3f`，与当前叠加分支一致；旧 `src/desktop/types.ts` 则**不存在**新版 `externalSources/mobileBridgeEnabled/readerSettings`。这些是源码连续性证据，不是对真实用户数据的迁移验收。

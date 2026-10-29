@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+## S3 PR #230｜Windows x64 纯 Core Portable QA 真实 ZIP 与启动器（2026-10-29）
+
+- 叠加 #229 创建 [Draft PR #230](https://github.com/Saber-Alter-Lily/pica-library/pull/230)。沿用现有 source-free `core.mjs`、Reader DOM+9资源，不造第二数据库/Reader；新建**只在 CI OS Temp 内**组装 ZIP（20 文件 + 清单）、官方 Node 24.15.0 x64 运行时和 LICENSE、AdmZip MIT 许可证、项目 MIT/NOTICES、只可启动 sentinel QA 目录的 `.cmd`。不上传可执行 ZIP，仅保留短期 SHA/源闭包/许可证/真实启动验收 JSON。
+- [官方 Node 归档 SHA256](https://nodejs.org/dist/v24.15.0/SHASUMS256.txt) 验证通过，附加固定归档 hash `cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62`，防止运行时静默替换；实际解压后用随包 `runtime/node.exe` 运行旧 Reader、Local PNG 章节/媒体、Cookie/CSRF/Host 边界及 SQLite 进度重启恢复。后来把启动脚本 `.cmd` 本身加入正向运行测试并负责清理整个临时进程树。
+- 失败记录保留：初版 [#40837813326](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40837813326) 因 pnpm 管理的 AdmZip LICENSE 硬链接被拒绝；仅许可证做严格例外后 [#40838038263](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838038263) **PASS**；新增正向 CMD 测试首次 [#40838531135](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838531135) 因测试类型函数未改全失败，修后精确源码 **0ca6f6e8** 的 [Windows #40838638638](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838638638) **SUCCESS**。本轮 [Android/Web 完整 CI #40838644597](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838644597) 登记时尚未结束。
+- 重要：**该 ZIP 没有提供给用户、没有签名和 Release，正式 Windows UI/Android APK 的 Pica/EH/JM 仍未物理脱离**，不声明 G1–G4 或 NEW-SRC-01 通过；老用户 v0.5.0 原账号、记忆书库、下载和一键更新/回滚亦未真正验收。详情 [S3 Windows Portable QA](docs/S3_WINDOWS_OFFLINE_PORTABLE_QA_20261029.md)。
+
 ## S3 PR #229｜Reader 静态资源从源码仓库真正拆出（2026-10-28）
 
 - 在 [Draft PR #229](https://github.com/Saber-Alter-Lily/pica-library/pull/229) 中，新增严格白名单资源装配器：只复制**当前原始 Reader section DOM** 和 9 项已有 Reader JS/CSS/图标，带 SHA-256/大小回读；不复制完整 `index.html`、`web/app.js`、Pica/E-H/JM 账号、来源 Host 或推荐脚本。只能装配到不存在的 OS Temp 子目录，不覆盖其他目录，不上传/发布任何可执行候选。

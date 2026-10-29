@@ -1,0 +1,156 @@
+name: S3 Windows x64 source-free portable package QA (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s3-windows-portable-qa-20261029
+    paths:
+      - '.github/workflows/s3-windows-offline-portable-qa.yml'
+      - 'scripts/build-windows-offline-portable-qa.ts'
+      - 'scripts/verify-windows-offline-portable-qa.ts'
+      - 'scripts/tsconfig.s3-windows-qa.json'
+      - 'scripts/build-offline-core-candidate.ts'
+      - 'scripts/stage-offline-reader-assets-qa.ts'
+      - 'src/offline-core/**'
+      - 'src/reader/local-http-read.ts'
+      - 'web/offline-core-reader-qa.js'
+      - 'web/reader-input.js'
+      - 'web/reader-progress.js'
+      - 'web/reader-settings.js'
+      - 'web/reader-viewport.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-windows-portable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-x64-portable:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Verify isolated Windows Portable compiler types
+        run: pnpm exec tsc --project scripts/tsconfig.s3-windows-qa.json
+      - name: Retrieve official exact Node 24.15.0 Windows x64 runtime and check SHA-256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version='24.15.0'
+          $name="node-v$version-win-x64.zip"
+          $base="https://nodejs.org/dist/v$version"
+          $archive=Join-Path $env:RUNNER_TEMP $name
+          $checksums=Join-Path $env:RUNNER_TEMP 'S3_NODE_SHASUMS256.txt'
+          Invoke-WebRequest -Uri "$base/SHASUMS256.txt" -OutFile $checksums
+          $matches=@(Get-Content -LiteralPath $checksums | Where-Object {
+            $_ -match ('^[0-9a-f]{64}\s+' + [regex]::Escape($name) + '$')
+          })
+          if($matches.Count -ne 1){ throw 'Exactly one official Node runtime checksum required' }
+          $expected=($matches[0] -split '\s+')[0].ToLowerInvariant()
+          if($expected -ne 'cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62'){ throw 'Pinned Node 24.15.0 archive checksum changed; review required' }
+          Invoke-WebRequest -Uri "$base/$name" -OutFile $archive
+          $actual=(Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($actual -ne $expected){ throw 'Node distribution archive checksum mismatch' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip=[IO.Compression.ZipFile]::OpenRead($archive)
+          $runtimeRoot=Join-Path $env:RUNNER_TEMP 's3-offline-node'
+          New-Item -ItemType Directory -Force -Path $runtimeRoot | Out-Null
+          try {
+            $prefix="node-v$version-win-x64/"
+            $requested=@{
+              'node.exe'='node.exe'
+              'LICENSE'='Node.js-LICENSE.txt'
+            }
+            foreach($file in $requested.Keys){
+              $entry=$zip.GetEntry($prefix+$file)
+              if(-not $entry -or $entry.Length -lt 1024 -or $entry.Length -gt 150MB){
+                throw "Missing, empty or oversized official Node entry $file"
+              }
+              $dest=Join-Path $runtimeRoot $requested[$file]
+              $inputStream=$entry.Open()
+              try {
+                $outputStream=[IO.File]::Open($dest,[IO.FileMode]::CreateNew)
+                try { $inputStream.CopyTo($outputStream) } finally { $outputStream.Dispose() }
+              } finally { $inputStream.Dispose() }
+            }
+          } finally { $zip.Dispose() }
+          $exe=Join-Path $runtimeRoot 'node.exe'
+          $license=Join-Path $runtimeRoot 'Node.js-LICENSE.txt'
+          $reportedVersion=& $exe --version
+          if($LASTEXITCODE -ne 0 -or $reportedVersion.Trim() -ne "v$version"){
+            throw 'Actual bundled official Node executable cannot report pinned version'
+          }
+          "S3_NODE_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "S3_NODE_LICENSE=$license" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "S3_NODE_ARCHIVE_SHA256=$expected" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Assemble real local-only portable ZIP inside CI temporary directory
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $build=Join-Path $env:RUNNER_TEMP 'S3_OFFLINE_PORTABLE_BUILD.json'
+          & pnpm exec tsx scripts/build-windows-offline-portable-qa.ts --runtime $env:S3_NODE_EXE --runtime-license $env:S3_NODE_LICENSE --archive-sha256 $env:S3_NODE_ARCHIVE_SHA256 --source-sha $env:GITHUB_SHA | Set-Content -LiteralPath $build -Encoding utf8
+          if($LASTEXITCODE -ne 0){ throw 'Source-free Windows portable assembly failed' }
+          $result=Get-Content -Raw -LiteralPath $build | ConvertFrom-Json
+          if($result.status -ne 'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY' -or $result.publishAuthorized -or $result.artifactUploaded){
+            throw 'Unexpected Windows source-free QA package state'
+          }
+          if(-not (Test-Path -LiteralPath $result.zipPath)){ throw 'QA ZIP is absent' }
+          "S3_PORTABLE_ZIP=$($result.zipPath)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "S3_PORTABLE_BUILD_REPORT=$build" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Extract the actual ZIP and use its bundled official Node for local Reader regression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $verification=Join-Path $env:RUNNER_TEMP 'S3_OFFLINE_PORTABLE_VERIFY.json'
+          & pnpm exec tsx scripts/verify-windows-offline-portable-qa.ts --zip $env:S3_PORTABLE_ZIP --source-sha $env:GITHUB_SHA | Set-Content -LiteralPath $verification -Encoding utf8
+          if($LASTEXITCODE -ne 0){ throw 'Extracted Windows source-free QA ZIP execution failed' }
+          $result=Get-Content -Raw -LiteralPath $verification | ConvertFrom-Json
+          if($result.status -ne 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS' -or $result.sourceCount -ne 0 -or $result.publishAuthorized -or -not $result.verifiedProgressRestart){
+            throw 'Source-free portable ZIP acceptance did not pass'
+          }
+          "S3_PORTABLE_VERIFY_REPORT=$verification" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Retain non-executable integrity and license evidence only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force -Path 's3-offline-portable-evidence' | Out-Null
+          $report=Get-Content -Raw -LiteralPath $env:S3_PORTABLE_BUILD_REPORT | ConvertFrom-Json
+          $manifest=Join-Path $report.packageRoot 'BUILD-MANIFEST.json'
+          if(-not (Test-Path -LiteralPath $manifest)){ throw 'Package file manifest missing' }
+          Copy-Item -LiteralPath $manifest -Destination 's3-offline-portable-evidence/BUILD-MANIFEST.json'
+          $report | Select-Object status,fileCount,zipSha256,nodeExeSha256,verifiedNodeArchiveSha256,publishAuthorized,artifactUploaded | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath 's3-offline-portable-evidence/BUILD_QA.json' -Encoding utf8
+          Copy-Item -LiteralPath $env:S3_PORTABLE_VERIFY_REPORT -Destination 's3-offline-portable-evidence/EXTRACTED_RUN_QA.json'
+          if((Get-ChildItem -LiteralPath 's3-offline-portable-evidence' -Recurse -File | Where-Object { $_.Extension -eq '.exe' -or $_.Extension -eq '.zip' -or $_.Extension -eq '.mjs' }).Count -gt 0){
+            throw 'Executable or installable artifact accidentally entered evidence'
+          }
+      - name: Delete temporary portable ZIP and staged executable bytes
+        if: always()
+        shell: pwsh
+        run: |
+          $report=Join-Path $env:RUNNER_TEMP 'S3_OFFLINE_PORTABLE_BUILD.json'
+          if(Test-Path -LiteralPath $report){
+            $build=Get-Content -Raw -LiteralPath $report | ConvertFrom-Json
+            $root=Split-Path -Parent $build.packageRoot
+            if((Split-Path -Leaf $root) -match '^pica-s3-portable-[a-zA-Z0-9_-]+$' -and (Test-Path -LiteralPath $root)){
+              Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event.repository.private == false
+        with:
+          name: s3-offline-windows-portable-METADATA-ONLY-${{ github.sha }}
+          path: s3-offline-portable-evidence/
+          retention-days: 1
+          if-no-files-found: ignore

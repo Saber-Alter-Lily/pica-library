@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 CORE-LIB-04a｜旧正式 Windows UI 启动基础接口开始迁入无源核心
+
+- 新 [Draft #237](https://github.com/Saber-Alter-Lily/pica-library/pull/237)：真实旧 `src/library/server.ts` 的 `GET /status`、`GET /authors`、`GET /capabilities` 三项 API 改为来源无关 `coreBootstrapRead`，**旧生产 Provider 完整状态/历史字段保持不变**；独立无源实体 Core 使用同一 API，但明确关闭根本不存在的站点来源/收藏修改/在线推荐能力，仍需持有本机随机 QA 会话 Cookie 才可访问。
+- 现有 esbuild 的严格无源包实际包含原版本号、appCapabilities、模块契约与该端口，原 `src/version.ts` 的 `package.json` 引用触发首轮严谨门禁 FAIL；修复后仅允许项目根版本元数据，不放宽任意 npm 依赖。Windows 官方 Node x64 实体 ZIP [#40859105359](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859105359) 修后 **SUCCESS**；Linux/Windows/Chromium [#40859128504](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859128504) 与全 Android/Web/Desktop [#40859135753](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859135753) 本条写入时尚未完成，不提前认定。
+- **下一目标 CORE-LIB-04b**：原 Windows **完整 Web 首页+JS 资源**真正接无源 core-only 后端，在缺失具体来源时 UI 提供明确功能不可用状态，不要造第二套迷你 UI，也不能用假接口掩盖缺失。随后 CORE-LIB-04c 才能拆原 Server/Desktop `LibraryService/ProviderService` 强制构造，完成实体无 SDK Windows 应用，再到 Android 服务/Binder、插件可信发行与撤销、老 v0.5.0 无痛升级/回滚和所有实机用户验收。G1–G4 OPEN。[本轮审计](S3_CORE_BOOTSTRAP_20261029.md)。
+
+---
+
 ## 2026-10-29 S3 CORE-LIB-03c｜旧 Windows 本地配置及平台目录能力提取
 
 - [Draft #236](https://github.com/Saber-Alter-Lily/pica-library/pull/236) 完成**正式** `src/desktop/config.ts` 的本地目录/profile/Reader 设置/配置原子保存和敏感字段保护抽离，源策略兼容仍由 Desktop 主组合注入；`src/library/server.ts` 的原 `choose-folder/open-directory` 与 `src/desktop/main.ts` 使用来源中立 OS 能力用途接口。只允许旧五种本地目录用途，阻止网页路径/命令注入，沿用原原生选择器、系统打开函数、CSRF 与旧配置文件。

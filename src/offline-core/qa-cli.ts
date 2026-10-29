@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto'
 import { LibraryDatabase } from '../library/database'
 import { LocalLibraryIngestion } from '../local-library/ingestion'
 import { ReaderService } from '../services/reader-service'
+import { localReaderGet } from '../reader/local-http-read'
 
 const SENTINEL = '.pica-offline-core-qa-v1'
 const SENTINEL_TEXT = 'PICA_OFFLINE_CORE_QA_V1\n'
@@ -105,6 +106,9 @@ async function run() {
     assertDisposableRoot(root)
     const db = new LibraryDatabase(path.join(root, 'library.db'))
     const reader = new ReaderService(db, root)
+    // Exercise the EXACT original Desktop GET route contract, not parallel
+    // read behavior in an offline-only pseudo Reader.
+    const get = (route: string) => localReaderGet(route, reader)
     try {
         if (command === 'status')
             return { status: 'OFFLINE_QA_ONLY', summary: db.summary() }
@@ -130,14 +134,28 @@ async function run() {
             // Real preview + confirmation from the existing implementation.
             return await ingest.confirm(preview.token)
         }
-        if (command === 'chapters')
-            return { chapters: reader.chapters(required('comic-id')) }
-        if (command === 'chapter')
-            return reader.chapter(required('comic-id'), required('episode-id'))
+        if (command === 'chapters') {
+            const result = get('/api/v1/reader/comics/' +
+                encodeURIComponent(required('comic-id')) + '/chapters')
+            if (!result || result.kind !== 'json')
+                throw new Error('Offline Reader chapters route unavailable')
+            return { chapters: result.value }
+        }
+        if (command === 'chapter') {
+            const result = get('/api/v1/reader/comics/' +
+                encodeURIComponent(required('comic-id')) + '/chapters/' +
+                encodeURIComponent(required('episode-id')))
+            if (!result || result.kind !== 'json')
+                throw new Error('Offline Reader chapter route unavailable')
+            return result.value
+        }
         if (command === 'picture') {
             // The QA command only proves the existing file Reader can access
             // the page; do not print binary copyrighted/user media to stdout.
-            const picture = reader.picture(required('picture-id'))
+            const picture = get('/api/v1/reader/pictures/' +
+                encodeURIComponent(required('picture-id')))
+            if (!picture || picture.kind !== 'image')
+                throw new Error('Offline Reader picture route unavailable')
             return {
                 contentType: picture.contentType,
                 bytes: picture.data.length,
@@ -153,8 +171,12 @@ async function run() {
             return reader.saveProgress(
                 required('comic-id'), required('episode-id'), Number(raw))
         }
-        if (command === 'history')
-            return { readingProgress: reader.recentProgress() }
+        if (command === 'history') {
+            const result = get('/api/v1/reader/progress')
+            if (!result || result.kind !== 'json')
+                throw new Error('Offline Reader progress route unavailable')
+            return { readingProgress: result.value }
+        }
         throw new Error('Unsupported offline QA command')
     } finally { db.close() }
 }

@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 CORE-LIB-03a｜复用原正式本地文件导入与纯核心
+
+- 在 [Draft PR #234](https://github.com/Saber-Alter-Lily/pica-library/pull/234) 真实抽离原 Desktop `/api/v1/desktop/local-import` 的受信任文件选择器/预览/确认/取消逻辑为来源中立控制器，保留旧文件夹/CBZ `LocalLibraryIngestion`、原 SQLite 和进度，不重造功能。独立无源 CLI 也调用同一端口；物理 QA Core 的源码闭包门禁必须包含它。
+- 新增真实 SQLite、路径注入/来源字段/无原生文件选择器/headless/取消/token 单次/并发测试，连同已有生产 HTTP/CSRF/Reader 回归。Linux/Windows S3、Windows Portable、Android/Web/Desktop CI 均按新的精确 SHA 单独验收；**当前 CI 待检，不宣称全部通过**。
+- 下一段 CORE-LIB-03b：正式 Desktop `choose-folder/open-directory`、无源设置和 WebDAV 能力端口；CORE-LIB-04：完整旧首页/书库/书架/Reader/设置在不启动 `ProviderService/LibraryService` 的 Windows 核心上运行。随后才可能认定实际来源外置和旧 v0.5.0 安全迁移。Android 源服务/Binder、签名可信发布、G1–G4 保持 OPEN。[详细审计](S3_CORE_LOCAL_IMPORT_20261029.md)。
+
+---
+
 ## 2026-10-29 S3 续进｜生产书架 API/事件从含源 Server 剥离
 
 - 叠加上一轮完成原 Catalogue API 的 #231，新增 [Draft PR #233](https://github.com/Saber-Alter-Lily/pica-library/pull/233)：生产正式 `src/library/server.ts` 的所有书架 HTTP 动作迁入源中立 `coreShelfRoutes`，继续复用原 `ShelfService`、SQLite 和分面筛选及书架事件事务；不重写书库或推荐。仅在沙箱 QA 子入口运行本地 `local:<id>` 的同一路由，不允许跨源项目、records 或不受控筛选。

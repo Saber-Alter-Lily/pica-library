@@ -6,6 +6,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import http from 'node:http'
 import { createHash } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
@@ -339,9 +340,7 @@ async function main() {
     ) + '\n')
 }
 if (process.argv[1] &&
-    path.resolve(process.argv[1]) === path.resolve(
-        new URL(import.meta.url).pathname.replace(/^\/([a-zA-Z]:)/, '$1')
-    ))
+    path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
     main().catch(error => {
         process.stderr.write(
             (error instanceof Error ? error.message : String(error)) + '\n')

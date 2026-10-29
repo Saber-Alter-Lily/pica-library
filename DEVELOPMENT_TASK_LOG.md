@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+## S3 PR #226｜本地纯核心真实独立进程候选（2026-10-28）
+
+- 从已确认 #225 完整 CI SUCCESS 的开发线新建 [Draft PR #226](https://github.com/Saber-Alter-Lily/pica-library/pull/226)，仅加入 src/offline-core/qa-cli.ts、build-offline-core-candidate.ts、专项回归与 CI。直接复用旧 LibraryDatabase、LocalLibraryIngestion、ReaderService，真实 esbuild ESM 物理打包并检查站点 SDK 不在单文件依赖闭包；临时 QA root 与用户 v0.5.0 数据隔离。
+- 已测试真实不同 OS Node 进程的**文件夹与 CBZ 导入→章节与媒体摘要→显示/保存阅读进度→重启恢复**、无确认拒绝、旧数据库不写入，且 CI Artifact 只留 SHA/依赖 JSON，不传可执行文件或用户资料。AdmZip 的 Electron 可选 original-fs 引起旧 CI 失败，修复为在 Node-only QA 显式 alias 到 node:fs，正式 Rollup/包不改。旧失败不删除。
+- **精确源码 bc1539515aa0f5b41dfbedb0b3b0a47df3744609** 的 [双系统 S3 专项 #40821030082](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821030082) **SUCCESS**：Linux 26/26、Windows 26/26、两端 TS 检查通过。[全项目 CI #40821035105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821035105) 登记时仍运行中，不能冒充完整 PASS。
+- **核心重要限制**：这不是用户可用 Windows 浏览器 UI/启动器，也不是正式源外置版本。旧 src/library/server.ts/LibraryService 仍捆绑具体 Pica/E-H/JM，Android 核心仍含来源代码；G1–G4、NEW-SRC-01、旧版无痛升级和物理回滚全部仍 OPEN。
+- 详见 [S3 离线核心证据及后续抽路由计划](docs/S3_OFFLINE_CORE_PHYSICAL_QA_20261028.md)。
+
 ## S3 PR #225｜修复 E-H 旧 ID 点击签名来源无反应（2026-10-28）
 
 - 实际发现 Web 入口 openReaderComic 的单冒号限制与已有 EhPublicIdentityBridge 保持旧 eh:gid:token 的计划矛盾：统一书库会显示已连接的签名阅读按钮，但点击旧作品 ID 静默返回。新增来源中立 Web signed-route 语法校验（两段/三段标识，无 URL、路径和 local/hosted），并将无效会话改为显式错误反馈。沿用唯一 Reader、既有 SignedSourceDesktopReader、独立 CSRF、同一数据库作品身份与保存进度。

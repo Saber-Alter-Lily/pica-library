@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-28 S3 新进展｜Windows/Linux 无来源独立本地阅读核心 QA
+
+- **不覆盖既定发布关口**：新增 Draft [PR #226](https://github.com/Saber-Alter-Lily/pica-library/pull/226)，以 v0.5.0 现有 Reader/导入/数据库为原件，实际 esbuild 构建一个独立本地 Node ESM QA 候选，所有具体来源 SDK 不在这个打包图中。
+- [S3 Linux/Windows 专项 #40821030082](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821030082) 对精确源码 bc153951 **26/26 + 26/26 SUCCESS**，实际独立进程操作文件夹和 CBZ、保存和重启恢复阅读进度；用户旧目录完全拒绝访问。仅输出可读源码依赖/哈希 JSON，不上传可执行件。
+- **G2 仍 OPEN**：现有 Desktop main/HTTP Server、Windows 正式发行包和 Android APK 仍依赖旧 Pica/E-H/JM 代码；尚未抽出同一 Web Reader 的零来源 HTTP 组合，未做 Windows/Android 物理主程序替换或生产信任根。下一任务是共享本地 Reader HTTP 路由的受控提取与跨包可用性测试，不造第二套 Reader。
+- 详细进度和边界：[S3 离线核心实体 QA](S3_OFFLINE_CORE_PHYSICAL_QA_20261028.md)。完整 CI 以精确结果为准，所有原42+新增12案例与 G1–G4 不豁免。
+
+---
 ## 2026-10-28 S3 阶段关口｜真实 Windows/Linux 进程原型
 
 - 开发分支：[S2 Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) → [S3 Draft PR #220](https://github.com/Saber-Alter-Lily/pica-library/pull/220)。基于 v0.5.0 正式版继续做未发布隔离开发，不触碰 main、签名包、OTA 或用户数据。

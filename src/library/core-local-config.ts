@@ -50,7 +50,8 @@ export function readCoreLocalConfig(
     if (!fs.existsSync(file)) return null
     const value = JSON.parse(fs.readFileSync(file, 'utf8')) as DesktopConfig
     if (
-        !value || value.schemaVersion !== 1 ||
+        !value || typeof value !== 'object' || value.schemaVersion !== 1 ||
+        typeof value.libraryDirectory !== 'string' ||
         !path.isAbsolute(value.libraryDirectory) ||
         !profiles.has(value.profile)
     )

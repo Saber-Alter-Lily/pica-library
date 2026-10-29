@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+## S3 PR #228｜无来源核心真实 HTTP＋Chromium 阅读界面（2026-10-28）
+
+- 新建 [Draft PR #228](https://github.com/Saber-Alter-Lily/pica-library/pull/228)，叠加 #227。在已具备真实源码无源 ESM 文件、旧 Reader GET 端口的基础上，新增只允许 disposable QA sentinel 目录的 `serve`，启动固定 127.0.0.1 随机端口 HTTP；复用原 Reader GET 路由、数据库、图片/进度逻辑。额外保护 256-bit 一次性入口、HttpOnly/SameSite Cookie、实际 Host/loopback、Origin+CSRF、CSP、静态资源白名单、no-store，拒绝其它来源和在线路由。
+- **现有界面复用而非复制**：取原 `web/index.html` 的 `section#reader` DOM，沿用原样式、`reader-input/viewport/progress/settings` 模块；QA 浏览器适配层负责将保存在测试目录内的本地漫画与原 `/api/v1/reader/...` URL 接通。没有搬入旧 Desktop 的在线 SDK/ProviderService，也不涉及正式用户账号/资料。
+- 精确代码 `87f142b305fd051f8006d94ad23e46f44c49e794` 的 [S3 双平台及浏览器 #40826346306](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40826346306) **SUCCESS**：Linux 31/31、Windows 31/31、真实 Chromium 1/1、TS 双端通过。浏览器实际翻到第二页并保存，在刷新后恢复；HTTP 测试完成跨站与源路径拒绝。
+- 本轮 [全项目 CI #40826350952](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40826350952) 记录时仍待最终状态，不以专项通过代替全项目验收。详见 [`docs/S3_OFFLINE_CORE_HTTP_UI_20261028.md`](docs/S3_OFFLINE_CORE_HTTP_UI_20261028.md)。
+- 纯核心仅为隔离 QA 阅读入口；**生产 Windows 启动器、完整多功能 Web UI、Android 纯 Core、可验证来源签名安装和 v0.5.0 一键升级仍未完成**。保留 G1–G4 OPEN，不合并或发布。
+
 ## S3 PR #227｜统一本地 Reader 的 HTTP GET 路由（2026-10-28）
 
 - 在 #226 已验证的来源中立本地 CLI 上创建 [Draft PR #227](https://github.com/Saber-Alter-Lily/pica-library/pull/227)，从**实际旧** src/library/server.ts 抽出本地 Reader 的章节/单章/页图片/进度 GET 分派到 src/reader/local-http-read.ts。旧 Desktop Server 保留原 HTTP 安全校验/headers/输出以及 POST 保存进度、用户事件、导出和外部文件打开；同时让零来源实体 QA 候选调用同一 GET 路由，不造第二个 Reader。

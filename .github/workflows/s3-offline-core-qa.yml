@@ -5,12 +5,22 @@ on:
     branches:
       - codex/s3-offline-core-candidate-20261028
       - codex/s3-shared-local-http-20261028
+      - codex/s3-offline-http-ui-20261028
     paths:
       - '.github/workflows/s3-offline-core-qa.yml'
       - 'src/offline-core/**'
+      - 'web/offline-core-reader-qa.js'
+      - 'web/reader-viewport.js'
+      - 'web/reader-input.js'
+      - 'web/reader-progress.js'
+      - 'web/reader-settings.js'
+      - 'web/index.html'
       - 'src/reader/local-http-read.ts'
       - 'src/library/server.ts'
       - 'test/unit/local-reader-http-read.test.ts'
+      - 'test/unit/offline-core-http-ui.test.ts'
+      - 'scripts/qa-offline-browser-harness.ts'
+      - 'test/e2e/offline-core-reader.spec.mjs'
       - 'src/library/database.ts'
       - 'src/local-library/**'
       - 'src/services/reader-service.ts'
@@ -47,7 +57,7 @@ jobs:
       - name: Typecheck all offline-core ports and tests
         run: pnpm type:check
       - name: Real standalone bundle, local CBZ/folder, Reader and protected-root tests
-        run: pnpm exec vitest run test/unit/offline-core-candidate.test.ts test/unit/local-reader-http-read.test.ts test/unit/local-library-ingestion.test.ts test/unit/reader-service.test.ts test/unit/module-dag-policy.test.ts
+        run: pnpm exec vitest run test/unit/offline-core-http-ui.test.ts test/unit/offline-core-candidate.test.ts test/unit/local-reader-http-read.test.ts test/unit/local-library-ingestion.test.ts test/unit/reader-service.test.ts test/unit/module-dag-policy.test.ts
       - name: Produce SHA/inventory evidence only; NEVER publish runnable bytes
         shell: bash
         run: |
@@ -59,5 +69,35 @@ jobs:
         with:
           name: s3-offline-core-metadata-${{ matrix.os }}-${{ github.sha }}
           path: s3-offline-core-evidence/manifest.json
+          retention-days: 1
+          if-no-files-found: ignore
+
+  browser-ui-qa:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    needs: source-free-real-process
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Reuse project's existing CI-only Playwright version
+        run: pnpm add -D '@playwright/test@1.63.0' --ignore-workspace-root-check
+      - name: Install actual Chromium for reader UI acceptance
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify existing Reader markup, local image and persisted page in Chromium
+        run: pnpm exec playwright test test/e2e/offline-core-reader.spec.mjs --config=playwright.smoke.config.mjs --workers=1 --reporter=line
+      - name: Keep failure diagnostics for synthetic disposable QA data only
+        if: failure() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-offline-chromium-qa-${{ github.sha }}
+          path: test-results/
           retention-days: 1
           if-no-files-found: ignore

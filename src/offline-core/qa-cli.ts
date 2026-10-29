@@ -5,7 +5,9 @@
  * QA root carrying our exact sentinel. Never touch a v0.5.0 user's data.
  *
  * No LibraryService, ProviderService, SDK, network client, Host, workers or
- * sign/install capability. No server is started, and no code is downloaded.
+ * sign/install capability. An explicit, loopback-only QA HTTP service
+ * may be launched after checking its isolated data root; no content or
+ * executable code is downloaded.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -14,12 +16,13 @@ import { LibraryDatabase } from '../library/database'
 import { LocalLibraryIngestion } from '../local-library/ingestion'
 import { ReaderService } from '../services/reader-service'
 import { localReaderGet } from '../reader/local-http-read'
+import { startOfflineCoreHttp } from './qa-http'
 
 const SENTINEL = '.pica-offline-core-qa-v1'
 const SENTINEL_TEXT = 'PICA_OFFLINE_CORE_QA_V1\n'
 const COMMANDS = new Set([
     'init', 'status', 'list', 'import', 'chapters', 'chapter',
-    'picture', 'progress', 'history'
+    'picture', 'progress', 'history', 'serve'
 ])
 const FLAGS = new Set([
     'root', 'confirm-disposable', 'confirm', 'path', 'kind', 'comic-id',
@@ -56,7 +59,8 @@ function options(argv: string[]) {
         chapter: ['root', 'comic-id', 'episode-id'],
         picture: ['root', 'picture-id'],
         progress: ['root', 'comic-id', 'episode-id', 'page-index', 'confirm'],
-        history: ['root']
+        history: ['root'],
+        serve: ['root']
     }
     if ([...values.keys()].some(key => !permitted[command].includes(key)))
         throw new Error('Argument not supported by this QA command')
@@ -110,6 +114,24 @@ async function run() {
     // read behavior in an offline-only pseudo Reader.
     const get = (route: string) => localReaderGet(route, reader)
     try {
+        if (command === 'serve') {
+            const http = await startOfflineCoreHttp({
+                database: db, reader,
+                // The QA build reads the repo's existing Web reader assets;
+                // it never accepts a remote or user-chosen HTML root.
+                webRoot: path.resolve(process.cwd(), 'web')
+            })
+            process.stdout.write(JSON.stringify({
+                status: 'OFFLINE_HTTP_QA_ONLY', url: http.url,
+                sources: 0, publishable: false
+            }) + '\n')
+            await new Promise<void>(resolve => {
+                process.once('SIGINT', () => resolve())
+                process.once('SIGTERM', () => resolve())
+            })
+            await http.close()
+            return { status: 'OFFLINE_HTTP_QA_STOPPED' }
+        }
         if (command === 'status')
             return { status: 'OFFLINE_QA_ONLY', summary: db.summary() }
         if (command === 'list')

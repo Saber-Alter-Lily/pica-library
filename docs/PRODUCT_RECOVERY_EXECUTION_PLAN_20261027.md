@@ -6,7 +6,7 @@
 #### 新发现的覆盖缺口和更严格的上线门禁
 
 - 仅使用旧 idle-browser 检测结果可能遗漏 `LibraryService` 原任务诊断里的维护扫描、书库整理、V5 shadow、Work Identity refresh 与资源协调器待运行队列。故已将真实 `runtimeTaskDiagnostics` 与 `runtimeResourceProfile` 合并至更新准入，不能再把旧 `eb61cd748` 的 CI 绿色当作最终门禁。
-- 最新可执行测试源码 `572d6758`，独立 [双系统 #40975511400](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975511400) 和 [完整 CI #40975519327](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975519327) **待终态回读**；仍不能证明临时观测之后无新写入，后续必须实现 source-free/legacy HTTP + worker + WebDAV 真正 write barrier 和可核查停写收据后才考虑生产级无损迁移。
+- 最新可执行测试源码 `572d6758`，独立 [双系统 #40975511400](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975511400) **Ubuntu/Windows 2/2 SUCCESS，各 67/67 tests**；[完整 CI #40975519327](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975519327) **仍排队/NOT_VERIFIED**；仍不能证明临时观测之后无新写入，后续必须实现 source-free/legacy HTTP + worker + WebDAV 真正 write barrier 和可核查停写收据后才考虑生产级无损迁移。
 
 
 

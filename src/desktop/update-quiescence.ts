@@ -38,6 +38,67 @@ export interface DesktopUpgradeQuiescencePort {
 }
 
 /**
+ * Merge the EXISTING Desktop collector with the EXISTING LibraryService
+ * task diagnostics and RuntimeResourceCoordinator snapshots. The older idle
+ * browser detector does not necessarily include organize/maintenance/v5
+ * shadow/work-identity tasks or resource acquisitions still waiting.
+ *
+ * No task names or error text escape from this function to the user.
+ * Invalid/missing snapshots fail closed instead of silently meaning idle.
+ */
+export function collectDesktopUpgradeWorkLeases(
+    existing: readonly string[],
+    diagnosticInput: unknown,
+    resourceInput: unknown
+): string[] {
+    const fail = () => {
+        throw new DesktopUpgradeQuiescenceError('DESKTOP_UPDATE_NOT_READY')
+    }
+    if (!Array.isArray(existing) ||
+        existing.some(item => typeof item !== 'string' || !item.trim()))
+        return fail()
+    if (!diagnosticInput || typeof diagnosticInput !== 'object' ||
+        !('schemaVersion' in diagnosticInput) ||
+        diagnosticInput.schemaVersion !== 1 ||
+        !('tasks' in diagnosticInput) ||
+        !Array.isArray(diagnosticInput.tasks))
+        return fail()
+    if (!resourceInput || typeof resourceInput !== 'object' ||
+        !('active' in resourceInput) ||
+        !Array.isArray(resourceInput.active) ||
+        !('waiting' in resourceInput) ||
+        !Array.isArray(resourceInput.waiting))
+        return fail()
+    const statuses = diagnosticInput.tasks as unknown[]
+    const cleanStates = new Set(['idle', 'complete', 'cancelled'])
+    const knownStates = new Set([
+        ...cleanStates, 'waiting', 'running', 'pausing', 'paused',
+        'cancelling', 'failed', 'unknown'
+    ])
+    let taskActive = false
+    for (const item of statuses) {
+        if (!item || typeof item !== 'object' ||
+            !('taskKey' in item) || typeof item.taskKey !== 'string' ||
+            !item.taskKey.trim() ||
+            !('state' in item) || typeof item.state !== 'string' ||
+            !knownStates.has(item.state) ||
+            !('active' in item) || typeof item.active !== 'boolean' ||
+            !('resourceState' in item) ||
+            !['none', 'running', 'waiting'].includes(String(item.resourceState)))
+            return fail()
+        if (item.active || !cleanStates.has(item.state) ||
+            item.resourceState !== 'none') taskActive = true
+    }
+    const resources = resourceInput as { active: unknown[]; waiting: unknown[] }
+    return [
+        ...existing,
+        ...(taskActive ? ['library-task-not-idle'] : []),
+        ...(resources.active.length || resources.waiting.length
+            ? ['runtime-resource-not-drained'] : [])
+    ]
+}
+
+/**
  * No operations on source files, PIDs, user data or update payloads.
  * The original owner must still hold its exact lock before and after
  * gathering the currently active work statuses.

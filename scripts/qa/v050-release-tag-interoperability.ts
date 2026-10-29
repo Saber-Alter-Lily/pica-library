@@ -12,18 +12,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
+import { verifyPinnedV050Checkout, V050_RELEASE_COMMIT } from './v050-release-identity'
 import { qualifyV050HistoricalFixtureReadOnly, V050_HISTORY_QA_MARKER, V050_HISTORY_QA_MARKER_TEXT } from '../../src/desktop/v050-historical-fixture-gate'
-
-const RELEASE_COMMIT = 'bec7f9f31828e8c57e0a2c103b6b1206c22c37cf'
-const RELEASE_BLOBS = {
-    'src/library/database.ts': '649f19b65ca67996b934b9e15535135f8889b96f',
-    'src/desktop/config.ts': '58792d6f15315b6000cd28db20319132f5bba91b',
-    'src/desktop/types.ts': 'e63de26c3a592542ea1b0efc0c06b0fd50c70e72',
-    'src/desktop/paths.ts': 'f4cf5e3f6bf3d5b9603dbbcc295d8ff58659ae8d',
-    'src/storage/sqlite/migrations.ts': '4a98683fb29feec31970d3958385968f65af6365'
-} as const
 
 type ReleaseComic = {
     comicId: string
@@ -54,35 +45,8 @@ type ReleaseConfig = {
     proxyUrl?: string
 }
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
-const gitBlob = (bytes: Buffer) =>
-    createHash('sha1').update(Buffer.from('blob ' + bytes.length + '\0'))
-        .update(bytes).digest('hex')
-const isWin = process.platform === 'win32'
 function check(condition: unknown, label: string): asserts condition {
     if (!condition) throw new Error('V050_RELEASE_FIXTURE_' + label)
-}
-function fixedCheckout() {
-    check(process.env.GITHUB_ACTIONS === 'true' &&
-        process.env.GITHUB_REPOSITORY === 'Saber-Alter-Lily/pica-library',
-        'CI_ONLY')
-    const project = fs.realpathSync.native(process.cwd())
-    const checkout = path.join(project, 'release-v050')
-    const st = fs.lstatSync(checkout, {throwIfNoEntry: false})
-    check(st?.isDirectory() && !st.isSymbolicLink(), 'RELEASE_CHECKOUT_MISSING')
-    const real = fs.realpathSync.native(checkout)
-    check(path.dirname(real).toLowerCase() === project.toLowerCase(),
-        'RELEASE_CHECKOUT_NOT_OWNED')
-    const rev = execFileSync('git', ['-C', real, 'rev-parse', 'HEAD'],
-        {encoding: 'utf8'}).trim()
-    check(rev === RELEASE_COMMIT, 'RELEASE_COMMIT_MISMATCH')
-    const modified = execFileSync('git', ['-C', real, 'status', '--porcelain'],
-        {encoding: 'utf8'}).trim()
-    check(modified === '', 'RELEASE_TREE_DIRTY')
-    for (const [name, sha] of Object.entries(RELEASE_BLOBS)) {
-        const actual = gitBlob(fs.readFileSync(path.join(real, ...name.split('/'))))
-        check(actual === sha, 'RELEASE_BLOB_MISMATCH')
-    }
-    return real
 }
 function fingerprint(file: string) {
     const data = fs.readFileSync(file)
@@ -107,7 +71,7 @@ function resultStatus(root: string, expectedStatus: string, reason?: string) {
     return observed
 }
 async function main() {
-    const source = fixedCheckout()
+    const source = verifyPinnedV050Checkout()
     const releaseDb = await import(pathToFileURL(path.join(source,
         'src/library/database.ts')).href) as unknown as {
         LibraryDatabase: new (file: string) => ReleaseDatabase
@@ -286,7 +250,7 @@ async function main() {
         const summary = {
             status: 'OFFICIAL_TAG_SYNTHETIC_INTEROPERABILITY_PASS',
             tag: 'v0.5.0',
-            tagSha: RELEASE_COMMIT,
+            tagSha: V050_RELEASE_COMMIT,
             legacyImplementationExecuted: true,
             actualTaggedConfigAndSqliteUsed: true,
             scenarioCount: 9,

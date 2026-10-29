@@ -8,7 +8,6 @@ import { LibraryService } from './service'
 import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
 import { PRODUCT_VERSION } from '../version'
-import { appCapabilities } from '../app-capabilities'
 import { ProviderService } from '../services/provider-service'
 import { LibraryQueryService } from '../services/library-query-service'
 import { ShelfService } from '../services/shelf-service'
@@ -26,6 +25,7 @@ import {
 import { ReaderService } from '../services/reader-service'
 import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from './core-catalog-read'
+import { coreBootstrapStatus, coreBootstrapAuthors, coreBootstrapCapabilities } from './core-bootstrap-read'
 import { coreShelfMatch, coreShelfExecute } from './core-shelf-routes'
 import { coreLocalPlatformMatch, coreLocalPlatformExecute } from './core-local-platform'
 import { ExternalReaderAdapter } from '../services/external-reader-adapter'
@@ -633,17 +633,14 @@ export async function startLibraryServer(options: {
                         error: 'Desktop startup is not ready',
                         startupReady: false
                     })
-                return json(response, 200, {
-                    ...appCapabilities(
-                        providerService.capabilities.favoriteMutation,
-                        process.platform,
-                        process.arch,
-                        desktopStatus
-                    ),
+                return json(response, 200, coreBootstrapCapabilities({
+                    kind: 'provider-enabled',
+                    desktopStatus,
+                    favoriteMutation: providerService.capabilities.favoriteMutation,
                     providers: providerService.providerStatus(),
                     sourceModules: providerService.sourceModuleStatus(),
                     externalSources: options.service.sources.snapshot()
-                })
+                }))
             }
             if (
                 url.pathname === '/api/v1/recommendation-v5' &&
@@ -2065,16 +2062,9 @@ export async function startLibraryServer(options: {
                 return
             }
             if (url.pathname === '/api/v1/status' && request.method === 'GET') {
-                return json(response, 200, {
-                    application: 'Pica Library',
-                    mode: 'connected',
-                    version: PRODUCT_VERSION,
-                    database: options.database.file,
-                    summary: options.database.summary(),
-                    reconciliation: options.database.reconcileLibraryCounts(),
-                    favoritesSyncProgress:
-                        options.service.favoritesSyncProgress()
-                })
+                return json(response, 200, coreBootstrapStatus(
+                    options.database, options.service.favoritesSyncProgress()
+                ))
             }
             if (
                 url.pathname === '/api/v1/sync/progress' &&
@@ -2453,7 +2443,7 @@ export async function startLibraryServer(options: {
                 url.pathname === '/api/v1/authors' &&
                 request.method === 'GET'
             ) {
-                return json(response, 200, options.database.listAuthors())
+                return json(response, 200, coreBootstrapAuthors(options.database))
             }
             const authorRefresh = url.pathname.match(
                 /^\/api\/v1\/authors\/([^/]+)\/refresh$/

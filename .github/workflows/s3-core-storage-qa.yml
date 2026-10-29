@@ -1,0 +1,47 @@
+name: S3 source-neutral WebDAV/remote-storage command port QA (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s3-core-remote-storage-20261029
+    paths:
+      - '.github/workflows/s3-core-storage-qa.yml'
+      - 'src/remote-storage/core-action-port.ts'
+      - 'src/remote-storage/desktop-manager.ts'
+      - 'src/desktop/main.ts'
+      - 'test/unit/core-remote-storage-port.test.ts'
+      - 'test/unit/remote-multi-target.test.ts'
+      - 'test/unit/remote-selected-copies.test.ts'
+      - 'test/unit/webdav-123pan-compat.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-core-storage-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  webdav-source-neutral:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck original Desktop and type-only storage port
+        run: pnpm type:check
+      - name: Verify existing WebDAV targets, credentials and signed destructive guards
+        run: pnpm exec vitest run test/unit/core-remote-storage-port.test.ts test/unit/remote-multi-target.test.ts test/unit/remote-selected-copies.test.ts test/unit/webdav-123pan-compat.test.ts

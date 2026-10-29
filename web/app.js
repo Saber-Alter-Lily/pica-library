@@ -21,7 +21,6 @@ import { normalizeReaderSettings, loadReaderSettings, cacheReaderSettings, creat
 import { recordReaderProgress, captureReaderProgress, acknowledgeReaderProgress } from './reader-progress.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
 import { createChronicleView } from './chronicle-view.js'
-import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
 import {
     applyTranslations,
     localizeAuthorEvidence,
@@ -4383,6 +4382,10 @@ async function buildVisualIndex() {
                 if (state.visualIndexStopRequested) break
                 visualController = new AbortController()
                 state.visualIndexAbortController = visualController
+                // The visual foundation is an optional, on-demand module.
+                // A source-free local Reader never fetches a model or starts
+                // a visual Worker during ordinary library/browser startup.
+                const { analyzeVisualSamples } = await import('./visual-runtime.js')
                 const result = await analyzeVisualSamples(
                     prepared.samples,
                     (progress) => {

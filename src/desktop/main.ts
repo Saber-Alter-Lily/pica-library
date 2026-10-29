@@ -7,6 +7,7 @@ import path from 'node:path'
 import type { Server } from 'node:http'
 import AdmZip from 'adm-zip'
 import { LibraryDatabase } from '../library/database'
+import { coreLocalDirectoryPath } from '../library/core-local-platform'
 import {
     startLibraryServer,
     type DesktopServerController
@@ -716,8 +717,7 @@ function openDirectory(kind: string) {
             ? { 'browser-lite-export': lastBrowserLiteExportDirectory }
             : {})
     }
-    const directory = allowed[kind]
-    if (!directory) throw new Error('Unknown directory')
+    const directory = coreLocalDirectoryPath(kind, allowed)
     fs.mkdirSync(directory, { recursive: true })
     let launchError: unknown = null
     const started = launchDirectory(directory, (error) => {

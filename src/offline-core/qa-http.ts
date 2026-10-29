@@ -4,6 +4,7 @@ import http, {
     type IncomingMessage, type Server, type ServerResponse
 } from 'node:http'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { verifiedFullWebQaAssets } from './full-web-qa-assets'
 import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from '../library/core-catalog-read'
 import { coreBootstrapStatus, coreBootstrapAuthors, coreBootstrapCapabilities } from '../library/core-bootstrap-read'
@@ -178,17 +179,20 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
     close(): Promise<void>
 }> {
     const webRoot = fs.realpathSync.native(options.webRoot)
-    const markupFile = fs.existsSync(path.join(webRoot, 'reader-fragment.html'))
-        ? 'reader-fragment.html' : 'index.html'
-    for (const asset of [
-        markupFile, ...SCRIPT_ASSETS, ...STYLE_ASSETS, ...IMAGE_ASSETS
-    ]) requiredAsset(webRoot, asset)
+    const fullWeb = verifiedFullWebQaAssets(webRoot)
+    if (!fullWeb) {
+        const markupFile = fs.existsSync(path.join(webRoot, 'reader-fragment.html'))
+            ? 'reader-fragment.html' : 'index.html'
+        for (const asset of [
+            markupFile, ...SCRIPT_ASSETS, ...STYLE_ASSETS, ...IMAGE_ASSETS
+        ]) requiredAsset(webRoot, asset)
+    }
 
     const libraryQueries = new LibraryQueryService(options.database)
     const shelves = new ShelfService(options.database, libraryQueries)
     const secret = randomBytes(32).toString('hex')
     const csrf = randomBytes(32).toString('hex')
-    const markup = existingReaderMarkup(webRoot)
+    const markup = fullWeb ? null : existingReaderMarkup(webRoot)
     let server: Server
     server = http.createServer(async (request, response) => {
         response.setHeader('cache-control', 'no-store')
@@ -228,8 +232,15 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             response.setHeader('set-cookie',
                 SESSION_NAME + '=' + secret +
                 '; Path=/; HttpOnly; SameSite=Strict')
-            response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-            response.end(page(markup, csrf))
+            if (fullWeb) {
+                // Redirect to / after setting the same private session cookie:
+                // original ./app.js and CSS URLs resolve from the real root.
+                response.writeHead(303, { location: '/' })
+                response.end()
+            } else {
+                response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+                response.end(page(markup!, csrf))
+            }
             return
         }
         if (!hasCookie(request, secret))
@@ -241,6 +252,38 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             return json(response, 400, { error: 'Invalid shelf URL' })
         }
         if (request.method === 'GET') {
+            if (fullWeb && url.pathname === '/') {
+                const original = fullWeb.get('index.html')!.data.toString('utf8')
+                // This session-only token is used by the ORIGINAL app.js on
+                // explicit local requests, never persisted or sent cross-site.
+                const html = original.replace('</head>',
+                    '<meta name="pica-core-qa-csrf" content="' + csrf + '"></head>')
+                response.writeHead(200, {
+                    'content-type': 'text/html; charset=utf-8'
+                })
+                response.end(html)
+                return
+            }
+            if (fullWeb && url.pathname === '/api/v1/desktop/status') {
+                return json(response, 200, {
+                    application: 'Pica Library',
+                    version: coreBootstrapCapabilities({
+                        kind: 'source-free'
+                    }).appVersion,
+                    configured: true,
+                    coreOnly: true,
+                    startupReady: true,
+                    csrfToken: csrf,
+                    profile: 'balanced',
+                    libraryDirectory: '',
+                    picaAccount: { configured: false, enabled: false },
+                    ehAccount: { configured: false, enabled: false },
+                    externalSources: { schemaVersion: 1, revision: 0, enabled: [] },
+                    remoteStorage: { configured: false, kind: 'webdav' },
+                    nativePicker: { folderPicker: false, savePicker: false },
+                    runtime: { mode: 'headless' }
+                })
+            }
             // These are the exact original Desktop bootstrap read ports,
             // with no ProviderService/online module in this physical binary.
             if (url.pathname === '/api/v1/status')
@@ -254,7 +297,17 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             if (url.pathname === '/api/v1/authors')
                 return json(response, 200, coreBootstrapAuthors(options.database))
             const asset = url.pathname.slice(1)
-            if ((SCRIPT_ASSETS.has(asset) || STYLE_ASSETS.has(asset) ||
+            if (fullWeb && url.pathname === '/' + asset &&
+                fullWeb.has(asset)) {
+                const { data, contentType } = fullWeb.get(asset)!
+                response.writeHead(200, {
+                    'content-type': contentType,
+                    'content-length': String(data.byteLength)
+                })
+                response.end(data)
+                return
+            }
+            if (!fullWeb && (SCRIPT_ASSETS.has(asset) || STYLE_ASSETS.has(asset) ||
                 IMAGE_ASSETS.has(asset)) && url.pathname === '/' + asset) {
                 const file = requiredAsset(webRoot, asset)
                 response.writeHead(200, {
@@ -336,7 +389,7 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                 return json(response, 200, coreCatalogueQuery(
                     input as LibraryFacetQuery,
                     libraryQueries,
-                    { localOnly: true }
+                    { localOnly: true, fullWebQa: Boolean(fullWeb) }
                 ))
             }
             const input = await readSmallJson(request)

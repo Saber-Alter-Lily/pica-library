@@ -1488,6 +1488,7 @@ export const translations = {
         'message.syncNeedsEngine': '同步收藏需要连接本地服务。',
         'message.engineRecovered': '本地服务已重新确认可用，继续执行当前操作。',
         'message.partialInit': '本地服务仍然在线，但有一个可选模块没有完成初始化：{reason}',
+        'message.coreOnlyRecommendations': '当前为纯本地书库模式。尚未启用兼容的漫画源模块，因此在线推荐暂不可用。',
         'message.searchNeedsEngine': '站内搜索需要连接本地服务。',
         'message.searching': '正在搜索…',
         'message.searchCount': '找到 {count} 条结果。',

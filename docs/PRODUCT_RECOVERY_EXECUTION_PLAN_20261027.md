@@ -1,6 +1,21 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
 
+### 2026-10-29 CORE-LIB-04c-02c-01｜正式 Desktop 更新前防活动任务交接（第一阶段门禁）
+
+#### 新发现的覆盖缺口和更严格的上线门禁
+
+- 仅使用旧 idle-browser 检测结果可能遗漏 `LibraryService` 原任务诊断里的维护扫描、书库整理、V5 shadow、Work Identity refresh 与资源协调器待运行队列。故已将真实 `runtimeTaskDiagnostics` 与 `runtimeResourceProfile` 合并至更新准入，不能再把旧 `eb61cd748` 的 CI 绿色当作最终门禁。
+- 最新可执行测试源码 `572d6758`，独立 [双系统 #40975511400](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975511400) **Ubuntu/Windows 2/2 SUCCESS，各 67/67 tests**；[完整 CI #40975519327](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975519327) **仍排队/NOT_VERIFIED**；仍不能证明临时观测之后无新写入，后续必须实现 source-free/legacy HTTP + worker + WebDAV 真正 write barrier 和可核查停写收据后才考虑生产级无损迁移。
+
+
+
+- [Draft #247](https://github.com/Saber-Alter-Lily/pica-library/pull/247)，基于 #246：复用已有 `InstanceLock`、`activeDesktopWorkLeases`、`applyUpdateAndScheduleShutdown` 和 `UpdateManager`，把非停止/已就绪/真实进程持锁/零运行中或暂停任务检查接到**原 `src/desktop/main.ts`** 的实际更新命令，失败时 helper 和延迟 shutdown 都不能启动。模块仍在 Draft，未合并 main/未发布。
+- 首轮 [#40974599032](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974599032) 实际只有测试夹具断言计数失败；修复后代码+单测 SHA `eb61cd748` 的 [Linux/Windows 专项 #40974706377](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974706377) **双方各 57/57 SUCCESS**。原 Android/Web/Desktop [完整 CI #40974712298](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974712298) 继续独立回读，不借用专项绿灯。
+- **下一步 04c-02c-02**：构造所有修改接口/背景 worker 的可拒绝写入 barrier，更新前禁止新增、再逐个 drain/确认 release，旧 helper 必须验证真正进程退出及数据库/媒体文件一致性。只读门禁不是锁死写入；当前更新助手接线仍不支持真实生产数据迁移授权。不得提前关闭 G1–G4。[技术审计](S3_DESKTOP_UPDATE_QUIESCENCE_GATE_20261029.md)。
+
+
+
 ### 2026-10-29｜CORE-LIB-04c-02b-03b-02：真实发布版历史 schema5/11/13 与 QA 媒体检查
 
 - [Draft #246](https://github.com/Saber-Alter-Lily/pica-library/pull/246) 基于 #245，不涉及 main/Release：重用官方发布版迁移代码完成 **5/11/13→14**、原自带升级前备份与业务行持久性检查；本地媒体另外用仅合成 OS Temp 的只读清单核查，不扫描外置用户书库。节点模块 `v050-release-identity` 共用官方 Git SHA/blob 验证，无新增备份/SQLite 引擎。

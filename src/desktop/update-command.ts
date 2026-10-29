@@ -19,7 +19,9 @@ export function applyUpdateAndScheduleShutdown(
     commands: DesktopUpdateApplyPort,
     id: string,
     context: DesktopUpdateContext,
-    shutdown: () => void | Promise<void>
+    shutdown: () => void | Promise<void>,
+    /** Optional owner/activity admission. Never authorizes a data snapshot. */
+    preflight?: () => void
 ) {
     let pending = pendingByHost.get(commands)
     if (!pending) {
@@ -30,6 +32,10 @@ export function applyUpdateAndScheduleShutdown(
     if (existing) return existing
     const tasks = pending
     const result = (async () => {
+        // Reject without invoking the existing helper when real Desktop work
+        // or lock ownership is unsafe. Only the first request is admitted;
+        // deduplicated callers receive the same in-flight promise.
+        preflight?.()
         const accepted = await commands.apply(id, context)
         setTimeout(() => void shutdown(), 150)
         return accepted

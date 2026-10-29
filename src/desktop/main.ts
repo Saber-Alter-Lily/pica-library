@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import { applyUpdateAndScheduleShutdown } from './update-command'
+import { collectDesktopUpgradeWorkLeases, requireDesktopUpgradeQuiescence } from './update-quiescence'
 import { exportRecommendationAuditV5 } from '../services/recommendation-audit-export'
 import path from 'node:path'
 import type { Server } from 'node:http'
@@ -1262,7 +1263,20 @@ async function startEngine(preferredPort: number) {
                 desktopHomeRoot: paths.root,
                 libraryDirectory: config?.libraryDirectory ?? paths.data,
                 currentUrl
-            },stop),
+            },stop,() => requireDesktopUpgradeQuiescence({
+                ownership: instance,
+                engineReady,
+                stopping,
+                hasDatabase: database !== null,
+                hasService: service !== null,
+                // The same actual task inventory that already prevents
+                // idle-browser shutdown during active downloads/sync/work.
+                activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
+                    activeDesktopWorkLeases(),
+                    service?.runtimeTaskDiagnostics(),
+                    service?.runtimeResourceProfile()
+                )
+            })),
         updateProgress: () => updateManager.progress(),
         runtimeTasks: () => {
             if (!service)

@@ -4,7 +4,7 @@
 ### 2026-10-29｜CORE-LIB-04c-02b-03b-02：真实发布版历史 schema5/11/13 与 QA 媒体检查
 
 - [Draft #246](https://github.com/Saber-Alter-Lily/pica-library/pull/246) 基于 #245，不涉及 main/Release：重用官方发布版迁移代码完成 **5/11/13→14**、原自带升级前备份与业务行持久性检查；本地媒体另外用仅合成 OS Temp 的只读清单核查，不扫描外置用户书库。节点模块 `v050-release-identity` 共用官方 Git SHA/blob 验证，无新增备份/SQLite 引擎。
-- [独立审计](S3_V050_HISTORICAL_SCHEMA_MEDIA_QA_20261029.md) 记录来源与限制。初轮测试暴露未来 schema 表的历史行误期待、合成来源 ID 非法以及 SQLite 迁移备份误算漫画媒体；原失败保留并修正。最新源码 `80ded46b5` 对应 [Linux/Windows 专项 #40922700787](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922700787) 需确认终态；全 Android/Web/Desktop CI 独立判定。
+- [独立审计](S3_V050_HISTORICAL_SCHEMA_MEDIA_QA_20261029.md) 记录来源与限制。初轮测试暴露未来 schema 表的历史行误期待、合成来源 ID 非法以及 SQLite 迁移备份误算漫画媒体；原失败保留并修正。精确代码 `80ded46b5` 的 [Linux/Windows 专项 #40922700787](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922700787) **2/2 SUCCESS**；两系统均通过官方旧码 5/11/13→14 和原始备份验证、各 28/28 单元/安全回归。完整 Android/Web/Desktop [CI #40922712429](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922712429) 仍按实际终态独立判定。
 - 后续不可跳过的关口仍是 真实外置媒体及 NTFS reparse/硬链接资格、用户显式授权、停止后台任务并冻结跨文件写入、受保护备份/DPAPI/失败回滚、旧版实际升级器及 G1–G4 全部验收。此阶段不是生产迁移许可。
 
 

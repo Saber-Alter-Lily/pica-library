@@ -167,7 +167,7 @@ export function inventoryV050OwnedMediaSyntheticReadOnly(
                 // not as manga media, and never delete or open it. Unknown
                 // backup spellings remain unclassified and need review.
                 const taggedSqliteBackup = prefix === 'data/' &&
-                    (/^library\\.db\\.pre-migration-v[0-9]{1,3}\\.bak$/.test(name) ||
+                    (/^library\.db\.pre-migration-v[0-9]{1,3}\.bak$/.test(name) ||
                      name === 'library.db.pre-unreleased-schema-reconcile.bak')
                 if (total + st.size > MAX_TOTAL_BYTES)
                     reject('REVIEW_REQUIRED', 'MEDIA_BUDGET_REQUIRES_REVIEW')

@@ -191,7 +191,7 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         throw new Error('Mandatory source-free QA file missing: ' + required)
 
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-s3-qa-extract-'))
-    let running: Awaited<ReturnType<typeof startServer>> | undefined
+    let running: Awaited<ReturnType<typeof startServerThroughPortableLauncher>> | undefined
     try {
         const unpacked = path.join(temp, 'unpacked')
         fs.mkdirSync(unpacked)

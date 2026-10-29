@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## S3 PR #239｜正式完整网页可在无来源物理 Core 和 Windows x64 ZIP 内运行（CORE-LIB-04b-02/03，2026-10-29）
+
+- 基于已完成原 Web 初始化门禁的 Draft #238，建立 [Draft PR #239](https://github.com/Saber-Alter-Lily/pica-library/pull/239)，直接复用**原** `web/index.html`、`web/app.js`、CSS/语言模块、SQLite/Reader/书架与真实 HTTP。新增 `scripts/stage-offline-full-web-qa.ts` 以 TypeScript AST 审核 ES module 闭包、拷贝到全新 OS Temp、哈希清单/原五视图回读，明确排除 Pica/E-H/JM 站点登录的独立顶层入口、重复 Host Library 初始化及非必要 Worker。原画风推理改为仅在用户主动开始分析时按需导入，正常书库启动不强制加载模型。
+- `src/offline-core/full-web-qa-assets.ts` 与现有 `qa-http.ts` 复用旧 session Cookie/Host/同源/CSRF，原首页本地目录/分面/书架/阅读/状态接口由**同一真实业务实现**支撑；只有显式 QA 完整网页权限允许最多5000条本地目录查询，原旧 Reader QA 限制保持。原正常 Desktop API 未更改。新增真实 SQLite、无权限/跨源拒绝、脚本 SHA 篡改测试。
+- [Linux/Windows 原完整 HTML/HTTP 资源闭包 #40869094570](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869094570) 与 [实际 Chromium 原首页/书库筛选/书架创建/阅读/设置 #40869551499](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869551499) 均 **SUCCESS**；原 E2E 没有对外网络请求或浏览器运行异常。全 Android/Web/Desktop [原完整 UI 代码 CI #40869749947](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869749947) SUCCESS。
+- 延用现有 `scripts/build-windows-offline-portable-qa.ts`、`verify-windows-offline-portable-qa.ts` 官方 Node 24.15.0 固定 SHA 发行校验、许可证、原 CMD/Node 真实进程树关闭与 SQLite 恢复，新增**可选** `--full-web` 和矩阵 Reader-only/Full-Web。源码 `28bd5d07ef7f9d59b19ff936be93652bacfd8164` 的 [实际 Windows x64 两 ZIP 提取/运行 #40870550859](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40870550859)：**2/2 JOBS SUCCESS**，无可执行 ZIP 上传给用户。其对应 Android/Web/Desktop [全 CI #40870561582](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40870561582) 初次登记时仍需单独核对，不挪用历史测试。
+- 开发期间严格审核发现并修复双重 Host JS 初始加载、原 AI Worker 动态外部模型、原完整网页 CSRF 和资源闭包风险，先前未通过/取消的 Actions 仍保留真实历史。详细 [技术审计](docs/S3_FULL_WEB_WINDOWS_PORTABLE_QA_20261029.md)。
+- **下一步 CORE-LIB-04c** 应以现有已经可以完整渲染原 HTML 的源无关 Core 业务端口为主，将正式 Windows `desktop/main.ts` 和 `library/server.ts` 对 `LibraryService/ProviderService` 的强制依赖做生产 composition 级拆除，不再重复 QA 小产品。其后才可信插件独立安装更新、Android Service/Binder 与纯核心 APK、旧 v0.5.0 用户数据无损升级和回滚及真机 G1 UX。G1–G4 全部 OPEN，**未合并 main、未发行、未操作真实用户书库/凭据/OTA**；#232/#233 两版书架分叉需选版。
+
+
 ### 2026-10-29 CORE-LIB-04b-01 完整 CI 回归与纠正（PR #238，保持 Draft）
 
 - [原可执行代码完整 CI #40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) **FAIL**：其原 `reading-library-shell.test.ts`（全量共 2,793 PASS、1 FAIL）证明当原 Desktop status 读取成功、但 capabilities 读取失败时，新的 `loadDesktop()` fallback 错误地重复请求了 capabilities。这会违反旧版明确的 fail-closed 读取资格，不能因为单独 Linux/Windows 新专项先前成功就声称完整验收通过。

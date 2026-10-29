@@ -153,7 +153,11 @@ describe('actual independent source-free Desktop entrypoint, never legacy profil
         ])
         first.child.kill('SIGTERM')
         await new Promise<void>(resolve => first.child.once('exit', () => resolve()))
-        expect(fs.existsSync(marker)).toBe(false)
+        // Windows TerminateProcess may bypass Node SIGTERM cleanup.
+        // The existing InstanceLock must recover only after proving the
+        // previous PID is dead, not by blindly deleting a lock.
+        if (process.platform !== 'win32')
+            expect(fs.existsSync(marker)).toBe(false)
         const second = await readyProcess(binary, root, home)
         const again = await fetch(second.state.url, { redirect: 'manual' })
         expect(again.status).toBe(303)

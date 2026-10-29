@@ -115,7 +115,8 @@ async function main() {
     const releaseConfig = await import(pathToFileURL(path.join(source,
         'src/desktop/config.ts')).href) as unknown as {
         buildConfig(input: {account: string; password: string;
-            libraryDirectory: string; profile: 'balanced'}): {config: ReleaseConfig}
+            libraryDirectory: string; profile: 'conservative' | 'balanced' | 'fast';
+            proxyUrl?: string}): {config: ReleaseConfig}
         saveConfig(file: string, config: ReleaseConfig): void
         loadConfig(file: string): ReleaseConfig | null
     }
@@ -202,6 +203,28 @@ async function main() {
             'READ_ONLY_GATE_MODIFIED_SOURCE')
         absentSQLiteSidecars(dbFile)
 
+        // Original release code supports all three download profiles. Validate
+        // those shapes with the current read-only gate, not new config builders.
+        for (const legacyProfile of ['conservative', 'fast'] as const) {
+            const alternate = releaseConfig.buildConfig({
+                account: 'synthetic-fixture@invalid.example',
+                password: 'fixture-only', libraryDirectory: dataDir,
+                profile: legacyProfile
+            })
+            releaseConfig.saveConfig(configFile, alternate.config)
+            resultStatus(sandbox, 'QUALIFIED_SYNTHETIC_RELEASE_LAYOUT')
+        }
+        const oldProxy = releaseConfig.buildConfig({
+            account: 'synthetic-fixture@invalid.example',
+            password: 'fixture-only', libraryDirectory: dataDir,
+            profile: 'balanced', proxyUrl: 'https://proxy.invalid'
+        })
+        releaseConfig.saveConfig(configFile, oldProxy.config)
+        resultStatus(sandbox, 'QUALIFIED_SYNTHETIC_RELEASE_LAYOUT')
+        fs.writeFileSync(configFile, fs.readFileSync(configFile))
+        // The normal baseline must be restored before the negative cases.
+        releaseConfig.saveConfig(configFile, build.config)
+
         // The same release-created fixture must fail closed when edited to
         // refer to an external/custom library; never open that target.
         const originalConfig = fs.readFileSync(configFile)
@@ -223,17 +246,51 @@ async function main() {
             }))
             resultStatus(sandbox, 'REVIEW_REQUIRED',
                 'POST_RELEASE_FIELDS_PRESENT')
+            // The release's own loadConfig accepted omitted GUI preferences,
+            // even though its buildConfig normally wrote them. We keep these
+            // unusual on-disk states at REVIEW_REQUIRED rather than guessing.
+            const noUiFields = {...sourceConfig}
+            delete noUiFields.openBrowser
+            delete noUiFields.preferredPort
+            fs.writeFileSync(configFile, JSON.stringify(noUiFields))
+            check(releaseConfig.loadConfig(configFile) !== null,
+                'OFFICIAL_CONFIG_LOADS_OPTIONAL_GUI_FIELDS')
+            resultStatus(sandbox, 'REVIEW_REQUIRED',
+                'CONFIG_SHAPE_REQUIRES_REVIEW')
         } finally {
             fs.writeFileSync(configFile, originalConfig)
         }
         resultStatus(sandbox, 'QUALIFIED_SYNTHETIC_RELEASE_LAYOUT')
+        // Separate non-mutating preflight denial paths: old lock and WAL
+        // markers must not be deleted or interpreted as offline-ready.
+        const runtime = path.join(profile, 'runtime-state')
+        fs.mkdirSync(runtime, {recursive: true, mode: 0o700})
+        const lock = path.join(runtime, 'instance.lock')
+        fs.writeFileSync(lock, 'synthetic-locked-instance', {flag: 'wx'})
+        resultStatus(sandbox, 'BLOCKED', 'DESKTOP_INSTANCE_LOCK_PRESENT')
+        check(fs.readFileSync(lock, 'utf8') === 'synthetic-locked-instance',
+            'LOCK_WAS_REMOVED')
+        fs.unlinkSync(lock)
+        const wal = dbFile + '-wal'
+        fs.writeFileSync(wal, 'synthetic-pending-WAL-not-a-valid-database',
+            {flag: 'wx'})
+        resultStatus(sandbox, 'REVIEW_REQUIRED', 'SQLITE_SIDECAR_PRESENT')
+        check(fs.readFileSync(wal, 'utf8') ===
+            'synthetic-pending-WAL-not-a-valid-database',
+            'WAL_MARKER_CHANGED')
+        fs.unlinkSync(wal)
+        const final = resultStatus(sandbox,
+            'QUALIFIED_SYNTHETIC_RELEASE_LAYOUT')
+        check(final.databaseSha256 === before[1].sha &&
+            final.configSha256 === before[0].sha, 'FINAL_SOURCE_CONTENT_CHANGED')
+        absentSQLiteSidecars(dbFile)
         const summary = {
             status: 'OFFICIAL_TAG_SYNTHETIC_INTEROPERABILITY_PASS',
             tag: 'v0.5.0',
             tagSha: RELEASE_COMMIT,
             legacyImplementationExecuted: true,
             actualTaggedConfigAndSqliteUsed: true,
-            scenarioCount: 3,
+            scenarioCount: 9,
             historicalSchemaVersion: 14,
             sourceDataUntouchedAfterReadOnlyGate: true,
             externalLibraryInspected: false,

@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+## S3 PR #234｜正式 Desktop 本地文件导入抽离（CORE-LIB-03a，2026-10-29）
+
+- 基于源无关书架 Draft #233 新建 [Draft PR #234](https://github.com/Saber-Alter-Lily/pica-library/pull/234)，**实际修改生产** `src/library/server.ts` 的 `POST /api/v1/desktop/local-import/preview|confirm|cancel`，提取 `CoreLocalImportController` 为不含来源/Host/旧业务服务运行时 import 的共用控制器。复用原 `LocalLibraryIngestion`，没有再做一套 CBZ/SQLite/Reader。
+- 保留受信任原生文件选择器、未配置/Headless/并发拒绝及 HTTP 路径、source 元数据输入拒绝；旧的二阶段 token、取消与临时库存未修改。真正的无源离线 CLI 亦改为调用**相同** `previewChosen/confirm`，esbuild 物理闭包必须包含新控制器。
+- 新增真实 SQLite 确认/取消/单次 token、路径注入、虚拟源字段、并发选取、headless 及路由回归。S3 Linux/Windows+Chromium、Windows 官方 Node x64 Portable、全项目 Android+Web/Desktop CI 需按**精确 SHA**核查，首次提交时仍在运行，不预设 SUCCESS。
+- 计划继续 CORE-LIB-03b（原正式 Windows 设置、本地文件夹/打开目录与已有 WebDAV 能力端口）→ CORE-LIB-04（完整 Windows UI/core-only 启动）；不能无限堆 QA mini UI。旧主程序仍依赖 `LibraryService/ProviderService`，Android core-only APK、可信外置来源、升级回滚、G1–G4 用户验收全部 OPEN。见 [本轮审计](docs/S3_CORE_LOCAL_IMPORT_20261029.md)。
+
+
 ## S3 PR #233｜正式桌面书架路由与纯 Core 共用（2026-10-29）
 
 - 在 [Draft PR #233](https://github.com/Saber-Alter-Lily/pica-library/pull/233) 抽出原 `src/library/server.ts` 书架 GET/POST/PATCH/DELETE 及 add/remove/add-filtered 路由为 `coreShelfMatch/coreShelfExecute`，直接沿用旧 `ShelfService/LibraryDatabase/LibraryQueryService`；正式 Desktop 的 HTTP 端点和 shelf_add/shelf_remove **逐作品事件批量事务、会话/上下文、搜索记录导入**均保留。实体纯 Core esbuild 必含新的共享 ShelfService，不允许旧 Pica/E-H/JM 源 SDK 导入。

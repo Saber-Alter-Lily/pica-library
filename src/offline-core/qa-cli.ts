@@ -14,6 +14,7 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { LibraryDatabase } from '../library/database'
 import { LocalLibraryIngestion } from '../local-library/ingestion'
+import { CoreLocalImportController } from '../library/core-local-import'
 import { ReaderService } from '../services/reader-service'
 import { localReaderGet } from '../reader/local-http-read'
 import { startOfflineCoreHttp } from './qa-http'
@@ -157,10 +158,16 @@ async function run() {
             const source = required('path')
             if (!path.isAbsolute(source))
                 throw new Error('Local QA import path must be absolute')
-            const ingest = new LocalLibraryIngestion(db, root)
-            const preview = await ingest.preview(source, kind)
-            // Real preview + confirmation from the existing implementation.
-            return await ingest.confirm(preview.token)
+            // Same source-neutral selection/confirmation controller as the
+            // production Desktop, with an explicitly confirmed CLI path
+            // (never a remotely submitted HTTP filesystem path).
+            const imports = new CoreLocalImportController(
+                new LocalLibraryIngestion(db, root)
+            )
+            const preview = await imports.previewChosen(kind, async () => source)
+            if ('cancelled' in preview)
+                throw new Error('Disposable local import was cancelled')
+            return await imports.confirm(preview.token)
         }
         if (command === 'chapters') {
             const result = get('/api/v1/reader/comics/' +

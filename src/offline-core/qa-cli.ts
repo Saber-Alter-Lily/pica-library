@@ -124,7 +124,9 @@ async function run() {
                 // Never accept a user/HTTP-selected asset root.
                 webRoot: fs.existsSync(path.join(
                     path.dirname(path.resolve(process.argv[1])), 'web',
-                    'reader-fragment.html'))
+                    'reader-fragment.html')) || fs.existsSync(path.join(
+                    path.dirname(path.resolve(process.argv[1])), 'web',
+                    'full-web-qa-manifest.json'))
                     ? path.join(path.dirname(path.resolve(process.argv[1])), 'web')
                     : path.resolve(process.cwd(), 'web')
             })

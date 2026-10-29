@@ -1,0 +1,77 @@
+name: S3 actual original full Web source-neutral assets QA (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s3-full-web-assets-20261029
+    paths:
+      - '.github/workflows/s3-full-web-assets-qa.yml'
+      - 'scripts/stage-offline-full-web-qa.ts'
+      - 'test/unit/offline-full-web-asset-stage.test.ts'
+      - 'src/offline-core/**'
+      - 'web/**'
+      - 'test/unit/offline-full-web-http.test.ts'
+      - 'test/e2e/offline-full-web.spec.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-original-full-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-original-html-assets:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck existing full app, core and original Web assets
+        run: pnpm type:check
+      - name: Reproduce full HTML, real source-free SQLite/HTTP, and old Reader
+        run: pnpm exec vitest run test/unit/offline-full-web-asset-stage.test.ts test/unit/offline-full-web-http.test.ts test/unit/offline-core-http-ui.test.ts test/unit/offline-core-candidate.test.ts test/unit/core-bootstrap-read.test.ts test/unit/core-catalog-read.test.ts
+
+  actual-original-full-web-chromium:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    needs: full-original-html-assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Use existing pinned CI-only Playwright version
+        run: pnpm add -D '@playwright/test@1.63.0' --ignore-workspace-root-check
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Exercise original full Web app against physical no-source Node core
+        run: pnpm exec playwright test test/e2e/offline-full-web.spec.mjs --config=playwright.smoke.config.mjs --workers=1 --reporter=line
+      - name: Retain only synthetic failure diagnostics
+        if: failure() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-original-full-web-chromium-${{ github.sha }}
+          path: test-results/
+          retention-days: 1
+          if-no-files-found: ignore
+

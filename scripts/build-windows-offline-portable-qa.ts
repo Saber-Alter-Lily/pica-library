@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import AdmZip from 'adm-zip'
 import { buildOfflineCoreCandidate } from './build-offline-core-candidate'
+import { stageOfflineFullWebQa } from './stage-offline-full-web-qa'
 import {
     OFFLINE_READER_ASSETS,
     stageOfflineReaderAssetsQa
@@ -102,6 +103,8 @@ export interface WindowsOfflinePortableInput {
     runtimeLicense: string
     verifiedRuntimeArchiveSha256: string
     sourceSha: string
+    /** Explicit opt-in to the original full Web QA composition, never Release. */
+    fullWebQa?: boolean
 }
 export interface WindowsOfflinePortableQa {
     directory: string
@@ -175,29 +178,66 @@ export async function buildWindowsOfflinePortableQa(
     add(NOTICE_PATHS[0], license)
     add(NOTICE_PATHS[1], admZipLicense())
     add('Start-Offline-Reader-QA.cmd', Buffer.from(LAUNCHER))
-    add('README-OFFLINE-QA.txt', Buffer.from(README))
-    const staged = stageOfflineReaderAssetsQa(path.join(root, 'app', 'web'))
-    if (staged.count !== OFFLINE_READER_ASSETS.length + 1 ||
-        staged.sources !== 0)
-        throw new Error('Portable core has unexpected Reader assets')
-    for (const row of staged.files) {
-        const name = 'app/web/' + row.name
-        const data = fs.readFileSync(path.join(root, ...name.split('/')))
-        if (sha256(data) !== row.sha256 || data.byteLength !== row.size)
-            throw new Error('Reader assets do not match their trusted stage')
-        bytes.set(name, data)
+    add('README-OFFLINE-QA.txt', Buffer.from(options.fullWebQa
+        ? README.replace(
+            'Pica Library - OFFLINE READER PORTABLE ENGINEERING QA ONLY',
+            'Pica Library - ORIGINAL FULL WEB PORTABLE ENGINEERING QA ONLY'
+          ).replace(
+            'It does not prove production Windows app UI, source isolation as an OS',
+            'This original full Web UI is a disposable, source-free QA fixture only.\r\n' +
+            'It does not prove production Windows app UI, source isolation as an OS'
+          )
+        : README))
+    if (options.fullWebQa) {
+        // Actual original full HTML and its verified, source-neutral ES module
+        // closure. This does not reimplement the Reader or package an SDK.
+        const staged = stageOfflineFullWebQa(path.join(root, 'app', 'web'))
+        if (staged.sourceSdkIncluded || staged.distributable ||
+            !staged.files.some(row => row.name === 'app.js') ||
+            !staged.files.some(row => row.name === 'index.html'))
+            throw new Error('Original full Web QA stage is incomplete')
+        for (const row of staged.files) {
+            const name = 'app/web/' + row.name
+            const data = fs.readFileSync(path.join(root, ...name.split('/')))
+            if (sha256(data) !== row.sha256 || data.byteLength !== row.size)
+                throw new Error('Full Web assets do not match their trusted stage')
+            bytes.set(name, data)
+        }
+        const name = 'app/web/full-web-qa-manifest.json'
+        bytes.set(name, checkedFile(path.join(root, ...name.split('/')), 32 * 1024))
+    } else {
+        const staged = stageOfflineReaderAssetsQa(path.join(root, 'app', 'web'))
+        if (staged.count !== OFFLINE_READER_ASSETS.length + 1 ||
+            staged.sources !== 0)
+            throw new Error('Portable core has unexpected Reader assets')
+        for (const row of staged.files) {
+            const name = 'app/web/' + row.name
+            const data = fs.readFileSync(path.join(root, ...name.split('/')))
+            if (sha256(data) !== row.sha256 || data.byteLength !== row.size)
+                throw new Error('Reader assets do not match their trusted stage')
+            bytes.set(name, data)
+        }
     }
 
     const entries = [...bytes].map(([entry, value]) => ({
         path: entry, sha256: sha256(value), bytes: value.length
     })).sort((a, b) => a.path.localeCompare(b.path, 'en'))
-    if (entries.length !== 20 ||
-        entries.some(item => /(?:^|\/)(?:node_modules|\.git|library\.db|app\.js|source-hosts\.js|eh-account\.js|jm-account\.js)(?:\/|$)/i.test(item.path)))
-        throw new Error('Portable QA package inventory includes forbidden files')
+    const providerFiles = /(?:^|\/)(?:node_modules|\.git|library\.db|source-hosts\.js|eh-account\.js|jm-account\.js|source-choices\.js)(?:\/|$)/i
+    if (entries.some(item => providerFiles.test(item.path)) ||
+        (options.fullWebQa
+            ? (entries.length < 30 ||
+                !entries.some(row => row.path === 'app/web/app.js') ||
+                !entries.some(row => row.path === 'app/web/index.html') ||
+                !entries.some(row => row.path === 'app/web/full-web-qa-manifest.json'))
+            : (entries.length !== 20 ||
+                entries.some(item => /(?:^|\/)app\.js$/.test(item.path)))))
+        throw new Error('Portable QA package inventory includes forbidden or missing files')
 
     const manifest: WindowsOfflinePortableQa['manifest'] = {
         schemaVersion: 1,
-        label: 'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY',
+        label: options.fullWebQa
+            ? 'UNSIGNED_S3_WINDOWS_X64_FULL_WEB_QA_ONLY'
+            : 'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY',
         sourceSha: options.sourceSha,
         runtimeVersion: OFFLINE_PORTABLE_NODE_VERSION,
         verifiedNodeArchiveSha256: options.verifiedRuntimeArchiveSha256,
@@ -221,10 +261,12 @@ export async function buildWindowsOfflinePortableQa(
         if (!entry) throw new Error('Portable QA ZIP entry missing')
         entry.header.time = ZIP_TIMESTAMP
     }
-    const zipPath = path.join(directory, 'offline-source-free-reader-qa-windows-x64.zip')
+    const zipPath = path.join(directory, options.fullWebQa
+        ? 'offline-source-free-full-web-qa-windows-x64.zip'
+        : 'offline-source-free-reader-qa-windows-x64.zip')
     zip.writeZip(zipPath)
     const check = new AdmZip(zipPath).getEntries()
-    if (check.length !== 21 ||
+    if (check.length !== bytes.size + 1 ||
         check.some(entry => entry.isDirectory ||
             ![...bytes.keys(), 'BUILD-MANIFEST.json'].includes(entry.entryName)))
         throw new Error('Portable QA ZIP file list changed after assembly')
@@ -235,7 +277,8 @@ export async function buildWindowsOfflinePortableQa(
 
 async function main() {
     const args = process.argv.slice(2)
-    if (args.length !== 8 ||
+    const fullWebQa = args.length === 9 && args[8] === '--full-web'
+    if ((!fullWebQa && args.length !== 8) ||
         args[0] !== '--runtime' || args[2] !== '--runtime-license' ||
         args[4] !== '--archive-sha256' || args[6] !== '--source-sha')
         throw new Error('Expected fixed runtime/license/archive/source CI inputs')
@@ -243,7 +286,8 @@ async function main() {
         runtimeExe: args[1],
         runtimeLicense: args[3],
         verifiedRuntimeArchiveSha256: args[5],
-        sourceSha: args[7]
+        sourceSha: args[7],
+        fullWebQa
     })
     process.stdout.write(JSON.stringify({
         status: built.manifest.label,

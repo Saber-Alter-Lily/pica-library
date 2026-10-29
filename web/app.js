@@ -21,7 +21,6 @@ import { normalizeReaderSettings, loadReaderSettings, cacheReaderSettings, creat
 import { recordReaderProgress, captureReaderProgress, acknowledgeReaderProgress } from './reader-progress.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
 import { createChronicleView } from './chronicle-view.js'
-import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
 import {
     applyTranslations,
     localizeAuthorEvidence,
@@ -494,12 +493,21 @@ async function ensureConnectedEngine(forceProbe = false) {
     }
 }
 
-const post = (path, value) =>
-    api(path, {
+const post = (path, value) => {
+    // An explicit, disposable source-free QA full Web entry sets this token.
+    // Production Desktop stays on its original POST contract unchanged.
+    const qaToken = document.querySelector(
+        'meta[name="pica-core-qa-csrf"]'
+    )?.content
+    return api(path, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+            'content-type': 'application/json',
+            ...(qaToken ? { 'x-pica-qa-csrf': qaToken } : {})
+        },
         body: JSON.stringify(value)
     })
+}
 // Legacy V2 contract remains intentionally discoverable:
 // post('/api/v1/recommendation-sessions', {})
 // api('/api/v1/recommendation-sessions/status')
@@ -4383,6 +4391,10 @@ async function buildVisualIndex() {
                 if (state.visualIndexStopRequested) break
                 visualController = new AbortController()
                 state.visualIndexAbortController = visualController
+                // The visual foundation is an optional, on-demand module.
+                // A source-free local Reader never fetches a model or starts
+                // a visual Worker during ordinary library/browser startup.
+                const { analyzeVisualSamples } = await import('./visual-runtime.js')
                 const result = await analyzeVisualSamples(
                     prepared.samples,
                     (progress) => {

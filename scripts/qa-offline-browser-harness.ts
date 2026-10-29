@@ -10,6 +10,7 @@ import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { buildOfflineCoreCandidate } from './build-offline-core-candidate'
 import { stageOfflineReaderAssetsQa } from './stage-offline-reader-assets-qa'
+import { stageOfflineFullWebQa } from './stage-offline-full-web-qa'
 
 const png = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6FkwAAAAASUVORK5CYII=',
@@ -36,9 +37,18 @@ async function main() {
     const candidate = await buildOfflineCoreCandidate()
     const binary = path.join(home, 'core.mjs')
     fs.writeFileSync(binary, candidate.bytes, { flag: 'wx' })
-    const staged = stageOfflineReaderAssetsQa(path.join(home, 'web'))
-    if (staged.count !== 10 || staged.sources !== 0)
-        throw new Error('No-source Reader QA Web stage is incomplete')
+    const fullWeb = process.env.PICA_QA_FULL_WEB === '1'
+    if (fullWeb) {
+        const manifest = stageOfflineFullWebQa(path.join(home, 'web'))
+        if (manifest.sourceSdkIncluded || manifest.distributable ||
+            !manifest.files.some(item => item.name === 'index.html') ||
+            !manifest.files.some(item => item.name === 'app.js'))
+            throw new Error('Original full Web QA asset stage is incomplete')
+    } else {
+        const staged = stageOfflineReaderAssetsQa(path.join(home, 'web'))
+        if (staged.count !== 10 || staged.sources !== 0)
+            throw new Error('No-source Reader QA Web stage is incomplete')
+    }
     const root = path.join(home, 'qa-library')
     const source = path.join(home, 'original-pages')
     fs.mkdirSync(source)
@@ -83,7 +93,9 @@ async function main() {
             done(new Error('Offline QA process died ' + code)))
     })
     process.stdout.write(JSON.stringify({
-        status: 'QA_BROWSER_HARNESS', url: started.url
+        status: fullWeb ? 'QA_FULL_BROWSER_HARNESS' : 'QA_BROWSER_HARNESS',
+        url: started.url,
+        ...(fullWeb ? { comicId: imported.comicId } : {})
     }) + '\n')
 }
 

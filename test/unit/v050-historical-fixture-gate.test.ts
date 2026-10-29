@@ -114,6 +114,33 @@ describe('v0.5.0 historical release-layout fixture — QA-only, no migration', (
         expect(qualifyV050HistoricalFixtureReadOnly(f.sandbox)).toEqual(result)
     }, 60000)
 
+    it('admits only original/canonical spellings of the same owned data directory', () => {
+        const f = fixture()
+        const canonical = fs.realpathSync.native(f.data)
+        fs.writeFileSync(f.configFile, JSON.stringify({
+            ...f.config, libraryDirectory: canonical
+        }))
+        expect(qualifyV050HistoricalFixtureReadOnly(f.sandbox))
+            .toMatchObject({
+                status: 'QUALIFIED_SYNTHETIC_RELEASE_LAYOUT',
+                productionMigrationAuthorized: false
+            })
+        // The similarly named sibling is never probed, even if it ends in
+        // profile/data: it is NOT the owned directory verified above.
+        const sibling = path.join(path.dirname(f.sandbox),
+            path.basename(f.sandbox) + '-other', 'profile', 'data')
+        fs.writeFileSync(f.configFile, JSON.stringify({
+            ...f.config, libraryDirectory: sibling
+        }))
+        expect(qualifyV050HistoricalFixtureReadOnly(f.sandbox))
+            .toMatchObject({
+                status: 'REVIEW_REQUIRED',
+                reason: 'LIBRARY_REFERENCE_REQUIRES_CONSENT',
+                externalLibraryInspected: false
+            })
+        expect(fs.existsSync(sibling)).toBe(false)
+    })
+
     it('fails closed for schema history drift without repairing the SQLite database', () => {
         const f = fixture()
         const db = new DatabaseSync(f.dbFile)

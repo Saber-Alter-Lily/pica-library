@@ -122,7 +122,8 @@ describe('actual Desktop update helper handoff preflight, no production migratio
             ownership: {
                 assertHeld: () => {
                     calls.push('assert')
-                    if (calls.length === 2) throw new Error('OWNER_LOST')
+                    if (calls.filter(entry => entry === 'assert').length === 2)
+                        throw new Error('OWNER_LOST')
                 }
             },
             activeWorkLeases: () => {

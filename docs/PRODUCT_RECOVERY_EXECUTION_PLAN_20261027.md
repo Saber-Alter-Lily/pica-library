@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+
+### 2026-10-29 CORE-LIB-04c-02b-02｜双平台备份与回滚最终门禁
+
+- [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 精确可执行/测试代码 `87a20359396f67ba30b54f39c1e8958ee4760569` 的 [Linux/Windows 专项 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) **SUCCESS**、[Android/Web/Desktop 完整 #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471) **SUCCESS**；所有测试仅使用合成 OS Temp profile，没有真实用户数据、发布或 OTA 变更。真实 v0.5.0 Release 中 migrations.ts、desktop/paths.ts blob 与当前一致，其他 Desktop 类型/配置存在演进，不能据此宣布实际历史 profile 迁移通过。
+- 下一切口 **04c-02b-03**：收集官方 v0.5.0 release 的只读、可复现结构证据及用户配置边缘形态，完成 SQLite/媒体完整事务冻结、可信独立备份/加密/签名、恢复失败注入和外置目录选择，再进行升级助手与实际旧版本用户资料隔离验收。G1–G4 仍 OPEN。
+
 ## 2026-10-29 S3 CORE-LIB-04c-02b-02｜v0.5.0 WAL 一致性备份/回滚演练（仅合成临时资料）
 
 - [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 只在显式 `OS Temp/pica-v050-rollback-qa-*` sentinel 中运行；新增 `legacy-profile-snapshot-qa.ts`，使用**项目现有 Node 24** `node:sqlite.backup`，使未 checkpoint 的 WAL 提交记录进入独立 SQLite 备份。无 WAL 时 immutable readonly 连接不应新建原始 sidecar。原 DB/WAL 的 SHA 在备份前后核实；目标数据库转 `journal_mode=DELETE` 后执行完整 `PRAGMA integrity_check`。

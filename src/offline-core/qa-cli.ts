@@ -13,9 +13,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { LibraryDatabase } from '../library/database'
-import { LocalLibraryIngestion } from '../local-library/ingestion'
-import { CoreLocalImportController } from '../library/core-local-import'
-import { ReaderService } from '../services/reader-service'
+import { createCoreLocalRuntime } from '../library/core-runtime-composition'
 import { localReaderGet } from '../reader/local-http-read'
 import { startOfflineCoreHttp } from './qa-http'
 
@@ -110,14 +108,15 @@ async function run() {
     }
     assertDisposableRoot(root)
     const db = new LibraryDatabase(path.join(root, 'library.db'))
-    const reader = new ReaderService(db, root)
+    const coreRuntime = createCoreLocalRuntime({ database: db, dataDir: root })
+    const reader = coreRuntime.readerService
     // Exercise the EXACT original Desktop GET route contract, not parallel
     // read behavior in an offline-only pseudo Reader.
     const get = (route: string) => localReaderGet(route, reader)
     try {
         if (command === 'serve') {
             const http = await startOfflineCoreHttp({
-                database: db, reader,
+                database: db, reader, coreRuntime,
                 // A real staged QA candidate serves only its own reviewed
                 // Reader assets, independent of cwd/repository checkout.
                 // Unstaged developer fixtures may use the existing repo Web.
@@ -163,13 +162,12 @@ async function run() {
             // Same source-neutral selection/confirmation controller as the
             // production Desktop, with an explicitly confirmed CLI path
             // (never a remotely submitted HTTP filesystem path).
-            const imports = new CoreLocalImportController(
-                new LocalLibraryIngestion(db, root)
+            const preview = await coreRuntime.localImport.previewChosen(
+                kind, async () => source
             )
-            const preview = await imports.previewChosen(kind, async () => source)
             if ('cancelled' in preview)
                 throw new Error('Disposable local import was cancelled')
-            return await imports.confirm(preview.token)
+            return await coreRuntime.localImport.confirm(preview.token)
         }
         if (command === 'chapters') {
             const result = get('/api/v1/reader/comics/' +

@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## S3 PR #237｜原 Windows 真正启动接口：状态、作者、能力声明抽离（CORE-LIB-04a，2026-10-29）
+
+- 基于 [CORE-LIB-03c Draft #236](https://github.com/Saber-Alter-Lily/pica-library/pull/236)（已核实 [Linux/Windows 专项 #40857679928](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857679928)、[完整 Android/Web/Desktop CI #40857731995](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857731995) 与 [其文档 HEAD CI #40858006521](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40858006521) 全 SUCCESS），继续新增 [CORE-LIB-04a Draft #237](https://github.com/Saber-Alter-Lily/pica-library/pull/237)，未合并 main，不改正式版本。
+- **修改原生产 `src/library/server.ts`**：旧 `GET /api/v1/status`、`/api/v1/authors` 与 `/api/v1/capabilities` 委托到来源中立 `src/library/core-bootstrap-read.ts`，仍用旧 SQLite、`appCapabilities` 与产品版本；旧 Desktop `provider-enabled` 分支透传原具体 Provider、来源模块与来源配置数据，**不改变其结构与行为**。
+- **同一旧正式 URL** 在物理 `src/offline-core/qa-http.ts` sentinel-only loopback Core 中执行；随机 Cookie 授权之前不可见。`source-free` 分支真实关闭未实现的来源、收藏修改和推荐/画像/在线预览能力声明，不能用虚假“可用”伪造完整 Windows 应用。原 Core/Reader/SQLite/书架依然复用。
+- 版本原 `src/version.ts` 引用项目根 `package.json` 触发 [Linux/Windows #40858854790](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40858854790) 与 [Windows Portable #40858861108](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40858861108) **实测失败**（原构建严格只允许 AdmZip）。修复 `81275598` 后仅允许**固定项目根 `package.json`** 作为版本 metadata，要求 `src/version.ts` 存在，不放行其它外部 JSON/JS/SDK。新增输入图与归档测试；[修后 Windows 官方 Node x64 Portable #40859105359](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859105359) **SUCCESS**，实体 QA ZIP 不上传发布。
+- [最新 Linux/Windows+真实 Chromium 专项 #40859128504](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859128504)、[完整 Android/Web/Desktop CI #40859135753](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859135753) 最初登记时仍需核查最终状态，不能以旧测试或单平台 PASS 代替全量。审计 [docs/S3_CORE_BOOTSTRAP_20261029.md](docs/S3_CORE_BOOTSTRAP_20261029.md)。
+- **下一步 CORE-LIB-04b**：原完整 `web/index.html`、`web/app.js`、原 UI 全资源、三语言和不联网无源模式，真正显示首页/书库/书架/Reader/设置/WebDAV，避免继续堆 QA 小型页面；CORE-LIB-04c 再移除原完整 Windows 主组合的 `LibraryService/ProviderService` 强制初始化，做实际零 SDK 稳定包、旧 v0.5.0 数据安全无痛升级/回滚和 Android Source Service/Binder。G1–G4 仍 OPEN；#232/#233 竞争书架分支须单独选版。
+
+
 ## S3 PR #236｜真实 Windows 本地配置及原生文件夹接口来源无关化（CORE-LIB-03c，2026-10-29）
 
 - 新建 [Draft #236](https://github.com/Saber-Alter-Lily/pica-library/pull/236)，在 #235 的已验收 WebDAV 端口基础上，直接重构**正式生产** `src/desktop/config.ts`、`src/desktop/main.ts` 和 `src/library/server.ts`，新增 `src/library/core-local-config.ts` 与 `core-local-platform.ts`。不是新的 QA 阅读器；复用旧 `config.json`、Reader 设置、SQLite VFS 校验、原生文件选择器、受控目录打开与完整旧 HTTP API。

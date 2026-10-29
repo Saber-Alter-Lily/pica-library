@@ -84,7 +84,7 @@ export async function buildOfflineCoreCandidate(): Promise<OfflineCoreCandidate>
     const externalImports = output[0].imports.map(item => item.path).sort()
     if (output[0].imports.some(item =>
         !item.external || !isBuiltin(item.path)))
-        throw new Error('Offline core contains non-Node external code imports')
+        throw new Error('Offline core contains non-Node external code imports: ' + JSON.stringify(output[0].imports))
     const bytes = compiled.outputFiles[0].contents
     if (!bytes.byteLength || bytes.byteLength > 8 * 1024 * 1024)
         throw new Error('Offline core bundle missing or exceeds QA size bound')

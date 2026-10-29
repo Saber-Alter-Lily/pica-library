@@ -22,6 +22,8 @@ const REQUIRE_SOURCE = [
     'src/library/core-catalog-read.ts',
     'src/library/core-bootstrap-read.ts',
     'src/app-capabilities.ts',
+    'src/version.ts',
+    'src/modules/contracts.ts',
     'src/services/library-query-service.ts',
     'src/library/core-shelf-routes.ts',
     'src/library/core-local-import.ts',
@@ -89,10 +91,15 @@ export async function buildOfflineCoreCandidate(): Promise<OfflineCoreCandidate>
     for (const item of sourceInputs)
         if (PROHIBITED.some(pattern => pattern.test(item)))
             throw new Error('Offline core includes executable source/Host code: ' + item)
-    // adm-zip is already in the shipping Reader and existing local CBZ parser.
-    // No other npm dependency may silently enter this minimal candidate.
+    // The actual PRODUCT_VERSION in src/version.ts imports exactly the root
+    // package.json as inert build-time version metadata. This is NOT blanket
+    // permission for JSON loaders, runtime npm packages or executable plugins.
+    // AdmZip remains the sole reviewed third-party executable dependency.
+    if (!packageInputs.includes('package.json') ||
+        !sourceInputs.includes('src/version.ts'))
+        throw new Error('Original version metadata is missing from core bootstrap')
     for (const item of packageInputs)
-        if (!/node_modules\/adm-zip\//.test(item))
+        if (item !== 'package.json' && !/node_modules\/adm-zip\//.test(item))
             throw new Error('Offline core gained an unreviewed runtime dependency: ' + item)
 
     const externalImports = output[0].imports.map(item => item.path).sort()

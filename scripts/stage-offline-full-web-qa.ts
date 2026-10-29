@@ -82,6 +82,11 @@ function moduleEdges(name: string, value: Buffer) {
             const arg = node.arguments[0]
             if (!arg || !ts.isStringLiteral(arg))
                 throw new Error('Dynamic Web import must be a constant: ' + name)
+            // Original visual inference loads its model on explicit user
+            // request. The source-free distribution has no visual model/worker;
+            // record this deliberate optional-module cut, not a broken import.
+            if (name === 'app.js' && arg.text === './visual-runtime.js')
+                return
             add(arg.text)
         }
         ts.forEachChild(node, walk)

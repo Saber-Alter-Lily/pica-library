@@ -13,15 +13,23 @@ internal static class Launcher
         {
             string root = AppDomain.CurrentDomain.BaseDirectory;
             string runtime = Path.Combine(root, "runtime", "node.exe");
-            string entry = Path.Combine(root, "app", "desktop.js");
+            // The default launcher remains the historical provider-enabled
+            // Desktop. The source-free preview is a separate optional binary,
+            // selected ONLY by an explicit first argument. It cannot silently
+            // fall back into the bundled legacy provider runtime.
+            bool sourceFreePreview = args.Length > 0 &&
+                String.Equals(args[0], "--source-free-preview", StringComparison.Ordinal);
+            string entry = Path.Combine(root, "app",
+                sourceFreePreview ? "desktop-core-preview.mjs" : "desktop.js");
             if (!File.Exists(runtime) || !File.Exists(entry))
                 throw new FileNotFoundException("The packaged runtime is incomplete. Extract the entire ZIP before starting Pica Library.");
 
-            var quoted = args.Select(Quote);
+            var forwarded = sourceFreePreview ? args.Skip(1).ToArray() : args;
+            var quoted = forwarded.Select(Quote);
             var info = new ProcessStartInfo
             {
                 FileName = runtime,
-                Arguments = Quote(entry) + (args.Length == 0 ? "" : " " + String.Join(" ", quoted)),
+                Arguments = Quote(entry) + (forwarded.Length == 0 ? "" : " " + String.Join(" ", quoted)),
                 WorkingDirectory = root,
                 UseShellExecute = false,
                 CreateNoWindow = true,

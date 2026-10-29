@@ -1,16 +1,16 @@
-import fs from 'node:fs'
 import path from 'node:path'
-import { normalizeReaderSettings, parseReaderSettings } from '../../web/reader-settings.js'
-import { sqliteDiskFilename } from '../storage/sqlite/filename'
+import {
+    validateCoreLocalSetup,
+    buildCoreLocalConfig,
+    readCoreLocalConfig,
+    writeCoreLocalConfig
+} from '../library/core-local-config'
 import { initialSourcePolicy, normalizeSourcePolicy } from '../sources/source-policy'
 import type {
     DesktopConfig,
-    DownloadProfile,
     SetupInput,
     StoredCredentials
 } from './types'
-
-const profiles = new Set<DownloadProfile>(['conservative', 'balanced', 'fast'])
 
 /** Absence in an existing config means pre-policy compatibility, not a new install. */
 export function sourcePolicyForConfig(config: DesktopConfig | null | undefined) {
@@ -42,18 +42,8 @@ export function safeProxy(input?: string): {
 export function validateSetup(input: SetupInput) {
     if (!input.account.trim()) throw new Error('Enter your Pica account')
     if (!input.password) throw new Error('Enter your Pica password')
-    validateLocalLibrarySetup(input)
+    validateCoreLocalSetup(input)
     safeProxy(input.proxyUrl)
-}
-
-function validateLocalLibrarySetup(
-    input: Pick<SetupInput, 'libraryDirectory' | 'profile'>
-) {
-    if (!path.isAbsolute(input.libraryDirectory))
-        throw new Error('Choose an absolute library folder')
-    sqliteDiskFilename(path.join(path.resolve(input.libraryDirectory), 'library.db'))
-    if (!profiles.has(input.profile))
-        throw new Error('Choose a supported download profile')
 }
 
 /** Local reading never requires a provider login or a secure credential backend. */
@@ -61,16 +51,7 @@ export function buildLocalConfig(
     input: Pick<SetupInput, 'libraryDirectory' | 'profile'>,
     current?: DesktopConfig | null
 ): DesktopConfig {
-    validateLocalLibrarySetup(input)
-    return {
-        schemaVersion: 1,
-        openBrowser: true,
-        preferredPort: 4789,
-        ...current,
-        externalSources: sourcePolicyForConfig(current),
-        libraryDirectory: path.resolve(input.libraryDirectory),
-        profile: input.profile
-    }
+    return buildCoreLocalConfig(input, current, sourcePolicyForConfig(current))
 }
 
 /** Editing one adapter must not erase another adapter's secure session. */
@@ -153,40 +134,16 @@ export function hasStoredCredentials(value: StoredCredentials) {
 }
 
 export function loadConfig(file: string): DesktopConfig | null {
-    if (!fs.existsSync(file)) return null
-    const value = JSON.parse(fs.readFileSync(file, 'utf8')) as DesktopConfig
-    if (
-        value.schemaVersion !== 1 ||
-        !path.isAbsolute(value.libraryDirectory) ||
-        !profiles.has(value.profile)
-    )
-        throw new Error('The saved configuration is invalid')
-    if (value.proxyUrl) safeProxy(value.proxyUrl)
-    if (value.externalSources !== undefined) value.externalSources = normalizeSourcePolicy(value.externalSources)
-    if (value.mobileBridgeEnabled !== undefined && typeof value.mobileBridgeEnabled !== 'boolean')
-        throw new Error('The saved Mobile Bridge choice is invalid')
-    if (value.readerSettings !== undefined) value.readerSettings = normalizeReaderSettings(value.readerSettings)
-    return value
+    const config = readCoreLocalConfig(file, safeProxy)
+    if (config?.externalSources !== undefined)
+        config.externalSources = normalizeSourcePolicy(config.externalSources)
+    return config
 }
 
 export function saveConfig(file: string, config: DesktopConfig) {
-    if (config.externalSources !== undefined) normalizeSourcePolicy(config.externalSources)
-    if (config.mobileBridgeEnabled !== undefined && typeof config.mobileBridgeEnabled !== 'boolean')
-        throw new Error('Invalid Mobile Bridge choice')
-    if (config.readerSettings !== undefined) parseReaderSettings(config.readerSettings)
-    const serialized = JSON.stringify(config, null, 2)
-    const hasSecretKey = (value: unknown): boolean => Boolean(value && typeof value === 'object' &&
-        Object.entries(value).some(([key,child]) => /password|account|username|authorization|cookie|token/i.test(key) || hasSecretKey(child)))
-    if (hasSecretKey(config))
-        throw new Error('Refusing to write sensitive fields to config')
-    if (config.proxyUrl) {
-        const proxy = new URL(config.proxyUrl)
-        if (proxy.username || proxy.password) throw new Error('Refusing to write proxy credentials to config')
-    }
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    const temporary = `${file}.tmp`
-    fs.writeFileSync(temporary, serialized, { encoding: 'utf8', mode: 0o600 })
-    fs.renameSync(temporary, file)
+    if (config.externalSources !== undefined)
+        normalizeSourcePolicy(config.externalSources)
+    writeCoreLocalConfig(file, config)
 }
 
 export function credentialedProxy(

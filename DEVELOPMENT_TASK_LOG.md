@@ -1,5 +1,10 @@
 # Pica Library Development Task Log
 
+
+### CORE-LIB-04c-02b-02 最终质量回填｜2026-10-29
+
+- [#243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 加固代码 `87a20359396f67ba30b54f39c1e8958ee4760569` 已通过 [Linux+Windows 实体 WAL/回滚专项 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) 和 [Android/Web/Desktop 完整 CI #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471)，均 SUCCESS。最新仅文档 HEAD 不改变已测试的业务代码。正式 `v0.5.0` 标签中 migrations.ts、desktop/paths.ts 与研发分支 SHA 完全相同；types.ts 仍有后续差异，后续需独立历史结构验收。**QA 快照不是生产迁移/真实用户回滚授权，G1–G4 全 OPEN。**
+
 ## S3 PR #243｜旧 v0.5.0 用户资料一致性备份与回滚演练（CORE-LIB-04c-02b-02，2026-10-29）
 
 - 新 [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243)：建立严格**仅合成 OS Temp sentinel**的 `src/desktop/legacy-profile-snapshot-qa.ts`，不触碰本机旧用户配置。复用 Node 24.15 原生 `node:sqlite.backup()`，读取旧同一 SQLite/书架/阅读数据并合并尚未 checkpoint 的 WAL；无 WAL 时使用 immutable 只读 URI 避免生成空 sidecar；只对目标快照规范化 journal_mode 和做 `integrity_check`。所有原始主 DB/WAL 通过备份前后哈希比对。来源凭据等仅作为测试中不透明字节复制，不解析或打印。

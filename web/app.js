@@ -811,8 +811,10 @@ function closeDesktopBrowserSession() {
 
 async function loadDesktop() {
     const settingsVersion = readerSettingsEditVersion
+    let desktopHostReached = false
     try {
         desktop = await api('/api/v1/desktop/status')
+        desktopHostReached = true
         state.capabilities = await api('/api/v1/capabilities')
         document.dispatchEvent(new Event('pica-local-import-refresh'))
         $('#settings-nav').hidden = false
@@ -840,13 +842,17 @@ async function loadDesktop() {
         }
     } catch {
         desktop = null
-        // The source-free local core shares the production capabilities API
-        // but has no Desktop host/status endpoint yet. Recover the explicit
-        // feature policy instead of treating a missing host as a missing DB.
-        try {
-            state.capabilities = await api('/api/v1/capabilities')
-        } catch {
-            state.capabilities = null
+        // An existing Desktop host with a failed capabilities request must
+        // stay fail-closed and must not retry or partially advertise features.
+        // Only a missing Desktop host can fall back to the source-free core's
+        // independent capabilities endpoint.
+        state.capabilities = null
+        if (!desktopHostReached) {
+            try {
+                state.capabilities = await api('/api/v1/capabilities')
+            } catch {
+                state.capabilities = null
+            }
         }
     }
 }

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { InstanceLock } from '../../src/desktop/instance'
 import {
     DesktopUpgradeQuiescenceError,
+    collectDesktopUpgradeWorkLeases,
     requireDesktopUpgradeQuiescence,
     type DesktopUpgradeQuiescencePort
 } from '../../src/desktop/update-quiescence'
@@ -188,11 +189,78 @@ describe('actual Desktop update helper handoff preflight, no production migratio
         expect(stop).toHaveBeenCalledTimes(1)
     })
 
+    it('includes all real LibraryService diagnostics, not just browser-idle task leases', () => {
+        const f = fixture()
+        const resources = { active: [], waiting: [] }
+        const diagnostics = {
+            schemaVersion: 1, tasks: [{
+                taskKey: 'library-organize',
+                state: 'running', active: true, resourceState: 'none'
+            }]
+        }
+        f.port.activeWorkLeases = () =>
+            collectDesktopUpgradeWorkLeases([], diagnostics, resources)
+        expect(() => requireDesktopUpgradeQuiescence(f.port))
+            .toThrow(DesktopUpgradeQuiescenceError)
+        diagnostics.tasks[0].state = 'complete'
+        diagnostics.tasks[0].active = false
+        expect(() => requireDesktopUpgradeQuiescence(f.port)).not.toThrow()
+    })
+
+    it.each([
+        'waiting', 'running', 'pausing', 'paused', 'cancelling', 'failed',
+        'unknown'
+    ])('never treats diagnostic state %s as safe to replace the application', state => {
+        const f = fixture()
+        const diagnostic = {
+            schemaVersion: 1,
+            tasks: [{ taskKey: 'maintenance-update', state,
+                active: false, resourceState: 'none' }]
+        }
+        expect(() => requireDesktopUpgradeQuiescence({
+            ...f.port,
+            activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
+                [], diagnostic, {active: [], waiting: []})
+        })).toThrow(DesktopUpgradeQuiescenceError)
+    })
+
+    it('blocks runtime acquisitions waiting for capacity, even when no task has started', () => {
+        const f = fixture()
+        const snapshot = {schemaVersion: 1, tasks: [{
+            taskKey: 'recommendation-v5-shadow',
+            state: 'idle', active: false, resourceState: 'none'
+        }]}
+        f.port.activeWorkLeases = () => collectDesktopUpgradeWorkLeases(
+            [], snapshot, { active: [], waiting: [{ownerId:'test'}] })
+        expect(() => requireDesktopUpgradeQuiescence(f.port))
+            .toThrow('Finish, pause and fully stop active work')
+    })
+
+    it('rejects malformed or absent diagnostic inventory rather than defaulting to idle', () => {
+        const f = fixture()
+        const bad: unknown[] = [
+            null, {schemaVersion:1}, {schemaVersion:2,tasks:[]},
+            {schemaVersion:1,tasks:[{taskKey:'t',state:'idle'}]},
+            {schemaVersion:1,tasks:[{taskKey:'t',state:'idle',
+                active:false,resourceState:'unrecognized'}]}
+        ]
+        for (const diagnostic of bad) {
+            f.port.activeWorkLeases = () => collectDesktopUpgradeWorkLeases(
+                [], diagnostic, {active:[],waiting:[]})
+            expect(() => requireDesktopUpgradeQuiescence(f.port))
+                .toThrow(DesktopUpgradeQuiescenceError)
+        }
+        f.port.activeWorkLeases = () => collectDesktopUpgradeWorkLeases(
+            [], {schemaVersion:1,tasks:[]}, {active:[]})
+        expect(() => requireDesktopUpgradeQuiescence(f.port))
+            .toThrow(DesktopUpgradeQuiescenceError)
+    })
+
     it('wires the preflight to the REAL Desktop one-click handler, not an inert test-only copy', () => {
         const source = fs.readFileSync('src/desktop/main.ts', 'utf8')
         expect(source).toContain('requireDesktopUpgradeQuiescence')
         expect(source).toMatch(/applyUpdate:[\s\S]{0,550}ownership: instance/)
-        expect(source).toMatch(/applyUpdate:[\s\S]{0,850}activeWorkLeases: activeDesktopWorkLeases/)
+        expect(source).toMatch(/applyUpdate:[\s\S]{0,850}activeWorkLeases: \\([\\s\\S]{0,250}collectDesktopUpgradeWorkLeases/)
         expect(source).toContain('service?.quiesceLocalDownloads()')
         const preflight = fs.readFileSync(
             'src/desktop/update-quiescence.ts','utf8')

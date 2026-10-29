@@ -4,6 +4,7 @@ export const jaCoreTranslations = {
     'nav.label': 'メインナビゲーション',
     'mode.detecting': '接続状態を確認中',
     'mode.connected': '接続済み',
+    'message.coreOnlyRecommendations': 'ローカルライブラリモードです。対応する配信元モジュールが有効になるまで、オンラインおすすめは利用できません。',
     'mode.lite': 'Browser Lite',
     'nav.home': 'ホーム',
     'nav.library': 'ライブラリ',

@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 CORE-LIB-03c｜旧 Windows 本地配置及平台目录能力提取
+
+- [Draft #236](https://github.com/Saber-Alter-Lily/pica-library/pull/236) 完成**正式** `src/desktop/config.ts` 的本地目录/profile/Reader 设置/配置原子保存和敏感字段保护抽离，源策略兼容仍由 Desktop 主组合注入；`src/library/server.ts` 的原 `choose-folder/open-directory` 与 `src/desktop/main.ts` 使用来源中立 OS 能力用途接口。只允许旧五种本地目录用途，阻止网页路径/命令注入，沿用原原生选择器、系统打开函数、CSRF 与旧配置文件。
+- Linux/Windows 专项 [#40857679928](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857679928) **SUCCESS**；包含真实 Desktop HTTP、多种旧配置保存/机密与平台/Reader 测试。全量 [CI #40857731995](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857731995) 在文档提交时单独待核，不挪用专项结果。
+- 下一目标 **CORE-LIB-04a**：拆分旧 Windows HTTP 启动及完整用户网页的核心服务 composition，而不是继续创造独立小型 QA Reader。须证明不创建 `LibraryService/ProviderService` 时书库/书架/Reader/设置/WebDAV 真实可用；随后做 Windows 实体 SDK 无源、Android Service/Binder 与核心 APK、可信来源生命周期、老 v0.5.0 一键升级/回滚、物理用户验收。#232/#233 实现分叉仍须消解。G1–G4 不豁免。详见 [技术审计](S3_CORE_LOCAL_PLATFORM_20261029.md)。
+
+---
+
 ## 2026-10-29 S3 CORE-LIB-03b｜生产 WebDAV 状态和命令使用来源无关端口
 
 - 新增 [Draft PR #235](https://github.com/Saber-Alter-Lily/pica-library/pull/235)：不重新发明 WebDAV，而是将旧正式 Windows `desktop.save` 的网盘设置/同步/暂停恢复取消/远端删除委托到仅 type-import 原 `RemoteStorageDesktopManager` 的 `coreRemoteStorageDispatch`；旧 status 同样委托，网络和密钥操作只有原业务实现负责，未自动启动在线动作。

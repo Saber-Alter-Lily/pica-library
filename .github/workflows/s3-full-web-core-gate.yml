@@ -43,4 +43,4 @@ jobs:
           pnpm type:check
           pnpm web:check
       - name: Execute real original Web detect() and Desktop capability fallback
-        run: pnpm exec vitest run test/unit/web-source-free-bootstrap.test.ts test/unit/i18n.test.ts test/unit/desktop-web.test.ts test/unit/core-bootstrap-read.test.ts
+        run: pnpm exec vitest run test/unit/web-source-free-bootstrap.test.ts test/unit/reading-library-shell.test.ts test/unit/i18n.test.ts test/unit/desktop-web.test.ts test/unit/core-bootstrap-read.test.ts

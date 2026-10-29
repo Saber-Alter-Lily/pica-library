@@ -9,12 +9,12 @@ export const OFFLINE_QA_SENTINEL_TEXT = 'PICA_OFFLINE_CORE_QA_V1\n'
 export function assertDisposableCoreRoot(root: string) {
     if (typeof root !== 'string' || !path.isAbsolute(root))
         throw new Error('QA data root must be absolute')
-    const status = fs.lstatSync(root)
-    if (!status.isDirectory() || status.isSymbolicLink())
+    const status = fs.lstatSync(root, { throwIfNoEntry: false })
+    if (!status?.isDirectory() || status.isSymbolicLink())
         throw new Error('QA data root is not a regular directory')
     const marker = path.join(root, OFFLINE_QA_SENTINEL)
-    const info = fs.lstatSync(marker)
-    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 ||
+    const info = fs.lstatSync(marker, { throwIfNoEntry: false })
+    if (!info?.isFile() || info.isSymbolicLink() || info.nlink !== 1 ||
         fs.readFileSync(marker, 'utf8') !== OFFLINE_QA_SENTINEL_TEXT)
         throw new Error('This directory is not an owned disposable QA root')
     const dbFile = path.join(root, 'library.db')

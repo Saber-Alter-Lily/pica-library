@@ -5,12 +5,11 @@ import http, {
 } from 'node:http'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { verifiedFullWebQaAssets } from './full-web-qa-assets'
+import { createCoreLibraryPorts, type CoreLocalRuntime } from '../library/core-runtime-composition'
 import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from '../library/core-catalog-read'
 import { coreBootstrapStatus, coreBootstrapAuthors, coreBootstrapCapabilities } from '../library/core-bootstrap-read'
 import { coreShelfMatch, coreShelfExecute } from '../library/core-shelf-routes'
-import { ShelfService } from '../services/shelf-service'
-import { LibraryQueryService } from '../services/library-query-service'
 import type { LibraryFacetQuery } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
 import type { ReaderService } from '../services/reader-service'
@@ -25,6 +24,8 @@ import type { ReaderService } from '../services/reader-service'
 interface QaHttpOptions {
     database: LibraryDatabase
     reader: ReaderService
+    /** Reuse the same local runtime instance as the original Desktop/CLI. */
+    coreRuntime?: CoreLocalRuntime
     webRoot: string
 }
 const SCRIPT_ASSETS = new Set([
@@ -188,8 +189,8 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         ]) requiredAsset(webRoot, asset)
     }
 
-    const libraryQueries = new LibraryQueryService(options.database)
-    const shelves = new ShelfService(options.database, libraryQueries)
+    const { libraryQueries, shelfService: shelves } = options.coreRuntime ??
+        createCoreLibraryPorts(options.database)
     const secret = randomBytes(32).toString('hex')
     const csrf = randomBytes(32).toString('hex')
     const markup = fullWeb ? null : existingReaderMarkup(webRoot)

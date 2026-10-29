@@ -9,6 +9,7 @@ on:
       - codex/s3-core-local-import-20261029
       - codex/s3-core-bootstrap-20261029
       - codex/s3-full-web-assets-20261029
+      - codex/s3-core-runtime-composition-20261029
     paths:
       - '.github/workflows/s3-windows-offline-portable-qa.yml'
       - 'scripts/build-windows-offline-portable-qa.ts'
@@ -25,6 +26,8 @@ on:
       - 'src/app-capabilities.ts'
       - 'test/unit/core-bootstrap-read.test.ts'
       - 'src/library/core-shelf-routes.ts'
+      - 'src/library/core-runtime-composition.ts'
+      - 'test/unit/core-runtime-composition.test.ts'
       - 'src/library/core-local-import.ts'
       - 'src/services/shelf-service.ts'
       - 'test/unit/core-shelf-routes.test.ts'

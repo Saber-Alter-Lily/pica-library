@@ -36,7 +36,8 @@ type SnapshotManifest = {
     sourceWalIntegrated: boolean
     excludedNonUserState: string[]
     secretsParsed: false
-    sourceModified: false
+    sourceDatabaseAndWalVerifiedUnchanged: true
+    crossFileAtomicityProven: false
     productionRestoreAuthorized: false
 }
 export type LegacySnapshotQaResult = {
@@ -82,7 +83,7 @@ const ident = (a: fs.Stats, b: fs.Stats) =>
 function regular(file: string) {
     const info = status(file)
     if (!info?.isFile() || info.isSymbolicLink() || info.nlink !== 1 ||
-        info.size < 1 || info.size > MAX_FILE)
+        info.size < 0 || info.size > MAX_FILE)
         throw new Error('SYNTHETIC_QA_FILE_UNSAFE')
     return info
 }
@@ -102,6 +103,16 @@ function pathParts(value: string) {
         part.length > 255 || /[:<>|?*]/.test(part)))
         throw new Error('SYNTHETIC_QA_PATH_UNSAFE')
     return parts
+}
+/** Disallow symlinked intermediate directories, not just the leaf file. */
+function nestedFile(root: string, relative: string) {
+    const parts = pathParts(relative)
+    let cursor = root
+    for (const part of parts.slice(0, -1)) {
+        cursor = path.join(cursor, part)
+        directory(cursor)
+    }
+    return path.join(cursor, parts[parts.length - 1])
 }
 function inside(root: string, value: string) {
     const rel = path.relative(root, value)
@@ -212,7 +223,13 @@ function exclusiveCopy(source: string, destination: string): FileRecord {
             const read = fs.readSync(descriptor, buffer, 0,
                 Math.min(buffer.length, initial.size - copied), copied)
             if (read <= 0) throw new Error('SOURCE_CHANGED_WHILE_COPYING')
-            fs.writeSync(output, buffer, 0, read)
+            let written = 0
+            while (written < read) {
+                const amount = fs.writeSync(output, buffer,
+                    written, read - written)
+                if (amount <= 0) throw new Error('SNAPSHOT_DESTINATION_WRITE_FAILED')
+                written += amount
+            }
             digest.update(buffer.subarray(0, read))
             copied += read
         }
@@ -275,7 +292,9 @@ function assertManifest(raw: unknown): SnapshotManifest {
     if (value.format !== 'PICA_V050_CONSISTENT_ROLLBACK_REHEARSAL_V1' ||
         value.database !== 'data/library.db' ||
         value.sqliteOnlineBackup !== true ||
-        value.secretsParsed !== false || value.sourceModified !== false ||
+        value.secretsParsed !== false ||
+        value.sourceDatabaseAndWalVerifiedUnchanged !== true ||
+        value.crossFileAtomicityProven !== false ||
         value.productionRestoreAuthorized !== false ||
         typeof value.sourceWalIntegrated !== 'boolean' ||
         !Array.isArray(value.files) ||
@@ -290,7 +309,7 @@ function assertManifest(raw: unknown): SnapshotManifest {
         const row = entry as Record<string, unknown>
         if (typeof row.path !== 'string' ||
             !Number.isSafeInteger(row.bytes) ||
-            (row.bytes as number) <= 0 || (row.bytes as number) > MAX_FILE ||
+            (row.bytes as number) < 0 || (row.bytes as number) > MAX_FILE ||
             typeof row.sha256 !== 'string' ||
             !/^[a-f0-9]{64}$/.test(row.sha256) ||
             !['opaque', 'sqlite'].includes(String(row.kind)))
@@ -383,7 +402,11 @@ export async function snapshotLegacyFixtureProfile(
             sourceWalIntegrated: originalWal !== null,
             excludedNonUserState: excluded,
             secretsParsed: false,
-            sourceModified: false,
+            sourceDatabaseAndWalVerifiedUnchanged: true,
+            // Individual opaque files are stable at copy time, but SQLite and
+            // the entire filesystem are not one atomic transaction. A future
+            // production migration must establish an application-wide freeze.
+            crossFileAtomicityProven: false,
             productionRestoreAuthorized: false
         }
         assertManifest(manifest)
@@ -426,7 +449,7 @@ export function restoreLegacyFixtureSnapshot(
     const manifest = assertManifest(JSON.parse(raw.toString('utf8')))
     // Verify ALL inputs before creating even a synthetic restored folder.
     for (const row of manifest.files) {
-        const file = path.join(snapshot, ...pathParts(row.path))
+        const file = nestedFile(snapshot, row.path)
         const actual = digestFile(file)
         if (actual.bytes !== row.bytes || actual.sha256 !== row.sha256)
             throw new Error('SNAPSHOT_FILE_INTEGRITY_MISMATCH')
@@ -438,7 +461,7 @@ export function restoreLegacyFixtureSnapshot(
         for (const row of manifest.files) {
             const dst = path.join(destination, ...pathParts(row.path))
             const copied = exclusiveCopy(
-                path.join(snapshot, ...pathParts(row.path)), dst
+                nestedFile(snapshot, row.path), dst
             )
             if (copied.bytes !== row.bytes || copied.sha256 !== row.sha256)
                 throw new Error('ROLLBACK_COPY_MISMATCH')

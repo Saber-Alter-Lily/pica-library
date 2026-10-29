@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 CORE-LIB-04c-02a｜无源 Desktop 独立二进制与原生 Launcher 路由
+
+- [Draft #241](https://github.com/Saber-Alter-Lily/pica-library/pull/241)：用旧 createCoreLocalRuntime/Reader/SQLite/原完整 Web、InstanceLock，独立打包 desktop-core-preview.mjs；静态物理依赖只允许本地服务和原单实例组件，禁止具体漫画源 SDK/Provider/Host。原 C# Launcher 保留默认旧 desktop.js，仅明确 --source-free-preview 才选择独立可执行，且必须使用显式授权、OS Temp owned sentinel 的资料目录。没有修改任何真实旧版本用户数据。
+- [跨系统纯核心可执行 #40881540640](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40881540640) SUCCESS；Windows 双 ZIP 最新 [#40882450092](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40882450092) 和完整 Android/Web/Desktop [#40882462037](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40882462037) 在写入时尚待最终确认。原生初轮清理受控测试 PID 后仍 EPERM，已增加精确 PID 死亡等待与文件释放门禁，不得宣称正式 Windows 安装包通过。
+- 下一硬关口 04c-02b：在不同入口仍物理独立的前提下，增加正式新 profile 和旧 v0.5.0 只读迁移/回滚证据；之后可信来源安装/签名/撤销、Android 核心启动与 Service/Binder、升级助手安全切换及原 42+12 项双端 UX 真机验收。所有 G1–G4 OPEN，未发布。技术审计：[S3_CORE_DESKTOP_ENTRY_20261029.md](S3_CORE_DESKTOP_ENTRY_20261029.md)。
+
+---
 ## 2026-10-29 CORE-LIB-04c-01｜真正原 Desktop 与无源 Reader/书库共用运行组合
 
 - 新建 [Draft #240](https://github.com/Saber-Alter-Lily/pica-library/pull/240) 以旧 Desktop 正式 `src/library/server.ts` 和已实体运行的 source-free Core 为共同调用端，提取同一 `createCoreLocalRuntime({database,dataDir,externalFileOpener?})`：真正旧 `LibraryQueryService/ShelfService/ReaderService/LocalLibraryIngestion` 保持同一 SQLite，不再两个启动入口分别创建本地服务。只有 Desktop 可注入可信 `ExternalReaderAdapter`，无源模式默认拒绝 OS 文件打开。新增真实 SQLite、Reader、安全路径和 AST 闭包验收。

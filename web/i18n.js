@@ -681,6 +681,7 @@ export const translations = {
         'message.syncNeedsEngine': 'Sync Favorites requires the local engine.',
         'message.engineRecovered': 'Local service is reachable again. Continuing with the requested action.',
         'message.partialInit': 'The local service is connected, but one optional module did not finish loading: {reason}',
+        'message.coreOnlyRecommendations': 'Local library mode: online recommendation sessions are unavailable until a compatible source module is enabled.',
         'message.searchNeedsEngine':
             'Provider search requires the local engine.',
         'message.searching': 'Searching…',

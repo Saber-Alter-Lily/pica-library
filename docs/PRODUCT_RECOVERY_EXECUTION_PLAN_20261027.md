@@ -1,5 +1,14 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-29 S3 CORE-LIB-04b-02/03｜原完整网页 + Windows x64 实体无源 QA
+
+- [Draft PR #239](https://github.com/Saber-Alter-Lily/pica-library/pull/239)：真实旧 `web/index.html`、`app.js`、样式/翻译/Reader 通过 TS AST 真实资源闭包装配，排除独立在线来源登录启动与非必要 AI 模型；仍复用同一 SQLite/书架/Reader/HTTP，并对全部文件做来源白名单/SHA。原 Web 的 `post()` 仅在拥有测试核心随机同源 token 时送 `x-pica-qa-csrf`，不改变旧 Desktop。解决无源核心真实网页所需的原书库最多5000项查询，不能读取任意外源 ID。
+- 实际 [Linux/Windows + 真正 Chromium 原首页 #40869551499](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869551499) **3/3 SUCCESS**，测试原完整首页/书库筛选/书架创建/Reader/设置及无外网请求；完整 Android/Web/Desktop [#40869749947](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869749947) SUCCESS。
+- 旧 Windows x64 官方 Node 24.15.0 SHA 固定 ZIP 构建器/真实 CMD/Node 启动器新增 Full-Web **可选** `--full-web`，Reader-only 原路线依旧测试。[两种真实 Windows Portable ZIP 解压/进程/SQLite重启 #40870550859](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40870550859) **2/2 SUCCESS**。均是 OS Temp disposable QA，不上传任何可执行包、不签名、不装入真实用户目录；最新源码全量 CI 仍按 [#40870561582](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40870561582) 单独核验。技术审计见 [S3_FULL_WEB_WINDOWS_PORTABLE_QA_20261029.md](S3_FULL_WEB_WINDOWS_PORTABLE_QA_20261029.md)。
+- **下一个硬阻断 CORE-LIB-04c**：从真实正式 `src/desktop/main.ts` / `src/library/server.ts` 解除 `LibraryService/ProviderService` 的强制初始化，用同一个完整正式 UI/数据库、模块化来源工厂实现无源启动。然后可信来源签名安装/更新/撤销、Android 纯核心 Service/Binder/APK、既有 v0.5.0 的书库/账号/下载/偏好无痛升级与回滚及用户真机验收。G1/G2/G3/G4 均未完成，原 42+新增12 验收项仍适用；#232/#233 书架方案需选版。
+
+---
+
 ### CORE-LIB-04b-01 完整回归纠正（2026-10-29）
 
 - 旧完整 CI [#40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) 暴露原 `reading-library-shell` 失败：有 Desktop status，但 caps 失败时不应通过第二次请求尝试取得权限。精确 `a40d8e82` 修复状态区分，无源 Core 缺失 Desktop host 仍可恢复正确 caps。专项加入该历史安全回归，不削弱原有限制。

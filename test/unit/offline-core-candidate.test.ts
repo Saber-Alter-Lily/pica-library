@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
+import AdmZip from 'adm-zip'
 import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import { buildOfflineCoreCandidate } from '../../scripts/build-offline-core-candidate'
@@ -152,6 +153,33 @@ describe('S3 actual isolated local-only core file and process', () => {
                 .toEqual(tinyPng)
             expect(fs.readFileSync(path.join(originals, '02.png')))
                 .toEqual(tinyPng)
+
+            // The same physically source-free process reads a normal CBZ
+            // through the existing approved archive importer (no Host/SDK).
+            const archive = path.join(folder, 'synthetic.cbz')
+            const zip = new AdmZip()
+            zip.addFile('Volume 1/01.png', tinyPng)
+            zip.writeZip(archive)
+            const cbz = good(binary, 'import', library, [
+                '--path', archive, '--kind', 'cbz', '--confirm'
+            ])
+            expect(cbz).toMatchObject({ imported: true, pages: 1 })
+            expect(cbz.comicId).toMatch(/^local:[a-f0-9]{64}$/)
+            expect(cbz.comicId).not.toBe(imported.comicId)
+            const cbzChapters = good(binary, 'chapters', library, [
+                '--comic-id', cbz.comicId
+            ]).chapters
+            expect(cbzChapters).toHaveLength(1)
+            const cbzChapter = good(binary, 'chapter', library, [
+                '--comic-id', cbz.comicId,
+                '--episode-id', cbzChapters[0].id
+            ])
+            expect(cbzChapter.pages).toHaveLength(1)
+            expect(good(binary, 'picture', library, [
+                '--picture-id', cbzChapter.pages[0].id
+            ]).sha256).toBe(createHash('sha256').update(tinyPng).digest('hex'))
+            expect(good(binary, 'list', library).comics).toHaveLength(2)
+            expect(fs.existsSync(archive)).toBe(true)
         } finally {
             fs.rmSync(folder, { recursive: true, force: true, maxRetries: 10,
                 retryDelay: 150 })

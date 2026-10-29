@@ -29,7 +29,7 @@ describe('original Desktop read-only bootstrap shared with source-free core', ()
             })
             expect(coreBootstrapAuthors(db)).toEqual(db.listAuthors())
             expect(coreBootstrapAuthors(db)).toEqual(expect.arrayContaining([
-                expect.objectContaining({ name: 'Fixture author' })
+                expect.objectContaining({ canonicalName: 'Fixture author' })
             ]))
         } finally {
             db.close()

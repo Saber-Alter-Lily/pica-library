@@ -1,6 +1,17 @@
 # Pica Library Development Task Log
 
 
+### 2026-10-29｜CORE-LIB-04c-02c-01｜真实 Desktop 更新入口的活动/锁所有权门禁（Draft #247）
+
+- 新建 [Draft #247](https://github.com/Saber-Alter-Lily/pica-library/pull/247)，基于 #246；不是 main/Release/OTA。此前 #246 完整 Android/Web/Desktop [CI #40922712429](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922712429) 已核实 Android + Web/Desktop **SUCCESS**，补齐上一轮未完成的报告状态。
+- **改动原应用而非 QA 小产品**：增加 `src/desktop/update-quiescence.ts`，要求真实 `InstanceLock.assertHeld()` 先后两次通过、实际 Desktop engine/database/service 就绪、非停止状态、原 `activeDesktopWorkLeases()` 返回零活动任务。下载、本地书库操作、远端同步、来源检查、推荐/收藏同步、移动配对、资源租约等仍使用**原来用于自动退出判断的同一批业务状态**，不额外发明进程扫描器或第二套任务队列。
+- 修改原 `src/desktop/update-command.ts` 增加可选同步预检，在旧 `UpdateManager.apply` 及 helper startup **之前**拒绝活跃任务，拒绝情况下不启动 helper、不触发延迟退出；原去重/ACK/超时逻辑保留。原正式 `src/desktop/main.ts` 的 `applyUpdate` 现真实绑定此门禁，未改正常 Reader/Provider 行为。
+- 旧真实 `InstanceLock` 临时沙箱测试覆盖活动/暂停/未知状态，锁所有权在采样时丢失，未加载库、重试、重复点击、拒绝时的零副作用与主程序入口确实接线。新增 [Linux/Windows 专项](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/s3-desktop-update-quiescence.yml)。首轮 [#40974599032](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974599032) 因夹具误把第二次 owner assertion 当成第二条事件导致 56/57，通过修正**夹具计数**，不删断言或放宽生产门禁。正确源码 `eb61cd748` 的 [双平台 #40974706377](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974706377) **Linux 57/57 + Windows 57/57 SUCCESS**。完整 [Android/Web/Desktop CI #40974712298](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974712298) 要按最终终态另行回读。
+- **明确不可提前宣布“安全备份/完整停写”**：这只是 helper 启动前的即时状态检查，后续新 HTTP/后台任务仍可能被接纳；旧 `stop()` 的硬超时及分项清理失败也尚无可验证的持久成功凭据；原 #243 SQLite Online Backup 本身不保证数据库与漫画图片跨文件原子性。下一项 `CORE-LIB-04c-02c-02`：统一写入准入屏障 + 有界 drain/abort + 所有服务关闭确认 + 进程退出/数据快照身份验证，然后才谈受保护备份/回滚。
+- 开源复用决策：重用原 `InstanceLock`、活动任务快照、旧 `applyUpdateAndScheduleShutdown` 和 SQLite Online Backup，未引入 Litestream/restic/第二数据库/更新器。独立审计 [S3_DESKTOP_UPDATE_QUIESCENCE_GATE_20261029.md](docs/S3_DESKTOP_UPDATE_QUIESCENCE_GATE_20261029.md)。G1–G4 继续 OPEN，正式 v0.5.0 与用户资料不变。
+
+
+
 ### S3 2026-10-29｜CORE-LIB-04c-02b-03b-02 官方历史迁移与媒体边界（Draft PR #246）
 
 - 新建 [Draft #246](https://github.com/Saber-Alter-Lily/pica-library/pull/246)，叠加 #245，未合并 main/Release/OTA。两个工作簿共用新增 `scripts/qa/v050-release-identity.ts` 固定官方 `v0.5.0` commit `bec7f9f` 与五项 blob 身份，避免重复造仓库资格校验。

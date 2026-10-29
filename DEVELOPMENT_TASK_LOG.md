@@ -7,7 +7,7 @@
 
 - 复查真实 `LibraryService.runtimeTaskDiagnostics()` 发现维护更新/修复、书库整理、Recommendation V5 shadow 和 Work Identity 证据刷新不一定出现在原 `activeDesktopWorkLeases()` 的专有条目中，且 `RuntimeResourceCoordinator.waiting` 可能存在未获 lease 的待运行写任务。继续只用旧列表将出现**漏判**。
 - 将原 Collector 与服务已有完整任务诊断 + 活动及等待资源快照合并到同一纯函数 `collectDesktopUpgradeWorkLeases`，并在原 `main.ts` update handler 接线。拒绝 active/waiting/running/pausing/paused/cancelling/unknown 状态及无效诊断；`failed` 仅在不活跃且未持资源时视为已终止，避免一个历史失败任务永久阻止正常升级。不新造任务存储系统；UI 只返回统一错误，不泄漏任务名称和隐私。
-- 新增真实任务诊断和资源队列的回归测试，期间修正了一次夹具 TypeScript readonly 参数及断言括号错误。**这属于真实功能代码更新，前述 `eb61cd748` 57/57 绿色结果不能代表最新版本。** 最新精确业务/测试源码为 `572d6758bf95d21c58244123b23bf43e290d5e59`，其 [Linux/Windows 专项 #40975511400](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975511400) 与 [完整 Android/Web/Desktop CI #40975519327](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975519327) **待实际终态验证**。所有 PR 仍 Draft，G1–G4 OPEN。
+- 新增真实任务诊断和资源队列的回归测试，期间修正了一次夹具 TypeScript readonly 参数及断言括号错误。**这属于真实功能代码更新，前述 `eb61cd748` 57/57 绿色结果不能代表最新版本。** 最新精确业务/测试源码为 `572d6758bf95d21c58244123b23bf43e290d5e59`，其 [Linux/Windows 专项 #40975511400](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975511400) 已核实 **双平台 2/2 SUCCESS，双方各 67/67 单元及锁/升级助手回归 PASS**；[完整 Android/Web/Desktop CI #40975519327](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975519327) **尚排队/未判定**，不能借用先前完整 CI。所有 PR 仍 Draft，G1–G4 OPEN。
 
 
 

@@ -36,6 +36,8 @@ describe('local import HTTP and paired Reader boundary', () => {
             fs.rmSync(root, { recursive: true, force: true })
         })
         const picker = vi.fn(async () => original)
+        const chooseFolder = vi.fn(async () => null)
+        const openDirectory = vi.fn(async (_kind: string) => {})
         const server = await startLibraryServer({
             database: db,
             service,
@@ -50,10 +52,10 @@ describe('local import HTTP and paired Reader boundary', () => {
                 }),
                 save: async () => ({}),
                 testConnection: async () => ({}),
-                chooseFolder: async () => null,
+                chooseFolder,
                 chooseLocalComic: picker,
                 exportBrowserLitePackage: async () => ({}),
-                openDirectory: async () => {},
+                openDirectory,
                 shutdown: () => {}
             }
         })
@@ -91,6 +93,39 @@ describe('local import HTTP and paired Reader boundary', () => {
             (await post('preview', { kind: 'folder', path: root })).status
         ).toBe(400)
         expect(picker).not.toHaveBeenCalled()
+        // Exercise the actual PRODUCTION Desktop local OS routes after they
+        // delegate to the same source-neutral capability boundary.
+        const chooseWithoutCsrf = await fetch(server.url + '/api/v1/desktop/choose-folder', {
+            method: 'POST'
+        })
+        expect(chooseWithoutCsrf.status).toBe(403)
+        const folderResponse = await fetch(server.url + '/api/v1/desktop/choose-folder', {
+            method: 'POST',
+            headers: { 'x-pica-csrf': 'local-fixture-csrf', origin: server.url }
+        })
+        expect(folderResponse.status).toBe(200)
+        expect(await folderResponse.json()).toEqual({ path: null })
+        expect(chooseFolder).toHaveBeenCalledTimes(1)
+        const open = (payload: unknown, csrf = true) => fetch(
+            server.url + '/api/v1/desktop/open-directory', {
+                method: 'POST',
+                headers: {
+                    origin: server.url,
+                    'content-type': 'application/json',
+                    ...(csrf ? { 'x-pica-csrf': 'local-fixture-csrf' } : {})
+                },
+                body: JSON.stringify(payload)
+            }
+        )
+        expect((await open({ kind: 'data' }, false)).status).toBe(403)
+        expect((await open({ kind: 'data', path: root })).status).toBe(400)
+        expect((await open({ kind: '__proto__' })).status).toBe(400)
+        expect(openDirectory).not.toHaveBeenCalled()
+        const opened = await open({ kind: 'logs' })
+        expect(opened.status).toBe(200)
+        expect(await opened.json()).toEqual({ success: true })
+        expect(openDirectory).toHaveBeenCalledTimes(1)
+        expect(openDirectory).toHaveBeenCalledWith('logs')
         const capabilities = await fetch(
             server.url + '/api/v1/capabilities'
         ).then((r) => r.json())

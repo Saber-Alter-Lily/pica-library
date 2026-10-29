@@ -1,5 +1,14 @@
 # Pica Library Development Task Log
 
+## S3 PR #243｜旧 v0.5.0 用户资料一致性备份与回滚演练（CORE-LIB-04c-02b-02，2026-10-29）
+
+- 新 [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243)：建立严格**仅合成 OS Temp sentinel**的 `src/desktop/legacy-profile-snapshot-qa.ts`，不触碰本机旧用户配置。复用 Node 24.15 原生 `node:sqlite.backup()`，读取旧同一 SQLite/书架/阅读数据并合并尚未 checkpoint 的 WAL；无 WAL 时使用 immutable 只读 URI 避免生成空 sidecar；只对目标快照规范化 journal_mode 和做 `integrity_check`。所有原始主 DB/WAL 通过备份前后哈希比对。来源凭据等仅作为测试中不透明字节复制，不解析或打印。
+- 同步快照旧 `config`、`data`、`cache`、`packs`、`runtime-state/personalization` 的合成文件，包括书架/Reader/图片、虚拟 DPAPI 凭据和 WebDAV 配置；排除日志、实例锁与旧升级助手可执行文件。每项拥有独占读/写、身份检测、SHA256、路径/数量/容量限制；manifest 通过外部已知哈希校验后，恢复只写全新的 `restored/`，严禁覆盖原 profile。现增补零字节文件、短写重试、父目录软链接拒绝，以及 `crossFileAtomicityProven:false`——没有误称 SQLite 快照等于整个文件系统的原子性。
+- 新 `test/unit/legacy-profile-snapshot-qa.test.ts` 合成真实 `LibraryDatabase/LocalLibraryIngestion` 作品页、书架和阅读进度；实测 WAL 未检查点记录进入独立备份，恢复后校验，篡改、锁、外置目录和未授权资料均拒绝。Linux/Windows 使用固定 Node 24.15 的 [S3 专项工作流](.github/workflows/s3-v050-snapshot-rollback-qa.yml)，附原 Desktop instance ownership、旧只读 preflight 与本地导入回归。
+- 初轮 [#40894619522](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40894619522) Vite 5 无法直接解析 `node:sqlite`，按旧库 `createRequire` 修正；次轮 [#40894856666](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40894856666) 找到空 WAL sidecar 实际风险并以 immutable/在线备份分流修复。基础代码 [Linux/Windows #40895318054](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895318054) **2/2 SUCCESS**；加固最终提交的 [#40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) 与 [完整 Android/Web/Desktop CI #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471) 需按实际 SHA 最终核查，不能复用基础结果冒称新代码全通过。
+- **下阶段 CORE-LIB-04c-02b-03**：真实 v0.5.0 历史文件布局/Schema 的只读 fixture 资格、外置书库/媒体大小和缺失路径决策、正式受控快照保存与原地失败回滚、DPAPI/加密备份、升级器确认和断电/进程终止模拟；独立 source-free Windows 目前仍**只能运行临时 QA profile**。Android Service/Binder、正式来源签名/更新和 Android G1 UX、原 42+新增12 用例与 G1–G4 均 OPEN。详细见 [本轮审计](docs/S3_V050_WAL_SNAPSHOT_ROLLBACK_QA_20261029.md)。不合并 main、不发布/OTA、不触碰真实用户文件。
+
+
 ## S3 PR #241｜独立无来源 Desktop 执行入口和原 Windows Launcher 选择（CORE-LIB-04c-02a，2026-10-29）
 
 - 新 [Draft PR #241](https://github.com/Saber-Alter-Lily/pica-library/pull/241)：真正新增 src/desktop/core-preview-main.ts 作为无来源、非旧 Desktop 的独立可执行入口；原本地 SQLite/Reader/Shelf/本地导入/完整 Web 复用 createCoreLocalRuntime、旧 InstanceLock 和原受保护 loopback HTTP。明确只允许拥有原 QA sentinel、且 canonical realpath 在 OS Temp 的独立书库，绝不打开 v0.5.0 用户数据。

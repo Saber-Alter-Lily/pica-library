@@ -493,12 +493,21 @@ async function ensureConnectedEngine(forceProbe = false) {
     }
 }
 
-const post = (path, value) =>
-    api(path, {
+const post = (path, value) => {
+    // An explicit, disposable source-free QA full Web entry sets this token.
+    // Production Desktop stays on its original POST contract unchanged.
+    const qaToken = document.querySelector(
+        'meta[name="pica-core-qa-csrf"]'
+    )?.content
+    return api(path, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+            'content-type': 'application/json',
+            ...(qaToken ? { 'x-pica-qa-csrf': qaToken } : {})
+        },
         body: JSON.stringify(value)
     })
+}
 // Legacy V2 contract remains intentionally discoverable:
 // post('/api/v1/recommendation-sessions', {})
 // api('/api/v1/recommendation-sessions/status')

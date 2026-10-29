@@ -61,8 +61,9 @@ describe('source-neutral WebDAV/remote storage command port', () => {
         expect(store.value?.remoteStorageCredentials).toBeDefined()
         expect(coreRemoteStorageStatus(manager).configured).toBe(true)
         const actual = coreRemoteStorageStatus(manager)
-        expect(actual.targets).toHaveLength(1)
-        expect(actual.targets[0].label).toBe('My private WebDAV')
+        expect(actual).toMatchObject({
+            targets: [{ label: 'My private WebDAV' }]
+        })
         expect(manager.status().targets).toHaveLength(1)
     })
 

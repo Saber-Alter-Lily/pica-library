@@ -10,12 +10,17 @@ on:
       - codex/s3-core-bootstrap-20261029
       - codex/s3-full-web-assets-20261029
       - codex/s3-core-runtime-composition-20261029
+      - codex/s3-core-preview-entry-20261029
     paths:
       - '.github/workflows/s3-windows-offline-portable-qa.yml'
       - 'scripts/build-windows-offline-portable-qa.ts'
       - 'scripts/verify-windows-offline-portable-qa.ts'
       - 'scripts/tsconfig.s3-windows-qa.json'
       - 'scripts/build-offline-core-candidate.ts'
+      - 'src/desktop/core-preview-main.ts'
+      - 'src/desktop/instance.ts'
+      - 'src/offline-core/qa-ownership.ts'
+      - 'packaging/windows/Launcher.cs'
       - 'scripts/stage-offline-reader-assets-qa.ts'
       - 'scripts/stage-offline-full-web-qa.ts'
       - 'web/**'
@@ -149,7 +154,7 @@ jobs:
           if($LASTEXITCODE -ne 0){ throw 'Extracted Windows source-free QA ZIP execution failed' }
           $result=Get-Content -Raw -LiteralPath $verification | ConvertFrom-Json
           $expected=if ('${{ matrix.flavor }}' -eq 'full-web') {'WINDOWS_X64_EXTRACTED_FULL_WEB_QA_PASS'} else {'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS'}
-          if($result.status -ne $expected -or $result.sourceCount -ne 0 -or $result.publishAuthorized -or -not $result.verifiedProgressRestart -or -not $result.verifiedShelfRestart -or ('${{ matrix.flavor }}' -eq 'full-web' -and -not $result.verifiedFullWeb)) {
+          if($result.status -ne $expected -or $result.sourceCount -ne 0 -or $result.publishAuthorized -or -not $result.verifiedProgressRestart -or -not $result.verifiedShelfRestart -or ('${{ matrix.flavor }}' -eq 'full-web' -and (-not $result.verifiedFullWeb -or -not $result.nativeWindowsCorePreview))) {
             throw 'Source-free portable ZIP acceptance did not pass'
           }
           "S3_PORTABLE_VERIFY_REPORT=$verification" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8

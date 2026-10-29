@@ -1,5 +1,14 @@
 # Pica Library Development Task Log
 
+## S3 PR #241｜独立无来源 Desktop 执行入口和原 Windows Launcher 选择（CORE-LIB-04c-02a，2026-10-29）
+
+- 新 [Draft PR #241](https://github.com/Saber-Alter-Lily/pica-library/pull/241)：真正新增 src/desktop/core-preview-main.ts 作为无来源、非旧 Desktop 的独立可执行入口；原本地 SQLite/Reader/Shelf/本地导入/完整 Web 复用 createCoreLocalRuntime、旧 InstanceLock 和原受保护 loopback HTTP。明确只允许拥有原 QA sentinel、且 canonical realpath 在 OS Temp 的独立书库，绝不打开 v0.5.0 用户数据。
+- 复用原 esbuild 物理无源审核器，给 desktop-core-preview 增加严格入口模式，src/desktop 仅允许 core-preview-main.ts 与 instance.ts，其余具体来源 SDK/Provider/Host 全禁。原 packaging/windows/Launcher.cs 默认仍启动 app/desktop.js；只有首参数 --source-free-preview 才选择不同的 app/desktop-core-preview.mjs，缺文件直接失败，不回退旧来源程序。
+- 在原 Windows 官方 Node 固定 SHA Portable 的 Full-Web 临时 QA 变体中，现会编译原 C# Launcher 并打包单独无源 ESM（源账户/SDK 不进入该 QA ZIP），以实际 Windows 原生 exe 启动受控临时 Profile，检查 Cookie/原完整 UI/SQLite、禁用来源路由。Reader-only ZIP 原路径保持。
+- 首轮 Linux 发现未初始化根的 ENOENT 文案问题、Windows 发现粗暴 SIGTERM 可留下单实例锁；均已修复为显式拒绝和原有死 PID 验证回收，未删除未知锁。独立可执行 [Linux/Windows 专项 #40881540640](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40881540640) SUCCESS。
+- 原生 Launcher 初轮 [Windows 双 ZIP #40881936384](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40881936384) Reader-only SUCCESS，Full-Web 因本次测试持有的进程句柄未释放导致提取目录 EPERM，尚不可验收。修复仅检查本次已发布的精确 PID 并等待死亡/文件句柄释放，新运行 [#40882450092](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40882450092) 与全 Android/Web/Desktop [#40882462037](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40882462037) 写入时仍待最终判断，不能凭旧测试冒充通过。
+- **接下来 CORE-LIB-04c-02b**：真实 production profile 契约与 v0.5.0 用户资料、漫画、下载、推荐数据的只读盘点、备份/可验证回滚；然后允许正式 Windows 源无关客户端在可信新 profile 上启动，组合现有受限文件导入/设置/WebDAV。不允许在实机上无预检直接迁移。之后来源可信签名包/生命周期、Android 核心 APK/Service/Binder、视觉/引导和所有用户验收。见 [审计](docs/S3_CORE_DESKTOP_ENTRY_20261029.md)。G1–G4 全 OPEN；不合并 main/发布/OTA。
+
 ## S3 PR #240｜原正式 Desktop 和无源 Core 复用同一业务运行组合（CORE-LIB-04c-01，2026-10-29）
 
 - 在正式原 `src/library/server.ts` 与已验证 Windows Full-Web Core 共用代码上新增 [Draft PR #240](https://github.com/Saber-Alter-Lily/pica-library/pull/240)，加入 `src/library/core-runtime-composition.ts` 并**真实替换**原 Desktop 的 `LibraryQueryService`、`ShelfService`、`ReaderService`、`LocalLibraryIngestion` 分散初始化。原服务/SQLite/Reader/HTTP/用户事件语义不变，可信 Desktop 的 `ExternalReaderAdapter` 仍显式注入，来源插件不能获得 OS 文件打开能力；源中立 Core 不导入 `LibraryService/ProviderService` 或 Pica/E-H/JM SDK。

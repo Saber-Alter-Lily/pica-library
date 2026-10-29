@@ -173,6 +173,29 @@ export async function buildWindowsOfflinePortableQa(
         bytes.set(name, copy)
     }
     add('app/core.mjs', candidate.bytes)
+    if (options.fullWebQa) {
+        // Compile the exact EXISTING native Windows launcher used by the real
+        // application, with the new explicit --source-free-preview selector.
+        // The default desktop.js is deliberately absent: any fallback to the
+        // concrete bundled provider runtime MUST fail closed in this ZIP.
+        const preview = await buildOfflineCoreCandidate('desktop-core-preview')
+        const csc = path.join(process.env.SystemRoot ?? 'C:\\Windows',
+            'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe')
+        const launcherSource = path.join(ROOT, 'packaging', 'windows', 'Launcher.cs')
+        checkedFile(launcherSource, 128 * 1024)
+        const launcherOutput = path.join(directory, 'core-preview-launcher.exe')
+        const compiled = spawnSync(csc, [
+            '/nologo', '/target:winexe', '/optimize+', '/platform:x64',
+            '/reference:System.Windows.Forms.dll',
+            '/out:' + launcherOutput, launcherSource
+        ], { cwd: ROOT, windowsHide: true, encoding: 'utf8', timeout: 30000 })
+        if (compiled.error || compiled.status !== 0)
+            throw new Error('Original Windows launcher preview compilation failed: ' +
+                String(compiled.stderr ?? compiled.stdout ?? compiled.error))
+        add('Pica-Library-Core-Preview.exe',
+            checkedFile(launcherOutput, 8 * 1024 * 1024))
+        add('app/desktop-core-preview.mjs', preview.bytes)
+    }
     add('runtime/node.exe', runtime)
     for (const name of TOP_LEVEL) add(name, fileSource(name))
     add(NOTICE_PATHS[0], license)
@@ -228,7 +251,9 @@ export async function buildWindowsOfflinePortableQa(
             ? (entries.length < 30 ||
                 !entries.some(row => row.path === 'app/web/app.js') ||
                 !entries.some(row => row.path === 'app/web/index.html') ||
-                !entries.some(row => row.path === 'app/web/full-web-qa-manifest.json'))
+                !entries.some(row => row.path === 'app/web/full-web-qa-manifest.json') ||
+                !entries.some(row => row.path === 'app/desktop-core-preview.mjs') ||
+                !entries.some(row => row.path === 'Pica-Library-Core-Preview.exe'))
             : (entries.length !== 20 ||
                 entries.some(item => /(?:^|\/)app\.js$/.test(item.path)))))
         throw new Error('Portable QA package inventory includes forbidden or missing files')

@@ -111,6 +111,119 @@ async function startServerThroughPortableLauncher(
     return { state, stop }
 }
 
+async function verifyOriginalNativeLauncherCorePreview(
+    folder: string, root: string, expectedComicId: string
+) {
+    const launcher = path.join(folder, 'Pica-Library-Core-Preview.exe')
+    const infoFile = path.join(root, 'runtime-state',
+        'core-preview-instance.json')
+    let ownedPid: number | undefined
+    try {
+        // A real native Windows launcher, not a test-created JS subprocess.
+        // The default legacy desktop.js is intentionally ABSENT from this ZIP.
+        // Only the explicit preview flag may select the SDK-free executable.
+        const start = spawnSync(launcher, [
+            '--source-free-preview',
+            '--owned-temp-root', root, '--explicit-preview-only'
+        ], {
+            // The GUI Launcher starts Node and exits immediately. If capture
+            // pipes are used, the Node grandchild can inherit them, causing
+            // spawnSync to wait for the long-lived server and orphan it on
+            // timeout. Only this exact native QA launch uses inherited-null
+            // stdio; its identity is recovered from the owned InstanceLock.
+            cwd: folder, windowsHide: true, stdio: 'ignore',
+            timeout: 15000
+        })
+        if (start.error || start.status !== 0)
+            throw new Error('Original native Windows source-free launch failed')
+        let selectedUrl: string | undefined
+        for (let attempt = 0; attempt < 60; attempt++) {
+            if (fs.existsSync(infoFile)) {
+                const info = readJson(fs.readFileSync(infoFile))
+                if (Number.isSafeInteger(info.pid) && info.pid > 0 &&
+                    typeof info.url === 'string' &&
+                    /^http:\/\/127\.0\.0\.1:\d+\/qa\/[a-f0-9]{64}$/.test(info.url)) {
+                    ownedPid = info.pid
+                    selectedUrl = info.url
+                    break
+                }
+            }
+            await new Promise(resolve => setTimeout(resolve, 100))
+        }
+        if (!selectedUrl || !ownedPid)
+            throw new Error('Native Windows core preview did not publish an owned loopback session')
+        if ((await fetch(new URL(selectedUrl).origin +
+            '/api/v1/status')).status !== 403)
+            throw new Error('Native core-only session bypassed random cookie auth')
+        const entry = await fetch(selectedUrl, { redirect: 'manual' })
+        const cookie = entry.headers.get('set-cookie')?.split(';')[0]
+        if (entry.status !== 303 ||
+            !/^pica_offline_qa=[a-f0-9]{64}$/.test(cookie ?? ''))
+            throw new Error('Native core-only browser entry is not protected')
+        const get = (url: string) => fetch(new URL(selectedUrl!).origin + url, {
+            headers: { cookie: cookie! }
+        })
+        const html = await (await get('/')).text()
+        if (!html.includes('src="./app.js"') ||
+            !html.includes('id="shelves"') ||
+            html.includes('src="./eh-account.js"'))
+            throw new Error('Native core-only process lost the original source-free Web')
+        const books = await (await get('/api/v1/comics?limit=5000')).json() as any[]
+        if (books.length !== 1 || books[0].comicId !== expectedComicId)
+            throw new Error('Native core-only process lost its local SQLite data')
+        if ((await get('/source-hosts.js')).status !== 404)
+            throw new Error('Native source-free process exposed a source runtime')
+        return true
+    } finally {
+        // Windows may force-terminate Node without dispatching SIGTERM. The
+        // existing InstanceLock handles verified dead-PID recovery; this
+        // disposable temp fixture is deleted, never a real profile.
+        // Even a partial startup can publish its owned PID before a test
+        // assertion fails. Never leave an orphan holding the extracted Node.
+        if (ownedPid === undefined && fs.existsSync(infoFile)) {
+            try {
+                const candidate = readJson(fs.readFileSync(infoFile))
+                if (Number.isSafeInteger(candidate.pid) && candidate.pid > 0 &&
+                    typeof candidate.url === 'string' &&
+                    /^http:\/\/127\.0\.0\.1:\d+\/qa\/[a-f0-9]{64}$/.test(candidate.url))
+                    ownedPid = candidate.pid
+            } catch {
+                // No valid owned instance identity is available to terminate.
+            }
+        }
+        if (ownedPid !== undefined) {
+            const killed = spawnSync('taskkill.exe', [
+                '/PID', String(ownedPid), '/T', '/F'
+            ], { encoding: 'utf8', windowsHide: true, timeout: 10000 })
+            // A terminated PID is not a cleanup error even if taskkill raced
+            // with the child's natural exit. The important condition is that
+            // our exact owned PID is no longer alive and holding node.exe.
+            let alive = true
+            for (let attempt = 0; attempt < 70; attempt++) {
+                try {
+                    process.kill(ownedPid, 0)
+                } catch (error) {
+                    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+                        alive = false
+                        break
+                    }
+                    throw error
+                }
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
+            if (alive)
+                throw new Error('Native core preview owned PID remained alive after cleanup: ' +
+                    JSON.stringify({
+                        pid: ownedPid,
+                        taskkillExit: killed.status,
+                        error: String(killed.error ?? '')
+                    }))
+            // Let Windows finish releasing the executable/SQLite handles.
+            await new Promise(resolve => setTimeout(resolve, 300))
+        }
+    }
+}
+
 async function forgedHost(host: string, port: number, cookie: string) {
     return await new Promise<number>((resolve, reject) => {
         const request = http.request({
@@ -193,7 +306,8 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         'Start-Offline-Reader-QA.cmd', 'README-OFFLINE-QA.txt',
         ...(fullWebQa
             ? ['app/web/index.html', 'app/web/app.js',
-                'app/web/full-web-qa-manifest.json', 'app/web/alpha7-cloud.js']
+                'app/web/full-web-qa-manifest.json', 'app/web/alpha7-cloud.js',
+                'app/desktop-core-preview.mjs', 'Pica-Library-Core-Preview.exe']
             : ['app/web/reader-fragment.html',
                 'app/web/offline-core-reader-qa.js'])
     ]) if (!contents.has(required))
@@ -438,6 +552,10 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             throw new Error('Portable original shelf was not persisted across restart')
         await running.stop()
         running = undefined
+        const nativePreview = fullWebQa
+            ? await verifyOriginalNativeLauncherCorePreview(
+                unpacked, root, book.comicId
+            ) : false
         const persisted = succeeded(runtime, core, 'chapter', root, [
             '--comic-id', book.comicId, '--episode-id', episodeId
         ])
@@ -450,6 +568,7 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
                 ? 'WINDOWS_X64_EXTRACTED_FULL_WEB_QA_PASS'
                 : 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS',
             verifiedFullWeb: fullWebQa,
+            nativeWindowsCorePreview: nativePreview,
             files: contents.size,
             zipSha256: digest(fs.readFileSync(zipFile)),
             runtimeVersion: manifest.runtimeVersion,
@@ -465,7 +584,7 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
     } finally {
         await running?.stop()
         fs.rmSync(temp, { recursive: true, force: true,
-            maxRetries: 20, retryDelay: 150 })
+            maxRetries: 40, retryDelay: 250 })
     }
 }
 async function main() {

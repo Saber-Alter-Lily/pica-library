@@ -13,6 +13,8 @@ import { build } from 'esbuild'
 
 const ROOT = path.resolve(fileURLToPath(new URL('../', import.meta.url)))
 const ENTRY = 'src/offline-core/qa-cli.ts'
+const PREVIEW_ENTRY = 'src/desktop/core-preview-main.ts'
+export type OfflineCandidateKind = 'qa-cli' | 'desktop-core-preview'
 const REQUIRE_SOURCE = [
     ENTRY,
     'src/library/database.ts',
@@ -30,7 +32,8 @@ const REQUIRE_SOURCE = [
     'src/library/core-runtime-composition.ts',
     'src/services/shelf-service.ts',
     'src/offline-core/qa-http.ts',
-    'src/offline-core/full-web-qa-assets.ts'
+    'src/offline-core/full-web-qa-assets.ts',
+    'src/offline-core/qa-ownership.ts'
 ]
 const PROHIBITED = [
     /^src\/sdk(?:\/|\.ts$)/,
@@ -53,11 +56,15 @@ export interface OfflineCoreCandidate {
     externalImports: string[]
 }
 
-export async function buildOfflineCoreCandidate(): Promise<OfflineCoreCandidate> {
+export async function buildOfflineCoreCandidate(
+    kind: OfflineCandidateKind = 'qa-cli'
+): Promise<OfflineCoreCandidate> {
+    const entry = kind === 'qa-cli' ? ENTRY : PREVIEW_ENTRY
+    const filename = kind === 'qa-cli' ? 'core.mjs' : 'desktop-core-preview.mjs'
     const compiled = await build({
         absWorkingDir: ROOT,
-        entryPoints: [ENTRY],
-        outfile: path.join(ROOT, '.s3-offline-core-qa', 'core.mjs'),
+        entryPoints: [entry],
+        outfile: path.join(ROOT, '.s3-offline-core-qa', filename),
         bundle: true,
         // AdmZip's optional Electron-only require('original-fs') is not a
         // Node builtin. This QA executable is Node-only: map that single
@@ -80,19 +87,29 @@ export async function buildOfflineCoreCandidate(): Promise<OfflineCoreCandidate>
         compiled.outputFiles?.length !== 1)
         throw new Error('Source-free offline core must compile as one file')
     const output = Object.values(compiled.metafile.outputs)
-    if (output.length !== 1 || output[0].entryPoint !== ENTRY ||
+    if (output.length !== 1 || output[0].entryPoint !== entry ||
         output[0].exports.length !== 0)
         throw new Error('Offline QA core has an unexpected build entry or output')
 
     const inputs = Object.keys(compiled.metafile.inputs).map(normalized).sort()
     const sourceInputs = inputs.filter(item => item.startsWith('src/'))
     const packageInputs = inputs.filter(item => !item.startsWith('src/'))
-    for (const required of REQUIRE_SOURCE)
-        if (!sourceInputs.includes(required))
-            throw new Error('Offline core lost an actual local Reader dependency: ' + required)
-    for (const item of sourceInputs)
-        if (PROHIBITED.some(pattern => pattern.test(item)))
+    for (const required of [
+        ...REQUIRE_SOURCE.filter(item => item !== ENTRY),
+        ...(kind === 'qa-cli' ? [ENTRY] : [PREVIEW_ENTRY, 'src/desktop/instance.ts'])
+    ]) if (!sourceInputs.includes(required))
+        throw new Error('Offline core lost an actual local Reader dependency: ' + required)
+    for (const item of sourceInputs) {
+        // Only the explicit, audited Desktop preview entry and existing
+        // single-instance lock can enter this preview executable. Other
+        // Desktop, source SDK, Host and plugin runtime code remains forbidden.
+        const allowedPreviewDesktop = kind === 'desktop-core-preview' &&
+            [PREVIEW_ENTRY, 'src/desktop/instance.ts'].includes(item)
+        if (!allowedPreviewDesktop && PROHIBITED.some(pattern => pattern.test(item)))
             throw new Error('Offline core includes executable source/Host code: ' + item)
+    }
+    if (kind === 'desktop-core-preview' && sourceInputs.includes(ENTRY))
+        throw new Error('Desktop core preview cannot contain the QA CLI startup')
     // The actual PRODUCT_VERSION in src/version.ts imports exactly the root
     // package.json as inert build-time version metadata. This is NOT blanket
     // permission for JSON loaders, runtime npm packages or executable plugins.

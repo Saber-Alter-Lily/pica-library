@@ -16,9 +16,12 @@ import { LibraryDatabase } from '../library/database'
 import { createCoreLocalRuntime } from '../library/core-runtime-composition'
 import { localReaderGet } from '../reader/local-http-read'
 import { startOfflineCoreHttp } from './qa-http'
+import {
+    assertDisposableCoreRoot,
+    OFFLINE_QA_SENTINEL,
+    OFFLINE_QA_SENTINEL_TEXT
+} from './qa-ownership'
 
-const SENTINEL = '.pica-offline-core-qa-v1'
-const SENTINEL_TEXT = 'PICA_OFFLINE_CORE_QA_V1\n'
 const COMMANDS = new Set([
     'init', 'status', 'list', 'import', 'chapters', 'chapter',
     'picture', 'progress', 'history', 'serve'
@@ -74,21 +77,6 @@ function options(argv: string[]) {
     return { command, values, required, root: path.resolve(root) }
 }
 
-function assertDisposableRoot(root: string) {
-    const status = fs.lstatSync(root)
-    if (!status.isDirectory() || status.isSymbolicLink())
-        throw new Error('QA data root is not a regular directory')
-    const marker = path.join(root, SENTINEL)
-    const info = fs.lstatSync(marker)
-    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 ||
-        fs.readFileSync(marker, 'utf8') !== SENTINEL_TEXT)
-        throw new Error('This directory is not an owned disposable QA root')
-    const dbFile = path.join(root, 'library.db')
-    const dbInfo = fs.lstatSync(dbFile, { throwIfNoEntry: false })
-    if (!dbInfo || !dbInfo.isFile() || dbInfo.isSymbolicLink())
-        throw new Error('QA library database is absent or unsafe')
-}
-
 async function run() {
     const input = options(process.argv.slice(2))
     const { command, root, values, required } = input
@@ -98,15 +86,15 @@ async function run() {
         // mkdir is exclusive. Existing user libraries and prior QA roots are
         // NEVER migrated or overwritten, even if they resemble our paths.
         fs.mkdirSync(root, { mode: 0o700 })
-        const marker = path.join(root, SENTINEL)
-        fs.writeFileSync(marker, SENTINEL_TEXT, { flag: 'wx', mode: 0o600 })
+        const marker = path.join(root, OFFLINE_QA_SENTINEL)
+        fs.writeFileSync(marker, OFFLINE_QA_SENTINEL_TEXT, { flag: 'wx', mode: 0o600 })
         const db = new LibraryDatabase(path.join(root, 'library.db'))
         try {
             return { status: 'QA_INITIALIZED', sourceCount: 0,
                 summary: db.summary() }
         } finally { db.close() }
     }
-    assertDisposableRoot(root)
+    assertDisposableCoreRoot(root)
     const db = new LibraryDatabase(path.join(root, 'library.db'))
     const coreRuntime = createCoreLocalRuntime({ database: db, dataDir: root })
     const reader = coreRuntime.readerService

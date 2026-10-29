@@ -8,6 +8,7 @@
     "build-windows-offline-portable-qa.ts",
     "verify-windows-offline-portable-qa.ts",
     "build-offline-core-candidate.ts",
-    "stage-offline-reader-assets-qa.ts"
+    "stage-offline-reader-assets-qa.ts",
+    "stage-offline-full-web-qa.ts"
   ]
 }

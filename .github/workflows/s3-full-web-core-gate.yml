@@ -1,0 +1,46 @@
+name: S3 production full-Web source-free bootstrap gate (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s3-full-web-core-gate-20261029
+    paths:
+      - '.github/workflows/s3-full-web-core-gate.yml'
+      - 'web/app.js'
+      - 'web/i18n.js'
+      - 'web/i18n-ja-core.js'
+      - 'test/unit/web-source-free-bootstrap.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-production-web-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-original-web-bootstrap:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Complete TypeScript typecheck and Web syntax validation
+        run: |
+          pnpm type:check
+          pnpm web:check
+      - name: Execute real original Web detect() and Desktop capability fallback
+        run: pnpm exec vitest run test/unit/web-source-free-bootstrap.test.ts test/unit/i18n.test.ts test/unit/desktop-web.test.ts test/unit/core-bootstrap-read.test.ts

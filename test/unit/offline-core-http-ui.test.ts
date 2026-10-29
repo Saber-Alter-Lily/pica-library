@@ -169,6 +169,84 @@ describe('S3 real protected loopback HTTP with existing Web Reader markup', () =
             const get = async (route: string) => await fetch(base + route, {
                 headers: { cookie: cookie! }
             })
+            // The original Desktop shelf URLs now also work through the
+            // source-free core; all writes require this volatile local QA
+            // authority and can only affect the sentinel-owned SQLite.
+            expect((await fetch(base + '/api/v1/shelves')).status).toBe(403)
+            expect((await get('/api/v1/shelves')).status).toBe(200)
+            const shelfWrite = (method: string, route: string,
+                payload?: unknown, headers: Record<string, string> = {
+                    origin: base, 'x-pica-qa-csrf': csrf
+                }) => fetch(base + route, {
+                method,
+                headers: {
+                    cookie: cookie!,
+                    ...(payload !== undefined
+                        ? { 'content-type': 'application/json' } : {}),
+                    ...headers
+                },
+                ...(payload !== undefined
+                    ? { body: JSON.stringify(payload) } : {})
+            })
+            expect((await shelfWrite('POST', '/api/v1/shelves',
+                { name: 'Owned Shelf' }, {})).status).toBe(403)
+            expect((await shelfWrite('POST', '/api/v1/shelves',
+                { name: 'Owned Shelf' }, {
+                    origin: 'http://bad.example',
+                    'x-pica-qa-csrf': csrf
+                })).status).toBe(403)
+            const shelfCreate = await shelfWrite(
+                'POST', '/api/v1/shelves', { name: 'Owned Shelf' })
+            expect(shelfCreate.status).toBe(200)
+            const shelf = await shelfCreate.json() as Record<string, any>
+            expect(shelf.id).toMatch(/^[0-9a-f-]{36}$/)
+            const shelfUrl = '/api/v1/shelves/' + shelf.id
+            expect((await shelfWrite('POST', shelfUrl + '/items', {
+                comicIds: ['eh:123:abcdef1234']
+            })).status).toBe(400)
+            expect((await shelfWrite('POST', shelfUrl + '/items', {
+                comicIds: [comicId],
+                records: [{
+                    comicId: 'eh:123:abcdef1234',
+                    title: 'Prohibited remote import'
+                }]
+            })).status).toBe(400)
+            expect((await shelfWrite('POST', shelfUrl + '/items', {
+                comicIds: [comicId]
+            })).status).toBe(200)
+            const shelfContents = await (await get(shelfUrl)).json() as
+                Record<string, any>
+            expect(shelfContents.shelf.count).toBe(1)
+            expect(shelfContents.items).toMatchObject([{
+                comicId, providerId: 'local'
+            }])
+            expect((await (await get('/api/v1/shelves')).json() as
+                Array<Record<string, any>>)[0].count).toBe(1)
+            expect((await shelfWrite('PATCH', shelfUrl,
+                { name: 'Local Shelf 2026' })).status).toBe(200)
+            expect((await shelfWrite('POST', shelfUrl + '/add-filtered', {
+                query: { providerIds: ['eh'], scope: 'all' }
+            })).status).toBe(400)
+            const filtered = await shelfWrite('POST',
+                shelfUrl + '/add-filtered', {
+                    query: { providerIds: ['local'], scope: 'catalog' }
+                })
+            expect(filtered.status).toBe(200)
+            expect((await filtered.json() as Record<string, any>).matched).toBe(1)
+            const removed = await shelfWrite('POST', shelfUrl + '/remove', {
+                comicIds: [comicId]
+            })
+            expect(removed.status).toBe(200)
+            expect((await removed.json() as Record<string, any>).removed).toBe(1)
+            expect((await (await get(shelfUrl)).json() as
+                Record<string, any>).items).toHaveLength(0)
+            expect((await shelfWrite('DELETE', shelfUrl)).status).toBe(200)
+            expect((await (await get('/api/v1/shelves')).json() as
+                Array<unknown>)).toHaveLength(0)
+            // Deleting a shelf must not delete the original local comic.
+            expect((await get('/api/v1/comics/' + encodeURIComponent(comicId)))
+                .status).toBe(200)
+
             const listing = await get('/api/v1/offline-qa/library')
             expect(listing.status).toBe(200)
             const collection = await listing.json() as Record<string, any>

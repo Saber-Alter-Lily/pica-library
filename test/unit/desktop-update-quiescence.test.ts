@@ -202,7 +202,7 @@ describe('actual Desktop update helper handoff preflight, no production migratio
             activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
                 [], diagnostics, resources)
         }
-        expect(() => requireDesktopUpgradeQuiescence(upgraded)
+        expect(() => requireDesktopUpgradeQuiescence(upgraded))
             .toThrow(DesktopUpgradeQuiescenceError)
         diagnostics.tasks[0].state = 'complete'
         diagnostics.tasks[0].active = false
@@ -236,7 +236,7 @@ describe('actual Desktop update helper handoff preflight, no production migratio
             activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
                 [], snapshot, { active: [], waiting: [{ownerId:'test'}] })
         }
-        expect(() => requireDesktopUpgradeQuiescence(upgraded)
+        expect(() => requireDesktopUpgradeQuiescence(upgraded))
             .toThrow('Finish, pause and fully stop active work')
     })
 

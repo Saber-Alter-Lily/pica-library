@@ -210,6 +210,59 @@ describe('S3 real protected loopback HTTP with existing Web Reader markup', () =
                 scope: 'all', providerIds: ['eh']
             })).status).toBe(400)
 
+            // Original production ShelfService over real local-only HTTP.
+            expect(await (await get('/api/v1/shelves')).json()).toEqual([])
+            const shelfRequest = async (
+                suffix: string, method: string,
+                input?: Record<string, unknown>,
+                headers: Record<string, string> = {
+                    origin: base, 'x-pica-qa-csrf': csrf
+                }
+            ) => fetch(base + '/api/v1/shelves' + suffix, {
+                method, headers: {
+                    cookie: cookie!,
+                    ...(input ? { 'content-type': 'application/json' } : {}),
+                    ...headers
+                },
+                ...(input ? { body: JSON.stringify(input) } : {})
+            })
+            expect((await shelfRequest('', 'POST', {
+                name: 'Local QA shelf'
+            }, {})).status).toBe(403)
+            const createdResponse = await shelfRequest('', 'POST', {
+                name: 'Local QA shelf'
+            })
+            expect(createdResponse.status).toBe(200)
+            const shelf = await createdResponse.json() as { id: string }
+            expect(shelf.id).toMatch(/^[0-9a-f-]{36}$/)
+            const shelfUrl = '/' + encodeURIComponent(shelf.id)
+            expect((await shelfRequest(shelfUrl + '/items', 'POST', {
+                comicIds: ['eh:123:abcdef1234']
+            })).status).toBe(400)
+            expect((await shelfRequest(shelfUrl + '/items', 'POST', {
+                comicIds: [comicId]
+            })).status).toBe(200)
+            const contents = await (await get('/api/v1/shelves' +
+                shelfUrl)).json() as Record<string, any>
+            expect(contents.items.map((row: any) => row.comicId))
+                .toEqual([comicId])
+            expect((await (await get('/api/v1/shelves')).json() as any[])[0])
+                .toMatchObject({ count: 1 })
+            expect((await shelfRequest(shelfUrl + '/add-filtered', 'POST', {
+                query: { scope: 'all', providerIds: ['eh'] }
+            })).status).toBe(400)
+            expect((await shelfRequest(shelfUrl, 'PATCH', {
+                name: 'Renamed local shelf'
+            })).status).toBe(200)
+            expect((await shelfRequest(shelfUrl + '/remove', 'POST', {
+                comicIds: [comicId]
+            })).status).toBe(200)
+            expect((await shelfRequest(shelfUrl, 'DELETE')).status).toBe(200)
+            expect(await (await get('/api/v1/shelves')).json()).toEqual([])
+            // The local book survives changes to its shelf memberships.
+            expect((await get('/api/v1/comics/' +
+                encodeURIComponent(comicId))).status).toBe(200)
+
             const chaptersResponse = await get('/api/v1/reader/comics/' +
                 encodeURIComponent(comicId) + '/chapters')
             expect(chaptersResponse.status).toBe(200)

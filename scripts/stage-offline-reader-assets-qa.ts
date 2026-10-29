@@ -61,16 +61,20 @@ export function stageOfflineReaderAssetsQa(destination: string) {
     const tempRoot = fs.realpathSync.native(os.tmpdir())
     if (typeof destination !== 'string' || !path.isAbsolute(destination))
         throw new Error('Offline Reader QA stage must use an absolute temp path')
-    const target = path.resolve(destination)
-    const relative = path.relative(tempRoot, target)
-    if (!relative || relative.startsWith('..') || path.isAbsolute(relative))
-        throw new Error('Offline Reader QA assets must remain in OS temp')
-    // fs.mkdir without recursive means the staging root must not exist and
-    // the only parent is an already-created disposable QA fixture directory.
-    const parent = fs.realpathSync.native(path.dirname(target))
+    // Windows 8.3 aliases and native long paths may spell the exact same
+    // directory differently. Canonicalize the EXISTING parent on both sides
+    // before checking containment; never compare an uncanonical child path
+    // to a canonical OS temp root.
+    const originalTarget = path.resolve(destination)
+    const parent = fs.realpathSync.native(path.dirname(originalTarget))
     const parentRelative = path.relative(tempRoot, parent)
     if (!parentRelative || parentRelative.startsWith('..') ||
-        path.isAbsolute(parentRelative) || fs.existsSync(target))
+        path.isAbsolute(parentRelative))
+        throw new Error('Offline Reader QA assets must remain in OS temp')
+    const target = path.join(parent, path.basename(originalTarget))
+    // fs.mkdir without recursive means the staging root must not exist and
+    // the only parent is an already-created disposable QA fixture directory.
+    if (fs.lstatSync(target, { throwIfNoEntry: false }))
         throw new Error('Offline Reader QA stage destination is not disposable')
     fs.mkdirSync(target, { mode: 0o700 })
     const entries: Array<{ name: string; size: number; sha256: string }> = []

@@ -5,6 +5,9 @@ import http, {
 } from 'node:http'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { localReaderGet } from '../reader/local-http-read'
+import { coreCatalogueGet, coreCatalogueQuery } from '../library/core-catalog-read'
+import { LibraryQueryService } from '../services/library-query-service'
+import type { LibraryFacetQuery } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
 import type { ReaderService } from '../services/reader-service'
 
@@ -57,7 +60,7 @@ function hasCookie(request: IncomingMessage, secret: string) {
     return values.length === 1 && secureEqual(
         values[0].slice(SESSION_NAME.length + 1), secret)
 }
-async function readSmallJson(request: IncomingMessage) {
+async function readJsonObject(request: IncomingMessage) {
     const type = String(request.headers['content-type'] ?? '')
     if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(type))
         throw new Error('Invalid QA content type')
@@ -72,7 +75,10 @@ async function readSmallJson(request: IncomingMessage) {
     const value: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
     if (!value || Array.isArray(value) || typeof value !== 'object')
         throw new Error('Invalid QA input')
-    const input = value as Record<string, unknown>
+    return value as Record<string, unknown>
+}
+async function readSmallJson(request: IncomingMessage) {
+    const input = await readJsonObject(request)
     if (Object.keys(input).sort().join(',') !==
         'comicId,episodeId,pageIndex' ||
         typeof input.comicId !== 'string' ||
@@ -172,6 +178,7 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         markupFile, ...SCRIPT_ASSETS, ...STYLE_ASSETS, ...IMAGE_ASSETS
     ]) requiredAsset(webRoot, asset)
 
+    const libraryQueries = new LibraryQueryService(options.database)
     const secret = randomBytes(32).toString('hex')
     const csrf = randomBytes(32).toString('hex')
     const markup = existingReaderMarkup(webRoot)
@@ -234,6 +241,11 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                 fs.createReadStream(file).pipe(response)
                 return
             }
+            const catalogueRead = coreCatalogueGet(
+                url, options.database, { localOnly: true }
+            )
+            if (catalogueRead)
+                return json(response, catalogueRead.status, catalogueRead.value)
             if (url.pathname === '/api/v1/offline-qa/library') {
                 const comics = options.database.listComics({ limit: 100 })
                     .filter(comic => comic.providerId === 'local')
@@ -264,12 +276,21 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             return json(response, 404, { error: 'No source routes in offline QA' })
         }
         if (request.method !== 'POST' ||
-            url.pathname !== '/api/v1/reader/progress')
+            !['/api/v1/reader/progress', '/api/v1/library/query']
+                .includes(url.pathname))
             return json(response, 405, { error: 'Unsupported QA operation' })
         if (request.headers.origin !== origin ||
             !secureEqual(String(request.headers['x-pica-qa-csrf'] ?? ''), csrf))
             return json(response, 403, { error: 'QA CSRF rejected' })
         try {
+            if (url.pathname === '/api/v1/library/query') {
+                const input = await readJsonObject(request)
+                return json(response, 200, coreCatalogueQuery(
+                    input as LibraryFacetQuery,
+                    libraryQueries,
+                    { localOnly: true }
+                ))
+            }
             const input = await readSmallJson(request)
             return json(response, 200, options.reader.saveProgress(
                 input.comicId, input.episodeId, input.pageIndex

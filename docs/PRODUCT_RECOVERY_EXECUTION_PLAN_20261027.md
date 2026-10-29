@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 2026-10-28 S3 新进展｜纯核心独立 HTTP + 原 Reader Chromium 真实操作
+
+- 在 [Draft PR #228](https://github.com/Saber-Alter-Lily/pica-library/pull/228) 中，已将纯本地 Node Core QA 候选提供为受控 `127.0.0.1` HTTP 服务，仍通过同一 `localReaderGet`/`ReaderService` 读取原 `/api/v1/reader` API。直接复用旧 Reader DOM、CSS、翻页/视口/进度和设置模块，不载入具体站点 SDK。
+- [S3 Linux/Windows + Chromium #40826346306](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40826346306) 对精确代码 `87f142b3` **SUCCESS：31/31 + 31/31 + 真实 Chromium 1/1**。实际展示合成本地 PNG、翻页、保存/刷新后恢复，验证跨站请求与 Host/CSRF 拒绝，无 user data。
+- **严格限定**：这只是专用 QA 浏览器入口，不是完整 Windows GUI。主要 G2 阻断已经从“能否无来源读取漫画”收敛到“如何让完整多功能 Windows HTTP/Web UI 真正脱离 `LibraryService/ProviderService`，且不破坏旧书库”。完整 Windows 发行 ZIP 与 Android APK 仍含来源代码，不能说已完成 G2 或可以发布。
+- 下一切口：沿新 `localReaderGet` 和隔离 core 启动根继续去耦合真正的 Desktop Web 组合与生产安装/更新，再做 Android 对等机制和老用户无痛迁移。详细核查见 [S3 实际浏览器验收](S3_OFFLINE_CORE_HTTP_UI_20261028.md)。
+
+---
 ## 2026-10-28 S3 新进展｜Windows/Linux 无来源独立本地阅读核心 QA
 
 - **不覆盖既定发布关口**：新增 Draft [PR #226](https://github.com/Saber-Alter-Lily/pica-library/pull/226)，以 v0.5.0 现有 Reader/导入/数据库为原件，实际 esbuild 构建一个独立本地 Node ESM QA 候选，所有具体来源 SDK 不在这个打包图中。

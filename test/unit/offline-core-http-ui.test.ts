@@ -181,7 +181,7 @@ describe('S3 real protected loopback HTTP with existing Web Reader markup', () =
                 summary: expect.objectContaining({ comics: 1 }),
                 favoritesSyncProgress: null
             })
-            expect(String(snapshot.database)).toMatch(/library\\.db$/)
+            expect(String(snapshot.database)).toMatch(/library[.]db$/)
             const capResponse = await get('/api/v1/capabilities')
             expect(capResponse.status).toBe(200)
             const caps = await capResponse.json() as Record<string, any>

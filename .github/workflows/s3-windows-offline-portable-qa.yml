@@ -59,6 +59,7 @@ jobs:
           })
           if($matches.Count -ne 1){ throw 'Exactly one official Node runtime checksum required' }
           $expected=($matches[0] -split '\s+')[0].ToLowerInvariant()
+          if($expected -ne 'cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62'){ throw 'Pinned Node 24.15.0 archive checksum changed; review required' }
           Invoke-WebRequest -Uri "$base/$name" -OutFile $archive
           $actual=(Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           if($actual -ne $expected){ throw 'Node distribution archive checksum mismatch' }

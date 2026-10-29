@@ -20,6 +20,7 @@ import {
 } from './stage-offline-reader-assets-qa'
 
 export const OFFLINE_PORTABLE_NODE_VERSION = '24.15.0'
+export const OFFLINE_PORTABLE_NODE_ARCHIVE_SHA256 = 'cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62'
 const ROOT = path.resolve(fileURLToPath(new URL('../', import.meta.url)))
 const SHA256 = /^[0-9a-f]{64}$/
 const SOURCE_SHA = /^[0-9a-f]{40}$/
@@ -138,8 +139,9 @@ export async function buildWindowsOfflinePortableQa(
     if (process.platform !== 'win32' || process.arch !== 'x64')
         throw new Error('Portable Windows QA must run on Windows x64')
     if (!SOURCE_SHA.test(options.sourceSha) ||
-        !SHA256.test(options.verifiedRuntimeArchiveSha256))
-        throw new Error('Missing validated source or official runtime archive identity')
+        !SHA256.test(options.verifiedRuntimeArchiveSha256) ||
+        options.verifiedRuntimeArchiveSha256 !== OFFLINE_PORTABLE_NODE_ARCHIVE_SHA256)
+        throw new Error('Missing or changed SHA-pinned official Node archive identity')
     const runtime = checkedFile(options.runtimeExe, MAX_RUNTIME)
     const license = checkedFile(options.runtimeLicense, 8 * 1024 * 1024)
     const version = spawnSync(options.runtimeExe, ['--version'], {

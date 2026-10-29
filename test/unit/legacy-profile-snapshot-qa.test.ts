@@ -1,7 +1,11 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { createRequire } from 'node:module'
+import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite'
+const { DatabaseSync } = createRequire(import.meta.url)(
+    'node:sqlite'
+) as typeof import('node:sqlite')
 import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LocalLibraryIngestion } from '../../src/local-library/ingestion'

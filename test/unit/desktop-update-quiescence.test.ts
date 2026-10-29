@@ -210,7 +210,7 @@ describe('actual Desktop update helper handoff preflight, no production migratio
     })
 
     it.each([
-        'waiting', 'running', 'pausing', 'paused', 'cancelling', 'failed',
+        'waiting', 'running', 'pausing', 'paused', 'cancelling',
         'unknown'
     ])('never treats diagnostic state %s as safe to replace the application', state => {
         const f = fixture()
@@ -224,6 +224,21 @@ describe('actual Desktop update helper handoff preflight, no production migratio
             activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
                 [], diagnostic, {active: [], waiting: []})
         })).toThrow(DesktopUpgradeQuiescenceError)
+    })
+
+    it('allows a past FAILED task only when it is terminal and holds no resources', () => {
+        const f = fixture()
+        const diagnostic = {schemaVersion:1,tasks:[{
+            taskKey:'old-maintenance-failure',
+            state:'failed',active:false,resourceState:'none'
+        }]}
+        const status = {active:[],waiting:[]}
+        const guarded = {...f.port,activeWorkLeases:() =>
+            collectDesktopUpgradeWorkLeases([],diagnostic,status)}
+        expect(() => requireDesktopUpgradeQuiescence(guarded)).not.toThrow()
+        diagnostic.tasks[0].active = true
+        expect(() => requireDesktopUpgradeQuiescence(guarded))
+            .toThrow(DesktopUpgradeQuiescenceError)
     })
 
     it('blocks runtime acquisitions waiting for capacity, even when no task has started', () => {

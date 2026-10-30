@@ -358,6 +358,7 @@ export class LibraryService {
     private jmMetadataGeneration = 0
     private jmMetadataBusy = false
     private acceptingLocalDownloads = true
+    private backgroundTasksShuttingDown = false
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
     private localDownloadRunStartedAt: string | null = null
@@ -469,6 +470,23 @@ export class LibraryService {
 
     runtimeResourceProfile() {
         return this.runtimeResources.snapshot()
+    }
+
+    /** Cancel and await the real fire-and-forget task runs before closing SQLite. */
+    async quiesceBackgroundTasks() {
+        this.backgroundTasksShuttingDown = true
+        this.favoritesSyncControl('cancel')
+        this.recommendationBuildControl('cancel')
+        this.libraryOrganizeControl('cancel')
+        this.maintenanceRepairControl('cancel')
+        this.maintenanceUpdateControl('cancel')
+        await Promise.allSettled([
+            this.libraryOrganizeRun,
+            this.maintenanceRepairRun,
+            this.maintenanceUpdateRun,
+            this.recommendationShadowTaskV5.quiesce(),
+            this.workIdentityTaskV5.quiesce()
+        ].filter((run): run is Promise<void> => run !== null))
     }
 
     runtimeTaskDiagnostics() {
@@ -2852,6 +2870,8 @@ export class LibraryService {
     }
 
     startLibraryOrganize() {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         if (
             this.libraryOrganizeRun &&
             [
@@ -3065,6 +3085,8 @@ export class LibraryService {
     }
 
     startMaintenanceRepairScan() {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         if (
             this.maintenanceRepairRun &&
             [
@@ -3311,6 +3333,8 @@ export class LibraryService {
     }
 
     startMaintenanceUpdateCheck(comicIds?: string[]) {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         if (
             this.maintenanceUpdateRun &&
             [

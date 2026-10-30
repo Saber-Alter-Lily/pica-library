@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-14｜原 Android 书架本地状态物理复用（叠加 Draft #268）
+
+- 依据 #268 已核实 **20/20 Actions SUCCESS** 的开发基线推进实际日常功能，不增加第二套书架。原正式 `ShelfStore` 的 `portable-shelves-v1.json` schema 2、Shelf/Item/Snapshot、名称与成员操作、tombstone/日期与序列化逻辑物理迁到 `:local-storage/ShelfLedger`；新 `ShelfStore` 只保留旧 Context 方法和 `MobileStoragePaths`、UnifiedCatalog 元信息/原 Desktop Bridge 双向同步、旧来源兼容。
+- 独立 source-free `:local-app` 继续复用已经分包的 LocalComicStore/Reader/History。新增本地书架页：创建/重命名/删除书架，选择已导入作品加入书架，移出只写原 schema tombstone 而不删除漫画文件，书架条目直达同一 Reader；无源账号/网络或重复数据库。
+- 在既有 Android `LocalComicImportTest` 内仅增加一条真实本地作品 + 原 schema + 创建/加入/移出/改名/删除/正式版路径不变的定向集成测试，不新增测试框架。继续按 OSS-first 优先复用本项目原 Java 和 Android SDK；参考 Mihon（Apache-2.0）模块职责，不复制第三方实现。
+- 验收：新精确 SHA 的完整 Android/Web/Desktop CI、独立 APK 重新编译、Manifest/6 DEX 无来源 SDK 检查；真实手机书架与历史/重启恢复、正式版真实数据迁移、独立来源安装撤销和 G1–G4 仍 OPEN。Draft 不合并 main、不发布、无 OTA、无生产用户数据修改。
+
 ### 2026-10-30 CORE-ANDROID-13｜原阅读历史持久化复用进入独立本地 APK（叠加 Draft #267）
 
 - 继续基于已通过 20/20 Workflows 和 6 个 DEX/无来源 SDK 证据的独立 `:local-app`。**物理迁移原有 ReadingHistoryStore 的会话文件格式与行为，不开发第二套历史存储。** 原 `reading-history-v1.json` 的 `schemaVersion=1`、session ID、时间、first/lastPage、chapterOrder、source/provider、legacySnapshot、日期范围和排序逻辑统一由 `:local-storage/ReaderHistoryLedger` 实现。

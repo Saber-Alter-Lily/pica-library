@@ -1,5 +1,11 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-14：原 ShelfStore 数据模型及操作移入共享 core
+
+- 真正的 `:local-storage/ShelfLedger` 承接正式版原 `portable-shelves-v1.json` schema 2、命名/成员 CRUD 和删除 tombstone；`app/ShelfStore` 保留原 Context 接口、统一目录副作用及 Desktop 互同步，避免另造数据库或丢失原元信息。无新库/框架，保持原旧版键/字段及迁移能力。
+- 独立 local-app 新增可用书架页与本地书库按钮（创建/重命名/删除书架、已导入作品加入/移出、直接继续原 Reader），书架/漫画数据根独立于已安装 v0.5.0。只新增一项旧 Android 集成回归；不扩大无关测试。
+- **初次提交状态：实现已写入 Draft，精确提交 Android/Web/Desktop CI、独立 APK/DEX 均等待实际结果；未发布、未进入真机 G1/G2、旧用户 G3 或发布 G4 验收。**
+
 ### 2026-10-30｜S3 CORE-ANDROID-13：统一原阅读会话历史到 source-neutral Android 存储
 
 - 首轮确切提交 `2b3764b7` 的 Android CI **FAIL（保留证据）**：新加的 Robolectric 单条测试使用 JDK `Files.readString(Path)`，Android 编译 API 上无法解析。使用仓库既有 `Files.readAllBytes` + `StandardCharsets.UTF_8` 替换这一处测试表达式；不更改任何生产逻辑、测试要求或安全门禁。新 SHA 的完整 CI / APK / DEX 结果重新判断，不借用失败头或旧 #267 的 green。

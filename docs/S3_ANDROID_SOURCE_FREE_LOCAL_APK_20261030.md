@@ -22,3 +22,10 @@ Existing CI Android job builds `:local-app:assembleDebug`, inspects package/laun
 - G4: one signed, versioned, integrated release candidate with full previous functionality and user confirmation.
 
 Record exact head SHA, Actions results, device observations separately. Never interpret a synthetic fixture or an unsigned QA APK as production migration approval.
+
+## Original local shelf storage physical reuse — CORE-ANDROID-14
+- `:local-storage/ShelfLedger.java` is the **single** portable-shelves-v1.json schema-2 model, serialization, shelf create/rename/delete tombstones and add/remove member implementation, physically lifted from the installed `ShelfStore`.
+- Installed `app/ShelfStore` keeps the old Context APIs, original `MobileStoragePaths`, `UnifiedCatalogStore` enrichment, and Desktop bridge merge/sync. It delegates all local membership changes to the one ledger. No implicit cloud calls or migration.
+- Independent `:local-app/LocalShelvesActivity` uses the *same* ledger with its own `files/portable-shelves-v1.json` and existing `LocalComicReaderPort`. Create/rename/delete shelves, add/imported titles, remove membership without deleting any original comic files, and open the original reader. The local library now shows two secondary choices: Shelves and History.
+- Existing Android CI includes one focused original-schema/tombstone/metadata/isolation integration regression in `LocalComicImportTest`; original version code, package signing, source closure and legacy migration stay untouched. Exact new-source build/DEX results and real device acceptance must be recorded separately.
+- This engineering QA slice is not complete production UI parity, signed distribution or v0.5.0 account/profile migration. G1–G4 remain OPEN.

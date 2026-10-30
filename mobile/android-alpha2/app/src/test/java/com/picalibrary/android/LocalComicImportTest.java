@@ -123,6 +123,34 @@ public class LocalComicImportTest {
             assertArrayEquals(before,official.isFile()?Files.readAllBytes(official.toPath()):new byte[0]);
         } finally {isolated.delete();}
     }
+    @Test public void sharedShelfSchemaKeepsMembershipAndTombstonesWithoutTouchingOfficialFile() throws Exception {
+        LocalComicStore.Comic comic=imported();
+        File installed=MobileStoragePaths.dataFile(context,ShelfLedger.FILE);
+        byte[] installedBefore=installed.isFile()?Files.readAllBytes(installed.toPath()):new byte[0];
+        File isolated=new File(context.getCacheDir(),"portable-shelves-qa-"+UUID.randomUUID()+".json");
+        try {
+            ShelfLedger.Shelf shelf=ShelfLedger.create(isolated,"Local favourites");
+            ShelfLedger.Item item=new ShelfLedger.Item(comic.id,comic.title,"","",
+                    Collections.emptyList(),Collections.emptyList(),false,0,comic.pages.size(),ShelfLedger.now());
+            ShelfLedger.setMembership(isolated,shelf.id,item,true);
+            ShelfLedger.Snapshot first=ShelfLedger.load(isolated);
+            assertEquals(2,new JSONObject(new String(Files.readAllBytes(isolated.toPath()),
+                    java.nio.charset.StandardCharsets.UTF_8))
+                    .getInt("schemaVersion"));
+            assertEquals(1,first.activeShelves().get(0).activeItems().size());
+            assertEquals(comic.id,first.activeShelves().get(0).activeItems().get(0).comicId);
+            ShelfLedger.setMembership(isolated,shelf.id,item,false);
+            assertEquals(0,ShelfLedger.load(isolated).activeShelves().get(0).activeItems().size());
+            assertFalse(ShelfLedger.load(isolated).activeShelves().get(0).items.get(0).active());
+            ShelfLedger.rename(isolated,shelf.id,"Renamed");
+            assertEquals("Renamed",ShelfLedger.load(isolated).activeShelves().get(0).name);
+            assertTrue(ShelfLedger.delete(isolated,shelf.id));
+            assertEquals(0,ShelfLedger.load(isolated).activeShelves().size());
+            assertTrue(LocalComicStore.has(context,comic.id));
+            assertArrayEquals(installedBefore,installed.isFile()
+                    ?Files.readAllBytes(installed.toPath()):new byte[0]);
+        } finally {isolated.delete();}
+    }
     @Test public void cbzUsesSameReaderAndSubfolderChapters() throws Exception {
         File archive=new File(original,"synthetic.cbz");try(ZipOutputStream out=new ZipOutputStream(new FileOutputStream(archive))){for(String name:new String[]{"chapter2/10.png","chapter1/1.png","chapter2/2.png"}){out.putNextEntry(new ZipEntry(name));out.write(PNG);out.closeEntry();}}
         Uri uri=DocumentsContract.buildDocumentUri(AUTHORITY,"root/synthetic.cbz");LocalComicStore.Preview preview=LocalComicStore.prepare(context,uri,"cbz",()->{});assertEquals(3,preview.prepared.pages.size());assertEquals(2,preview.prepared.chapters);assertFalse(new File(preview.work,"archive.cbz").exists());LocalComicStore.Comic comic=LocalComicStore.confirm(context,preview,()->{});assertEquals(2,new LocalComicReaderSource(context).chapters(comic.id).size());assertTrue(archive.exists());

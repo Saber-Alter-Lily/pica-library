@@ -306,6 +306,29 @@ describe('desktop remediation boundaries', () => {
         database.close()
     })
 
+    it('settles detached library work before its SQLite owner closes', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-detached-stop-'))
+        directories.push(root)
+        const database = new LibraryDatabase(path.join(root, 'library.db'))
+        database.importCatalog([{
+            comicId: 'owned-local-work',
+            title: 'Owned local work',
+            author: 'Author',
+            categories: [],
+            tags: [],
+            finished: true
+        }])
+        const service = new LibraryService(
+            database, root, {} as Pica, undefined, undefined, enabledFixtureSources()
+        )
+        expect(service.startLibraryOrganize().started).toBe(true)
+        await service.quiesceBackgroundTasks()
+        expect(service.libraryOrganizeStatus().state).toBe('cancelled')
+        expect(() => service.startLibraryOrganize()).toThrow('shutting down')
+        expect(() => service.startMaintenanceRepairScan()).toThrow('shutting down')
+        database.close()
+    })
+
     it('detects local active jobs before a library directory switch', () => {
         const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-switch-'))
         directories.push(dataDir)

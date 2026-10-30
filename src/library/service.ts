@@ -472,6 +472,11 @@ export class LibraryService {
         return this.runtimeResources.snapshot()
     }
 
+    /** Drain resource-backed requests that may still run after HTTP closes. */
+    waitForRuntimeIdle() {
+        return this.runtimeResources.waitForIdle()
+    }
+
     /** Cancel and await the real fire-and-forget task runs before closing SQLite. */
     async quiesceBackgroundTasks() {
         this.backgroundTasksShuttingDown = true

@@ -44,6 +44,7 @@ public class ReaderImagesSourceAccessTest {
         public SourceAccessPolicy.Permit sourceAccess(){return permit;}
         public String kind(){return "jm";}
         public String scope(){return scope;}
+        public String diagnose(String path){return "fixture-diagnostic:"+path;}
         public List<BridgeClient.ChapterItem> chapters(String id){throw new AssertionError("No chapter request expected");}
         public BridgeClient.ChapterData chapter(String id,String episode){throw new AssertionError("No chapter request expected");}
         public String recentChapter(String id){return "";}
@@ -69,6 +70,11 @@ public class ReaderImagesSourceAccessTest {
         while(!complete.get()&&System.nanoTime()<deadline){Shadows.shadowOf(Looper.getMainLooper()).idle();Thread.sleep(10);}
         assertTrue("Reader callback must complete",complete.get());
         assertEquals(expectedSuccess,succeeded.get());
+    }
+    @Test public void diagnosticUsesExistingReaderSourceHookWithoutNetwork() {
+        reader=new ReaderImages(app,source(()->{}));
+        assertEquals("fixture-diagnostic:owned-page",reader.diagnose("owned-page"));
+        assertEquals(0,networkCalls.get());
     }
     @Test public void cachedPageRemainsReadableAfterSourceDisabledWithoutNetwork() throws Exception {
         String path="https://fixture.invalid/cached";Files.write(cached(path).toPath(),image);disable();

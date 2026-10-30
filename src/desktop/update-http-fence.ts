@@ -20,8 +20,10 @@ export class DesktopHttpHandoffError extends Error {
     }
 }
 
+// The actual Desktop helper health probe uses /api/v1/desktop/status.
+// Do NOT exempt unrelated /status (a static/Web fallback) from the freeze.
 const diagnostics = new Set([
-    '/status', '/api/v1/desktop/status', '/api/v1/update/progress'
+    '/api/v1/desktop/status', '/api/v1/update/progress'
 ])
 
 /** Does not inspect the request body, profile, credentials, PID or filesystem. */

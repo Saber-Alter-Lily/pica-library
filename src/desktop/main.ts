@@ -132,6 +132,12 @@ const platformCapabilities = {
 }
 const instance = new InstanceLock(paths.lock, paths.instance)
 const updateHttpFence = new DesktopHttpHandoffFence()
+// All Desktop-owned HTTP listeners share one in-flight request counter.
+// Only the original loopback server can use updater-control exemptions.
+const externalUpdateIngress = {
+    enter: (method: string, pathname: string) =>
+        updateHttpFence.enter(method, pathname, false)
+}
 let config = loadConfig(paths.config)
 const sources = new SourceRuntime(sourcePolicyForConfig(config))
 // Constructor performs no network, discovery, process launch or persistence.
@@ -207,6 +213,7 @@ function activeDesktopWorkLeases() {
     if (browserLiteExportProgress.state === 'running')
         leases.push('browser-lite-export')
     if (mobileBridgeHasActiveLease()) leases.push('mobile-bridge-activity')
+    if (mobileBridgeSettingsBusy) leases.push('mobile-bridge-settings')
     for (const task of service?.runtimeResourceProfile().active ?? [])
         leases.push(`runtime:${task.taskType}`)
     return [...new Set(leases)]
@@ -539,7 +546,7 @@ function friendlyConnectionError(error: unknown) {
 
 async function startSelectedMobileBridge() {
     if (mobileBridge) return
-    if (stopping || !database || !service || !mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode))
+    if (stopping || updateHttpFence.frozen || !database || !service || !mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode))
         throw new Error('Mobile Bridge is not explicitly enabled or the library is not ready')
     const epoch = mobileBridgeEpoch, owner = database
     const started = await startMobileBridge({
@@ -548,6 +555,7 @@ async function startSelectedMobileBridge() {
         host: '0.0.0.0',
         port: 7788,
         stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
+        requestAdmission: externalUpdateIngress,
         accountStatus: () => ({
             pica: { enabled: sources.isEnabled('pica'), configured: Boolean(sources.isEnabled('pica') && credentials?.account?.trim() && credentials?.password) },
             eh: { enabled: sources.isEnabled('eh'), configured: Boolean(sources.isEnabled('eh') && credentials?.ehMemberId && credentials?.ehPassHash) }
@@ -1386,6 +1394,7 @@ async function startEngine(preferredPort: number) {
             allowedOrigins: remoteApiSettings.allowedOrigins,
             webSessions: remoteApiSettings.webSessions,
             webRoot: path.join(applicationRoot, 'web', 'remote'),
+            requestAdmission: externalUpdateIngress,
             onAudit: (event) =>
                 log.write(
                     `Remote API ${event.method} ${event.path} -> ${event.status} [${event.remoteAddress}]`

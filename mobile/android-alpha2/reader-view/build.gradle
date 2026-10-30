@@ -1,0 +1,19 @@
+plugins {
+    id 'com.android.library'
+}
+
+// Original image viewport + gesture settings, physically separate from
+// Desktop/online sources. No new renderer, image library or source SDK.
+android {
+    namespace 'com.picalibrary.android.readerview'
+    compileSdk 35
+    defaultConfig { minSdk 28 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation project(':local-core')
+}

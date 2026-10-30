@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-06：原 Reader 缩放手势 UI 物理模块化（Draft #261）
+
+- [Draft #261](https://github.com/Saber-Alter-Lily/pica-library/pull/261) 继续 #260 的来源诊断/推荐 UI 解耦，**开源优先但复用本仓库已存在的真正产品能力**：参考 Mihon Reader viewer/gesture 拆分设计（Apache-2.0，仅结构参考、没有复制代码），实际复用原 Java `ZoomImageView`、`ReaderGestureSettings`、`ReaderGesturePolicy`、`ReaderTouchSession` 及原 Android `GestureDetector`/`ScaleGestureDetector`/AndroidX；不再引入大图/翻页/图片缓存新库。
+- 新标准 Android Library `:reader-view` 物理承接原 `ZoomImageView.java` 与 `ReaderGestureSettings.java`，原两份纯 Java 手势类物理迁入已有 `:local-core`。**4 份源码在移动前后 Git Blob SHA 均相同**，即核心触控与缩放行为未改；`:reader-view` 只依赖 `:local-core`，正式 Android 和独立本地 Draft 同用原组件。旧 `compileReaderGestureBoundary` 临时 JavaCompile 脚本删除（正式 Gradle 编译已覆盖），原标签测试与 Android `ZoomImageViewTest`、手势测试均保留。
+- **阶段限制**：完成的是缩放/手势 UI 的模块，不是整个 `ReaderActivity` 或 Reader 缓存/来源许可的物理解离；原正式 Android 仍包含具体来源 SDK。#261 最终源码 CI 必须独立验证，不借用 #260 绿色。待后续将原 ReaderActivity/ReaderImages/ReaderProgress 逐步以最小代价组合进入无漫画源 SDK 的真实独立 APK，再做 Android 实体/数据验收。G1–G4 OPEN；main/Release/OTA/用户资料不变。
+
+
 ### 2026-10-30｜S3 CORE-ANDROID-05：原 Android Reader UI 去除具体来源类/诊断/推荐引用（Draft #260）
 
 - [Draft #260](https://github.com/Saber-Alter-Lily/pica-library/pull/260) 叠加 20/20 CI SUCCESS 的 #259。按照执行计划中**开源优先、不重复造轮子**规则，参考 Mihon 的 Reader model/loader/viewer 分离设计但**不复制其代码**；只复用原 `ReaderActivity`、`ReaderImages`、`ReaderSource`、全部来源适配器、`RecommendationEvidenceStore` 与 AndroidX 阅读 UI，零新依赖。

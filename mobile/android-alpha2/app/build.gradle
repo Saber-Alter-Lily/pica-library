@@ -127,6 +127,7 @@ android {
 dependencies {
     implementation project(':local-core')
     implementation project(':local-storage')
+    implementation project(':reader-view')
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation('io.github.jukomu:jmcomic-core:v1.1.12') {
         exclude group: 'io.github.darkxanter', module: 'webp-imageio'
@@ -151,15 +152,8 @@ configurations.configureEach {
     exclude group: 'io.github.darkxanter', module: 'webp-imageio'
 }
 
-// Compile the decision seam without Android, SDKs or any other application classes.
-// Recognition remains in GestureDetector / ScaleGestureDetector; this is not a new touch framework.
-def gestureBoundary = tasks.register('compileReaderGestureBoundary', JavaCompile) {
-    source fileTree('src/main/java/com/picalibrary/android/reader/gestures') { include '**/*.java' }
-    classpath = files()
-    destinationDirectory = layout.buildDirectory.dir('reader-gesture-boundary')
-    options.release = 17
-    options.encoding = 'UTF-8'
-}
+// Gesture decisions compile in the existing :local-core dependency, and
+// original ZoomImageView/ReaderGestureSettings compile in :reader-view.
 def tagBoundary = tasks.register('compileTagPolicyBoundary', JavaCompile) {
     source fileTree('src/main/java/com/picalibrary/android/tags') { include '**/*.java' }
     classpath = files()
@@ -168,7 +162,7 @@ def tagBoundary = tasks.register('compileTagPolicyBoundary', JavaCompile) {
     options.encoding = 'UTF-8'
 }
 tasks.configureEach {
-    if (name == 'testDebugUnitTest') dependsOn gestureBoundary, tagBoundary
+    if (name == 'testDebugUnitTest') dependsOn tagBoundary
 }
 
 // The same original importer is now built by the standard :local-core Java

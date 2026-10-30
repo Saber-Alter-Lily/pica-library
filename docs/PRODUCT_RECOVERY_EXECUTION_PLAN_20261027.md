@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-06｜原 Reader Viewer/手势 UI 迁入标准独立模块
+
+- [Draft #261](https://github.com/Saber-Alter-Lily/pica-library/pull/261)：复用 Mihon viewer 与 loader 职责划分的**设计**（仅参考、不拷贝），**实际不重做**本项目 `ZoomImageView`/手势策略。原 4 份源码物理迁入 `:reader-view` Android library 和现有 `:local-core` 纯 Java library；内容 hash 完全不变，原 Android ViewPager2/RecyclerView、书签和阅读 UI 继续复用。用标准 Gradle 依赖替代之前的临时 gesture 编译任务，无新框架或第三方依赖。
+- 下一真实产品关口：逐项拆出原 `ReaderActivity` 所需的图像加载/缓存、ReaderProgress、ReaderSource 源权限适配及通用 UI；最终在**另一个 APK 真实构建的 DEX/Gradle 依赖报告**中核实无 Pica/E-H/JM SDK，并进行真机本地/CBZ/翻页/进度和重启恢复验收。当前 `:reader-view` 通过 CI 后也不能直接视为整包无源，G1–G4 OPEN。
+
+
 ### 2026-10-30 CORE-ANDROID-05｜原 Reader UI 通过来源接口获取诊断与推荐应用扩展
 
 - [Draft #260](https://github.com/Saber-Alter-Lily/pica-library/pull/260)：继续 #259 通用 Chapter/Page 数据模型，复用原 Reader/AndroidX，把 E-H 诊断、显示名称等来源差异封装到原 `ReaderSource` 与具体适配器（原 E-H 安全/诊断实现不复制、不弱化），`ReaderImages` 不再强转具体 E-H 来源。推荐完成写入留在原应用 `ReaderSourceFactory`，原 UI 只在已有后台 executor 触发；原 Reader 页面不再直接 import/引用漫画源 SDK 类。仅扩展现有 3 处定向测试，完整 CI 待终态。

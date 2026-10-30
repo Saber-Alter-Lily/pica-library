@@ -15,4 +15,5 @@ dependencyResolutionManagement {
 rootProject.name = 'PicaLibraryAndroid'
 include ':app'
 include ':local-core'
+include ':local-storage'
 include ':macrobenchmark'

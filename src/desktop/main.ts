@@ -408,6 +408,13 @@ async function closeEngine() {
     )
     ehWebLogin = null
 
+    log.write('Shutdown: quiescing detached library tasks')
+    await shutdownStep(
+        'library background tasks',
+        async () => { await service?.quiesceBackgroundTasks() },
+        errors
+    )
+
     log.write('Shutdown: quiescing local downloads')
     await shutdownStep(
         'local download quiesce',
@@ -448,6 +455,11 @@ async function closeEngine() {
     }
     server = null
 
+    await shutdownStep(
+        'provider runtime cleanup',
+        () => { service?.closeSources() },
+        errors
+    )
     log.write('Shutdown: closing database')
     await shutdownStep(
         'database',

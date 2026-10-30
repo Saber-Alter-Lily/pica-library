@@ -4,7 +4,7 @@
 ### 2026-10-29 CORE-LIB-04c-02c-02a｜原 Desktop HTTP 及 RuntimeResourceCoordinator 升级交接准入冻结
 
 - [Draft #248](https://github.com/Saber-Alter-Lily/pica-library/pull/248) 基于 #247，接入**原 `src/library/server.ts` 所有普通 HTTP 路由**，对实际读写请求采集在途数并在原 `UpdateManager.apply` 启动前阻止新请求；原 Host/Origin/CSRF 检查仍先行。用现有 ResourceCoordinator 冻结新 `acquire/withLease`（含尚未开始的背景任务），并于 helper 启动失败时恢复 HTTP 与资源准入；helper ACK 后由原退出流程接管。没有新调度器/数据库/升级器。
-- 最初 HTTP-only [Linux/Windows #40981591695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981591695) **各79/79 SUCCESS**。后续真实源码增加 `RuntimeResourceCoordinator` 屏障，独立 [双平台 #40981944161](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981944161) 与 [完整 CI #40981949826](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981949826) 必须按精确源码核对，不提前标 PASS。技术审计：[S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md](S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md)。
+- 最初 HTTP-only [Linux/Windows #40981591695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981591695) **各79/79 SUCCESS**。经真实 HTTP 在途文件夹选择请求并发检验与冻结期间 GET 白名单收紧，最终精确代码 `ee6722585c6da942d0dd9bbe2dfc4097cd6abea1` 的 [Linux+Windows 专项 #40982432823](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40982432823) **两平台各 89/89 SUCCESS**；[Android/Web/Desktop 全 CI #40982438311](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40982438311) 必须独立等待终态，不能把专项 PASS 写作正式发布或全应用停写。技术审计：[S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md](S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md)。
 - **下一步 04c-02c-02b**：盘点并实际阻断不经过原本机 HTTP/共享 ResourceCoordinator 的写者（Mobile Bridge、独立 source worker、外部 WebDAV、异步任务），需要有界 drain/退出 ACK 才能制作跨 SQLite/媒体/凭据的强一致性备份及真实升级失败回退。G1–G4 全 OPEN；禁用自动发布。
 
 

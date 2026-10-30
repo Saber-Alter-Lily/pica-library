@@ -1,5 +1,17 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-10：显示设置与手势面板物理隔离（叠加 #264）
+
+- 新 `:reader-view/ReaderDisplaySettings` 实现原 `ReaderSettingsStore` 的本地 SharedPreferences 读写及远端回写数据承接；原应用类仅保留 WebDAV timestamp reconcile/线程入口，`ReaderSettingsStore.Snapshot` 原调用形状不变。
+- 新 `:reader-view/ReaderGesturePanel` 物理接管旧 Android Switch/RadioGroup 选项及即时应用，原 `ReaderGestureOptions` 只传入现有三语文字解析；没有新 UI 框架、重写 Reader、复制第三方代码或新增测试套件。
+- 验收按本 Draft 精确 SHA 的旧 CI、已有 local-only APK 编译/Manifest 检查；真无源 APK、`ReaderActivity` 完整模块移入和 G1–G4 仍 OPEN，保持未发布。下一切口拆出原 ReaderActivity UI 的实际 Android View/RecyclerView/ViewPager2，同时继续把来源权限、Local/Remote 配置与推荐触发留在 App 适配层。
+
+### 2026-10-30｜S3 CORE-ANDROID-07–09：补齐 Draft #262–#264 实际进度记录
+
+- [Draft #262](https://github.com/Saber-Alter-Lily/pica-library/pull/262) 原 `ReaderImages` 的图片加载、解码、预载、取消和缓存行为迁入 `:reader-view/ReaderImageLoader`；缓存写授权仍走原来源适配。
+- [Draft #263](https://github.com/Saber-Alter-Lily/pica-library/pull/263) 原章节/页面/阅读进度等通用接口迁入 `:reader-view/ReaderChapterSource`，来源权限留在 App 的 `ReaderSource`。
+- [Draft #264](https://github.com/Saber-Alter-Lily/pica-library/pull/264) 原书签、历史、revision/ack、远程合并迁入 `:reader-view/ReaderProgressLedger`，旧存储仍由 `ReaderHistoryPort` 适配；其精确提交 `ca74d0e` 的完整 CI Android/Web/Desktop 与 Macrobenchmark Build、内存限制、Worker 恢复 Actions 已成功。这不是实体真机或最终包验收。
+
 ### 2026-10-30｜S3 CORE-ANDROID-06：原 Reader 缩放手势 UI 物理模块化（Draft #261）
 
 - [Draft #261](https://github.com/Saber-Alter-Lily/pica-library/pull/261) 继续 #260 的来源诊断/推荐 UI 解耦，**开源优先但复用本仓库已存在的真正产品能力**：参考 Mihon Reader viewer/gesture 拆分设计（Apache-2.0，仅结构参考、没有复制代码），实际复用原 Java `ZoomImageView`、`ReaderGestureSettings`、`ReaderGesturePolicy`、`ReaderTouchSession` 及原 Android `GestureDetector`/`ScaleGestureDetector`/AndroidX；不再引入大图/翻页/图片缓存新库。

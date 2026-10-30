@@ -1,5 +1,10 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-03｜Reader 接口与具体来源实现分离
+
+- [Draft #258](https://github.com/Saber-Alter-Lily/pica-library/pull/258)：从原 `ReaderSource.java` 移出 Desktop/WebDAV/Pica 具体类，放入 `OnlineReaderSources.java`；核心声明只保留接口，原方法逻辑未变。下一步优先将 ReaderUI 使用的 `BridgeClient` 类型替换为无来源数据模型、抽离原 Reader 页渲染到单独模块，避免重写阅读器。真正干净 Android APK 尚未实现；不合并/发布，G1–G4 OPEN。
+
+
 ### 2026-10-30 CORE-ANDROID-02｜来源无关的本地 Reader Port
 
 - [Draft #257](https://github.com/Saber-Alter-Lily/pica-library/pull/257)：在标准 `:local-storage` Android 模块实现可独立消费的 LocalComicReaderPort，从旧 `LocalComicStore` 读取已导入的本地作品、封面、章节、文件页和页 ID 书签。原 `LocalComicReaderSource` 只保留 BridgeClient 数据形状适配，继续供原 ReaderActivity 阅读，避免第二套阅读器。测试复用已有 Android SAF 合成文件/实际导入场景，且不引入额外测试框架。

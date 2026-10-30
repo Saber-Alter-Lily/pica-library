@@ -142,7 +142,7 @@ class ReaderProgressLedger {
                     } catch (Exception e) { break; }
                 }
             } catch (Exception ignored) { }
-            finally { synchronized (ReaderProgress.this) { syncing = false; } }
+            finally { synchronized (ReaderProgressLedger.this) { syncing = false; } }
         });
     }
 }

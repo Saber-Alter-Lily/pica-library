@@ -81,7 +81,8 @@ android {
         debug {
             // Side-by-side manual QA build. It must never replace the formal app.
             applicationIdSuffix debugAppSuffix
-            versionNameSuffix localOnlyDraft ? '-local-draft' : '-dev-pr35'
+            versionNameSuffix '-dev-pr35'
+            if (localOnlyDraft) versionNameSuffix '-local-draft'
             debuggable true
             buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', localOnlyDraft ? 'true' : 'false'
             manifestPlaceholders = [

@@ -77,6 +77,54 @@ jobs:
             echo "Local-only APK still requests a forbidden runtime capability"
             exit 1
           fi
+      - name: Build and inspect physically source-free Android local QA APK
+        working-directory: mobile/android-alpha2
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          gradle :local-app:assembleDebug --no-daemon --max-workers=2
+          apk=local-app/build/outputs/apk/debug/local-app-debug.apk
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$aapt" dump badging "$apk" | grep -F "package: name='com.picalibrary.android.localcore.qa'"
+          "$aapt" dump badging "$apk" | grep -F "launchable-activity: name='com.picalibrary.android.LocalLibraryActivity'"
+          if "$aapt" dump permissions "$apk" | grep -E 'android.permission.(INTERNET|CAMERA|REQUEST_INSTALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE)'; then
+            echo "Source-free APK requested a forbidden permission"
+            exit 1
+          fi
+          APK_PATH="$apk" python3 - <<'PY'
+          import os, re, zipfile
+          apk = os.environ["APK_PATH"]
+          forbidden = (
+              b"Lcom/picalibrary/android/Pica",
+              b"Lcom/picalibrary/android/Eh",
+              b"Lcom/picalibrary/android/Jm",
+              b"Lcom/picalibrary/android/Bridge",
+              b"Lcom/picalibrary/android/Host",
+              b"Lcom/picalibrary/android/OnlineReader",
+              b"Lcom/picalibrary/android/RemoteReader",
+              b"Lcom/picalibrary/android/ReaderSourceFactory",
+              b"Lio/github/jukomu/",
+          )
+          with zipfile.ZipFile(apk) as archive:
+              dexes = [name for name in archive.namelist()
+                       if re.fullmatch(r"classes[0-9]*\.dex", name)]
+              if not dexes:
+                  raise SystemExit("APK has no compiled DEX")
+              for name in dexes:
+                  contents = archive.read(name)
+                  hits = [item.decode() for item in forbidden if item in contents]
+                  if hits:
+                      raise SystemExit(f"Source SDK in {name}: {hits}")
+          print(f"PASS: standalone APK contains {len(dexes)} checked DEX files, no source SDK")
+          PY
+      - name: Upload unsigned local-core QA APK (not a Release)
+        if: success() && github.event.repository.private == false && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-free-local-qa-${{ github.run_id }}
+          path: mobile/android-alpha2/local-app/build/outputs/apk/debug/local-app-debug.apk
+          retention-days: 2
+          if-no-files-found: error
       - name: Preserve actual Android JUnit results even on timeout
         if: always() && github.event.repository.private == false
         uses: actions/upload-artifact@v4

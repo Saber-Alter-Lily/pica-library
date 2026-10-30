@@ -1,0 +1,27 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.picalibrary.android.localcore.qa'
+    compileSdk 35
+    defaultConfig {
+        // Never overwrite the signed v0.5.0 app or the earlier localdraft.
+        applicationId 'com.picalibrary.android.localcore.qa'
+        minSdk 28
+        targetSdk 35
+        versionCode 1
+        versionName '0.5.0-local-core-qa'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Reuse the physically extracted production implementation; do not include :app.
+    implementation project(':local-core')
+    implementation project(':local-storage')
+    implementation project(':reader-view')
+}

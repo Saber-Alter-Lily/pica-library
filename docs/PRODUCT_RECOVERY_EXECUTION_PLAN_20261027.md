@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-10｜原 Reader 显示设置与手势面板进入来源无关模块（叠加 Draft #264）
+
+- 从原 Android App 的 `ReaderSettingsStore` 中直接移动原有 `reader-display` SharedPreferences、`mode`/`keepOn`/`portableUpdatedAt` 和读写操作到 `:reader-view/ReaderDisplaySettings`；原 `ReaderSettingsStore` 继续保留旧调用形式、原 WebDAV 时间戳 reconcile 和异步同步，仅作为应用层桥接。没有更改键名、模式范围、默认常亮状态或创建新的设置数据。
+- 把原 `ReaderGestureOptions` **实际 UI 控件实现**移到 `:reader-view/ReaderGesturePanel`：原 `ReaderGestureSettings`、Switch、1.5×/2×/3× RadioGroup、即时应用、关闭回调保持一致；薄应用兼容入口将现有 `LocalizedText.ui` 三语文案传给面板，不向通用模块导入应用端语言/Provider/推荐类。
+- OSS 选择：继续借鉴 Mihon Apache-2.0 的 Viewer/业务数据分离职责；本轮只复用既有 Android 组件和原 Pica Library 实现，没有复制 Mihon/Kotatsu 代码、没有增加依赖、没有新阅读器/设置系统或测试框架。通过原 Android/Web/Desktop CI 和已有本地 Draft 构建检查后，再准备将原 `ReaderActivity` 主 UI 物理抽取到 `:reader-view`。
+- **边界**：此步只完成本地阅读设置与手势面板的物理隔离。原 App 的 `ReaderActivity`、来源工厂、远程配置、推荐完成事件仍归应用层，local-only APK 仍包含在线来源 SDK；物理无源 APK、真实手机 G1/G2 和 v0.5.0 迁移 G3/G4 都未完成。Draft 不合并 main、无 Release/OTA、不触及实际用户文件。
+
 ### 2026-10-30 CORE-ANDROID-09｜原 Reader 阅读进度、书签与会话历史物理迁移（Draft #264）
 
 - [Draft #264](https://github.com/Saber-Alter-Lily/pica-library/pull/264)：遵照 OSS 优先规则，对比 Mihon ReaderChapter/PageLoader 的状态与数据来源分离方式（Apache-2.0，仅借鉴）；**真正复用原项目的 ReaderProgress/ReadingHistoryStore/UnifiedCatalogStore**，不另建阅读历史数据库、推荐引擎或同步器。

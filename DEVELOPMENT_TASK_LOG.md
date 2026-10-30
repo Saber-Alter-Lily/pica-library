@@ -2,7 +2,7 @@
 
 ### 2026-10-30｜S3 CORE-ANDROID-01：原生本地导入与持久化存储实际模块拆分（Draft #256）
 
-- [Draft #256](https://github.com/Saber-Alter-Lily/pica-library/pull/256) 叠加 #255；不新增 Reader/Importer，实际把**原生产源码** `LocalComicImporter.java`、`ReaderPolicy.java` 从原 `:app` Java 编译移入 Gradle 内置 `java-library` 模块 `:local-core`，无 Android/API/第三方内容源依赖；删除原本为测试临时引入的 `compileLocalImportBoundary` 自定义 JavaCompile task，改由正常 app 构建直接依赖并编译。避免重复造轮子。
+- [Draft #256](https://github.com/Saber-Alter-Lily/pica-library/pull/256) 叠加 #255；不新增 Reader/Importer，**原生产文件实际移动到模块各自的 `src/main/java`**：`LocalComicImporter.java`、`ReaderPolicy.java` 进入 Gradle 官方 `java-library` 的 `:local-core`；`LocalComicStore.java`、`DeviceIdentity.java` 进入官方 `com.android.library` 的 `:local-storage`。四份文件 Git Blob SHA 与原文件逐一相同（内容没有改写），原 App 旧文件位置删除、由 Gradle 依赖共享。同一份代码不重复编译。原 `compileLocalImportBoundary` 自定义 JavaCompile task 删除。
 - 同步拆分 `:local-storage` 标准 Android Library，直接复用原 `LocalComicStore.java`、`DeviceIdentity.java`，仅依赖上面的 `:local-core` 和原已使用的 AndroidX DocumentFile；源代码不复制，正式客户端及独立本地 Draft APK 共同复用。旧 `:app` 显式排除这些类的原路径，避免重复编译。现有导入、存储清单、页面、书架与阅读逻辑不改。
 - 验收以**原 CI 的真实 Android Gradle 编译与测试**为准，不创建新测试框架/矩阵。#255 的最新 21/21 工作流已 SUCCESS；#256 的准确源码另行确认，不能沿用父 PR 结果。真正无源独立 APK/Reader 剩余依赖、旧版原数据迁移、G1–G4 仍待后续。main/Release/OTA/用户资料保持不动。
 

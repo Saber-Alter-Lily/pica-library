@@ -18,7 +18,13 @@ final class DesktopReaderSource implements ReaderSource {
     public String scope(){return ReaderPolicy.hash(BridgeStore.host(context)+"\n"+BridgeStore.token(context));}
     public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {return BridgeClient.chapters(context,comicId);}
     public BridgeClient.ChapterData chapter(String comicId,String episodeId) throws Exception {return BridgeClient.chapter(context,comicId,episodeId);}
-    public String recentChapter(String comicId){return "";}
+    public String recentChapter(String comicId){
+        try {
+            for(BridgeClient.RecentItem row:BridgeClient.recent(context,100))
+                if(row.comic.id.equals(comicId))return row.episodeId;
+        }catch(Exception ignored){}
+        return "";
+    }
     public HttpURLConnection image(String path) throws Exception {
         String host=BridgeStore.host(context);if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");
         HttpURLConnection c=(HttpURLConnection)new URL(host.replaceAll("/$","")+path).openConnection();c.setConnectTimeout(2500);c.setReadTimeout(15000);c.setRequestProperty("Accept","image/*");c.setRequestProperty("Authorization","Bearer "+BridgeStore.token(context));c.setUseCaches(false);return c;

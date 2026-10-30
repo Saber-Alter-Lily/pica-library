@@ -30,6 +30,11 @@ async function runCoreDesktopPreview(
     argv: string[] = process.argv.slice(2),
     entryFile: string = process.argv[1]
 ) {
+    const persistentLocal = argv.length === 1 &&
+        argv[0] === '--persistent-local-profile'
+    // Preserve original disposable-preview validation order. The persistent
+    // root is created only after a complete application Web stage is proven.
+    const temporaryRoot = persistentLocal ? undefined : previewRoot(argv)
     const webRoot = path.join(path.dirname(path.resolve(entryFile)), 'web')
     // A real full-page app is required. Never silently fall back to the
     // Reader-only QA shell or load a user-selected arbitrary Web directory.
@@ -38,11 +43,9 @@ async function runCoreDesktopPreview(
     if (!manifest?.isFile() || manifest.isSymbolicLink() ||
         manifest.nlink !== 1)
         throw new Error('Original full Web QA manifest is required')
-    const persistentLocal = argv.length === 1 &&
-        argv[0] === '--persistent-local-profile'
     const root = persistentLocal
         ? openWindowsLocalProfile()
-        : previewRoot(argv)
+        : temporaryRoot!
     const lock = new InstanceLock(
         path.join(root, 'runtime-state', 'core-preview.lock'),
         path.join(root, 'runtime-state', 'core-preview-instance.json'),

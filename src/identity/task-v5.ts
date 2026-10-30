@@ -36,6 +36,7 @@ export class WorkIdentityTaskV5 {
         () => void
     >()
     private workIdentityEvidenceRefreshRun: Promise<void> | null = null
+    private shuttingDown = false
     private workIdentityEvidenceRefreshResult: {
         scannedComicCount: number
         candidateCount: number
@@ -147,7 +148,16 @@ export class WorkIdentityTaskV5 {
         this.workIdentityEvidenceRefreshRun = null
     }
 
+    /** Await the existing detached task before the owning SQLite connection closes. */
+    async quiesce() {
+        this.shuttingDown = true
+        this.control('cancel')
+        await this.workIdentityEvidenceRefreshRun
+    }
+
     start(requestedLimit = 500) {
+        if (this.shuttingDown)
+            throw new Error('Work Identity task is shutting down')
         if (
             this.workIdentityEvidenceRefreshRun &&
             ['running', 'pausing', 'paused', 'cancelling'].includes(

@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-05｜原 Reader UI 通过来源接口获取诊断与推荐应用扩展
+
+- [Draft #260](https://github.com/Saber-Alter-Lily/pica-library/pull/260)：继续 #259 通用 Chapter/Page 数据模型，复用原 Reader/AndroidX，把 E-H 诊断、显示名称等来源差异封装到原 `ReaderSource` 与具体适配器（原 E-H 安全/诊断实现不复制、不弱化），`ReaderImages` 不再强转具体 E-H 来源。推荐完成写入留在原应用 `ReaderSourceFactory`，原 UI 只在已有后台 executor 触发；原 Reader 页面不再直接 import/引用漫画源 SDK 类。仅扩展现有 3 处定向测试，完整 CI 待终态。
+- **下一真实功能切口**：盘点并物理拆出剩余 `ReaderImages` 缓存授权/来源策略、`ReaderProgress` 元信息及原 `ReaderActivity` 所用 UI/图片手势组件，构建直接依赖 `:local-core`+`:local-storage` 的干净 Android Reader 模块/应用，不以关闭网络权限或隐藏在线 UI 冒充“无源”。参考 Mihon Reader/loader/viewer 的职责划分，优先原实现且遵守开源许可证。G1–G4 OPEN。
+
+
 ## 全阶段工程硬规则｜开源优先与禁止重复造轮子（2026-10-30 起适用于 S0–S6）
 
 **优先顺序：现有 Pica Library 生产代码与用户兼容性 → 成熟开源项目和标准平台组件 → 最小必要适配 → 仅在确有缺口时新增实现。** 每项新功能/架构拆分先查已有相同或相似功能，不得为“解耦”另造一套 Reader、导入器、数据库、调度器、插件框架、升级器或测试系统。

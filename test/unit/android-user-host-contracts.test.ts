@@ -6,7 +6,9 @@ import { HOST_READER_OPERATIONS, HOST_DISCOVERY_OPERATIONS } from '../../src/sou
 // These are Node source/resource drift gates, NOT Android compilation or runtime tests.
 const base = 'mobile/android-alpha2/app/src/'
 const read = (file: string) => fs.readFileSync(base + file, 'utf8')
-const java = (name: string) => read('main/java/com/picalibrary/android/' + name + '.java')
+const java = (name: string) => name === 'LocalComicStore'
+    ? fs.readFileSync('mobile/android-alpha2/local-storage/src/main/java/com/picalibrary/android/LocalComicStore.java', 'utf8')
+    : read('main/java/com/picalibrary/android/' + name + '.java')
 const strings = (locale: string) => Object.fromEntries([...read(`main/res/${locale}/strings_host.xml`).matchAll(/<string name="([^"]+)">([\s\S]*?)<\/string>/g)].map(row => [row[1], row[2]]))
 
 describe('native user-Host source/resource contracts only', () => {

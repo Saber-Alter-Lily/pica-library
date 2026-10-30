@@ -13,6 +13,7 @@ on:
       - 'test/unit/desktop-external-http-handoff.test.ts'
       - 'test/unit/desktop-http-handoff-fence.test.ts'
       - 'test/unit/mobile-bridge.test.ts'
+      - 'test/unit/desktop-mobile-bridge-opt-in.test.ts'
       - 'test/unit/remote-api-gateway.test.ts'
   workflow_dispatch:
 
@@ -47,4 +48,4 @@ jobs:
       - name: Typecheck original Desktop and both network servers
         run: pnpm type:check
       - name: Prove Mobile pairing and authenticated Remote API cannot bypass original updater fence
-        run: pnpm exec vitest run test/unit/desktop-external-http-handoff.test.ts test/unit/desktop-http-handoff-fence.test.ts test/unit/desktop-update-quiescence.test.ts test/unit/runtime-resource-coordinator.test.ts test/unit/mobile-bridge.test.ts test/unit/remote-api-gateway.test.ts
+        run: pnpm exec vitest run test/unit/desktop-external-http-handoff.test.ts test/unit/desktop-http-handoff-fence.test.ts test/unit/desktop-update-quiescence.test.ts test/unit/runtime-resource-coordinator.test.ts test/unit/mobile-bridge.test.ts test/unit/desktop-mobile-bridge-opt-in.test.ts test/unit/remote-api-gateway.test.ts

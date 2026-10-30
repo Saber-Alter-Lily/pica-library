@@ -477,6 +477,7 @@ export class LibraryService {
         this.backgroundTasksShuttingDown = true
         this.favoritesSyncControl('cancel')
         this.recommendationBuildControl('cancel')
+        this.jmCancelFavorites()
         this.libraryOrganizeControl('cancel')
         this.maintenanceRepairControl('cancel')
         this.maintenanceUpdateControl('cancel')
@@ -778,6 +779,8 @@ export class LibraryService {
     }
 
     private beginRecommendationBuild(cycleId: string) {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         this.recommendationBuildCycleId = cycleId
         this.latestRecommendationBuildCycleId = cycleId
         this.recommendationPauseRequested = false
@@ -2090,11 +2093,18 @@ export class LibraryService {
         return this.jmFavorites.scan(this.jmProvider, folderId, checkpoint)
     }
     async jmConfirmFavorites(token: string) {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
+        const generation = this.jmMetadataGeneration
         const identity = await this.sources.run('jm', () => this.jmProvider.accountStatus())
+        if (this.backgroundTasksShuttingDown || generation !== this.jmMetadataGeneration)
+            throw new Error('JM favorites confirmation was cancelled')
         return this.jmFavorites.confirm(token, identity, this.database)
     }
     jmCancelFavorites() { this.jmMetadataGeneration++; this.jmFavorites.clear() }
     async jmEnrichFavorites(checkpoint?: () => Promise<void>) {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         const lease = this.sources.acquire('jm')
         if (this.jmMetadataBusy) throw new Error('JM 资料补全正在进行')
         this.jmMetadataBusy = true
@@ -2608,6 +2618,8 @@ export class LibraryService {
     }
 
     async syncFavorites(mode: FavoritesSyncMode = 'quick') {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         if (
             this.favoritesTaskState === 'running' ||
             this.favoritesTaskState === 'pausing' ||

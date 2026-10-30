@@ -3,13 +3,14 @@
 ## What is reused
 - Original Pica Library `LocalComicImporter` + Android `LocalComicStore` folder/CBZ SAF pipeline and atomic manifest/generation commit.
 - Original `LocalComicReaderPort` identity/pages/page-ID bookmarks.
+- Original v1 `ReadingHistoryStore` session ledger now has a single physical implementation `:local-storage/ReaderHistoryLedger`; the installed app keeps its original `MobileStoragePaths` and legacy-bookmark conversion adapter.
 - Original `ReaderScreenActivity`, `ReaderImageLoader`, `ReaderProgressLedger`, gestures, continuous and paged UI (moved in #256–#266).
 - Standard Android Gradle, SAF, RecyclerView/ViewPager2. Mihon Apache-2.0 is an architectural reference only. Kotatsu GPL source is not copied.
 
 ## What the independent QA APK does
-The new `:local-app` installs as `com.picalibrary.android.localcore.qa` and runs without provider SDKs or network access. Use system picker to import a folder or CBZ; confirm the staged comic; list imported titles; tap to read with the original Reader; save/reopen the same chapter/page; long-press to remove a local copy.
+The new `:local-app` installs as `com.picalibrary.android.localcore.qa` and runs without provider SDKs or network access. Use system picker to import a folder or CBZ; confirm the staged comic; list imported titles; tap to read with the original Reader; save/reopen the same chapter/page; long-press to remove a local copy. Reading now writes original-format sessions to the isolated local-app directory; the History entry lists actual sessions by today/7/30/all dates and resumes a selected chapter/page.
 
-This is deliberately an **engineering QA product slice**, not a signed/public end-user release. No source marketplace, Pica/E-H/JM login, cloud, recommendation, full HistoryStore, or complete three-language Viewer UI is claimed. Its package/data directory is isolated from v0.5.0 and earlier dev APKs.
+This is deliberately an **engineering QA product slice**, not a signed/public end-user release. No source marketplace, Pica/E-H/JM login, cloud, recommendation, full production HistoryActivity/catalog/cover/grouped UI, or complete three-language Viewer UI is claimed. Its package/data directory is isolated from v0.5.0 and earlier dev APKs.
 
 ## Actual build gate
 Existing CI Android job builds `:local-app:assembleDebug`, inspects package/launcher and missing network/camera/install/broad-storage permissions with `aapt`, then inspects every compiled classes*.dex for concrete source SDK/Host/Bridge descriptors. It uploads a **two-day unsigned/debug QA artifact only when the job succeeds**. The APK must **not** be promoted to a stable Release or installed over the official app.

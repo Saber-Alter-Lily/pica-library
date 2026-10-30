@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-13｜原阅读历史持久化复用进入独立本地 APK（叠加 Draft #267）
+
+- 继续基于已通过 20/20 Workflows 和 6 个 DEX/无来源 SDK 证据的独立 `:local-app`。**物理迁移原有 ReadingHistoryStore 的会话文件格式与行为，不开发第二套历史存储。** 原 `reading-history-v1.json` 的 `schemaVersion=1`、session ID、时间、first/lastPage、chapterOrder、source/provider、legacySnapshot、日期范围和排序逻辑统一由 `:local-storage/ReaderHistoryLedger` 实现。
+- 旧正式 App 仍使用名为 `ReadingHistoryStore` 的薄兼容入口：保持 `MobileStoragePaths.dataFile` 外置数据目录选择、原 API/嵌套类型/日期过滤及 Legacy 导入签名，Pica/E-H/目录元信息与旧 Bookmarks 首次迁移仍只留原 App 适配，不污染无来源共享模块；不移动、不改写、不读取正式用户资料。
+- `LocalReaderActivity` 从 `ReaderProgressLedger` 的空会话回调改为真实共享 `ReaderHistoryLedger.record`，明确只写 `local-app` 自己的 `getFilesDir()/reading-history-v1.json`，书签照旧由原 Ledger 保存。`LocalHistoryActivity` 只提供轻量 QA 查看/今天/7天/30天/全部/点击续读入口，复用原时间与筛选、显式确认本地作品仍可读；不复制原 `HistoryActivity` 的云端、作者封面及高级卡片 UI。
+- 仅扩展已有的 `LocalComicImportTest` 一条真实共享历史 JSON/会话更新/旧版数据路径不修改回归，源位置测试随真实模块位置调整；不新建测试套件、数据库、同步器、UI 框架或平台依赖。开源优先维持本项目原 Java/Android SAF/AndroidX，Mihon（Apache-2.0）只参考职责划分，未复制 Mihon/Kotatsu 源码。
+- 验收边界：本轮新提交的 Android/Web/Desktop CI、正式版旧历史测试、独立 APK 重新编译与 DEX/权限检查必须独立 PASS 才能标工程接受。Android 真机书签/历史/重启与原 v0.5.0 对比，统一完整 HistoryActivity UI、签名/来源生命周期、真实旧资料 G3 回滚和 G1–G4 用户验收仍 OPEN；保持 Draft，不合并/发布/OTA。
+
 ### 2026-10-30 CORE-ANDROID-12｜真正独立的 Android 本地书库/阅读 APK（Draft #267）
 
 - 基于已 **20/20 GitHub Actions SUCCESS** 的 #266 `6ca0aec`，新建实际 `:local-app` **com.android.application**，唯一编译依赖为已分包的 `:local-core`、`:local-storage` 和 `:reader-view`，没有引用原 `:app`、在线源/Host/Bridge/JM SDK 或原账号初始化。安装包 ID `com.picalibrary.android.localcore.qa` 与原正式 APK、旧 localdraft 完全隔离；独立 App files/cache/SharedPreferences，不碰正式用户资料。

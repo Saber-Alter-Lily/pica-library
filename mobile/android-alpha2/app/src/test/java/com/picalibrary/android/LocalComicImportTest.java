@@ -102,6 +102,27 @@ public class LocalComicImportTest {
         assertArrayEquals(PNG,Files.readAllBytes(new File(original,"2.png").toPath()));
     }
 
+    @Test public void sharedV1HistoryWritesIsolatedQaSessionsWithoutTouchingOriginalAppFile() throws Exception {
+        File official=MobileStoragePaths.dataFile(context,ReaderHistoryLedger.FILE);
+        byte[] before=official.isFile()?Files.readAllBytes(official.toPath()):new byte[0];
+        File isolated=File.createTempFile("reader-history-qa-", ".json",context.getCacheDir());
+        try {
+            ReaderHistoryLedger.record(context,isolated,"qa-session-v1","local:test","local-chapter:test",
+                    "Imported title","Local author","Chapter 1",1,"local","local",0,
+                    "2026-10-30T10:00:00Z","2026-10-30T10:00:00Z");
+            ReaderHistoryLedger.record(context,isolated,"qa-session-v1","local:test","local-chapter:test",
+                    "Imported title","Local author","Chapter 1",1,"local","local",2,
+                    "2026-10-30T10:00:00Z","2026-10-30T10:01:00Z");
+            ReaderHistoryLedger.Session saved=ReaderHistoryLedger.load(isolated).sorted().get(0);
+            assertEquals("Imported title",saved.title);
+            assertEquals("local",saved.sourceKind);
+            assertEquals(1,saved.chapterOrder);
+            assertEquals(0,saved.firstPage);
+            assertEquals(2,saved.lastPage);
+            assertEquals(1,new JSONObject(new String(Files.readAllBytes(isolated.toPath()),java.nio.charset.StandardCharsets.UTF_8)).getInt("schemaVersion"));
+            assertArrayEquals(before,official.isFile()?Files.readAllBytes(official.toPath()):new byte[0]);
+        } finally {isolated.delete();}
+    }
     @Test public void cbzUsesSameReaderAndSubfolderChapters() throws Exception {
         File archive=new File(original,"synthetic.cbz");try(ZipOutputStream out=new ZipOutputStream(new FileOutputStream(archive))){for(String name:new String[]{"chapter2/10.png","chapter1/1.png","chapter2/2.png"}){out.putNextEntry(new ZipEntry(name));out.write(PNG);out.closeEntry();}}
         Uri uri=DocumentsContract.buildDocumentUri(AUTHORITY,"root/synthetic.cbz");LocalComicStore.Preview preview=LocalComicStore.prepare(context,uri,"cbz",()->{});assertEquals(3,preview.prepared.pages.size());assertEquals(2,preview.prepared.chapters);assertFalse(new File(preview.work,"archive.cbz").exists());LocalComicStore.Comic comic=LocalComicStore.confirm(context,preview,()->{});assertEquals(2,new LocalComicReaderSource(context).chapters(comic.id).size());assertTrue(archive.exists());

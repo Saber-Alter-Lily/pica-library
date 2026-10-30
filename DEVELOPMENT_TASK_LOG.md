@@ -1,5 +1,14 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-13：统一原阅读会话历史到 source-neutral Android 存储
+
+- 首轮确切提交 `2b3764b7` 的 Android CI **FAIL（保留证据）**：新加的 Robolectric 单条测试使用 JDK `Files.readString(Path)`，Android 编译 API 上无法解析。使用仓库既有 `Files.readAllBytes` + `StandardCharsets.UTF_8` 替换这一处测试表达式；不更改任何生产逻辑、测试要求或安全门禁。新 SHA 的完整 CI / APK / DEX 结果重新判断，不借用失败头或旧 #267 的 green。
+
+
+- 依据 #267 的 20/20 Actions 成功和真实 APK 6 DEX 无具体来源 SDK 证据继续。旧 `ReadingHistoryStore` 已拆为 `:local-storage/ReaderHistoryLedger` 唯一 JSON v1 存储/日期筛选实现，原 App 仅保留历史外置目录定位、旧 Pica/E-H/Unified Catalog Legacy 迁移和原 API 兼容。旧用户资料未移动；完全延用 `reading-history-v1.json` 的字段、排序、限制与 session 语义。
+- 独立 `:local-app` Reader 的历史回调从空实现改为写入同一 v1 Ledger 的自有文件；新增轻量 QA 历史查看和实际章节/页恢复界面，入口属于本地书库，不接云端或漫画源。仅在原已有 Robolectric 测试内加一项隔离文件/原版路径不变化检查，旧 TS 合同指向真实模块实现。无第二套 DB/Reader 或新框架/依赖。
+- **当前状态：代码候选，精确提交 CI / 实际 `:local-app` 构建及 DEX 检查待验收。** 真机 G1/G2、完整生产历史页界面、G3 数据迁移/回滚、可信可选来源及 G4 发布仍 OPEN，禁止直接 merge/main/Release/OTA。
+
 ### 2026-10-30｜S3 CORE-ANDROID-12：真正 source-SDK-free 独立 Android QA APK
 
 - #266 `6ca0aec9fb07e34bf68347755331cf4d0b16d732` 所有 20/20 GitHub Actions 工作流已独立核实 SUCCESS。以此为准确父提交继续开发。

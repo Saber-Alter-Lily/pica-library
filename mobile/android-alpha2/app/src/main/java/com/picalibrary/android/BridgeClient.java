@@ -27,14 +27,28 @@ final class BridgeClient {
         final ComicItem comic;final String episodeId, episodeTitle, updatedAt;final int pageIndex, episodeOrder;
         RecentItem(ComicItem comic,String episodeId,String episodeTitle,int episodeOrder,int pageIndex,String updatedAt){this.comic=comic;this.episodeId=episodeId;this.episodeTitle=episodeTitle;this.episodeOrder=episodeOrder;this.pageIndex=pageIndex;this.updatedAt=updatedAt;}
     }
-    static final class ChapterItem {
-        final String id, title;final int order, downloadedPictures;
-        ChapterItem(String id, String title, int order, int downloadedPictures) {this.id=id; this.title=title; this.order=order; this.downloadedPictures=downloadedPictures;}
+    // Original Bridge data constructors remain compatible with existing
+    // Desktop/provider clients. The actual fields now come from :local-core.
+    static final class ChapterItem extends ReaderContent.Chapter {
+        ChapterItem(String id, String title, int order, int downloadedPictures) {
+            super(id,title,order,downloadedPictures);
+        }
     }
-    static final class PageItem {final String id, url;final int position;PageItem(String id, String url, int position) { this.id=id; this.url=url; this.position=position; }}
-    static final class ChapterData {
-        final ChapterItem episode;final List<PageItem> pages;final int progressIndex;
-        ChapterData(ChapterItem episode, List<PageItem> pages, int progressIndex) {this.episode=episode; this.pages=pages; this.progressIndex=progressIndex;}
+    static final class PageItem extends ReaderContent.Page {
+        PageItem(String id, String url, int position) {
+            super(id,url,position);
+        }
+    }
+    static final class ChapterData extends ReaderContent.ChapterData {
+        // Preserve the old strongly typed fields for provider callers while
+        // ReaderSource/ReaderActivity consume the neutral supertype.
+        final ChapterItem episode;
+        final List<PageItem> pages;
+        final int progressIndex;
+        ChapterData(ChapterItem episode, List<PageItem> pages, int progressIndex) {
+            super(episode,pages,progressIndex);
+            this.episode=episode; this.pages=pages; this.progressIndex=progressIndex;
+        }
     }
     static final class RecommendationItem {
         final String id,title,author,reason;final double score;final List<String> tags,categories;

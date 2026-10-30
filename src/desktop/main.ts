@@ -391,6 +391,36 @@ async function closeEngine() {
     )
     mobileBridge = null
 
+    if (server) {
+        log.write('Shutdown: closing local HTTP server')
+        const closing = server
+        await shutdownStep(
+            'local HTTP server',
+            async () => {
+                closing.closeIdleConnections()
+                await new Promise<void>((resolve) => {
+                    let settled = false
+                    const finish = () => {
+                        if (settled) return
+                        settled = true
+                        resolve()
+                    }
+                    closing.close(finish)
+                    setTimeout(() => {
+                        log.write(
+                            'Shutdown: forcing remaining local HTTP connections closed'
+                        )
+                        closing.closeAllConnections()
+                        finish()
+                    }, 1_000)
+                })
+                log.write('Shutdown: local HTTP server closed')
+            },
+            errors
+        )
+    }
+    server = null
+
     log.write('Shutdown: draining WebDAV mutations')
     await shutdownStep(
         'remote storage quiesce',
@@ -425,41 +455,16 @@ async function closeEngine() {
         errors
     )
 
-    if (server) {
-        log.write('Shutdown: closing local HTTP server')
-        const closing = server
-        await shutdownStep(
-            'local HTTP server',
-            async () => {
-                closing.closeIdleConnections()
-                await new Promise<void>((resolve) => {
-                    let settled = false
-                    const finish = () => {
-                        if (settled) return
-                        settled = true
-                        resolve()
-                    }
-                    closing.close(finish)
-                    setTimeout(() => {
-                        log.write(
-                            'Shutdown: forcing remaining local HTTP connections closed'
-                        )
-                        closing.closeAllConnections()
-                        finish()
-                    }, 1_000)
-                })
-                log.write('Shutdown: local HTTP server closed')
-            },
-            errors
-        )
-    }
-    server = null
-
     await shutdownStep(
         'provider runtime cleanup',
         () => { service?.closeSources() },
         errors
     )
+    // The original shared scheduler owns foreground sync/build/download leases.
+    // These can continue after their initiating HTTP connection closes.
+    log.write('Shutdown: waiting for existing resource-backed work')
+    await service?.waitForRuntimeIdle()
+
     log.write('Shutdown: closing database')
     await shutdownStep(
         'database',

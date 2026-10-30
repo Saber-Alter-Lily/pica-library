@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-LIB-04e｜可跨重启的无源 Windows 个人书库
+
+- [Draft #254](https://github.com/Saber-Alter-Lily/pica-library/pull/254)：继续 #253 的本地/CBZ 导入，保留旧 v0.5.0 默认启动，添加用户主动选择的 `--source-free-local` 模式与独立持久 profile `%LOCALAPPDATA%/Pica Library Local`。复用原 SQLite、Reader、书架、文件对话框和完整 Web；原用户凭据、文件及旧目录不参与。自动打开原网页，支持重启续用该新书库。只新增一个既有套件内测试，当前仍不正式发布，CI/真实 Windows 启动待核实。
+- **下一产品硬关口**：真实独立 Windows 成品启动/导入/保存/重启验收，以及 Android 纯核心个人书库启动、必要的 trusted source 接入；旧用户 v0.5.0 安全迁移及 G1–G4 仍未完成。已实现的图鉴 BLOCK/LESS 过滤无需重复开发。
+
+
 ### 2026-10-29 S3 CORE-LIB-04d｜先实现独立核心的本地导入
 
 - [Draft #253](https://github.com/Saber-Alter-Lily/pica-library/pull/253)：现有 source-free 原网页、原生选择器与原本地文件夹/CBZ 导入器联通。仅增加必需接口接线和 1 项既有套件回归，保持默认正式 v0.5.0 和旧资料完全不动。当前仍是用户显式选择的 OS Temp 隔离预览，并非正式可持久化安装/源外置验收。CI 待核。

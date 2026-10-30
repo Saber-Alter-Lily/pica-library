@@ -44,6 +44,23 @@ const LAUNCHER = [
     '"%~dp0runtime\\node.exe" "%~dp0app\\core.mjs" serve --root "%~1"',
     'exit /b %ERRORLEVEL%'
 ].join('\r\n') + '\r\n'
+const LOCAL_ONLY_DRAFT_LAUNCHER = [
+    '@echo off',
+    'setlocal',
+    'rem New persistent local-only library; never reads installed v0.5.0 data.',
+    '"%~dp0Pica-Library-Core-Preview.exe" --source-free-local',
+    'exit /b %ERRORLEVEL%'
+].join('\r\n') + '\r\n'
+const LOCAL_ONLY_DRAFT_README = [
+    'Pica Library - UNSIGNED LOCAL-ONLY DRAFT (NOT A RELEASE)',
+    'Double-click Start-Local-Only-Draft.cmd to open the original full Web.',
+    'A NEW independent library is saved at:',
+    '  %LOCALAPPDATA%\\Pica Library Local',
+    'Your installed v0.5.0 library, accounts and downloads are untouched.',
+    'You can import folders or CBZ, read, save progress and use shelves.',
+    'No network manga sources or source SDK are included.',
+    'This CI-built archive is not signed or distributed automatically.'
+].join('\r\n') + '\r\n'
 const README = [
     'Pica Library - OFFLINE READER PORTABLE ENGINEERING QA ONLY',
     'UNSIGNED / NOT DISTRIBUTABLE / NOT AN OFFICIAL RELEASE.',
@@ -195,6 +212,8 @@ export async function buildWindowsOfflinePortableQa(
         add('Pica-Library-Core-Preview.exe',
             checkedFile(launcherOutput, 8 * 1024 * 1024))
         add('app/desktop-core-preview.mjs', preview.bytes)
+        add('Start-Local-Only-Draft.cmd', Buffer.from(LOCAL_ONLY_DRAFT_LAUNCHER))
+        add('README-LOCAL-ONLY-DRAFT.txt', Buffer.from(LOCAL_ONLY_DRAFT_README))
     }
     add('runtime/node.exe', runtime)
     for (const name of TOP_LEVEL) add(name, fileSource(name))
@@ -253,7 +272,9 @@ export async function buildWindowsOfflinePortableQa(
                 !entries.some(row => row.path === 'app/web/index.html') ||
                 !entries.some(row => row.path === 'app/web/full-web-qa-manifest.json') ||
                 !entries.some(row => row.path === 'app/desktop-core-preview.mjs') ||
-                !entries.some(row => row.path === 'Pica-Library-Core-Preview.exe'))
+                !entries.some(row => row.path === 'Pica-Library-Core-Preview.exe') ||
+                !entries.some(row => row.path === 'Start-Local-Only-Draft.cmd') ||
+                !entries.some(row => row.path === 'README-LOCAL-ONLY-DRAFT.txt'))
             : (entries.length !== 20 ||
                 entries.some(item => /(?:^|\/)app\.js$/.test(item.path)))))
         throw new Error('Portable QA package inventory includes forbidden or missing files')

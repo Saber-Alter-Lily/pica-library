@@ -260,11 +260,11 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     private void settingsEntry(){
         LinearLayout p=page(true);titleRow(p,"设置");
         if(BuildConfig.LOCAL_ONLY_DRAFT){
-            p.addView(Ui.text(this,"独立本地书库 · 不连接漫画源、电脑或网盘",13,Ui.MUTED,false));
-            p.addView(SettingsRow.row(this,"导入本地漫画","文件夹 / CBZ",v->startActivity(new Intent(this,LocalComicImportActivity.class))));
+            p.addView(Ui.text(this,LocalizedText.ui(this,"独立本地书库 · 不连接漫画源、电脑或网盘","Local library only · no online sources, Desktop or WebDAV","ローカル書庫のみ · オンラインソース・PC・WebDAV は使用しません"),13,Ui.MUTED,false));
+            p.addView(SettingsRow.row(this,LocalizedText.ui(this,"导入本地漫画","Import local comics","ローカル漫画を取り込む"),"Folder / CBZ",v->startActivity(new Intent(this,LocalComicImportActivity.class))));
             p.addView(SettingsRow.row(this,getString(R.string.settings_language),getString(R.string.settings_language_summary),v->startActivity(new Intent(this,LanguageActivity.class))));
             p.addView(SettingsRow.row(this,"个性化",ThemeStore.label(this),v->startActivity(new Intent(this,AppearanceActivity.class))));
-            p.addView(SettingsRow.row(this,"关于","本地阅读开发版本",v->startActivity(new Intent(this,AboutActivity.class))));
+            p.addView(SettingsRow.row(this,LocalizedText.ui(this,"关于","About","情報"),LocalizedText.ui(this,"本地阅读开发版本","Local reading development build","ローカル閲覧開発版"),v->startActivity(new Intent(this,AboutActivity.class))));
             return;
         }
         boolean paired=BridgeStore.paired(this);

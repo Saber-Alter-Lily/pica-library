@@ -41,6 +41,7 @@ export class RecommendationShadowTaskV5 {
         'retrieving'
     private readonly recommendationV5ShadowResumeWaiters = new Set<() => void>()
     private recommendationV5ShadowRun: Promise<void> | null = null
+    private shuttingDown = false
     private recommendationV5ShadowResult: {
         rawCandidateCount: number
         candidateCount: number
@@ -156,7 +157,16 @@ export class RecommendationShadowTaskV5 {
         this.recommendationV5ShadowRun = null
     }
 
+    /** Await the existing detached task before the owning SQLite connection closes. */
+    async quiesce() {
+        this.shuttingDown = true
+        this.control('cancel')
+        await this.recommendationV5ShadowRun
+    }
+
     start(input: Record<string, unknown>) {
+        if (this.shuttingDown)
+            throw new Error('Recommendation V5 shadow task is shutting down')
         if (
             String(input.confirmation ?? '').trim() !==
             RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION

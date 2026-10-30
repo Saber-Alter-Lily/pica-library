@@ -358,6 +358,7 @@ export class LibraryService {
     private jmMetadataGeneration = 0
     private jmMetadataBusy = false
     private acceptingLocalDownloads = true
+    private backgroundTasksShuttingDown = false
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
     private localDownloadRunStartedAt: string | null = null
@@ -469,6 +470,24 @@ export class LibraryService {
 
     runtimeResourceProfile() {
         return this.runtimeResources.snapshot()
+    }
+
+    /** Cancel and await the real fire-and-forget task runs before closing SQLite. */
+    async quiesceBackgroundTasks() {
+        this.backgroundTasksShuttingDown = true
+        this.favoritesSyncControl('cancel')
+        this.recommendationBuildControl('cancel')
+        this.jmCancelFavorites()
+        this.libraryOrganizeControl('cancel')
+        this.maintenanceRepairControl('cancel')
+        this.maintenanceUpdateControl('cancel')
+        await Promise.allSettled([
+            this.libraryOrganizeRun,
+            this.maintenanceRepairRun,
+            this.maintenanceUpdateRun,
+            this.recommendationShadowTaskV5.quiesce(),
+            this.workIdentityTaskV5.quiesce()
+        ].filter((run): run is Promise<void> => run !== null))
     }
 
     runtimeTaskDiagnostics() {
@@ -760,6 +779,8 @@ export class LibraryService {
     }
 
     private beginRecommendationBuild(cycleId: string) {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         this.recommendationBuildCycleId = cycleId
         this.latestRecommendationBuildCycleId = cycleId
         this.recommendationPauseRequested = false
@@ -2072,11 +2093,18 @@ export class LibraryService {
         return this.jmFavorites.scan(this.jmProvider, folderId, checkpoint)
     }
     async jmConfirmFavorites(token: string) {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
+        const generation = this.jmMetadataGeneration
         const identity = await this.sources.run('jm', () => this.jmProvider.accountStatus())
+        if (this.backgroundTasksShuttingDown || generation !== this.jmMetadataGeneration)
+            throw new Error('JM favorites confirmation was cancelled')
         return this.jmFavorites.confirm(token, identity, this.database)
     }
     jmCancelFavorites() { this.jmMetadataGeneration++; this.jmFavorites.clear() }
     async jmEnrichFavorites(checkpoint?: () => Promise<void>) {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         const lease = this.sources.acquire('jm')
         if (this.jmMetadataBusy) throw new Error('JM 资料补全正在进行')
         this.jmMetadataBusy = true
@@ -2590,6 +2618,8 @@ export class LibraryService {
     }
 
     async syncFavorites(mode: FavoritesSyncMode = 'quick') {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         if (
             this.favoritesTaskState === 'running' ||
             this.favoritesTaskState === 'pausing' ||
@@ -2852,6 +2882,8 @@ export class LibraryService {
     }
 
     startLibraryOrganize() {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         if (
             this.libraryOrganizeRun &&
             [
@@ -3065,6 +3097,8 @@ export class LibraryService {
     }
 
     startMaintenanceRepairScan() {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         if (
             this.maintenanceRepairRun &&
             [
@@ -3311,6 +3345,8 @@ export class LibraryService {
     }
 
     startMaintenanceUpdateCheck(comicIds?: string[]) {
+        if (this.backgroundTasksShuttingDown)
+            throw new Error('Library background tasks are shutting down')
         if (
             this.maintenanceUpdateRun &&
             [

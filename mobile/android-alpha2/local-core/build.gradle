@@ -8,12 +8,3 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
-sourceSets {
-    main {
-        java {
-            srcDirs = ['../app/src/main/java']
-            include 'com/picalibrary/android/local/**/*.java'
-            include 'com/picalibrary/android/ReaderPolicy.java'
-        }
-    }
-}

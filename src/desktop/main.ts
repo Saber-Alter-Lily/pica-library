@@ -1453,15 +1453,20 @@ async function startEngine(preferredPort: number) {
 
 async function restartEngine() {
     if (stopping) return
-    const previousUrl = currentUrl
-    await closeEngine()
-    if (stopping) return
-    const port = currentUrl
-        ? Number(new URL(currentUrl).port)
-        : config?.preferredPort ?? 4789
-    await startEngine(port || config?.preferredPort || 4789)
-    if (await waitForHealth(currentUrl)) {
-        if (currentUrl !== previousUrl) browser(currentUrl)
+    try {
+        const previousUrl = currentUrl
+        await closeEngine()
+        if (stopping) return
+        const port = currentUrl
+            ? Number(new URL(currentUrl).port)
+            : config?.preferredPort ?? 4789
+        await startEngine(port || config?.preferredPort || 4789)
+        if (await waitForHealth(currentUrl)) {
+            if (currentUrl !== previousUrl) browser(currentUrl)
+        }
+    } catch (error) {
+        log.write(`Restart failed: ${shutdownReason(error)}`)
+        await stop(1)
     }
 }
 

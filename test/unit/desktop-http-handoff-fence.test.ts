@@ -243,6 +243,8 @@ describe('actual original local web server uses the new Desktop-only admission p
             ])
             expect(blockedGet.status).toBe(503)
             expect(blockedPost.status).toBe(503)
+            expect(blockedPost.headers.get('retry-after')).toBe('2')
+            expect(blockedPost.headers.get('connection')).toBe('close')
             expect((await blockedPost.json()).code)
                 .toBe('DESKTOP_UPDATE_HANDOFF_FROZEN')
             expect(diag.status).toBe(200)

@@ -104,6 +104,7 @@ export async function buildOfflineCoreCandidate(
         // the preview entry and instance lock. No source SDK or Host code.
         const allowedPreviewDesktop = kind === 'desktop-core-preview' &&
             [PREVIEW_ENTRY, 'src/desktop/instance.ts',
+                'src/desktop/core-local-profile.ts',
                 'src/desktop/pickers.ts', 'src/desktop/child-process.ts',
                 'src/desktop/platform.ts'].includes(item)
         if (!allowedPreviewDesktop && PROHIBITED.some(pattern => pattern.test(item)))

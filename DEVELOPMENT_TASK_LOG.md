@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-12：真正 source-SDK-free 独立 Android QA APK
+
+- #266 `6ca0aec9fb07e34bf68347755331cf4d0b16d732` 所有 20/20 GitHub Actions 工作流已独立核实 SUCCESS。以此为准确父提交继续开发。
+- 已新增 `:local-app` 标准 Android 应用；`build.gradle` 仅依赖现有 `:local-core`/`:local-storage`/`:reader-view`；独立 ID/数据根/SAF 导入/书库/同一个 Reader/按 page ID 保存和恢复，不调用原 `:app`，不拷贝第三方源或重复造导入器/Viewer。
+- 原独立 localdraft 只是无网络权限但仍包含旧 SDK；本候选将用实际 **APK classes*.dex / aapt manifest** 的明确排除清单验收“物理无源”，而非只凭 Gradle 文本或隐藏页面。原 CI 增加一个实际 assemble + DEX/Manifest 检查、可选极短期 Debug 工件，没有新增工作流或大型测试框架。精确最终 CI 待运行，不能宣称通过。
+- G1/G2 真机、完整会话历史与高级功能、旧资料迁移/回滚和 G3/G4 仍 OPEN。下一任务若本包通过，优先在真机/安装包实际导入和阅读回归中核对，再抽取原共享 ReadingHistoryStore 等剩余原功能，避免留下第二套历史实现。
+
 ### 2026-10-30｜S3 CORE-ANDROID-11：原 ReaderActivity UI 和交互迁入 reader-view（叠加 Draft #265）
 
 - 原生产 `ReaderActivity` 的 Viewer/章节/分页/连续阅读/失败处理/书签保存/手势的唯一实现已直接移到 `:reader-view/ReaderScreenActivity`；保留原 `.ReaderActivity` Manifest 入口作为 12 个明确的 App 适配方法与旧三语/账户/推荐连接，不复制界面或数据库。既有 `:local-core`/`:local-storage`、ReaderImageLoader/ProgressLedger 直接复用，AndroidX 原依赖版本不变。

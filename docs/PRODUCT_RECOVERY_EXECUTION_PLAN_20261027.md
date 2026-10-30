@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-12｜真正独立的 Android 本地书库/阅读 APK（Draft #267）
+
+- 基于已 **20/20 GitHub Actions SUCCESS** 的 #266 `6ca0aec`，新建实际 `:local-app` **com.android.application**，唯一编译依赖为已分包的 `:local-core`、`:local-storage` 和 `:reader-view`，没有引用原 `:app`、在线源/Host/Bridge/JM SDK 或原账号初始化。安装包 ID `com.picalibrary.android.localcore.qa` 与原正式 APK、旧 localdraft 完全隔离；独立 App files/cache/SharedPreferences，不碰正式用户资料。
+- 复用原 `LocalComicStore.prepare/confirm/remove` SAF 文件夹/CBZ、预览/原子目录提交和 `LocalComicReaderPort` 章节/页码/本地页面 ID；最小 `LocalLibraryActivity` 提供实际导入、预览确认、加载态/取消、列表、点击阅读、长按删除。复用原 `:reader-view/ReaderScreenActivity` 全部翻页/连续阅读/缩放/书签/章节/进度 UI，`LocalReaderActivity` 仅把这三份原生产模块连接到同一 Reader。没有再造导入器、Reader、同步、数据库或 plugin loader。
+- 实际 DEX 与 Manifest 门禁嵌入现有 Android CI：编译 `:local-app:assembleDebug`，`aapt` 核对隔离包名/真实 Launcher、缺 INTERNET/CAMERA/INSTALL/BROAD STORAGE，逐个 DEX 检查来源 SDK 类描述符；只保留两天的可下载安装 Debug **QA artifact**，不创建 Release、tag、OTA、签名正式 APK。未通过精确最终 CI 前不能标 PASS。
+- 开源优先：旧 Pica Library 本地导入/文件 Manifest/原 Reader 优先，使用 Android SAF、AndroidX 原版依赖；Mihon (Apache-2.0) 仅作为职责边界参考，没有复制 Mihon/Kotatsu 代码。维持原文书、身份、缓存边界及来源的用户授权模型。真正无源包不是规避版权审查的保证。
+- **局限/后续**：本地独立 QA 首批实现文件夹/CBZ/阅读/书签持久；**完整 HistoryStore 会话历史、正式版所有书架/Visual/同步/三语 Reader 文案尚未移入这个 QA 包**，不得将其宣称为完整用户版。Android 真机读/重启 G1/G2、正式签名/G3 旧用户迁移回滚、来源可选安装撤销与 S6 发布均 OPEN。先以最少实际手测和同源码 CI 闭环，再在原模块物理移植这些功能，不制造第二套业务实现。保持 Draft、不改 main/Release/OTA。
+
 ### 2026-10-30 CORE-ANDROID-11｜原完整 ReaderActivity 阅读屏幕物理迁入 reader-view（叠加 Draft #265）
 
 - **本轮真实移入原生产 UI，而非创建第二个阅读器。** 原 `ReaderActivity` 的 ViewPager2/RecyclerView 翻页、连续阅读、图片 Holder/进度页码、章节跳转、失败重试/诊断、预载/取消/销毁、键盘及画面手势回调全部进入 `:reader-view/ReaderScreenActivity`，只用已存在的 AndroidX RecyclerView/ViewPager2 同版依赖。原来源、数据存储、历史合并与章节读取实现不重写。

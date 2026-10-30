@@ -1,0 +1,21 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- No INTERNET, provider account, package install, camera or broad storage permission. SAF is user-selected. -->
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
+        android:label="Pica Library Local QA"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity
+            android:name="com.picalibrary.android.LocalReaderActivity"
+            android:screenOrientation="unspecified"
+            android:exported="false" />
+        <activity
+            android:name="com.picalibrary.android.LocalLibraryActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

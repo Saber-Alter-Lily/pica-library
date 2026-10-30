@@ -26,6 +26,7 @@ abstract class ReaderScreenActivity extends Activity {
     protected abstract void pushReaderSettings();
     protected abstract int readerPrefetchPages();
     protected abstract String translateReaderText(String source);
+    protected abstract TextView readerText(String text,float sp,int color,boolean bold);
     protected abstract String readerGestureTitle();
     protected abstract void showReaderGestures(Runnable onChanged,Runnable onDismiss);
     protected abstract void openReaderStorageSettings();
@@ -72,8 +73,8 @@ abstract class ReaderScreenActivity extends Activity {
     private void render() {
         root = new FrameLayout(this); root.setBackgroundColor(Color.BLACK);canvas = new FrameLayout(this); root.addView(canvas, new FrameLayout.LayoutParams(-1, -1));
         loading = new ProgressBar(this); root.addView(loading, new FrameLayout.LayoutParams(48, 48, Gravity.CENTER));retry = button("读取失败，点此重试", v -> loadInitial()); retry.setVisibility(View.GONE);root.addView(retry, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
-        top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setBackgroundColor(0xdd111111);top.addView(button("返回", v -> finish()));heading = Ui.text(this, title == null ? "阅读" : title, 15, Color.WHITE, true); heading.setMaxLines(1);top.addView(heading, new LinearLayout.LayoutParams(0, -2, 1)); top.addView(button("章节", v -> chooseChapter()));root.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
-        bottom = new LinearLayout(this); bottom.setOrientation(LinearLayout.VERTICAL); bottom.setBackgroundColor(0xdd111111);counter = Ui.text(this, "正在读取章节…", 13, Color.WHITE, false); counter.setGravity(Gravity.CENTER); bottom.addView(counter);seek = new SeekBar(this); bottom.addView(seek);
+        top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setBackgroundColor(0xdd111111);top.addView(button("返回", v -> finish()));heading = readerText( title == null ? "阅读" : title, 15, Color.WHITE, true); heading.setMaxLines(1);top.addView(heading, new LinearLayout.LayoutParams(0, -2, 1)); top.addView(button("章节", v -> chooseChapter()));root.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
+        bottom = new LinearLayout(this); bottom.setOrientation(LinearLayout.VERTICAL); bottom.setBackgroundColor(0xdd111111);counter = readerText( "正在读取章节…", 13, Color.WHITE, false); counter.setGravity(Gravity.CENTER); bottom.addView(counter);seek = new SeekBar(this); bottom.addView(seek);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {public void onStartTrackingTouch(SeekBar s) { dragging = true; main.removeCallbacks(hideChrome); }public void onProgressChanged(SeekBar s, int value, boolean user) { if (user) counter.setText((value + 1) + " / " + pages.size()); }public void onStopTrackingTouch(SeekBar s) { dragging = false; go(s.getProgress(), false); scheduleHide(); }});
         chapterAdvance=button("下一章",v->advanceChapter());chapterAdvance.setVisibility(View.GONE);chapterAdvance.setTextSize(14);bottom.addView(chapterAdvance,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout actions = new LinearLayout(this);actions.addView(button("上一页", v -> flip(-1)), new LinearLayout.LayoutParams(0, -2, 1));actions.addView(button("阅读设置", v -> displayOptions()), new LinearLayout.LayoutParams(0, -2, 1));nextPageButton=button("下一页", v -> flip(1));actions.addView(nextPageButton, new LinearLayout.LayoutParams(0, -2, 1));bottom.addView(actions); root.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));

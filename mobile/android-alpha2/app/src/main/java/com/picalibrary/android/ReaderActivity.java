@@ -3,6 +3,7 @@ package com.picalibrary.android;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.widget.TextView;
 
 /** Original Android intent/manifest entry, now wiring app services to one source-neutral Reader screen. */
 public class ReaderActivity extends ReaderScreenActivity {
@@ -58,6 +59,11 @@ public class ReaderActivity extends ReaderScreenActivity {
 
     @Override protected String translateReaderText(String source){
         return LocalizedText.ui(source);
+    }
+
+    // Preserve the original app-owned Ui.text typography and localized copy.
+    @Override protected TextView readerText(String text,float sp,int color,boolean bold){
+        return Ui.text(this,text,sp,color,bold);
     }
 
     @Override protected String readerGestureTitle(){

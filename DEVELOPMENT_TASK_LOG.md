@@ -1,6 +1,18 @@
 # Pica Library Development Task Log
 
 
+### 2026-10-29｜CORE-LIB-04c-02c-02a｜真实 Desktop HTTP 与共享资源协调器的升级交接冻结（Draft PR #248）
+
+- [Draft #248](https://github.com/Saber-Alter-Lily/pica-library/pull/248) 叠加 #247：**改动原正式版业务入口** `src/library/server.ts`、`src/desktop/main.ts`、`src/desktop/update-command.ts` 和原 `RuntimeResourceCoordinator`，不是新增独立 QA 小阅读器。保留原书库、书架、Reader、推荐、网盘和更新器，不碰正式 `main`、Release、OTA 或用户数据。
+- 增加 `DesktopHttpHandoffFence`，通过 **原本机 HTTP Server** 请求入口 after Host/Origin/CSRF 授权、before 实际业务路由接受请求；活动 HTTP 请求包含 GET/POST 等，响应 `finish/close` 幂等释放。升级前活动请求大于 0 时拒绝 helper；冻结后所有普通 API、Reader/网页新请求返 503（含稳定 code），仅原已授权的 update/apply 和严格三个 GET 诊断入口保留。原 source-free Core 不注入此端口则完全不受影响。
+- 扩展旧 `applyUpdateAndScheduleShutdown` 的可选 preflight 返回失败恢复回调：收到现有 `UpdateManager.apply` 的真正 helper ACK 前，HTTP 及共享资源准入一直冻结；helper 拒绝启动时撤销两层冻结、不触发退出并允许重试；已接受时保持冻结等待旧 OS shutdown/process-proof。不会自己实现第二套升级器。
+- 真实 `RuntimeResourceCoordinator.freezeAcquisitionsForUpdate()` 同步拒绝活动/等待 lease；冻结后 `acquire/withLease` 在 observe/enforce 两种旧模式均 fail-closed；原定时队列、优先级、正常模式、资源释放及取消行为未重写。旧 `startEngine` 的同一个 `runtimeResources` 已用于 Service、RemoteStorage 和 Host 任务，因此不依赖另造任务调度。
+- Linux/Windows 初轮仅 HTTP 精确源码 `06000c802` 的 [专项 #40981591695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981591695) **2/2 SUCCESS，各79/79**；审计发现没有 HTTP 请求仍可取得新的 runtime lease，故补更严格的真实资源准入，而不能借用79项绿灯。新源码/测试 CI [双系统 #40981944161](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981944161) 与 [全 Android/Web/Desktop #40981949826](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981949826) **待终态核验**，后续记录真实失败/修复。
+- OSS 复用证据：[Node.js HTTP Response finish/close](https://nodejs.org/api/http.html)、SQLite [Online Backup](https://www.sqlite.org/backup.html)/[WAL](https://www.sqlite.org/wal.html)、原项目 InstanceLock/HTTP/RuntimeResourceCoordinator/UpdateManager。详见 [S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md](docs/S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md)。
+- **不视为全部应用已停止写入**：Mobile Bridge、独立来源进程/外置 WebDAV 写方、异步 fire-and-forget、非资源调度路径仍可能绕过这两层准入；没有持久停写/退出成功收据，没有 SQLite+媒体同一事务、DPAPI、加密备份/回滚或真实用户升级。下一子项 `CORE-LIB-04c-02c-02b` 逐入口整合非 HTTP writer、等待有界 drain、实际进程退出与资料一致性验证，继续 G1–G4 OPEN。
+
+
+
 ### 2026-10-29｜CORE-LIB-04c-02c-01｜真实 Desktop 更新入口的活动/锁所有权门禁（Draft #247）
 
 #### 2026-10-29 追加工程审计｜原 idle-browser 任务占用表不足以证明更新安全

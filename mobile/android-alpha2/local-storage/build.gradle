@@ -1,0 +1,24 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.picalibrary.android.localstorage'
+    compileSdk 35
+    defaultConfig { minSdk 28 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main.java {
+        // Compile the unchanged production Android-owned storage adapter.
+        srcDirs = ['../app/src/main/java']
+        include 'com/picalibrary/android/LocalComicStore.java'
+        include 'com/picalibrary/android/DeviceIdentity.java'
+    }
+}
+
+dependencies {
+    implementation project(':local-core')
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+}

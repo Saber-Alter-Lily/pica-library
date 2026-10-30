@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-09｜原 Reader 阅读进度、书签与会话历史物理迁移（Draft #264）
+
+- [Draft #264](https://github.com/Saber-Alter-Lily/pica-library/pull/264)：遵照 OSS 优先规则，对比 Mihon ReaderChapter/PageLoader 的状态与数据来源分离方式（Apache-2.0，仅借鉴）；**真正复用原项目的 ReaderProgress/ReadingHistoryStore/UnifiedCatalogStore**，不另建阅读历史数据库、推荐引擎或同步器。
+- 旧 `ReaderProgress` 中的书签键、页码恢复、远端并发 revision/ack、会话分组、进度同步和单个异步 executor，移至 `:reader-view/ReaderProgressLedger` 唯一实现。原应用 `ReaderProgress` 保留旧构造 API，并使用 `ReaderHistoryPort` 把标题/作者/来源的原目录查询和 `ReadingHistoryStore.record` 原有历史持久化交给原应用；不修改本地数据格式、目录、授权或重新发明历史存储。
+- 在既有 `LocalComicImportTest` 中新增仅一项真实 SAF 导入→书签提交→重新实例化恢复→旧历史记录信息核对；旧源码契约同步指向真实模块实现且保留原记录断言。原 CI + 独立本地 APK 已有门禁继续复用，不新建套件。
+- **后续仍需**：实际提取原 `ReaderActivity`、其 `ReaderSettingsStore`/ `ReaderGestureOptions` 等 UI/设置依赖并把完整本地客户端物理编译成不包含漫画源 SDK 的 APK，然后做权限/DEX/gradle 与真机 G1–G4 检查。当前仍不宣称最终 clean APK。保持 Draft，不合并 main/发布/操作旧用户资料。
+
+
 ### 2026-10-30 CORE-ANDROID-08｜Reader 通用章节、进度及展示契约进入真正独立模块（Draft #263）
 
 - [Draft #263](https://github.com/Saber-Alter-Lily/pica-library/pull/263) 继续 #262 已验证的旧图片缓存实现：**不是再造 Reader**，而是把原 ReaderSource 中已有的章节、页面、阅读进度、显示名称、可选诊断方法搬到现有 `:reader-view` 中的 `ReaderChapterSource`，依赖已抽出的纯 Java `ReaderContent` 与 `ReaderImageTransport`。通用接口不依赖 Pica/E-H/JM、BridgeClient、账户、来源权限或网盘实现。

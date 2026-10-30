@@ -449,10 +449,13 @@ describe('Android Library / Author / History V2 contracts', () => {
   })
 
   it('records session history separately from bookmarks and supports exact-date resume', () => {
-    const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
+    const progress = fs.readFileSync('mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderProgressLedger.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')
     const history = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HistoryActivity.java','utf8')
-    expect(progress).toContain('ReadingHistoryStore.record(')
+    expect(progress).toContain('history.record(')
+    const appProgress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
+    expect(appProgress).toContain('ReadingHistoryStore.record(')
+    expect(appProgress).toContain('UnifiedCatalogStore.load(context).byId.get(id)')
     expect(progress).toContain('historyChapterId')
     expect(progress).toContain('seedOneShotPosition')
     expect(store).toContain('enum Range { TODAY, DAYS_7, DAYS_30, ALL }')
@@ -464,7 +467,7 @@ describe('Android Library / Author / History V2 contracts', () => {
 
   it('groups mobile history by comic, shows covers and preserves chapter metadata', () => {
     const reader = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderActivity.java','utf8')
-    const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
+    const progress = fs.readFileSync('mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderProgressLedger.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')
     const history = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HistoryActivity.java','utf8')
     expect(reader).toContain('chapterAdvance.setText(LocalizedText.ui("下一章 · ")+target.title)')

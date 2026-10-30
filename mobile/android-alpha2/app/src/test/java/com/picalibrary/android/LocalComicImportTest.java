@@ -77,6 +77,31 @@ public class LocalComicImportTest {
         assertEquals(1,new LocalComicReaderSource(context).restorePosition(comic.id,first.id,0));
         assertArrayEquals(PNG,Files.readAllBytes(new File(original,"2.png").toPath()));
     }
+    @Test public void movedReaderProgressKeepsOriginalBookmarkAndHistoryMetadata() throws Exception {
+        LocalComicStore.Comic comic=imported();
+        UnifiedCatalogStore.reconcileLocalReferences(context);
+        LocalComicReaderSource source=new LocalComicReaderSource(context);
+        BridgeClient.ChapterItem chapter=source.chapters(comic.id).get(0);
+        ReaderProgress progress=new ReaderProgress(context,source);
+        progress.chapterMetadata(chapter.id,chapter.title,chapter.order);
+        progress.save(comic.id,chapter.id,1,true);
+        assertEquals(1,new ReaderProgress(context,new LocalComicReaderSource(context))
+                .position(comic.id,chapter.id,0));
+        boolean found=false;
+        for(ReadingHistoryStore.Session session:ReadingHistoryStore.load(context).sorted()) {
+            if(!comic.id.equals(session.comicId)||!chapter.id.equals(session.chapterId))continue;
+            found=true;
+            assertEquals(comic.title,session.title);
+            assertEquals("local",session.providerId);
+            assertEquals("local",session.sourceKind);
+            assertEquals(chapter.order,session.chapterOrder);
+            assertEquals(1,session.lastPage);
+            break;
+        }
+        assertTrue("Original history ledger retains imported-book metadata",found);
+        assertArrayEquals(PNG,Files.readAllBytes(new File(original,"2.png").toPath()));
+    }
+
     @Test public void cbzUsesSameReaderAndSubfolderChapters() throws Exception {
         File archive=new File(original,"synthetic.cbz");try(ZipOutputStream out=new ZipOutputStream(new FileOutputStream(archive))){for(String name:new String[]{"chapter2/10.png","chapter1/1.png","chapter2/2.png"}){out.putNextEntry(new ZipEntry(name));out.write(PNG);out.closeEntry();}}
         Uri uri=DocumentsContract.buildDocumentUri(AUTHORITY,"root/synthetic.cbz");LocalComicStore.Preview preview=LocalComicStore.prepare(context,uri,"cbz",()->{});assertEquals(3,preview.prepared.pages.size());assertEquals(2,preview.prepared.chapters);assertFalse(new File(preview.work,"archive.cbz").exists());LocalComicStore.Comic comic=LocalComicStore.confirm(context,preview,()->{});assertEquals(2,new LocalComicReaderSource(context).chapters(comic.id).size());assertTrue(archive.exists());

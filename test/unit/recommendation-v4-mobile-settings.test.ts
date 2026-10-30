@@ -42,7 +42,7 @@ describe('Recommendation V4 mobile settings surface', () => {
         const control = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java')
         const evidence = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationEvidenceStore.java')
         const localProfile = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationLocalProfile.java')
-        const reader = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java')
+        const reader = read('mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderProgressLedger.java')
         const home = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java')
         expect(profile).toContain('Executors.newSingleThreadExecutor()')
         expect(profile).toContain('private void loadAsync()')

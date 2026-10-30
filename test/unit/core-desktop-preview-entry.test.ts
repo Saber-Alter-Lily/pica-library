@@ -87,7 +87,13 @@ describe('actual independent source-free Desktop entrypoint, never legacy profil
         expect(candidate.sourceInputs).not.toContain('src/services/provider-service.ts')
         expect(candidate.sourceInputs).not.toContain('src/sdk/index.ts')
         expect(candidate.sourceInputs.filter(name => name.startsWith('src/desktop/')))
-            .toEqual(['src/desktop/core-preview-main.ts', 'src/desktop/instance.ts'])
+            .toEqual([
+                'src/desktop/child-process.ts',
+                'src/desktop/core-preview-main.ts',
+                'src/desktop/instance.ts',
+                'src/desktop/pickers.ts',
+                'src/desktop/platform.ts'
+            ])
         expect(candidate.packageInputs.every(name =>
             name === 'package.json' || name.includes('node_modules/adm-zip/')))
             .toBe(true)

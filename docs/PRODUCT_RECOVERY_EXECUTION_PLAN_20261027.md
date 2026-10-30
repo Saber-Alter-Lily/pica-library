@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-29 S3 CORE-LIB-04d｜先实现独立核心的本地导入
+
+- [Draft #253](https://github.com/Saber-Alter-Lily/pica-library/pull/253)：现有 source-free 原网页、原生选择器与原本地文件夹/CBZ 导入器联通。仅增加必需接口接线和 1 项既有套件回归，保持默认正式 v0.5.0 和旧资料完全不动。当前仍是用户显式选择的 OS Temp 隔离预览，并非正式可持久化安装/源外置验收。CI 待核。
+- Issue #199 的 Desktop 图鉴 BLOCK/LESS **显示过滤已经存在于草稿** `web/chronicle-view.js` 及 profile/view 接口，正式 main 尚无该文件，后续应集成/验收而非重复开发。
+- 下一产品功能关口：使真正无源核心可以在保留旧版数据安全的前提下作为双端可安装独立应用运行；补 Android 纯核心启动与可信源适配连接，而非不断增加安全测试。G1–G4 OPEN。
+
+
 ### 2026-10-29 CORE-LIB-04c-02c-02b-02c｜真实 Desktop 资源租约收尾
 
 - [Draft #252](https://github.com/Saber-Alter-Lily/pica-library/pull/252) 在 #251 的后台任务取消/等待之上，复用共享 `RuntimeResourceCoordinator`：原 HTTP 停止接新任务后，等待包含前台收藏同步、推荐及下载在内的在途/等待 lease 清空，最后关闭 SQLite；改动原业务，不增加框架，单个顺序测试。#251 原始全 CI 已通过，#252 本身待核实。

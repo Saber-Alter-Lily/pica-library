@@ -15,6 +15,8 @@ import { createCoreLocalRuntime } from '../library/core-runtime-composition'
 import { startOfflineCoreHttp } from '../offline-core/qa-http'
 import { assertTemporaryCorePreviewRoot } from '../offline-core/qa-ownership'
 import { InstanceLock } from './instance'
+import { DesktopNativePicker } from './pickers'
+import type { CoreLocalPicker } from '../library/core-local-import'
 
 function previewRoot(argv: string[]) {
     if (argv.length !== 3 || argv[0] !== '--owned-temp-root' ||
@@ -50,10 +52,29 @@ async function runCoreDesktopPreview(
             database, dataDir: root
             // Deliberately no Desktop OS opener and no sources.
         })
+        // The existing native picker is the only filesystem selection
+        // authority; browser requests never contain an arbitrary local path.
+        const nativePicker = new DesktopNativePicker()
+        const localPicker: CoreLocalPicker | undefined =
+            nativePicker.status.folderPicker ? {
+                configured: () => true,
+                status: () => ({
+                    runtime: { mode: 'interactive' },
+                    platform: { runtimeFoundation: true },
+                    nativePicker: {
+                        folderPicker: true,
+                        savePicker: nativePicker.status.savePicker
+                    }
+                }),
+                chooseLocalComic: kind => kind === 'folder'
+                    ? nativePicker.chooseFolder('选择漫画文件夹 / Choose comic folder')
+                    : nativePicker.chooseComicArchive()
+            } : undefined
         running = await startOfflineCoreHttp({
             database,
             reader: coreRuntime.readerService,
             coreRuntime,
+            localPicker,
             webRoot
         })
         lock.publish(running.url)

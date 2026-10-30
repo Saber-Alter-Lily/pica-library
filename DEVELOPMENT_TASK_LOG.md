@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-29｜S3 CORE-LIB-04d：无源 Desktop 原生文件夹/CBZ 导入（Draft #253）
+
+- [Draft #253](https://github.com/Saber-Alter-Lily/pica-library/pull/253) 叠加 #252。**功能直接接线**：旧 `DesktopNativePicker` → 旧 `CoreLocalImportController`/`LocalLibraryIngestion` → 原始 Web 的 `web/local-import.js` 按钮，源中立核心允许预览、明确确认导入、刷新书库和立即阅读本地 Folder/CBZ。复用旧 Session/Origin/CSRF；Web 请求绝不接收绝对路径。开启条件仅是明确启动的 source-free OS Temp 预览、实际原生选择器可用；无源认证/推荐仍保持禁用。
+- 仅在原 `offline-full-web-http.test.ts` 增加 **1 项**真实本地临时图片的选取→预览→确认→LOCAL DB 测试；更新既有物理 bundle 依赖名单，仍禁止 Pica/E-H/JM、Host、在线 SDK 和未知 npm 依赖。没有新的 UI/导入器/Reader/框架。**#253 CI 待终态验证**。
+- #252 核心全 CI #41005347254 已 SUCCESS；当次独立 Android Memory/Background #41005347415 为 FAILURE，日志显示 Android emulator/adb 初始化问题，不能称“全部工作流成功”；未针对无关 CI 基建引入额外防御性代码。G1–G4 仍 OPEN，无正式 Release/OTA/用户旧资料变动。
+
+
 ### 2026-10-29｜CORE-LIB-04c-02c-02b-02c：原资源租约完成后关闭 SQLite（Draft #252）
 
 - [Draft #252](https://github.com/Saber-Alter-Lily/pica-library/pull/252) 叠加 #251；**实际功能改动**：将旧本地 HTTP 监听关闭前移到后台任务收尾前；原 `RuntimeResourceCoordinator` 增加等待 active/waiting lease 清空的通知（复用 lease.release/等待取消，不建新调度器/轮询）；真实 `LibraryService` 暴露该共享租约等待，原 `closeEngine()` 在所有已登记资源任务退出后才显式关闭 SQLite。旧实例无法完成停机时不打开新数据库主人；重启失败走原停止机制。

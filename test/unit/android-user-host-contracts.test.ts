@@ -89,7 +89,13 @@ describe('native user-Host source/resource contracts only', () => {
         expect(source).toContain('public String kind(){return "host";}')
         expect(source).not.toMatch(/WebView|BridgeClient\.(?:get|post)|PicaClient|EhClient|JmClient/)
         expect(source).toContain('public boolean emitsRecommendationEvidence(){return false;}')
-        expect(java('ReaderActivity')).toContain('if(!source.emitsRecommendationEvidence())return;')
+        // The original Reader screen now lives in the source-neutral reader-view module.
+        // Host/anonymous reads must still not write recommendation-complete evidence.
+        const readerScreen = fs.readFileSync(
+            'mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderScreenActivity.java',
+            'utf8'
+        )
+        expect(readerScreen).toContain('if(!source.emitsRecommendationEvidence())return;')
         expect(java('ReadingHistoryStore')).toContain('comic.startsWith("hosted:")')
         expect(java('HistoryActivity')).toContain('if("host".equals(row.sourceKind)){openHost(row);return;}')
         expect(java('HistoryActivity')).toContain('HostSourceManager.get(this).canResume(row.comicId)')

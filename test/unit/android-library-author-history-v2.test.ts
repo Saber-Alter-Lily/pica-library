@@ -417,7 +417,7 @@ describe('Android Library / Author / History V2 contracts', () => {
 
   it('keeps Reader completion evidence persistence off the UI thread', () => {
     const reader = fs.readFileSync(
-      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderActivity.java',
+      'mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderScreenActivity.java',
       'utf8'
     )
 
@@ -432,7 +432,7 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(helper).toContain('String comicId=comic;')
     expect(helper).toContain('metadata.submit(()->{')
     expect(helper).toContain('if(!source.emitsRecommendationEvidence())return;')
-    expect(helper).toContain('ReaderSourceFactory.recordReaderComplete(app,comicId);')
+    expect(helper).toContain('recordReaderComplete(app,comicId);')
     expect(helper).not.toContain('UnifiedCatalogStore.load(')
     expect(helper).not.toContain('RecommendationEvidenceStore.recordReaderComplete(')
     const factory = fs.readFileSync(
@@ -441,6 +441,11 @@ describe('Android Library / Author / History V2 contracts', () => {
     )
     expect(factory).toContain('UnifiedCatalogStore.load(context).byId.get(comicId)')
     expect(factory).toContain('RecommendationEvidenceStore.recordReaderComplete(')
+    const activityAdapter = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderActivity.java',
+      'utf8'
+    )
+    expect(activityAdapter).toContain('ReaderSourceFactory.recordReaderComplete(context,comicId);')
 
     expect(save).toContain('completionRecordedChapter=chapter;')
     expect(save).toContain('recordReaderCompleteAsync();')
@@ -466,11 +471,11 @@ describe('Android Library / Author / History V2 contracts', () => {
   })
 
   it('groups mobile history by comic, shows covers and preserves chapter metadata', () => {
-    const reader = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderActivity.java','utf8')
+    const reader = fs.readFileSync('mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderScreenActivity.java','utf8')
     const progress = fs.readFileSync('mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderProgressLedger.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')
     const history = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HistoryActivity.java','utf8')
-    expect(reader).toContain('chapterAdvance.setText(LocalizedText.ui("下一章 · ")+target.title)')
+    expect(reader).toContain('chapterAdvance.setText(translateReaderText("下一章 · ")+target.title)')
     expect(reader).toContain('progress.chapterMetadata(data.episode.id,data.episode.title,data.episode.order)')
     expect(reader).toContain('if(atChapterEnd())setChrome(true)')
     expect(progress).toContain('void chapterMetadata(String chapterId,String chapterTitle,int chapterOrder)')

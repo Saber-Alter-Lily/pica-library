@@ -1,6 +1,14 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
 
+### 2026-10-29 CORE-LIB-04c-02c-02b-01｜Mobile Bridge / Remote API 纳入同一更新交接冻结
+
+- [Draft #249](https://github.com/Saber-Alter-Lily/pica-library/pull/249) 叠加 #248。确认原 Mobile Bridge（含配对）和独立 Remote API 网关是两套真实网络监听器，绕过原本机 HTTP；这轮**只复用已有 `DesktopHttpHandoffFence`**，在原两套业务路由之前登记在途请求，冻结时统一返回有界 503；原 UpdateManager/helper ACK/失败回退与授权保留。外部监听器显式禁止借用仅原桌面使用的健康、apply 例外；手机桥接设置变更加入原活动任务判断。
+- 用真实未完成配对 POST 和被延迟的远程代理 GET 验证更新不能错误接管；原 Mobile/Remote 套件亦保持可用。[专项 CI #40986598520](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40986598520) 精确 `5f7f4698` **Ubuntu 64/64 + Windows 63 PASS/1 POSIX-only SKIP，双方 SUCCESS**；完整 [Android/Web/Desktop #40986649175](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40986649175) 尚未取得最终证明。[安全边界和开源复用审计](S3_MOBILE_REMOTE_SHARED_UPDATE_FENCE_20261029.md) 已记录。
+- 下一 `04c-02c-02b-02`：真正独立后台 writer/Provider Worker/WebDAV/文件下载入口盘点，打通数据库/媒体写入拒绝和 bounded drain/stop+exit receipt；后续才开展受保护一致性备份、真实旧库回滚及新版安装签名验证。三 HTTP ingress 绿灯不等于全文件系统停写或 G3 验收，G1–G4 继续 OPEN，正式 v0.5.0/`main`/OTA 不变。
+
+
+
 ### 2026-10-29 CORE-LIB-04c-02c-02a｜原 Desktop HTTP 及 RuntimeResourceCoordinator 升级交接准入冻结
 
 - [Draft #248](https://github.com/Saber-Alter-Lily/pica-library/pull/248) 基于 #247，接入**原 `src/library/server.ts` 所有普通 HTTP 路由**，对实际读写请求采集在途数并在原 `UpdateManager.apply` 启动前阻止新请求；原 Host/Origin/CSRF 检查仍先行。用现有 ResourceCoordinator 冻结新 `acquire/withLease`（含尚未开始的背景任务），并于 helper 启动失败时恢复 HTTP 与资源准入；helper ACK 后由原退出流程接管。没有新调度器/数据库/升级器。

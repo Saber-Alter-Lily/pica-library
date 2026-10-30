@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-29｜CORE-LIB-04c-02c-02b-02b：原书库后台任务停止并等待实际完成（Draft #251）
+
+- [Draft #251](https://github.com/Saber-Alter-Lily/pica-library/pull/251) 叠加 #250。直接修正式 Desktop `closeEngine()` 和旧 `LibraryService`：利用既有 cancel/checkpoint/任务 Promise，停机时取消且等待书库整理、维护更新/修复扫描、V5 推荐 Shadow 和 Work Identity 刷新结束后再关闭 SQLite；同时请求终止正在运行的收藏同步/推荐构建，并关闭原 JM provider runtime。两个 V5 任务类仅补 `quiesce()` 和停止后禁止重新启动，3 个原脱离请求的后台任务入口也禁止停机后新建。普通使用逻辑与任务队列保持不变。
+- 在原 `desktop-remediation.test.ts` 只加 **1 项**真实 `LibraryService` 停止整理任务回归；不引入新框架、工作流或依赖。**本轮 CI 待最终核对**，不得将先前 #250 的绿灯套用至 #251。
+- 该提交尚不是全应用写入屏障；其他前台异步/来源回调、独立 source worker、外部卷、真正用户数据升级与受保护回滚仍需进一步处理。G1–G4 均 OPEN，保持 Draft，不合并 main/Release/OTA。
+
+
 ### 2026-10-29｜CORE-LIB-04c-02c-02b-02a：WebDAV 实际写任务收尾（Draft #250）
 
 - [Draft #250](https://github.com/Saber-Alter-Lily/pica-library/pull/250) 叠加 #249，以**功能优先、少量回归**方式改动原 `RemoteStorageDesktopManager` 与 `src/desktop/main.ts`：远端副本删除现在使用已有共享 `RuntimeResourceCoordinator` 计入真实活动任务；原 Desktop 更新前检查通过 `busy` 同时覆盖同步/删除；停机时先通知 WebDAV 取消同步并等待在途写任务结算，再关闭 SQLite；备用监听端口也共享同一资源协调器。未创建独立任务系统、备份器、Updater 或新依赖。

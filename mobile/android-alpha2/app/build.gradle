@@ -125,6 +125,8 @@ android {
 }
 
 dependencies {
+    implementation project(':local-core')
+    implementation project(':local-storage')
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation('io.github.jukomu:jmcomic-core:v1.1.12') {
         exclude group: 'io.github.darkxanter', module: 'webp-imageio'
@@ -169,12 +171,5 @@ tasks.configureEach {
     if (name == 'testDebugUnitTest') dependsOn gestureBoundary, tagBoundary
 }
 
-// Local ingestion is a storage boundary, not another provider or Reader implementation.
-def localImportBoundary = tasks.register('compileLocalImportBoundary', JavaCompile) {
-    source fileTree('src/main/java/com/picalibrary/android/local') { include '**/*.java' }
-    classpath = files()
-    destinationDirectory = layout.buildDirectory.dir('local-import-boundary')
-    options.release = 17
-    options.encoding = 'UTF-8'
-}
-tasks.configureEach { if (name == 'testDebugUnitTest') dependsOn localImportBoundary }
+// The same original importer is now built by the standard :local-core Java
+// module, not by a bespoke ad-hoc compile task.

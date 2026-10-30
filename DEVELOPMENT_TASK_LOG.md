@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-01：原生本地导入与持久化存储实际模块拆分（Draft #256）
+
+- [Draft #256](https://github.com/Saber-Alter-Lily/pica-library/pull/256) 叠加 #255；不新增 Reader/Importer，**原生产文件实际移动到模块各自的 `src/main/java`**：`LocalComicImporter.java`、`LocalComicExporter.java`、`ReaderPolicy.java` 进入 Gradle 官方 `java-library` 的 `:local-core`；`LocalComicStore.java`、`DeviceIdentity.java` 进入官方 `com.android.library` 的 `:local-storage`。五份文件 Git Blob SHA 与原文件逐一相同（内容没有改写），原 App 旧文件位置删除、由 Gradle 依赖共享。同一份代码不重复编译。原 `compileLocalImportBoundary` 自定义 JavaCompile task 删除。
+- 同步拆分 `:local-storage` 标准 Android Library，直接复用原 `LocalComicStore.java`、`DeviceIdentity.java`，仅依赖上面的 `:local-core` 和原已使用的 AndroidX DocumentFile；源代码不复制，正式客户端及独立本地 Draft APK 共同复用。旧 `:app` 显式排除这些类的原路径，避免重复编译。现有导入、存储清单、页面、书架与阅读逻辑不改。
+- 验收以**原 CI 的真实 Android Gradle 编译与测试**为准，不创建新测试框架/矩阵。#255 的最新 21/21 工作流已 SUCCESS；#256 的准确源码另行确认，不能沿用父 PR 结果。真正无源独立 APK/Reader 剩余依赖、旧版原数据迁移、G1–G4 仍待后续。main/Release/OTA/用户资料保持不动。
+
+
 ### 2026-10-30｜S3 Android 本地书库独立安装试验｜Draft #255
 
 - [Draft #255](https://github.com/Saber-Alter-Lily/pica-library/pull/255) 叠加已通过 24/24 工作流的 Windows #254。按**功能优先**继续 Android：通过明确环境变量 `PICA_ANDROID_LOCAL_ONLY_DRAFT=1` 编译独立 `com.picalibrary.android.localdraft` 开发 APK，其 Android 私有漫画、书架、书签和收藏记录与正式包、日常 Dev 包隔离。普通 Android Gradle 构建/签名/默认包名不改。

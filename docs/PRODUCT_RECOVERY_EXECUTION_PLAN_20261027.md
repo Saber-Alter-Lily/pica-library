@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-01｜本地导入和 Android 存储物理分包
+
+- [Draft #256](https://github.com/Saber-Alter-Lily/pica-library/pull/256) 复用 Gradle 官方 `java-library`/`com.android.library`，将原 `LocalComicImporter` + `LocalComicExporter` + `ReaderPolicy` 文件**物理迁移、保持 blob 完全不变**至 `:local-core/src/main/java`，原 `LocalComicStore` + `DeviceIdentity` 同样迁移至 `:local-storage/src/main/java`，不使用 AGP 不可靠的外部源码目录筛选或自定义复制脚本。两模块不依赖 Pica/E-H/JM；原正式 App 与独立本地 Draft App 依赖同一编译产物，清理旧重复 JavaCompile。首批筛选编译失败已按目录迁移纠正，准确新代码 CI 待核。
+- 下一切口：从 `ReaderSource`/Bridge 数据模型和 UI 的旧 provider 依赖分离出**真正可被独立 APK 编译的本地 Reader + Home + Import**，并在 APK 依赖及 DEX 中确认 Pica/E-H/JM SDK 不存在，而不依赖单纯隐藏页面/禁用网络权限。G1–G4 保持 OPEN。
+
+
 ### 2026-10-30｜S3 Android 本地模式功能切口（Draft #255）
 
 - [Draft #255](https://github.com/Saber-Alter-Lily/pica-library/pull/255) 以现有导入、书架、Reader 和 UI 为基础，新增隔离包名 `com.picalibrary.android.localdraft` 的可选离线 Android 构建；保留原免责声明，禁用网络权限、来源入口、Desktop/WebDAV 刷新和后台联网工作。当前保留旧 Java 包和 source SDK 的编译，**不能当成真正物理无源 Android 安装包**。既有 CI 只增加一次实际 APK 编译/manifest 核对，无新框架。

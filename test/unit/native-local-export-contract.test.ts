@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest'
 // Source contracts only. No javac, Gradle, Android, provider, process or listener execution.
 const root = 'mobile/android-alpha2/app/src/'
 const java = (name: string) =>
-    fs.readFileSync(root + 'main/java/com/picalibrary/android/' + name, 'utf8')
+    fs.readFileSync(
+        (name.startsWith('local/') ? 'mobile/android-alpha2/local-core/src/' :
+         name === 'LocalComicStore.java' ? 'mobile/android-alpha2/local-storage/src/' :
+         root) + 'main/java/com/picalibrary/android/' + name, 'utf8'
+    )
 const read = (name: string) => fs.readFileSync(name, 'utf8')
 const authority = JSON.parse(read('test/fixtures/native-local-export-authority.json'))
 const domain = java('local/LocalComicExporter.java')
@@ -22,7 +26,8 @@ describe('native local body export source contracts, not native runtime proof', 
         const forbiddenHost = /android\.|new File\(|ProcessBuilder|java\.net|SharedPreferences|UnifiedCatalogStore|BridgeClient|Database/
         expect(hostCode).not.toMatch(forbiddenHost)
         expect('import android.content.Context;').toMatch(forbiddenHost)
-        expect(read('mobile/android-alpha2/app/build.gradle')).toMatch(/source fileTree\('src\/main\/java\/com\/picalibrary\/android\/local'\)[\s\S]*?classpath = files\(\)/)
+        expect(read('mobile/android-alpha2/local-core/build.gradle')).toContain("id 'java-library'")
+        expect(read('mobile/android-alpha2/app/build.gradle')).toContain("implementation project(':local-core')")
     })
     it('preserves unchanged importer identity/archive/path/raster validators while sharing the bounded copier', () => {
         const importer = java('local/LocalComicImporter.java')

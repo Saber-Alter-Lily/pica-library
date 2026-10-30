@@ -1,0 +1,18 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.picalibrary.android.localstorage'
+    compileSdk 35
+    defaultConfig { minSdk 28 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation project(':local-core')
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+}

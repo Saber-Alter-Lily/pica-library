@@ -1,5 +1,11 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-11：原 ReaderActivity UI 和交互迁入 reader-view（叠加 Draft #265）
+
+- 原生产 `ReaderActivity` 的 Viewer/章节/分页/连续阅读/失败处理/书签保存/手势的唯一实现已直接移到 `:reader-view/ReaderScreenActivity`；保留原 `.ReaderActivity` Manifest 入口作为 12 个明确的 App 适配方法与旧三语/账户/推荐连接，不复制界面或数据库。既有 `:local-core`/`:local-storage`、ReaderImageLoader/ProgressLedger 直接复用，AndroidX 原依赖版本不变。
+- 将原 unit 源码契约中的 Reader UI 路径更正为模块路径，同时检查推荐完成事件还经原 App `ReaderSourceFactory`，没有降低原异步保存、章节历史断言。完整 CI/Android lint 及可选 local-only APK 必须在当前 SHA 上独立核对，现阶段不宣称通过。
+- 下一产品硬关口：真实**独立 APK 的 Gradle/Dex 无来源 SDK**，在一套本地 Home/Import/Reader 完成文件夹/CBZ/翻页/进度与重启恢复，然后真机 G1/G2 和旧资料 G3/G4。绝不能因为 `:reader-view` 单独编译就声称整包 clean。无额外测试框架、新阅读器或正式版数据修改。
+
 ### 2026-10-30｜S3 CORE-ANDROID-10：显示设置与手势面板物理隔离（叠加 #264）
 
 - 新 `:reader-view/ReaderDisplaySettings` 实现原 `ReaderSettingsStore` 的本地 SharedPreferences 读写及远端回写数据承接；原应用类仅保留 WebDAV timestamp reconcile/线程入口，`ReaderSettingsStore.Snapshot` 原调用形状不变。

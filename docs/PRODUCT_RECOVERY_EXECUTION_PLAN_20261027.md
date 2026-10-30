@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-11｜原完整 ReaderActivity 阅读屏幕物理迁入 reader-view（叠加 Draft #265）
+
+- **本轮真实移入原生产 UI，而非创建第二个阅读器。** 原 `ReaderActivity` 的 ViewPager2/RecyclerView 翻页、连续阅读、图片 Holder/进度页码、章节跳转、失败重试/诊断、预载/取消/销毁、键盘及画面手势回调全部进入 `:reader-view/ReaderScreenActivity`，只用已存在的 AndroidX RecyclerView/ViewPager2 同版依赖。原来源、数据存储、历史合并与章节读取实现不重写。
+- 现有 AndroidManifest 仍指向 `com.picalibrary.android.ReaderActivity`。它现在是原生产 App 的薄继承入口：负责 `ReaderSourceFactory`、原图片缓存与书签适配、WebDAV 显示设置同步、原 `StorageSettings` 和语言/新手引导、原推荐完成写入；Viewer 模块不 import 具体 Pica/E-H/JM、Bridge、远程配置或推荐系统。原 `LocaleAwareActivity` 在 Reader 上的 attachBaseContext/语言变更 recreate/高级引导回调由兼容入口保留。
+- 原有离线 `ReaderChapterSource`、`ReaderImageLoader`、`ReaderProgressLedger`、`ReaderGesturePanel`、`ReaderDisplaySettings` 直接组合使用。旧用户 intent、原 Android 本地资料、书签 key/schema 与同步语义不变，缓存写授权仍在 App 的来源适配器。唯一迁移的是生产 Reader 的代码归属；原测试只校正源文件路径并验证完成证据仍通过 App 适配器异步提交，没有新测试套件。
+- 继续参考 [Mihon](https://github.com/mihonapp/mihon) Apache-2.0 Viewer 与来源分离的设计，实际复制/复用的是本项目旧代码与既有 AndroidX，并未复制 Mihon/Kotatsu 源码。
+- **剩余**：原本地 Draft `:app` APK 仍编译全部来源 SDK；真正干净的独立 `:local-app` 应用/构建变体（Gradle 依赖、最终 DEX、Manifest 无来源 SDK）、手机端实际阅读 G1/G2、签名/授权来源生命周期及 v0.5.0 数据迁移 G3/G4 仍 OPEN。本 Draft 不合并 main、不触碰 Release/OTA 或真实用户数据。必须以本精确提交的完整 Android/Web/Desktop CI 为准，不借用 #265 的通过记录。
+
 ### 2026-10-30 CORE-ANDROID-10｜原 Reader 显示设置与手势面板进入来源无关模块（叠加 Draft #264）
 
 - 从原 Android App 的 `ReaderSettingsStore` 中直接移动原有 `reader-display` SharedPreferences、`mode`/`keepOn`/`portableUpdatedAt` 和读写操作到 `:reader-view/ReaderDisplaySettings`；原 `ReaderSettingsStore` 继续保留旧调用形式、原 WebDAV 时间戳 reconcile 和异步同步，仅作为应用层桥接。没有更改键名、模式范围、默认常亮状态或创建新的设置数据。

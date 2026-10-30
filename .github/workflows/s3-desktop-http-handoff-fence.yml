@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/s3-desktop-http-handoff-fence.yml'
       - 'src/desktop/update-http-fence.ts'
+      - 'src/runtime/resource-coordinator.ts'
+      - 'test/unit/runtime-resource-coordinator.test.ts'
       - 'src/desktop/update-quiescence.ts'
       - 'src/desktop/update-command.ts'
       - 'src/desktop/main.ts'
@@ -45,4 +47,4 @@ jobs:
       - name: Typecheck current Desktop/HTTP/upgrade contracts
         run: pnpm type:check
       - name: Real local HTTP CSRF, in-flight work, rollback and historical gates
-        run: pnpm exec vitest run test/unit/desktop-http-handoff-fence.test.ts test/unit/desktop-update-quiescence.test.ts test/unit/desktop-update-command.test.ts test/unit/desktop-instance-ownership.test.ts test/unit/server.test.ts test/unit/legacy-profile-preflight.test.ts
+        run: pnpm exec vitest run test/unit/desktop-http-handoff-fence.test.ts test/unit/desktop-update-quiescence.test.ts test/unit/desktop-update-command.test.ts test/unit/desktop-instance-ownership.test.ts test/unit/runtime-resource-coordinator.test.ts test/unit/server.test.ts test/unit/legacy-profile-preflight.test.ts

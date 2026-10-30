@@ -1,0 +1,50 @@
+name: S3 Mobile and Remote API shared updater freeze (QA only)
+
+on:
+  push:
+    branches:
+      - codex/s3-mobile-remote-http-freeze-20261029
+    paths:
+      - '.github/workflows/s3-external-http-freeze-qa.yml'
+      - 'src/desktop/main.ts'
+      - 'src/desktop/update-http-fence.ts'
+      - 'src/mobile/bridge-server.ts'
+      - 'src/remote-api/gateway.ts'
+      - 'test/unit/desktop-external-http-handoff.test.ts'
+      - 'test/unit/desktop-http-handoff-fence.test.ts'
+      - 'test/unit/mobile-bridge.test.ts'
+      - 'test/unit/remote-api-gateway.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-mobile-remote-http-freeze-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-mobile-remote-admission:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck original Desktop and both network servers
+        run: pnpm type:check
+      - name: Prove Mobile pairing and authenticated Remote API cannot bypass original updater fence
+        run: pnpm exec vitest run test/unit/desktop-external-http-handoff.test.ts test/unit/desktop-http-handoff-fence.test.ts test/unit/desktop-update-quiescence.test.ts test/unit/runtime-resource-coordinator.test.ts test/unit/mobile-bridge.test.ts test/unit/remote-api-gateway.test.ts

@@ -4,7 +4,9 @@
 
 - [Draft #254](https://github.com/Saber-Alter-Lily/pica-library/pull/254) 基于已通过全量 CI 的 #253。实际完成：旧 Windows Launcher 新增**显式** `--source-free-local`，复用原独立 `desktop-core-preview.mjs`、完整正式 Web、`LibraryDatabase`、Reader/书架及上一轮原生 Folder/CBZ 导入；普通 `Pica Library.exe` 启动路径完全不改。新模式首次创建并在后续启动复用 `%LOCALAPPDATA%/Pica Library Local`，独立于既有 `%LOCALAPPDATA%/Pica Library`；真实持久 SQLite 书库与单实例锁都复用旧实现。显式模式自动打开原 Web，本地文件不依赖在线账号/漫画源。
 - 新目录必须由本模式独占创建并含固定身份标记，旧/外部/非本模式目录不会被自动当成数据源；未进行 v0.5.0 原用户资料迁移，也未装载原账号或内容。仅在既有 `core-desktop-preview-entry.test.ts` 添加 **1 项**“写入→关闭→重开、旧目录字节不变、拒绝认领不明目录”的实际 SQLite 回归，物理无源依赖图白名单只扩展这一小型 profile 模块，禁止原 Provider/Host/JM/E-H/Pica/额外依赖。
-- 本轮属于 Draft 功能候选，CI 和 Windows 实体启动证据按当前源码单独核定；**不合并 main、不发布/安装、不改正式 OTA**。G1–G4 仍 OPEN。下一步以可用的独立 Windows 无源客户端、Android 纯核心与可选来源适配为主，避免新增无必要的测试框架。
+- 现有 Windows Full-Web QA ZIP 加入双击用 `Start-Local-Only-Draft.cmd` 与简明使用说明，直接调用同一个原 Windows Launcher；不新造可执行核心、安装程序或 GUI。复用既有 Windows Portable workflow 检查物理包。
+- 首次源码 CI [#41018450901](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41018450901) **Android PASS / Web-Desktop FAIL**：仅 1 条旧隔离预览拒绝测试因启动验证顺序变化而失败。`4d49540081b488567484e21a111aa7414353e88b` 已恢复原临时目录先验证的行为，同时仍坚持新持久模式先校验完整 Web 再创建 profile；最终全 CI/Windows 包另行核定，不借旧版本绿色。
+- 本轮属于 Draft 功能候选，CI 和 Windows 实体启动证据按当前源码单独核定；**不合并 main、不发布/安装、不改正式 OTA**。G1–G4 仍 OPEN。下一步以可用的独立 Windows 无源客户端、Android 纯核心与可选来源适配为主，避免新增无必要的测试框架.
 
 
 ### 2026-10-29｜S3 CORE-LIB-04d：无源 Desktop 原生文件夹/CBZ 导入（Draft #253）

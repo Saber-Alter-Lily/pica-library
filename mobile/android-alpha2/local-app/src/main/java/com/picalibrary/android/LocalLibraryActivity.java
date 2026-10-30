@@ -80,6 +80,9 @@ public final class LocalLibraryActivity extends Activity {
         actions.addView(folderButton,new LinearLayout.LayoutParams(0,dp(52),1));
         actions.addView(cbzButton,new LinearLayout.LayoutParams(0,dp(52),1));
         root.addView(actions);
+        Button historyButton=action(copy("阅读历史","Reading history","閲覧履歴"));
+        root.addView(historyButton,new LinearLayout.LayoutParams(-1,dp(48)));
+        historyButton.setOnClickListener(v->startActivity(new Intent(this,LocalHistoryActivity.class)));
         folderButton.setOnClickListener(v->choose(PICK_FOLDER));
         cbzButton.setOnClickListener(v->choose(PICK_CBZ));
 

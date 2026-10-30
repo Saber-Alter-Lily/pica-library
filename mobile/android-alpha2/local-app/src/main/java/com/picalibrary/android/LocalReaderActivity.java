@@ -7,9 +7,7 @@ import android.os.Bundle;
 import android.widget.TextView;
 import java.io.File;
 import java.net.HttpURLConnection;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -22,15 +20,16 @@ public final class LocalReaderActivity extends ReaderScreenActivity {
             return new Metadata(source.displayTitle(comicId),"", "local");
         }
         public LocalDate localDay(String timestamp){
-            try{return Instant.parse(timestamp).atZone(ZoneId.systemDefault()).toLocalDate();}
-            catch(Exception invalid){return null;}
+            return ReaderHistoryLedger.localDay(timestamp);
         }
         public void record(Context context,String sessionId,String comicId,String chapterId,
                            String title,String author,String chapterTitle,int chapterOrder,
                            String providerId,String sourceKind,int page,String startedAt,String lastReadAt){
-            // Bookmarks and exact-page restart already persist in ReaderProgressLedger.
-            // Full session history requires extracting the existing app HistoryStore;
-            // this QA binary must not create a second, incompatible history ledger.
+            // Same original schema, session grouping and file format as the installed app.
+            // This independent QA application writes only its private files directory.
+            ReaderHistoryLedger.record(context,ReaderHistoryLedger.localFile(context),
+                    sessionId,comicId,chapterId,title,author,chapterTitle,chapterOrder,
+                    providerId,sourceKind,page,startedAt,lastReadAt);
         }
     };
 

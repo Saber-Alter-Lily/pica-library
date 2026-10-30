@@ -6,6 +6,9 @@
         android:label="Pica Library Local QA"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
+            android:name="com.picalibrary.android.LocalHistoryActivity"
+            android:exported="false" />
+        <activity
             android:name="com.picalibrary.android.LocalReaderActivity"
             android:screenOrientation="unspecified"
             android:exported="false" />

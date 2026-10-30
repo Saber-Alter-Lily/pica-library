@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-29 CORE-LIB-04c-02c-02b-02a｜WebDAV 共享写任务与停机收尾
+
+- [Draft #250](https://github.com/Saber-Alter-Lily/pica-library/pull/250) 叠加 #249，先修**真实功能缺口**而不继续扩展测试框架：remote-only 删除使用现有资源协调器 lease，Desktop preflight 感知远程同步/删除 busy，停机取消并等待 WebDAV 在途修改，备用端口注入相同 coordinator；仅扩展现有 1 项回归测试。CI 待核实。
+- 下一步处理与 WebDAV 不同的后台任务/独立 Worker 写入来源，完成必要的停写确认，再结合旧版一致性备份/失败回滚。G1–G4 仍 OPEN；本步骤不对真实用户资料或正式更新授权。
+
+
 
 ### 2026-10-29 CORE-LIB-04c-02c-02b-01｜Mobile Bridge / Remote API 纳入同一更新交接冻结
 

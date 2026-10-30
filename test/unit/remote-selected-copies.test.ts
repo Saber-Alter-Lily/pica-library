@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
+import { RuntimeResourceCoordinator } from '../../src/runtime/resource-coordinator'
 import { RemoteLibrarySyncService } from '../../src/remote-storage/sync-service'
 import {
     removeRemoteCopies,
@@ -184,6 +185,49 @@ describe('selected cloud uploads and remote-only deletion', () => {
             )!.state
         ).toBe('remote-present')
     })
+    it('waits for an active remote deletion before Desktop shutdown can close SQLite', async () => {
+        const { root, db, provider } = fixture()
+        vi.spyOn(factory, 'createRemoteStorageProvider').mockReturnValue(provider)
+        const resources = new RuntimeResourceCoordinator({ mode: 'observe' })
+        const manager = new RemoteStorageDesktopManager(
+            path.join(root, 'remote.json'),
+            { save: vi.fn() } as unknown as CredentialStore,
+            null, db, root, () => {}, resources
+        )
+        manager.save({ remoteStorage: {
+            kind: 'webdav', baseUrl: 'https://dav.example', root: 'PicaLibrary',
+            username: 'fixture-user', password: 'fixture-only'
+        } })
+        await manager.sync({})
+        const inventory = await manager.inventory({})
+        let started!: () => void
+        let finishDelete!: () => void
+        const entered = new Promise<void>((resolve) => { started = resolve })
+        const held = new Promise<void>((resolve) => { finishDelete = resolve })
+        provider.deleteComic = async () => { started(); await held }
+        const deleting = manager.deleteCopies({
+            comicIds: ['comic-a'], confirmation: 'DELETE_REMOTE_ONLY',
+            remoteScopeId: inventory.scopeId, expectedGeneration: inventory.generation
+        })
+        await entered
+        const draining = manager.quiesce()
+        let drained = false
+        void draining.then(() => { drained = true })
+        try {
+            expect(manager.busy).toBe(true)
+            expect(resources.activeTaskTypes()).toContain('remote-storage-delete')
+            await expect(manager.sync({})).rejects.toThrow('shutting down')
+            await Promise.resolve()
+            expect(drained).toBe(false)
+        } finally {
+            finishDelete()
+        }
+        await Promise.all([deleting, draining])
+        expect(manager.busy).toBe(false)
+        expect(resources.activeTaskTypes()).not.toContain('remote-storage-delete')
+        expect(fs.existsSync(path.join(root, 'comic-a.png'))).toBe(true)
+    })
+
     it('uploads only selected comics and retains unselected remote comics', async () => {
         const { service, provider, puts } = fixture()
         await service.sync(['comic-b'])

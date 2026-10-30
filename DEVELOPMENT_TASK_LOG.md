@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-29｜CORE-LIB-04c-02c-02b-02a：WebDAV 实际写任务收尾（Draft #250）
+
+- [Draft #250](https://github.com/Saber-Alter-Lily/pica-library/pull/250) 叠加 #249，以**功能优先、少量回归**方式改动原 `RemoteStorageDesktopManager` 与 `src/desktop/main.ts`：远端副本删除现在使用已有共享 `RuntimeResourceCoordinator` 计入真实活动任务；原 Desktop 更新前检查通过 `busy` 同时覆盖同步/删除；停机时先通知 WebDAV 取消同步并等待在途写任务结算，再关闭 SQLite；备用监听端口也共享同一资源协调器。未创建独立任务系统、备份器、Updater 或新依赖。
+- 只在已有 `remote-selected-copies.test.ts` 补一项延迟真实 `deleteComic` 的定向回归，验证等待、旧应用拒绝新同步与本地副本保留；不增专用 workflow/测试矩阵。**CI 待核实**，不得直接声称已通过。
+- 下一步按实际写入路径继续处理 **非 HTTP 启动的本地后台任务和独立 source worker**；生产级一致性备份/退出回执、Android Service/Binder、真实 v0.5.0 更新仍未验收。G1–G4 OPEN，main/Release/OTA/用户资料不变。
+
+
 
 ### 2026-10-29｜CORE-LIB-04c-02c-02b-01：原 Mobile Bridge 与 Remote API 接入同一升级冻结（Draft #249）
 

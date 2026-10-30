@@ -30,7 +30,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
 
     private void renderShell(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});body=new FrameLayout(this);body.setBackgroundColor(Ui.BG);root.addView(body,new LinearLayout.LayoutParams(-1,0,1));bottomNavigationHost=new LinearLayout(this);bottomNavigationHost.setOrientation(LinearLayout.VERTICAL);root.addView(bottomNavigationHost,new LinearLayout.LayoutParams(-1,-2));showNormalBottomNavigation();setContentView(root);root.requestApplyInsets();}
     private Button compact(String label,View.OnClickListener action){return Ui.button(this,label,action,true);}
-    private void showNormalBottomNavigation(){if(bottomNavigationHost==null)return;bottomNavigationHost.removeAllViews();bottomNavigationHost.addView(ShellNavigation.build(this,current,showingShelves),new LinearLayout.LayoutParams(-1,-2));}
+    private void showNormalBottomNavigation(){if(bottomNavigationHost==null)return;bottomNavigationHost.removeAllViews();bottomNavigationHost.addView(BuildConfig.LOCAL_ONLY_DRAFT?ShellNavigation.build(this,current,showingShelves):ShellNavigation.build(this,current),new LinearLayout.LayoutParams(-1,-2));}
     private Button selectionBottomButton(String label,View.OnClickListener action){
         Button b=Ui.button(this,label,action,true);
         b.setTextSize(12f);

@@ -33,7 +33,7 @@ final class ReaderSettingsStore {
     }
 
     static Snapshot reconcile(Context context){
-        Context app=context.getApplicationContext();Snapshot local=local(app);if(!RemoteConfigStore.load(app).configured())return local;
+        Context app=context.getApplicationContext();Snapshot local=local(app);if(BuildConfig.LOCAL_ONLY_DRAFT||!RemoteConfigStore.load(app).configured())return local;
         try{
             RemoteLibraryClient client=new RemoteLibraryClient(app);RemoteLibraryClient.ReaderSettings remote=client.readerSettings();
             if(remote!=null&&remote.updatedAt.compareTo(local.updatedAt)>0)return applyRemote(app,remote);

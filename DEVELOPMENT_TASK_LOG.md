@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-03：Reader 通用接口与在线来源实现分文件（Draft #258）
+
+- [Draft #258](https://github.com/Saber-Alter-Lily/pica-library/pull/258) 叠加 #257，在不改变 Reader UI、来源 API 或任何网络处理逻辑的条件下，将原 `ReaderSource.java` 中混放的 Desktop、WebDAV、Pica 三个具体类，原样移到独立 `OnlineReaderSources.java`；原文件只留下现有 `ReaderSource` 接口及原方法签名。这是可复用 Reader 物理构建边界的必要准备，不复制源功能、不开新 SDK。
+- **边界真实状态**：当前 ReaderSource 方法仍引用 BridgeClient 的旧章节/页面 DTO 和 SourceAccessPolicy 接口，故还不能被独立无漫画源 Android 应用完整编译；本步骤仅从接口所在源文件排除具体网络实现，不宣称干净 APK。完成旧 Reader UI 的数据契约迁移后才能把核心 UI 真正外置。此 PR 不新增测试，使用原 Android CI 验证。
+- #257 的本地独立 Port 和原 Reader 适配继续保留。G1–G4 OPEN，正式 v0.5.0、main、Release、OTA、用户资料均不动。
+
+
 ### 2026-10-30｜S3 CORE-ANDROID-02：Android 本地 Reader 数据与来源接口解耦（Draft #257）
 
 - [Draft #257](https://github.com/Saber-Alter-Lily/pica-library/pull/257) 叠加通过 21/21 CI 的 #256。基于既有 `:local-storage` 实际增加 **LocalComicReaderPort**，直接复用已搬迁的 `LocalComicStore` 与 `ReaderPolicy`，提供应用私有漫画列表、封面、按原章节顺序分组、本地 `file://` 页清单和按原页面 ID 恢复书签。端口不引用 BridgeClient、Pica/E-H/JM、Desktop、WebDAV、HTTP 或网络来源 SDK，源代码是真正的独立模块业务路径。

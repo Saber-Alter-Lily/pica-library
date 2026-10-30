@@ -1,5 +1,6 @@
 package com.picalibrary.android;
 
+import android.content.Context;
 import java.net.HttpURLConnection;
 import java.util.List;
 
@@ -8,6 +9,14 @@ interface ReaderSource {
     default com.picalibrary.android.sources.SourceAccessPolicy.Access sourceAccess(){return null;}
     default String displayTitle(String comicId){return "";}
     default boolean emitsRecommendationEvidence(){return true;}
+    // Presentation and optional diagnosis belong to each source adapter,
+    // never to the shared ReaderActivity's class/SDK dependency graph.
+    default String readerLabel(Context context,boolean compact){
+        return compact?"电脑/缓存":"电脑连接";
+    }
+    default String chapterDiagnosticPath(String comicId){return "";}
+    default boolean canDiagnosePage(){return false;}
+    default String diagnose(String path){return "当前来源没有额外诊断信息";}
     String kind();
     String scope();
     List<? extends ReaderContent.Chapter> chapters(String comicId) throws Exception;

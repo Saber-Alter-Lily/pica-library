@@ -35,10 +35,11 @@ describe('original Desktop HTTP freeze: process-local, not production snapshot',
         expect(gate.enter('GET','/reader.html')).toBeNull()
         expect(gate.enter('POST','/api/v1/update/apply'))
             .toBeTypeOf('function')
-        for(const path of ['/status','/api/v1/desktop/status',
+        for(const path of ['/api/v1/desktop/status',
             '/api/v1/update/progress'])
             expect(gate.enter('GET',path)).toBeTypeOf('function')
         expect(gate.enter('POST','/api/v1/desktop/status')).toBeNull()
+        expect(gate.enter('GET','/status')).toBeNull()
         expect(gate.pendingRequests).toBe(0)
         expect(() => gate.freezeForHandoff())
             .toThrow('An update handoff is already in progress')

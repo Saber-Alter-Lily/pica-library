@@ -60,6 +60,23 @@ public class LocalComicImportTest {
         File manifest=new File(LocalComicStore.root(context),comic.id.substring(6)+"/manifest.json");String json=new String(Files.readAllBytes(manifest.toPath()),java.nio.charset.StandardCharsets.UTF_8);assertFalse(json.contains(AUTHORITY));assertFalse(json.contains("content://"));assertFalse(json.contains(original.getPath()));
         UnifiedLibraryFilter.Spec filter=new UnifiedLibraryFilter.Spec();filter.locations.add(UnifiedLibraryFilter.Location.PHONE);assertEquals(1,UnifiedLibraryFilter.apply(Collections.singletonList(entry),filter).size());assertThrows(IllegalStateException.class,()->source.image("https://example.invalid"));
     }
+    @Test public void sourceFreeLocalReaderPortOpensChaptersAndRestoresBookmarks() throws Exception {
+        LocalComicStore.Comic comic=imported();
+        LocalComicReaderPort local=new LocalComicReaderPort(context);
+        assertEquals(1,local.books().size());
+        assertEquals(comic.id,local.books().get(0).id);
+        assertEquals(2,local.books().get(0).pageCount);
+        assertNotNull(local.coverFile(comic.id));
+        LocalComicReaderPort.Chapter first=local.chapters(comic.id).get(0);
+        LocalComicReaderPort.ChapterData data=local.chapter(comic.id,first.id);
+        assertEquals(2,data.pages.size());
+        assertEquals(1,data.chapter.order);
+        assertTrue(data.pages.get(0).uri.startsWith("file://"));
+        local.rememberPosition(comic.id,first.id,1);
+        assertEquals(1,new LocalComicReaderPort(context).restorePosition(comic.id,first.id,0));
+        assertEquals(1,new LocalComicReaderSource(context).restorePosition(comic.id,first.id,0));
+        assertArrayEquals(PNG,Files.readAllBytes(new File(original,"2.png").toPath()));
+    }
     @Test public void cbzUsesSameReaderAndSubfolderChapters() throws Exception {
         File archive=new File(original,"synthetic.cbz");try(ZipOutputStream out=new ZipOutputStream(new FileOutputStream(archive))){for(String name:new String[]{"chapter2/10.png","chapter1/1.png","chapter2/2.png"}){out.putNextEntry(new ZipEntry(name));out.write(PNG);out.closeEntry();}}
         Uri uri=DocumentsContract.buildDocumentUri(AUTHORITY,"root/synthetic.cbz");LocalComicStore.Preview preview=LocalComicStore.prepare(context,uri,"cbz",()->{});assertEquals(3,preview.prepared.pages.size());assertEquals(2,preview.prepared.chapters);assertFalse(new File(preview.work,"archive.cbz").exists());LocalComicStore.Comic comic=LocalComicStore.confirm(context,preview,()->{});assertEquals(2,new LocalComicReaderSource(context).chapters(comic.id).size());assertTrue(archive.exists());

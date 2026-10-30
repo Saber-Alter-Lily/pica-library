@@ -19,8 +19,12 @@ if (isolatedQaSuffix && !(isolatedQaSuffix ==~ /^\.s1qa[1-9][0-9]{0,2}$/)) {
 def localOnlyDraft = System.getenv('PICA_ANDROID_LOCAL_ONLY_DRAFT') == '1'
 if (localOnlyDraft && isolatedQaSuffix)
     throw new GradleException('Local-only draft and S1 snapshot identity cannot be combined')
-def debugAppSuffix = localOnlyDraft ? '.localdraft' : (isolatedQaSuffix ? isolatedQaSuffix : '.dev')
-def debugAppLabel = localOnlyDraft ? 'Pica Library Local Draft' : (isolatedQaSuffix ? "Pica Library S1 QA${isolatedQaSuffix.substring(5)}" : 'Pica Library Dev')
+def debugAppSuffix = isolatedQaSuffix ? isolatedQaSuffix : '.dev'
+def debugAppLabel = isolatedQaSuffix ? "Pica Library S1 QA${isolatedQaSuffix.substring(5)}" : 'Pica Library Dev'
+if (localOnlyDraft) {
+    debugAppSuffix = '.localdraft'
+    debugAppLabel = 'Pica Library Local Draft'
+}
 def debugPairScheme = isolatedQaSuffix ? "picalibrary-${isolatedQaSuffix.substring(1)}" : 'picalibrary'
 
 android {

@@ -1,120 +1,19 @@
 package com.picalibrary.android;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.net.Uri;
-import android.os.Handler;
-import android.os.Looper;
-import android.widget.Toast;
-import java.io.*;
-import java.net.HttpURLConnection;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.io.File;
 
-/** Persistent encoded-page cache shared by Desktop/WebDAV/Pica/E-H. Explicit phone downloads are decoded in place. */
-final class ReaderImages implements AutoCloseable {
-    interface Callback { void complete(Bitmap bitmap); void failed(); }
-    static final class Request {
-        volatile boolean cancelled;
-        volatile HttpURLConnection connection;
-        Future<?> future;
-        void cancel(){cancelled=true;if(connection!=null)connection.disconnect();if(future!=null)future.cancel(true);}
-    }
-    private final ExecutorService workers=Executors.newFixedThreadPool(4);
-    private final ExecutorService prefetchers=Executors.newFixedThreadPool(2);
-    private final Handler main=new Handler(Looper.getMainLooper());
-    private final AtomicInteger prefetchGeneration=new AtomicInteger();
-    private final ConcurrentHashMap<String,String> failures=new ConcurrentHashMap<>();
-    private final File cache;
-    private final ReaderSource source;
-    private final Context context;
-    private volatile boolean closed;
-    private static final String ROOT="reader-pages-v2";
+/** Original ReaderImages API; one actual image pipeline lives in :reader-view. */
+final class ReaderImages extends ReaderImageLoader {
+    private static final ReaderPageStorage STORAGE=new ReaderPageStorage() {
+        public File cacheDir(Context context,String name){return MobileStoragePaths.cacheDir(context,name);}
+        public File cacheRoot(Context context){return MobileStoragePaths.cacheRoot(context);}
+        public long pageLimitBytes(Context context){return StorageSettings.pageLimitBytes(context);}
+        public String failurePrefix(Context context){return LocalizedText.ui("图片读取失败 · ");}
+        public String disabledMessage(Context context){return context.getString(R.string.source_disabled);}
+    };
 
-    ReaderImages(Context context,ReaderSource source){this.context=context.getApplicationContext();this.source=source;cache=MobileStoragePaths.cacheDir(this.context,ROOT+"/"+source.scope());}
-
-    Request load(String path,int width,Callback callback){
-        Request request=new Request();
-        request.future=workers.submit(()->{
-            if(isLocal(path)){
-                try{Bitmap bitmap=decodeLocal(path,width);if(bitmap==null)throw new IOException("decode failed");failures.remove(path);if(request.cancelled||closed){bitmap.recycle();return;}main.post(()->{if(!request.cancelled&&!closed)callback.complete(bitmap);else bitmap.recycle();});}
-                catch(Exception|OutOfMemoryError e){String reason=failureReason(e);failures.put(path,reason);main.post(()->{if(!request.cancelled&&!closed){Toast.makeText(context,LocalizedText.ui("图片读取失败 · ")+reason,Toast.LENGTH_LONG).show();callback.failed();}});}
-                return;
-            }
-            File target=new File(cache,ReaderPolicy.hash(path));File partial=null;
-            try{
-                if(!target.isFile()){partial=fetchNetworkToPartial(path,request);validateImage(partial);commitCache(partial,target);}
-                if(request.cancelled||closed)return;
-                Bitmap bitmap=decodeFile(target,width);if(bitmap==null){target.delete();throw new IOException("decode failed");}failures.remove(path);target.setLastModified(System.currentTimeMillis());main.post(()->{if(!request.cancelled&&!closed)callback.complete(bitmap);else bitmap.recycle();});trim(target);
-            }catch(Exception|OutOfMemoryError e){String reason=failureReason(e);failures.put(path,reason);main.post(()->{if(!request.cancelled&&!closed){Toast.makeText(context,LocalizedText.ui("图片读取失败 · ")+reason,Toast.LENGTH_LONG).show();callback.failed();}});}
-            finally{if(partial!=null)partial.delete();}
-        });
-        return request;
-    }
-
-    void prefetch(List<String> paths){
-        final int generation=prefetchGeneration.incrementAndGet();
-        for(String path:paths){
-            if(path==null||path.isEmpty()||isLocal(path))continue;
-            File target=new File(cache,ReaderPolicy.hash(path));if(target.isFile())continue;
-            prefetchers.submit(()->{if(closed||generation!=prefetchGeneration.get())return;Request request=new Request();File partial=null;try{partial=fetchNetworkToPartial(path,request);if(closed||generation!=prefetchGeneration.get())return;validateImage(partial);commitCache(partial,target);target.setLastModified(System.currentTimeMillis());trim(target);}catch(Exception ignored){}finally{if(partial!=null)partial.delete();}});
-        }
-    }
-
-    String failureDetail(String path){String value=failures.get(path);return value==null||value.isEmpty()?"暂时无法读取":value;}
-    private void commitCache(File partial,File target){SourceAccess.commit(source.sourceAccess(),()->{synchronized(ReaderImages.class){if(!target.exists()&&!partial.renameTo(target))throw new IOException("cache rename failed");return null;}});}
-    String diagnose(String path){return source.diagnose(path);}
-
-    private File fetchNetworkToPartial(String path,Request request) throws Exception {
-        if(isLocal(path))throw new IllegalArgumentException("local downloads must bypass reader cache");
-        File partial=File.createTempFile("page-",".part",cache);
-        try{
-            HttpURLConnection connection=source.image(path);request.connection=connection;
-            try{if(request.cancelled||closed)throw new IOException("cancelled");int status=connection.getResponseCode();if(status!=200)throw new IOException("HTTP "+status);try(InputStream in=connection.getInputStream();OutputStream out=new FileOutputStream(partial)){copy(in,out,request);}return partial;}
-            finally{connection.disconnect();request.connection=null;}
-        }catch(Exception e){partial.delete();throw e;}
-    }
-
-    private Bitmap decodeLocal(String value,int width) throws Exception {
-        Uri uri=Uri.parse(value);
-        if("file".equalsIgnoreCase(uri.getScheme()))return decodeFile(new File(uri.getPath()),width);
-        if(!"content".equalsIgnoreCase(uri.getScheme()))throw new FileNotFoundException("不支持的本地页面地址");
-        BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
-        try(InputStream in=context.getContentResolver().openInputStream(uri)){if(in==null)throw new FileNotFoundException("手机下载页面不可读");BitmapFactory.decodeStream(in,null,bounds);}
-        if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("invalid image");
-        BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=ReaderPolicy.sampleSize(bounds.outWidth,bounds.outHeight,width);
-        try(InputStream in=context.getContentResolver().openInputStream(uri)){if(in==null)throw new FileNotFoundException("手机下载页面不可读");return BitmapFactory.decodeStream(in,null,options);}
-    }
-    private static Bitmap decodeFile(File file,int width){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);if(bounds.outWidth<=0||bounds.outHeight<=0)return null;BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=ReaderPolicy.sampleSize(bounds.outWidth,bounds.outHeight,width);return BitmapFactory.decodeFile(file.getPath(),options);}
-    private static boolean isLocal(String value){return value!=null&&(value.startsWith("content://")||value.startsWith("file://"));}
-    private void copy(InputStream in,OutputStream out,Request request) throws Exception {byte[] buffer=new byte[32768];int n;long bytes=0;while((n=in.read(buffer))!=-1){if(request.cancelled||closed||Thread.currentThread().isInterrupted())throw new IOException("cancelled");bytes+=n;if(bytes>64L*1024*1024)throw new IOException("page too large");out.write(buffer,0,n);}}
-    private static void validateImage(File file) throws IOException {BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("invalid image");}
-
-    private String failureReason(Throwable error){
-        if(error instanceof com.picalibrary.android.sources.SourceAccessPolicy.Disabled)return context.getString(R.string.source_disabled);
-        if(error instanceof OutOfMemoryError)return "图片过大或内存不足";
-        String value=error==null||error.getMessage()==null?"":error.getMessage().trim();String lower=value.toLowerCase(Locale.ROOT);
-        if(value.contains("HTTP 509"))return "请求过于频繁";
-        if(value.contains("HTTP 403"))return "站点拒绝图片请求";
-        if(value.contains("HTTP 404"))return "图片地址已失效";
-        if(value.contains("HTTP 429"))return "请求过于频繁";
-        if(value.contains("第 ")&&value.contains("页定位失败"))return value;
-        if(value.contains("图片页没有可读取图片"))return "图片页解析失败";
-        if(value.contains("异常跳转"))return "E-H 页面发生异常跳转";
-        if(lower.contains("timed out")||lower.contains("timeout"))return "网络请求超时";
-        if(lower.contains("unknownhost")||lower.contains("unable to resolve host"))return "无法解析图片服务器";
-        if("invalid image".equals(lower)||"decode failed".equals(lower))return "服务器返回的内容不是有效图片";
-        if("page too large".equals(lower))return "图片文件过大";
-        if(value.startsWith("E-H HTTP "))return value;
-        return value.isEmpty()?"暂时无法读取":value.length()>64?value.substring(0,64):value;
-    }
-
-    private synchronized void trim(File active){File root=cache.getParentFile();File[] scopes=root==null?null:root.listFiles(File::isDirectory);if(scopes==null)return;ArrayList<File> files=new ArrayList<>();for(File scope:scopes){File[] nested=scope.listFiles(file->file.isFile()&&!file.getName().endsWith(".part"));if(nested!=null)files.addAll(Arrays.asList(nested));}files.sort(Comparator.comparingLong(File::lastModified));long total=0;for(File file:files)total+=file.length();long limit=StorageSettings.pageLimitBytes(context);for(File file:files)if(limit!=Long.MAX_VALUE&&total>limit&&!file.equals(active)){long n=file.length();if(file.delete())total-=n;}}
-    static long cacheBytes(Context context){return bytes(new File(MobileStoragePaths.cacheRoot(context),ROOT));}
-    private static long bytes(File file){if(file==null||!file.exists())return 0;if(file.isFile())return file.length();long total=0;File[] children=file.listFiles();if(children!=null)for(File child:children)total+=bytes(child);return total;}
-    static void clearCache(Context context){delete(new File(MobileStoragePaths.cacheRoot(context),ROOT));}
-    private static void delete(File file){if(file==null||!file.exists())return;if(file.isDirectory()){File[] children=file.listFiles();if(children!=null)for(File child:children)delete(child);}file.delete();}
-    public void close(){closed=true;prefetchGeneration.incrementAndGet();workers.shutdownNow();prefetchers.shutdownNow();}
+    ReaderImages(Context context,ReaderSource source){super(context,source,STORAGE);}
+    static long cacheBytes(Context context){return ReaderImageLoader.cacheBytes(context,STORAGE);}
+    static void clearCache(Context context){ReaderImageLoader.clearCache(context,STORAGE);}
 }

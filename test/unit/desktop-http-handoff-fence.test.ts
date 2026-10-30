@@ -10,6 +10,7 @@ import {
     DesktopHttpHandoffError
 } from '../../src/desktop/update-http-fence'
 import { applyUpdateAndScheduleShutdown } from '../../src/desktop/update-command'
+import { RuntimeResourceCoordinator } from '../../src/runtime/resource-coordinator'
 import { enabledFixtureSources } from '../helpers/source-runtime-fixture'
 
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
@@ -110,6 +111,44 @@ describe('original Desktop HTTP freeze: process-local, not production snapshot',
         expect(gate.frozen).toBe(true)
     })
 
+    it('freezes both real HTTP admissions and original runtime leases, restoring both after helper error', async () => {
+        const httpFence = new DesktopHttpHandoffFence()
+        const resources = new RuntimeResourceCoordinator({mode:'observe'})
+        const shutdown = vi.fn()
+        const failing = {apply:vi.fn(async()=> {
+            throw new Error('synthetic-helper-rejected')
+        })}
+        vi.useFakeTimers()
+        const result = applyUpdateAndScheduleShutdown(
+            failing, 'synthetic-combined', {
+                desktopHomeRoot:'synthetic-only',
+                libraryDirectory:'synthetic-only'
+            },shutdown,()=>{
+                const restoreHttp=httpFence.freezeForHandoff()
+                try {
+                    const restoreResources=resources.freezeAcquisitionsForUpdate()
+                    return () => {restoreResources();restoreHttp()}
+                } catch(error){restoreHttp();throw error}
+            }
+        )
+        expect(httpFence.frozen).toBe(true)
+        expect(httpFence.enter('POST','/api/v1/comics')).toBeNull()
+        await expect(resources.acquire({
+            ownerId:'new-background',
+            taskType:'maintenance',
+            resources:{'sqlite-write-heavy':1}
+        })).rejects.toThrow('Runtime task admission is already frozen')
+        await expect(result).rejects.toThrow('synthetic-helper-rejected')
+        expect(httpFence.frozen).toBe(false)
+        const after=await resources.acquire({
+            ownerId:'resumed',
+            taskType:'ordinary',
+            resources:{'sqlite-write-heavy':1}
+        })
+        after.release()
+        expect(shutdown).not.toHaveBeenCalled()
+    })
+
     it('preserves source-free server compatibility without requiring a fence', async () => {
         const serverCode = fs.readFileSync('src/library/server.ts','utf8')
         expect(serverCode).toContain('requestAdmission?:')
@@ -118,6 +157,7 @@ describe('original Desktop HTTP freeze: process-local, not production snapshot',
         expect(main).toContain('const updateHttpFence = new DesktopHttpHandoffFence()')
         expect(main.split('requestAdmission: updateHttpFence').length-1).toBe(2)
         expect(main).toContain('updateHttpFence.freezeForHandoff()')
+        expect(main).toContain('runtimeResources.freezeAcquisitionsForUpdate()')
         const fenceSource = fs.readFileSync('src/desktop/update-http-fence.ts','utf8')
         expect(fenceSource).not.toMatch(/(?:readFileSync|copyFileSync|writeFileSync|unlinkSync|rmSync|spawn\(|fork\()/)
     })

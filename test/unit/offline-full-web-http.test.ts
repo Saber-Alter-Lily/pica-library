@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LocalLibraryIngestion } from '../../src/local-library/ingestion'
+import { createCoreLocalRuntime } from '../../src/library/core-runtime-composition'
 import { ReaderService } from '../../src/services/reader-service'
 import { startOfflineCoreHttp } from '../../src/offline-core/qa-http'
 import { stageOfflineFullWebQa } from '../../scripts/stage-offline-full-web-qa'
@@ -126,6 +127,58 @@ describe('real original full Web HTML behind source-free, cookie-protected local
         expect((await get('/api/v1/authors')).status).toBe(200)
         expect((await get('/api/v1/sources')).status).toBe(404)
         expect(db.getComic(comic.comicId)?.providerId).toBe('local')
+    }, 60_000)
+
+    it('imports a local folder using the original native picker port and Web UI contract', async () => {
+        const { home, root, db, web } = await fixture()
+        const chosen = path.join(home, 'chosen-through-picker')
+        fs.mkdirSync(chosen)
+        fs.writeFileSync(path.join(chosen, '02.png'), png)
+        const coreRuntime = createCoreLocalRuntime({ database: db, dataDir: root })
+        const http = await startOfflineCoreHttp({
+            database: db, reader: coreRuntime.readerService, coreRuntime, webRoot: web,
+            localPicker: {
+                configured: () => true,
+                status: () => ({
+                    runtime: { mode: 'interactive' },
+                    platform: { runtimeFoundation: true },
+                    nativePicker: { folderPicker: true, savePicker: false }
+                }),
+                chooseLocalComic: async kind => kind === 'folder' ? chosen : null
+            }
+        })
+        cleanup.push(() => http.close())
+        const homeUrl = new URL(http.url).origin
+        const entry = await fetch(http.url, { redirect: 'manual' })
+        const cookie = entry.headers.get('set-cookie')!.split(';')[0]
+        const status = await (await fetch(homeUrl + '/api/v1/desktop/status', {
+            headers: { cookie }
+        })).json()
+        const capabilities = await (await fetch(homeUrl + '/api/v1/capabilities', {
+            headers: { cookie }
+        })).json()
+        expect(capabilities.features.localFileImport).toBe(true)
+        expect(status.nativePicker.folderPicker).toBe(true)
+        const post = (operation: string, input: unknown) => fetch(
+            homeUrl + '/api/v1/desktop/local-import/' + operation, {
+                method: 'POST',
+                headers: {
+                    cookie, origin: homeUrl, 'content-type': 'application/json',
+                    'x-pica-csrf': status.csrfToken
+                },
+                body: JSON.stringify(input)
+            }
+        )
+        expect((await post('preview', { kind: 'folder', path: chosen })).status).toBe(400)
+        const selected = await post('preview', { kind: 'folder' })
+        expect(selected.status).toBe(200)
+        const preview = await selected.json()
+        expect(preview.pages).toBe(1)
+        const confirmed = await post('confirm', { token: preview.token })
+        expect(confirmed.status).toBe(200)
+        const result = await confirmed.json()
+        expect(db.getComic(result.comicId)?.providerId).toBe('local')
+        expect(fs.existsSync(path.join(chosen, '02.png'))).toBe(true)
     }, 60_000)
 
     it('never serves a mutated full Web script with a stale staged checksum', async () => {

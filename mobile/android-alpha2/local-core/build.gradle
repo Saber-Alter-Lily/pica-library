@@ -13,6 +13,7 @@ sourceSets {
         java {
             srcDirs = ['../app/src/main/java']
             include 'com/picalibrary/android/local/**/*.java'
+            include 'com/picalibrary/android/ReaderPolicy.java'
         }
     }
 }

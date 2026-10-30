@@ -5,8 +5,16 @@ import java.net.HttpURLConnection;
 import java.util.List;
 
 /** Neutral Reader contract; concrete Desktop/remote/provider implementations live separately. */
-interface ReaderSource {
+interface ReaderSource extends ReaderImageTransport {
     default com.picalibrary.android.sources.SourceAccessPolicy.Access sourceAccess(){return null;}
+    // Preserve the existing short atomic write lease for online/Host readers.
+    // ReaderImageLoader itself never imports a provider SDK or access policy.
+    default void commitImageCache(ReaderImageTransport.CacheWrite write){
+        SourceAccess.commit(sourceAccess(),()->{write.run();return null;});
+    }
+    default boolean isAccessRevoked(Throwable error){
+        return error instanceof com.picalibrary.android.sources.SourceAccessPolicy.Disabled;
+    }
     default String displayTitle(String comicId){return "";}
     default boolean emitsRecommendationEvidence(){return true;}
     // Presentation and optional diagnosis belong to each source adapter,

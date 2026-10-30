@@ -44,7 +44,12 @@ describe('native user-Host source/resource contracts only', () => {
         expect(policy).toContain('class Permit implements Access')
         expect(java('SourceHttpConnection')).toContain('SourceAccessPolicy.Access permit')
         expect(java('HostSourceManager')).toContain('class Session implements SourceAccessPolicy.Access')
-        expect(java('ReaderImages')).toContain('SourceAccess.commit(source.sourceAccess()')
+        expect(java('ReaderSource')).toContain('SourceAccess.commit(sourceAccess()')
+        const loader = fs.readFileSync(
+            'mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderImageLoader.java', 'utf8'
+        )
+        expect(loader).toContain('source.commitImageCache(')
+        expect(loader).not.toMatch(/SourceAccess|SourceAccessPolicy|PicaClient|EhClient|JmClient/)
     })
     it('uses exact signed-Long strings and checks source/book/chapter/page ownership', () => {
         const protocol = java('HostProtocol'), manager = java('HostSourceManager')

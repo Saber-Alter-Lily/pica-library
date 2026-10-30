@@ -10,6 +10,7 @@ import { localReaderGet } from '../reader/local-http-read'
 import { coreCatalogueGet, coreCatalogueQuery } from '../library/core-catalog-read'
 import { coreBootstrapStatus, coreBootstrapAuthors, coreBootstrapCapabilities } from '../library/core-bootstrap-read'
 import { coreShelfMatch, coreShelfExecute } from '../library/core-shelf-routes'
+import { coreLocalImportMatch, type CoreLocalPicker } from '../library/core-local-import'
 import type { LibraryFacetQuery } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
 import type { ReaderService } from '../services/reader-service'
@@ -26,6 +27,8 @@ interface QaHttpOptions {
     reader: ReaderService
     /** Reuse the same local runtime instance as the original Desktop/CLI. */
     coreRuntime?: CoreLocalRuntime
+    /** Only the trusted Desktop composition root may supply this native UI. */
+    localPicker?: CoreLocalPicker
     webRoot: string
 }
 const SCRIPT_ASSETS = new Set([
@@ -181,6 +184,12 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
 }> {
     const webRoot = fs.realpathSync.native(options.webRoot)
     const fullWeb = verifiedFullWebQaAssets(webRoot)
+    const localPickerStatus = fullWeb && options.coreRuntime
+        ? options.localPicker?.status() : undefined
+    const capabilities = () => coreBootstrapCapabilities({
+        kind: 'source-free' as const,
+        desktopStatus: localPickerStatus
+    })
     if (!fullWeb) {
         const markupFile = fs.existsSync(path.join(webRoot, 'reader-fragment.html'))
             ? 'reader-fragment.html' : 'index.html'
@@ -271,6 +280,9 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         } catch {
             return json(response, 400, { error: 'Invalid shelf URL' })
         }
+        const localImportRoute = fullWeb && options.coreRuntime && options.localPicker
+            ? coreLocalImportMatch(request.method ?? '', url.pathname)
+            : null
         if (request.method === 'GET') {
             if (fullWeb && url.pathname === '/') {
                 const original = fullWeb.get('index.html')!.data.toString('utf8')
@@ -287,9 +299,7 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             if (fullWeb && url.pathname === '/api/v1/desktop/status') {
                 return json(response, 200, {
                     application: 'Pica Library',
-                    version: coreBootstrapCapabilities({
-                        kind: 'source-free'
-                    }).appVersion,
+                    version: capabilities().appVersion,
                     configured: true,
                     coreOnly: true,
                     startupReady: true,
@@ -300,8 +310,9 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                     ehAccount: { configured: false, enabled: false },
                     externalSources: { schemaVersion: 1, revision: 0, enabled: [] },
                     remoteStorage: { configured: false, kind: 'webdav' },
-                    nativePicker: { folderPicker: false, savePicker: false },
-                    runtime: { mode: 'headless' }
+                    nativePicker: localPickerStatus?.nativePicker ??
+                        { folderPicker: false, savePicker: false },
+                    runtime: localPickerStatus?.runtime ?? { mode: 'headless' }
                 })
             }
             // These are the exact original Desktop bootstrap read ports,
@@ -311,9 +322,7 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                     options.database, null
                 ))
             if (url.pathname === '/api/v1/capabilities')
-                return json(response, 200, coreBootstrapCapabilities({
-                    kind: 'source-free'
-                }))
+                return json(response, 200, capabilities())
             if (url.pathname === '/api/v1/authors')
                 return json(response, 200, coreBootstrapAuthors(options.database))
             const asset = url.pathname.slice(1)
@@ -383,7 +392,7 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             }
             return json(response, 404, { error: 'No source routes in offline QA' })
         }
-        if (!shelfRoute && (request.method !== 'POST' ||
+        if (!shelfRoute && !localImportRoute && (request.method !== 'POST' ||
             !['/api/v1/reader/progress', '/api/v1/library/query']
                 .includes(url.pathname)))
             return json(response, 405, { error: 'Unsupported QA operation' })
@@ -398,6 +407,13 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             !secureEqual(csrfHeader, csrf))
             return json(response, 403, { error: 'QA CSRF rejected' })
         try {
+            if (localImportRoute && options.coreRuntime) {
+                const input = await readJsonObject(request)
+                const reply = await options.coreRuntime.localImport.http(
+                    localImportRoute, input, options.localPicker
+                )
+                return json(response, reply.status, reply.value)
+            }
             if (shelfRoute) {
                 const input = shelfRoute.needsBody
                     ? await readJsonObject(request) : {}

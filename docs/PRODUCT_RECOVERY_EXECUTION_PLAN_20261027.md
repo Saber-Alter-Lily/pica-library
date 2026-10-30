@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30｜S3 Android 本地模式功能切口（Draft #255）
+
+- [Draft #255](https://github.com/Saber-Alter-Lily/pica-library/pull/255) 以现有导入、书架、Reader 和 UI 为基础，新增隔离包名 `com.picalibrary.android.localdraft` 的可选离线 Android 构建；保留原免责声明，禁用网络权限、来源入口、Desktop/WebDAV 刷新和后台联网工作。当前保留旧 Java 包和 source SDK 的编译，**不能当成真正物理无源 Android 安装包**。既有 CI 只增加一次实际 APK 编译/manifest 核对，无新框架。
+- 后续优先将 LocalComicImport/LocalComicStore/Reader 等中立组件从原大 Android 编译中独立抽取，剔除 Pica/E-H/JM SDK 依赖，再接独立 Reader/来源扩展装载和真机 G1/G2。Windows #254 已可用独立持久本地库候选，尚未通过用户实装或 v0.5.0 迁移；所有 G1–G4 仍 OPEN。
+
+
 ### 2026-10-30 CORE-LIB-04e｜可跨重启的无源 Windows 个人书库
 
 - [Draft #254](https://github.com/Saber-Alter-Lily/pica-library/pull/254)：继续 #253 的本地/CBZ 导入，保留旧 v0.5.0 默认启动，添加用户主动选择的 `--source-free-local` 模式与独立持久 profile `%LOCALAPPDATA%/Pica Library Local`。复用原 SQLite、Reader、书架、文件对话框和完整 Web；原用户凭据、文件及旧目录不参与。自动打开原网页，支持重启续用该新书库。原 Windows QA 完整网页包增加双击启动脚本，无需额外参数。仅新增一个既有套件内持久化测试，不发布。

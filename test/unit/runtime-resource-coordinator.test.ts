@@ -42,6 +42,30 @@ describe('runtime resource coordinator', () => {
         expect(coordinator.snapshot().usage['provider-network']).toBe(0)
     })
 
+    it('waits for both active and queued work before reporting an idle database', async () => {
+        const coordinator = new RuntimeResourceCoordinator({
+            mode: 'enforce', budgets: { 'sqlite-write-heavy': 1 }
+        })
+        const first = await coordinator.acquire({
+            ownerId: 'first', taskType: 'favorites-sync',
+            resources: { 'sqlite-write-heavy': 1 }
+        })
+        const queued = coordinator.acquire({
+            ownerId: 'second', taskType: 'recommendation-build',
+            resources: { 'sqlite-write-heavy': 1 }
+        })
+        let idle = false
+        const waitingForIdle = coordinator.waitForIdle().then(() => { idle = true })
+        first.release()
+        const second = await queued
+        await Promise.resolve()
+        expect(idle).toBe(false)
+        second.release()
+        await waitingForIdle
+        expect(idle).toBe(true)
+        await expect(coordinator.waitForIdle()).resolves.toBeUndefined()
+    })
+
     it('acquires multi-resource requests atomically in enforcement mode', async () => {
         const coordinator = new RuntimeResourceCoordinator({
             mode: 'enforce',

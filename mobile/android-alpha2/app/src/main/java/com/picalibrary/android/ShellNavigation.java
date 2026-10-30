@@ -23,11 +23,11 @@ final class ShellNavigation {
     private static LinearLayout localTabs(Activity activity,int selected,boolean shelves){
         LinearLayout bar=new LinearLayout(activity);
         bar.setBackgroundColor(Ui.NAV);
-        String[] labels={"本地书库","书架","设置"};
+        String[][] labels={{"本地书库","Local library","ローカル書庫"},{"书架","Shelves","本棚"},{"设置","Settings","設定"}};
         for(int i=0;i<labels.length;i++){
             final int tab=i;
             Button button=new Button(activity);
-            button.setText(LocalizedText.ui(labels[i]));
+            button.setText(LocalizedText.ui(activity,labels[i][0],labels[i][1],labels[i][2]));
             button.setTextSize(12.5f);
             button.setAllCaps(false);
             button.setTextColor(Ui.PRIMARY);

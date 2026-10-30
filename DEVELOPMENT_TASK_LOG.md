@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜所有 S0–S6 任务统一执行原则：开源优先、避免重复造轮子（用户明确要求）
+
+- **强制执行：先检查本项目现有实现，再参考相关成熟 OSS，再决定复用/改造/新增。** 本仓库已有 Reader、文件夹/CBZ 导入、章节与书签、原生 AndroidX、SQLite/WebDAV、升级助手等实现，默认保留和复用，不为模块化另起一套应用或功能。
+- 每项任务/PR 留下最小决策记录：原有可复用文件、相关开源项目/对应链接与许可证、为何采用或仅借鉴、真正的剩余功能差距、最终用户可用性及必要验证。具体 S0–S6 规则和验收标准已写入 [产品恢复执行计划顶部](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md#全阶段工程硬规则开源优先与禁止重复造轮子2026-10-30-起适用于-s0s6)。
+- 当前 Android Reader 架构参考：[Mihon](https://github.com/mihonapp/mihon)（Apache-2.0，Reader/来源扩展分离）、[Mihon 本地指南](https://mihon.app/docs/guides/local-source/)、[Mihon 大图组件](https://github.com/mihonapp/subsampling-scale-image-view)，但本轮优先复用原 `ReaderActivity`、`ViewPager2`、`RecyclerView`、`LocalComicReaderPort`；[Kotatsu](https://github.com/KotatsuApp/Kotatsu) GPL-3.0 已归档，仅分析思路，不复制其源码。未引入新外部依赖，尚不宣称最终无源 APK。
+- **当前实际工作：** 接续已经 20/20 工作流成功的 #258，把 `BridgeClient.ChapterItem/PageItem/ChapterData` 等仅承载章节/图片页的通用模型转为纯 Java 共享定义，同时保留旧来源调用兼容与真实 Reader 功能；优先最小改动、少量原套件回归。G1–G4 继续 OPEN，不能因参考 OSS 或 CI 自动视作完成。
+
 ### 2026-10-30｜S3 CORE-ANDROID-03：Reader 通用接口与在线来源实现分文件（Draft #258）
 
 - [Draft #258](https://github.com/Saber-Alter-Lily/pica-library/pull/258) 叠加 #257，在不改变 Reader UI、来源 API 或任何网络处理逻辑的条件下，将原 `ReaderSource.java` 中混放的 Desktop、WebDAV、Pica 三个具体类，原样移到独立 `OnlineReaderSources.java`；原文件只留下现有 `ReaderSource` 接口及原方法签名。这是可复用 Reader 物理构建边界的必要准备，不复制源功能、不开新 SDK。

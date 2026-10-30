@@ -120,6 +120,31 @@ export class RuntimeResourceCoordinator {
     private readonly recent: RuntimeResourceEvent[] = []
     private sequence = 0
     private updateHandoffOwner: symbol | null = null
+    private readonly idleWaiters = new Set<() => void>()
+
+    /** Wait on the existing resource leases, including work outliving HTTP. */
+    waitForIdle(timeoutMs = 25_000): Promise<void> {
+        if (this.active.size === 0 && this.waiting.length === 0)
+            return Promise.resolve()
+        return new Promise<void>((resolve, reject) => {
+            const finish = () => {
+                clearTimeout(deadline)
+                this.idleWaiters.delete(finish)
+                resolve()
+            }
+            const deadline = setTimeout(() => {
+                this.idleWaiters.delete(finish)
+                reject(new Error('Timed out waiting for active library tasks to finish'))
+            }, timeoutMs)
+            this.idleWaiters.add(finish)
+        })
+    }
+
+    private notifyIdle() {
+        if (this.active.size !== 0 || this.waiting.length !== 0) return
+        for (const resolve of this.idleWaiters) resolve()
+        this.idleWaiters.clear()
+    }
 
     /**
      * Reuse the already-shared runtime coordinator for a strict admission
@@ -235,6 +260,7 @@ export class RuntimeResourceCoordinator {
                     at: new Date().toISOString()
                 })
                 this.drain()
+                this.notifyIdle()
             }
         }
     }
@@ -323,6 +349,7 @@ export class RuntimeResourceCoordinator {
             if (input.signal) {
                 waiting.abortHandler = () => {
                     this.removeWaiting(waiting)
+                    this.notifyIdle()
                     this.record({
                         type: 'cancelled',
                         leaseId: request.id,

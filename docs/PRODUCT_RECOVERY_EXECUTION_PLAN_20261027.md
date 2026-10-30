@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-29 CORE-LIB-04c-02c-02b-02c｜真实 Desktop 资源租约收尾
+
+- [Draft #252](https://github.com/Saber-Alter-Lily/pica-library/pull/252) 在 #251 的后台任务取消/等待之上，复用共享 `RuntimeResourceCoordinator`：原 HTTP 停止接新任务后，等待包含前台收藏同步、推荐及下载在内的在途/等待 lease 清空，最后关闭 SQLite；改动原业务，不增加框架，单个顺序测试。#251 原始全 CI 已通过，#252 本身待核实。
+- 下一阶段优先**真正可用的来源独立安装/Reader 双端功能**，仅在有明确数据风险时补最小必要停写逻辑；无真实 v0.5.0 数据迁移/回滚或 G1–G4 用户验收，不合并 main/发布。
+
+
 ### 2026-10-29 CORE-LIB-04c-02c-02b-02b｜书库后台任务受控停止
 
 - [Draft #251](https://github.com/Saber-Alter-Lily/pica-library/pull/251) 继续上一轮 WebDAV 写入停机改造：原 `LibraryService` 取消并等待 3 个维护/整理任务和 V5 Shadow/Work Identity 的实际运行 Promise；桌面关闭及重启路径按原有顺序先完成后台任务，再处理本地下载和 SQLite，清理 JM 运行时。源代码 + 1 项现有测试文件内的定向回归，无新增协调器/测试框架。CI 待核。

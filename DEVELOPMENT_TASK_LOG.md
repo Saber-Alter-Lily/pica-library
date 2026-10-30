@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-29｜CORE-LIB-04c-02c-02b-02c：原资源租约完成后关闭 SQLite（Draft #252）
+
+- [Draft #252](https://github.com/Saber-Alter-Lily/pica-library/pull/252) 叠加 #251；**实际功能改动**：将旧本地 HTTP 监听关闭前移到后台任务收尾前；原 `RuntimeResourceCoordinator` 增加等待 active/waiting lease 清空的通知（复用 lease.release/等待取消，不建新调度器/轮询）；真实 `LibraryService` 暴露该共享租约等待，原 `closeEngine()` 在所有已登记资源任务退出后才显式关闭 SQLite。旧实例无法完成停机时不打开新数据库主人；重启失败走原停止机制。
+- #251 可执行源码 `48aafdf29` 的 [全量 CI #41004589204](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41004589204) **Android/Web/Desktop 均 SUCCESS**，不能将该结果当作 #252 的验收。#252 只在旧 `runtime-resource-coordinator.test.ts` 增补 1 项在途+排队 lease 顺序完成测试，既有 CI 将单独判定；未增加依赖、测试矩阵或第二 Reader。
+- **尚需**：不经共享 lease 的来源异步请求/外部 writer、源外置完整双端安装、实际用户资料迁移及受保护回滚；G1–G4 全 OPEN。main/Release/OTA 不动；继续功能优先，停止无限扩张防御工程。
+
+
 ### 2026-10-29｜CORE-LIB-04c-02c-02b-02b：原书库后台任务停止并等待实际完成（Draft #251）
 
 - [Draft #251](https://github.com/Saber-Alter-Lily/pica-library/pull/251) 叠加 #250。直接修正式 Desktop `closeEngine()` 和旧 `LibraryService`：利用既有 cancel/checkpoint/任务 Promise，停机时取消且等待书库整理、维护更新/修复扫描、V5 推荐 Shadow 和 Work Identity 刷新结束后再关闭 SQLite；同时请求终止正在运行的收藏同步/推荐构建，并关闭原 JM provider runtime。两个 V5 任务类仅补 `quiesce()` 和停止后禁止重新启动，3 个原脱离请求的后台任务入口也禁止停机后新建。普通使用逻辑与任务队列保持不变。

@@ -5,6 +5,7 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LocalLibraryIngestion } from '../../src/local-library/ingestion'
+import { openOrCreateIsolatedLocalProfile } from '../../src/desktop/core-local-profile'
 import { stageOfflineFullWebQa } from '../../scripts/stage-offline-full-web-qa'
 import { buildOfflineCoreCandidate } from '../../scripts/build-offline-core-candidate'
 import {
@@ -89,6 +90,7 @@ describe('actual independent source-free Desktop entrypoint, never legacy profil
         expect(candidate.sourceInputs.filter(name => name.startsWith('src/desktop/')))
             .toEqual([
                 'src/desktop/child-process.ts',
+                'src/desktop/core-local-profile.ts',
                 'src/desktop/core-preview-main.ts',
                 'src/desktop/instance.ts',
                 'src/desktop/pickers.ts',
@@ -99,6 +101,44 @@ describe('actual independent source-free Desktop entrypoint, never legacy profil
             .toBe(true)
         expect(candidate.bytes.length).toBeGreaterThan(0)
     }, 60000)
+
+    it('retains a separate local-only library across launches and leaves v0.5.0 storage unchanged', () => {
+        const appData = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-core-local-profile-'))
+        folders.push(appData)
+        const official = path.join(appData, 'Pica Library')
+        fs.mkdirSync(official)
+        const legacy = path.join(official, 'library.db')
+        fs.writeFileSync(legacy, 'legacy-owned-by-the-existing-app')
+        const root = openOrCreateIsolatedLocalProfile(appData)
+        expect(root).not.toBe(official)
+        const first = new LibraryDatabase(path.join(root, 'library.db'))
+        first.importCatalog([{
+            comicId: 'local-only-restart-test',
+            title: 'Persistent local book',
+            author: 'Local',
+            categories: [],
+            tags: [],
+            finished: true
+        }])
+        first.close()
+        expect(openOrCreateIsolatedLocalProfile(appData)).toBe(root)
+        const second = new LibraryDatabase(path.join(root, 'library.db'))
+        expect(second.getComic('local-only-restart-test')?.title)
+            .toBe('Persistent local book')
+        second.close()
+        expect(fs.readFileSync(legacy, 'utf8'))
+            .toBe('legacy-owned-by-the-existing-app')
+
+        const unmarked = path.join(appData, 'another-installation')
+        fs.mkdirSync(unmarked)
+        const unrelated = path.join(unmarked, 'Pica Library Local')
+        fs.mkdirSync(unrelated)
+        fs.writeFileSync(path.join(unrelated, 'library.db'), 'not-ours')
+        expect(() => openOrCreateIsolatedLocalProfile(unmarked))
+            .toThrow('incomplete or unowned')
+        expect(fs.readFileSync(path.join(unrelated, 'library.db'), 'utf8'))
+            .toBe('not-ours')
+    })
 
     it('serves the ORIGINAL full Web from a fresh owned OS-temp library and keeps a single instance', async () => {
         const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-core-desktop-preview-'))

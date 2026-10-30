@@ -307,7 +307,8 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         ...(fullWebQa
             ? ['app/web/index.html', 'app/web/app.js',
                 'app/web/full-web-qa-manifest.json', 'app/web/alpha7-cloud.js',
-                'app/desktop-core-preview.mjs', 'Pica-Library-Core-Preview.exe']
+                'app/desktop-core-preview.mjs', 'Pica-Library-Core-Preview.exe',
+                'Start-Local-Only-Draft.cmd', 'README-LOCAL-ONLY-DRAFT.txt']
             : ['app/web/reader-fragment.html',
                 'app/web/offline-core-reader-qa.js'])
     ]) if (!contents.has(required))

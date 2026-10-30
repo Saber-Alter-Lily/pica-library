@@ -11,6 +11,7 @@ on:
       - codex/s3-full-web-assets-20261029
       - codex/s3-core-runtime-composition-20261029
       - codex/s3-core-preview-entry-20261029
+      - codex/s3-persistent-source-free-local-20261030
     paths:
       - '.github/workflows/s3-windows-offline-portable-qa.yml'
       - 'scripts/build-windows-offline-portable-qa.ts'
@@ -18,6 +19,7 @@ on:
       - 'scripts/tsconfig.s3-windows-qa.json'
       - 'scripts/build-offline-core-candidate.ts'
       - 'src/desktop/core-preview-main.ts'
+      - 'src/desktop/core-local-profile.ts'
       - 'src/desktop/instance.ts'
       - 'src/offline-core/qa-ownership.ts'
       - 'packaging/windows/Launcher.cs'

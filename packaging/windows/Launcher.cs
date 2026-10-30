@@ -13,18 +13,22 @@ internal static class Launcher
         {
             string root = AppDomain.CurrentDomain.BaseDirectory;
             string runtime = Path.Combine(root, "runtime", "node.exe");
-            // The default launcher remains the historical provider-enabled
-            // Desktop. The source-free preview is a separate optional binary,
-            // selected ONLY by an explicit first argument. It cannot silently
-            // fall back into the bundled legacy provider runtime.
+            // No-source modes are opt-in and never fall back to legacy.
+            // Default launch remains the official provider-enabled Desktop.
             bool sourceFreePreview = args.Length > 0 &&
                 String.Equals(args[0], "--source-free-preview", StringComparison.Ordinal);
+            bool sourceFreeLocal = args.Length > 0 &&
+                String.Equals(args[0], "--source-free-local", StringComparison.Ordinal);
+            if (sourceFreeLocal && args.Length != 1)
+                throw new ArgumentException("Local-only mode accepts no profile path or extra arguments.");
             string entry = Path.Combine(root, "app",
-                sourceFreePreview ? "desktop-core-preview.mjs" : "desktop.js");
+                sourceFreePreview || sourceFreeLocal ? "desktop-core-preview.mjs" : "desktop.js");
             if (!File.Exists(runtime) || !File.Exists(entry))
                 throw new FileNotFoundException("The packaged runtime is incomplete. Extract the entire ZIP before starting Pica Library.");
 
-            var forwarded = sourceFreePreview ? args.Skip(1).ToArray() : args;
+            var forwarded = sourceFreeLocal
+                ? new[] { "--persistent-local-profile" }
+                : sourceFreePreview ? args.Skip(1).ToArray() : args;
             var quoted = forwarded.Select(Quote);
             var info = new ProcessStartInfo
             {

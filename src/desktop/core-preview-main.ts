@@ -3,10 +3,10 @@
  * src/desktop/main.ts this executable does not import LibraryService,
  * ProviderService, SourceRuntime, Host, any Pica/E-H/JM SDK or updater.
  *
- * Until v0.5.0 profile migration and production launcher are independently
- * accepted, it refuses ALL installed/user roots and can serve only a freshly
- * initialized, sentinel-owned OS-temp library with the original, hash-verified
- * full Web. This is NOT a release binary or a default Desktop entrypoint.
+ * The existing OS-temp QA preview remains unchanged. A separately opted-in
+ * Windows local-only mode uses its own persistent, marked profile and never
+ * migrates or opens the installed v0.5.0 profile. Neither is a formal release
+ * or the default Desktop entrypoint.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -16,6 +16,8 @@ import { startOfflineCoreHttp } from '../offline-core/qa-http'
 import { assertTemporaryCorePreviewRoot } from '../offline-core/qa-ownership'
 import { InstanceLock } from './instance'
 import { DesktopNativePicker } from './pickers'
+import { openWindowsLocalProfile } from './core-local-profile'
+import { launchBrowser } from './child-process'
 import type { CoreLocalPicker } from '../library/core-local-import'
 
 function previewRoot(argv: string[]) {
@@ -28,7 +30,11 @@ async function runCoreDesktopPreview(
     argv: string[] = process.argv.slice(2),
     entryFile: string = process.argv[1]
 ) {
-    const root = previewRoot(argv)
+    const persistentLocal = argv.length === 1 &&
+        argv[0] === '--persistent-local-profile'
+    // Preserve original disposable-preview validation order. The persistent
+    // root is created only after a complete application Web stage is proven.
+    const temporaryRoot = persistentLocal ? undefined : previewRoot(argv)
     const webRoot = path.join(path.dirname(path.resolve(entryFile)), 'web')
     // A real full-page app is required. Never silently fall back to the
     // Reader-only QA shell or load a user-selected arbitrary Web directory.
@@ -37,6 +43,9 @@ async function runCoreDesktopPreview(
     if (!manifest?.isFile() || manifest.isSymbolicLink() ||
         manifest.nlink !== 1)
         throw new Error('Original full Web QA manifest is required')
+    const root = persistentLocal
+        ? openWindowsLocalProfile()
+        : temporaryRoot!
     const lock = new InstanceLock(
         path.join(root, 'runtime-state', 'core-preview.lock'),
         path.join(root, 'runtime-state', 'core-preview-instance.json'),
@@ -79,13 +88,21 @@ async function runCoreDesktopPreview(
         })
         lock.publish(running.url)
         process.stdout.write(JSON.stringify({
-            status: 'CORE_DESKTOP_PREVIEW_QA_ONLY',
+            status: persistentLocal
+                ? 'CORE_DESKTOP_LOCAL_DRAFT_ONLY'
+                : 'CORE_DESKTOP_PREVIEW_QA_ONLY',
             url: running.url,
             sourceCount: 0,
-            userProfileOpened: false,
+            userProfileOpened: persistentLocal,
+            legacyProfileOpened: false,
+            persistentLibrary: persistentLocal,
             defaultDesktopReplaced: false,
             publishAuthorized: false
         }) + '\n')
+        if (persistentLocal)
+            launchBrowser(running.url, error =>
+                process.stderr.write('Local-only browser launch failed: ' +
+                    String(error) + '\n'))
         await new Promise<void>(resolve => {
             process.once('SIGINT', () => resolve())
             process.once('SIGTERM', () => resolve())

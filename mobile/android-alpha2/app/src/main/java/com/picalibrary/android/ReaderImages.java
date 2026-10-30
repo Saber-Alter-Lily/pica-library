@@ -65,7 +65,7 @@ final class ReaderImages implements AutoCloseable {
 
     String failureDetail(String path){String value=failures.get(path);return value==null||value.isEmpty()?"暂时无法读取":value;}
     private void commitCache(File partial,File target){SourceAccess.commit(source.sourceAccess(),()->{synchronized(ReaderImages.class){if(!target.exists()&&!partial.renameTo(target))throw new IOException("cache rename failed");return null;}});}
-    String diagnose(String path){if(source instanceof EhReaderSource)return ((EhReaderSource)source).diagnose(path);return "当前来源没有额外诊断信息";}
+    String diagnose(String path){return source.diagnose(path);}
 
     private File fetchNetworkToPartial(String path,Request request) throws Exception {
         if(isLocal(path))throw new IllegalArgumentException("local downloads must bypass reader cache");

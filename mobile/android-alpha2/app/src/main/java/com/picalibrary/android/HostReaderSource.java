@@ -12,6 +12,7 @@ final class HostReaderSource implements ReaderSource {
     HostReaderSource(Context context){this(HostSourceManager.get(context));}
     HostReaderSource(HostSourceManager manager){this.manager=manager;try{session=manager.requireSession();}catch(RuntimeException unavailable){throw new IllegalArgumentException("SOURCE_HOST_CANCELLED");}}
     public String kind(){return "host";}
+    public String readerLabel(Context context,boolean compact){return context.getString(R.string.host_title);}
     public String scope(){return session.scope;}
     public String displayTitle(String comic){try{return manager.title(session,comic);}catch(RuntimeException unavailable){return "";}}
     public boolean emitsRecommendationEvidence(){return false;} // Host-only IDs are not part of portable recommendation sync.

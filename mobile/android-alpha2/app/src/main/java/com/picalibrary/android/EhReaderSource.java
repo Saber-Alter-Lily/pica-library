@@ -14,6 +14,11 @@ final class EhReaderSource implements ReaderSource {
     private String comicTitle="",author="";
     EhReaderSource(Context context){this.context=context.getApplicationContext();this.client=new EhClient(this.context);this.resolver=new EhReaderResolver(this.context);}
     public String kind(){return "eh";}
+    public String readerLabel(Context context,boolean compact){return compact?"E-H/缓存":"E-H 在线";}
+    public String chapterDiagnosticPath(String comicId){
+        return EhClient.isEhId(comicId)?EhReaderResolver.locator(comicId,1):"";
+    }
+    public boolean canDiagnosePage(){return true;}
     public com.picalibrary.android.sources.SourceAccessPolicy.Permit sourceAccess(){return client.access;}
     public String scope(){return ReaderPolicy.hash("eh-public-v5-mutable-chapters");}
 
@@ -37,6 +42,6 @@ final class EhReaderSource implements ReaderSource {
     }
     public String recentChapter(String comicId){return "";}
     public HttpURLConnection image(String path) throws Exception {return EhReaderResolver.handles(path)?resolver.openImage(path):client.image(path);}
-    String diagnose(String path){return EhReaderResolver.handles(path)?resolver.diagnose(path):"E-H 诊断不可用于该页面";}
+    public String diagnose(String path){return EhReaderResolver.handles(path)?resolver.diagnose(path):"E-H 诊断不可用于该页面";}
     public void saveProgress(String comicId,String episodeId,int pageIndex){if(!RemoteConfigStore.load(context).configured())return;BridgeClient.ChapterItem chapter=knownChapters.get(episodeId);try{new RemoteLibraryClient(context).saveReadingProgress(DeviceIdentity.id(context),comicId,episodeId,pageIndex,comicTitle,author,chapter==null?"":chapter.title,chapter==null?0:chapter.order);}catch(Exception e){throw new IllegalStateException("E-H 阅读进度云端同步失败",e);}}
 }

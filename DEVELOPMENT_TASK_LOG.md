@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-05：原 Android Reader UI 去除具体来源类/诊断/推荐引用（Draft #260）
+
+- [Draft #260](https://github.com/Saber-Alter-Lily/pica-library/pull/260) 叠加 20/20 CI SUCCESS 的 #259。按照执行计划中**开源优先、不重复造轮子**规则，参考 Mihon 的 Reader model/loader/viewer 分离设计但**不复制其代码**；只复用原 `ReaderActivity`、`ReaderImages`、`ReaderSource`、全部来源适配器、`RecommendationEvidenceStore` 与 AndroidX 阅读 UI，零新依赖。
+- 原 `ReaderSource` 增加最小的状态显示与可选故障诊断接口：各原适配器负责返回既有“本地/手机/WebDAV/Pica/E-H/JM/Host/电脑”显示文字；E-H 原适配器继续执行原 `EhClient.isEhId`、`EhReaderResolver.locator`、`resolver.diagnose`，其他来源默认无额外诊断。原 `ReaderActivity` 不再直接依赖具体在线来源类型；`ReaderImages` 去除 `EhReaderSource` 的直接类型判断，仍保留原来源缓存写入授权。
+- 旧 UI 的推荐完成仍由现有 `metadata` 线程池提交，`ReaderSourceFactory.recordReaderComplete`（原应用层）负责使用原 catalog 与 `RecommendationEvidenceStore` 写入；Host 禁推荐证据条件不变。既有 `LocalComicImportTest`、`ReaderImagesSourceAccessTest` 和原 async source contract 定向扩展，不增加新框架。
+- 下一步重点是原 Reader UI 的**物理模块迁移与真来源依赖排除**，而不是重做页面/缓存/推荐。当前正式 Android App 依然编译旧在线 SDK，不能宣称 clean APK；#260 CI 按源码终态分别核对。G1–G4 OPEN，main/Release/OTA/真实资料未更动。
+
+
 ### 2026-10-30｜所有 S0–S6 任务统一执行原则：开源优先、避免重复造轮子（用户明确要求）
 
 - **强制执行：先检查本项目现有实现，再参考相关成熟 OSS，再决定复用/改造/新增。** 本仓库已有 Reader、文件夹/CBZ 导入、章节与书签、原生 AndroidX、SQLite/WebDAV、升级助手等实现，默认保留和复用，不为模块化另起一套应用或功能。

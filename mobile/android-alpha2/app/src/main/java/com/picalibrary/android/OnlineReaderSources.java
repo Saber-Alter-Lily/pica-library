@@ -42,6 +42,7 @@ final class RemoteReaderSource implements ReaderSource {
     private String comicTitle="",author="";
     RemoteReaderSource(Context context){this.context=context.getApplicationContext();client=new RemoteLibraryClient(this.context);}
     public String kind(){return "remote";}
+    public String readerLabel(Context context,boolean compact){return compact?"云端/缓存":"WebDAV";}
     public String scope(){return client.scope();}
     public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {
         JSONObject root=client.comic("v1/comics/"+java.net.URLEncoder.encode(comicId,"UTF-8").replace("+","%20")+"/manifest.json");comicTitle=root.optString("title",comicTitle);author=root.optString("author",author);
@@ -70,6 +71,7 @@ final class PicaReaderSource implements ReaderSource {
     private String comicTitle="",author="";
     PicaReaderSource(Context context){this.context=context.getApplicationContext();this.client=new PicaClient(this.context);}
     public String kind(){return "pica";}
+    public String readerLabel(Context context,boolean compact){return compact?"Pica/缓存":"Pica 在线";}
     public com.picalibrary.android.sources.SourceAccessPolicy.Permit sourceAccess(){return client.access;}
     public String scope(){PicaAccountStore.Session session=PicaAccountStore.load(context);String identity=!session.account.isEmpty()?session.account:BridgeStore.paired(context)&&DesktopAccountStatusStore.load(context).picaConfigured?"desktop-relay:"+BridgeStore.host(context):"anonymous";return ReaderPolicy.hash("pica\n"+identity);}
     public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {

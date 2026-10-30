@@ -13,6 +13,7 @@ final class JmReaderSource implements ReaderSource {
     private final Map<String,BridgeClient.ChapterItem> knownChapters=new HashMap<>();
     JmReaderSource(Context context){this.context=context.getApplicationContext();client=JmClientManager.get(this.context);}
     public String kind(){return "jm";}
+    public String readerLabel(Context context,boolean compact){return compact?"JM/缓存":"JM 在线";}
     public com.picalibrary.android.sources.SourceAccessPolicy.Permit sourceAccess(){return client.access;}
     public String scope(){return ReaderPolicy.hash("jm\n"+JmAccountStore.scope(context));}
     public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {

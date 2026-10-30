@@ -17,6 +17,7 @@ final class LocalComicReaderSource implements ReaderSource {
     }
 
     public String kind() { return "local"; }
+    public String readerLabel(Context context,boolean compact){return context.getString(R.string.local_import_label);}
     public String scope() { return LocalComicReaderPort.SCOPE; }
     public String displayTitle(String id) { return local.displayTitle(id); }
 

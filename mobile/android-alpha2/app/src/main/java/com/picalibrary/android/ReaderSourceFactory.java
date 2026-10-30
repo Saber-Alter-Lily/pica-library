@@ -28,5 +28,18 @@ final class ReaderSourceFactory {
             default: return new DesktopReaderSource(context);
         }
     }
+    // App-owned recommendation hook. The shared Reader UI invokes it on its
+    // existing metadata executor, never synchronously on the render thread.
+    static void recordReaderComplete(Context context,String comicId) {
+        UnifiedCatalogStore.Entry entry=
+                UnifiedCatalogStore.load(context).byId.get(comicId);
+        RecommendationEvidenceStore.recordReaderComplete(
+                context,
+                comicId,
+                entry==null?"":entry.displayAuthor(),
+                entry==null?java.util.Collections.emptyList():entry.tags,
+                entry==null?java.util.Collections.emptyList():entry.categories
+        );
+    }
     private ReaderSourceFactory() {}
 }

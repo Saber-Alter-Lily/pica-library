@@ -431,8 +431,16 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(helper).toContain('Context app=getApplicationContext();')
     expect(helper).toContain('String comicId=comic;')
     expect(helper).toContain('metadata.submit(()->{')
-    expect(helper).toContain('UnifiedCatalogStore.load(app).byId.get(comicId)')
-    expect(helper).toContain('RecommendationEvidenceStore.recordReaderComplete(')
+    expect(helper).toContain('if(!source.emitsRecommendationEvidence())return;')
+    expect(helper).toContain('ReaderSourceFactory.recordReaderComplete(app,comicId);')
+    expect(helper).not.toContain('UnifiedCatalogStore.load(')
+    expect(helper).not.toContain('RecommendationEvidenceStore.recordReaderComplete(')
+    const factory = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderSourceFactory.java',
+      'utf8'
+    )
+    expect(factory).toContain('UnifiedCatalogStore.load(context).byId.get(comicId)')
+    expect(factory).toContain('RecommendationEvidenceStore.recordReaderComplete(')
 
     expect(save).toContain('completionRecordedChapter=chapter;')
     expect(save).toContain('recordReaderCompleteAsync();')

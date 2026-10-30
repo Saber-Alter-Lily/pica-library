@@ -25,24 +25,27 @@ public final class LocalComicReaderPort {
             this.id=id; this.title=title; this.updatedAt=updatedAt; this.pageCount=pageCount;
         }
     }
-    public static final class Chapter {
-        public final String id, title;
-        public final int order, pageCount;
+    // Retain the original LocalComicReaderPort field names while sharing the
+    // same source-neutral ReaderContent representation with all sources.
+    public static final class Chapter extends ReaderContent.Chapter {
+        public final int pageCount;
         Chapter(String id, String title, int order, int pageCount) {
-            this.id=id; this.title=title; this.order=order; this.pageCount=pageCount;
+            super(id,title,order,pageCount);
+            this.pageCount=pageCount;
         }
     }
-    public static final class Page {
-        public final String id, uri;
-        public final int position;
+    public static final class Page extends ReaderContent.Page {
+        public final String uri;
         Page(String id, String uri, int position) {
-            this.id=id; this.uri=uri; this.position=position;
+            super(id,uri,position);
+            this.uri=uri;
         }
     }
-    public static final class ChapterData {
+    public static final class ChapterData extends ReaderContent.ChapterData {
         public final Chapter chapter;
         public final List<Page> pages;
         ChapterData(Chapter chapter, List<Page> pages) {
+            super(chapter,pages,0);
             this.chapter=chapter; this.pages=pages;
         }
     }

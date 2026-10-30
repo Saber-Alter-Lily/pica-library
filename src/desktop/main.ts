@@ -1281,12 +1281,21 @@ async function startEngine(preferredPort: number) {
                 // No await can allow a new local HTTP request between the
                 // first activity check, admission freeze, and second check.
                 ready()
-                const restoreOnFailure = updateHttpFence.freezeForHandoff()
+                const restoreHttp = updateHttpFence.freezeForHandoff()
+                let restoreResources: (() => void) | undefined
                 try {
+                    // This is the SAME runtime resource coordinator already
+                    // passed to LibraryService, WebDAV and host-library tasks.
+                    // It blocks new/queued leases in BOTH observe/enforce modes.
+                    restoreResources = runtimeResources.freezeAcquisitionsForUpdate()
                     ready()
-                    return restoreOnFailure
+                    return () => {
+                        restoreResources?.()
+                        restoreHttp()
+                    }
                 } catch (error) {
-                    restoreOnFailure()
+                    restoreResources?.()
+                    restoreHttp()
                     throw error
                 }
             }),

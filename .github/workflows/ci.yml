@@ -61,6 +61,22 @@ jobs:
         timeout-minutes: 28
         # Keep every test enabled; bound hangs and preserve verbose per-test progress.
         run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon --stacktrace --info --max-workers=2
+      - name: Assemble opt-in local-only Android draft and inspect its manifest
+        if: ${{ github.head_ref == 'codex/s3-android-local-only-draft-20261030' }}
+        working-directory: mobile/android-alpha2
+        timeout-minutes: 10
+        env:
+          PICA_ANDROID_LOCAL_ONLY_DRAFT: '1'
+        run: |
+          gradle :app:assembleDebug --no-daemon --max-workers=2
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$aapt" dump badging "$apk" | grep -F "package: name='com.picalibrary.android.localdraft'"
+          "$aapt" dump badging "$apk" | grep -F "launchable-activity: name='com.picalibrary.android.HomeActivity'"
+          if "$aapt" dump permissions "$apk" | grep -E 'android.permission.(INTERNET|CAMERA|REQUEST_INSTALL_PACKAGES)'; then
+            echo "Local-only APK still requests a forbidden runtime capability"
+            exit 1
+          fi
       - name: Preserve actual Android JUnit results even on timeout
         if: always() && github.event.repository.private == false
         uses: actions/upload-artifact@v4

@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-29 CORE-LIB-04c-02c-02b-02b｜书库后台任务受控停止
+
+- [Draft #251](https://github.com/Saber-Alter-Lily/pica-library/pull/251) 继续上一轮 WebDAV 写入停机改造：原 `LibraryService` 取消并等待 3 个维护/整理任务和 V5 Shadow/Work Identity 的实际运行 Promise；桌面关闭及重启路径按原有顺序先完成后台任务，再处理本地下载和 SQLite，清理 JM 运行时。源代码 + 1 项现有测试文件内的定向回归，无新增协调器/测试框架。CI 待核。
+- **下一功能切口**：评估尚未进入原资源协调器的前台来源异步请求（尤其网络请求结束后仍会修改 SQLite/媒体的情形）并用原取消/任务 lease 逐项补齐；仍不允许声称全部写入者已冻结或可以迁移真实资料。G1–G4 OPEN，主线保持正式 Windows/Android 纯核心/来源真正外置。
+
+
 ### 2026-10-29 CORE-LIB-04c-02c-02b-02a｜WebDAV 共享写任务与停机收尾
 
 - [Draft #250](https://github.com/Saber-Alter-Lily/pica-library/pull/250) 叠加 #249，先修**真实功能缺口**而不继续扩展测试框架：remote-only 删除使用现有资源协调器 lease，Desktop preflight 感知远程同步/删除 busy，停机取消并等待 WebDAV 在途修改，备用端口注入相同 coordinator；仅扩展现有 1 项回归测试。CI 待核实。

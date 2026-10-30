@@ -65,6 +65,10 @@ export interface RemoteApiGatewayOptions {
     webRoot?: string
     rateLimit?: number
     rateWindowMs?: number
+    /** Optional shared Desktop helper-handoff admission; no new proxy. */
+    requestAdmission?: {
+        enter(method: string, pathname: string): (() => void) | null
+    }
     onAudit?: (event: {
         remoteAddress: string
         method: string
@@ -425,6 +429,27 @@ export async function startRemoteApiGateway(
                         error: 'Remote Origin is not allowed'
                     })
                 }
+            }
+
+            // The existing Remote API and remote Web shell are separate
+            // listeners from original Desktop loopback HTTP. Count them in
+            // the same update handoff fence BEFORE session creation,
+            // proxying, health probes, rate-limit mutations or asset reads.
+            const releaseRequest = options.requestAdmission?.enter(
+                method, pathname
+            )
+            if (releaseRequest === null) {
+                response.setHeader('retry-after', '2')
+                response.setHeader('connection', 'close')
+                audit(request, pathname, 503)
+                return json(response, 503, {
+                    code: 'DESKTOP_UPDATE_HANDOFF_FROZEN',
+                    error: 'Desktop is preparing to update. Try again later.'
+                })
+            }
+            if (releaseRequest) {
+                response.once('finish', releaseRequest)
+                response.once('close', releaseRequest)
             }
 
             const retryAfter = rateLimited(request)

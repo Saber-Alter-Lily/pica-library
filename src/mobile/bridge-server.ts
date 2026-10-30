@@ -240,6 +240,10 @@ export async function startMobileBridge(options: {
     port?: number
     stateFile?: string
     accountStatus?: () => Record<string, unknown>
+    /** Optional shared Desktop update handoff fence; no new LAN service. */
+    requestAdmission?: {
+        enter(method: string, pathname: string): (() => void) | null
+    }
 }) {
     const host = options.host ?? '0.0.0.0'
     const requestedPort = options.port ?? 7788
@@ -305,6 +309,26 @@ export async function startMobileBridge(options: {
             `http://${request.headers.host ?? `127.0.0.1:${actualPort}`}`
         )
         try {
+            // The pairing endpoint and all bearer-authenticated phone work
+            // must share the SAME original Desktop update ingress fence.
+            // An in-flight request retains its lease until response
+            // finish/close; a frozen updater admits no new pairing, sync
+            // or Reader operation. Credentials are not inspected here.
+            const releaseRequest = options.requestAdmission?.enter(
+                request.method ?? 'GET', url.pathname
+            )
+            if (releaseRequest === null) {
+                response.setHeader('connection', 'close')
+                response.setHeader('retry-after', '2')
+                return json(response, 503, {
+                    code: 'DESKTOP_UPDATE_HANDOFF_FROZEN',
+                    error: 'Desktop is preparing to update. Try again later.'
+                })
+            }
+            if (releaseRequest) {
+                response.once('finish', releaseRequest)
+                response.once('close', releaseRequest)
+            }
             if (
                 url.pathname === '/mobile/v1/status' &&
                 request.method === 'GET'

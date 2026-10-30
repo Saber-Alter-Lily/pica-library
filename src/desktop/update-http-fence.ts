@@ -44,14 +44,23 @@ export class DesktopHttpHandoffFence {
      * only after its existing local-host/origin/CSRF checks.
      *
      * Return null to send HTTP 503. The returned closure is called at finish
-     * or close; it is safe to call twice. Only the pre-existing authenticated
-     * POST update/apply command is exempt, since it initiates this freeze.
+     * or close; it is safe to call twice. Only the original Desktop HTTP
+     * host may opt into the authenticated update/apply and health exemptions.
+     * Other ingress surfaces must pass allowDesktopControl=false and never
+     * inherit exceptions for similarly named routes.
      */
-    enter(method: string, pathname: string): (() => void) | null {
-        if (method === 'POST' && pathname === '/api/v1/update/apply')
+    enter(
+        method: string,
+        pathname: string,
+        /** Never allow updater/health exceptions on Mobile or Remote ingress. */
+        allowDesktopControl = true
+    ): (() => void) | null {
+        if (allowDesktopControl &&
+            method === 'POST' && pathname === '/api/v1/update/apply')
             return () => undefined
         if (this.frozenOwner !== null) {
-            if (method === 'GET' && diagnostics.has(pathname))
+            if (allowDesktopControl &&
+                method === 'GET' && diagnostics.has(pathname))
                 return () => undefined
             return null
         }

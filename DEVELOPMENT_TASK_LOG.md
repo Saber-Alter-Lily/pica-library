@@ -1,6 +1,17 @@
 # Pica Library Development Task Log
 
 
+### 2026-10-29｜CORE-LIB-04c-02c-02b-01：原 Mobile Bridge 与 Remote API 接入同一升级冻结（Draft #249）
+
+- [Draft PR #249](https://github.com/Saber-Alter-Lily/pica-library/pull/249) 基于 #248，针对真实 Windows Desktop 的两个**独立 HTTP 监听器**：`src/mobile/bridge-server.ts` 的手机配对、书库/在线阅读/同步，以及 `src/remote-api/gateway.ts` 的远程会话、限流、健康和反向代理。二者原本不经过本机 `src/library/server.ts` 的更新冻结；这轮复用 **同一个** `DesktopHttpHandoffFence`，使真实在途请求也计入旧 UpdateManager 的 helper 交接前检查，不再新造服务或任务系统。
+- 原 `DesktopHttpHandoffFence.enter` 增加可信原生 Desktop 控制例外开关，独立 Mobile/Remote 入口强制 `allowDesktopControl=false`，避免通过伪造健康或 update/apply 同名路径绕过冻结。原主程序 `main.ts` 将同一 `externalUpdateIngress` 注入实际两个服务；Mobile Bridge 设置变更计入旧活跃任务，冻结后不得新增 Mobile listener。所有原 Host/Origin/CSRF、配对 token、Remote API 授权、原 WebDAV/Provider/Reader 与本地 HTTP 行为均保留。
+- 真实 Node HTTP 请求采用 `response.once('finish')`/`close` 幂等释放；冻结阶段 Mobile/Remote 普通新请求均返回有界 503、稳定 code、Retry-After=2、关闭连接。原 helper 启动失败按照 #248 的已有 rollback 闭包恢复原服务；ACK 后继续冻结等待原 shutdown/进程交接。不读取、不公开真实账户或内容。
+- 新 `test/unit/desktop-external-http-handoff.test.ts` 真正启动两套现有网络服务，使用 OS Temp 合成书库和 loopback；在**未传完的手机配对请求**及**被延迟的真实远程代理请求**仍执行时验证拒绝升级；冻结时验证配对、手机书库/状态、远程 API/health/bootstrap/网页都不能再产生新工作；解冻后能够恢复，并静态确认所有实际启动入口接线。
+- 初始生产功能源码 `5f7f4698` 的 [Linux/Windows 专项 #40986598520](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40986598520) **2/2 SUCCESS**：Linux 64/64、Windows 63 PASS+1 POSIX-only SKIP，但其 [完整 CI #40986649175](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40986649175) **Web/Desktop FAILURE：旧 AST+VM 测试夹具漏注入新增 `updateHttpFence` 依赖，导致 6 项失败**，原失败保留。已**不改生产安全判断**而补齐旧 VM 的合成 `updateHttpFence`/`externalUpdateIngress`，并增加“冻结后不启动 Mobile Listener”回归，同时扩展专项运行到该原测试。修后精确代码+测试+工作流 `35b9a8e7415b1c4f4f8b2491e5f738b2ab9bf981` 的 [双平台 #40987086618](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40987086618) **2/2 SUCCESS：Linux 83/83，Windows 82 PASS+1 POSIX-only SKIP**。[完整 Android/Web/Desktop #40987068615](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40987068615) **Android 与 Web/Desktop 两项均 SUCCESS**：原 Web/Desktop 367/367 文件、2877 PASS/14 SKIP，真实浏览器 61 PASS；Android 的测试/Lint/构建 BUILD SUCCESSFUL；精确业务和测试 SHA 为 `9c92e97688450e23858cd2b604862210eb194363`，后加的专用 workflow 不改源码。本轮工程专项与全 CI 可标 PASS，但正式 G1–G4 仍 OPEN。完整技术说明：[S3_MOBILE_REMOTE_SHARED_UPDATE_FENCE_20261029.md](docs/S3_MOBILE_REMOTE_SHARED_UPDATE_FENCE_20261029.md)。
+- **明确未完成**：这是三套 Desktop HTTP 服务和 RuntimeResourceCoordinator 的单进程准入，不能阻断所有后台 fire-and-forget、独立来源 Worker、他进程外置网盘/媒体写入，尚无全局 SQLite+文件冻结、可信停写/退出回执、OS 受保护备份/失败回滚；S5/G3 和 G1/G2/G4 继续 OPEN。下一步 `04c-02c-02b-02` 核查非 HTTP writer、真实数据库与媒体 mutation barrier、drain 及版本化收据，然后才评估生产迁移。保持 Draft，不合并 `main`，不发布安装包/OTA，不碰用户资料。
+
+
+
 ### 2026-10-29｜CORE-LIB-04c-02c-02a｜真实 Desktop HTTP 与共享资源协调器的升级交接冻结（Draft PR #248）
 
 - [Draft #248](https://github.com/Saber-Alter-Lily/pica-library/pull/248) 叠加 #247：**改动原正式版业务入口** `src/library/server.ts`、`src/desktop/main.ts`、`src/desktop/update-command.ts` 和原 `RuntimeResourceCoordinator`，不是新增独立 QA 小阅读器。保留原书库、书架、Reader、推荐、网盘和更新器，不碰正式 `main`、Release、OTA 或用户数据。

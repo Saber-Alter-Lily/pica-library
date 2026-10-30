@@ -257,6 +257,13 @@ export async function startLibraryServer(options: {
     port?: number
     desktop?: DesktopServerController
     cacheDir?: string
+    /**
+     * Optional original Desktop in-process request admission. The source-free
+     * local core does not receive a fence and keeps its existing behavior.
+     */
+    requestAdmission?: {
+        enter(method: string, pathname: string): (() => void) | null
+    }
 }) {
     const root = webRoot()
     // The existing Desktop and the physical no-source Core now instantiate
@@ -376,6 +383,26 @@ export async function startLibraryServer(options: {
                     error: 'This local request could not be verified'
                 })
             }
+            // One admission point for the ORIGINAL local HTTP surface,
+            // including GET endpoints that may indirectly schedule work.
+            // The in-flight lease ends at response finish/close, even on a
+            // client disconnect. Unknown routes are refused after freeze.
+            const releaseRequest = options.requestAdmission?.enter(
+                request.method ?? 'GET', url.pathname
+            )
+            if (releaseRequest === null) {
+                response.setHeader('retry-after', '2')
+                response.setHeader('connection', 'close')
+                return json(response, 503, {
+                    code: 'DESKTOP_UPDATE_HANDOFF_FROZEN',
+                    error: 'The desktop is preparing to update. Try again later.'
+                })
+            }
+            if (releaseRequest) {
+                response.once('finish', releaseRequest)
+                response.once('close', releaseRequest)
+            }
+
             if (
                 url.pathname === '/api/v1/desktop/status' &&
                 request.method === 'GET' &&

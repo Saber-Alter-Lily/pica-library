@@ -1,5 +1,19 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+## 全阶段工程硬规则｜开源优先与禁止重复造轮子（2026-10-30 起适用于 S0–S6）
+
+**优先顺序：现有 Pica Library 生产代码与用户兼容性 → 成熟开源项目和标准平台组件 → 最小必要适配 → 仅在确有缺口时新增实现。** 每项新功能/架构拆分先查已有相同或相似功能，不得为“解耦”另造一套 Reader、导入器、数据库、调度器、插件框架、升级器或测试系统。
+
+1. **先调研再决策。** 每个功能/重构 PR 说明记录：可复用原文件/接口，相关 OSS 项目、链接、维护状态与许可证，直接复用/只借鉴/不采用的选择及原因，以及当前缺口。至少核查本仓库；与任务相关才比较外部 OSS，不要求无关任务凑数量。
+2. **优先用现有组件。** Android 优先原 `ReaderActivity`、`ReaderPolicy`、`LocalComicImporter`/`LocalComicStore`、SAF/AndroidX `DocumentFile`、`ViewPager2`、`RecyclerView`；Windows 优先旧 SQLite、Reader、Web UI、Upgrade Assistant。模块化使用标准 Gradle/Java/Android 构建，除非有明确收益，不引入新库或框架。
+3. **开源项目参考基线。** [Mihon](https://github.com/mihonapp/mihon)（Apache-2.0，本地阅读及用户安装来源扩展）、[Mihon 本地文件说明](https://mihon.app/docs/guides/local-source/)（作品/章节/CBZ 结构）、[Mihon 大图组件](https://github.com/mihonapp/subsampling-scale-image-view)（Apache-2.0，必要时评估超大图缩放）；[Kotatsu](https://github.com/KotatsuApp/Kotatsu)（GPL-3.0、已归档）只比较功能和交互思路，**不得直接复制其 GPL 代码进入本项目**。列入参考不代表已引入依赖/已实现功能。
+4. **先核实许可证和可追溯性。** 只有确认授权兼容、维护/安全状况及必要的版权 NOTICE、修改记录、版本固定后，才可实际使用第三方代码和资源。不得把“开源”当作免授权或版权豁免；只借鉴架构时标注“未复制代码”。
+5. **功能优先，验证精简。** 目标是可使用的本地/网盘/可选来源阅读、Windows/Android 布局和老用户无痛更新。优先旧 CI + 实际功能场景，新增测试只针对真正改变的业务和高风险数据兼容性；不连续堆冗余防御层或新框架。
+6. **验收必须对应可核实证据。** 导入/阅读/书签/书架真实可用，纯核心依赖/DEX 中无来源 SDK，真实 Android/Windows 编译与旧用户兼容得到证明；工程 CI 与真机/正式发布验收分别标注，失败不冒充成功。G1–G4 全通过前保持 Draft，禁止自动合并、发布或处理真实用户资料。
+
+**当前 S3 Reader 决策：** 借鉴 Mihon 的 Reader 核心/来源扩展分离思路，但复用本项目原 Java Reader + AndroidX，不迁入 Mihon 的 Kotlin UI，也不复制 Kotatsu GPL 代码。先使 `BridgeClient` 的通用 Chapter/Page/ChapterData 数据类型由源中立 `:local-core` 统一定义，保留旧调用方兼容；后续再把原 Reader UI 和 Android 存储交给独立物理无源构建。每轮 PR 写明“复用/参考/未采用”与 APK 来源 SDK 实际状态。
+
+
 ### 2026-10-30 CORE-ANDROID-03｜Reader 接口与具体来源实现分离
 
 - [Draft #258](https://github.com/Saber-Alter-Lily/pica-library/pull/258)：从原 `ReaderSource.java` 移出 Desktop/WebDAV/Pica 具体类，放入 `OnlineReaderSources.java`；核心声明只保留接口，原方法逻辑未变。下一步优先将 ReaderUI 使用的 `BridgeClient` 类型替换为无来源数据模型、抽离原 Reader 页渲染到单独模块，避免重写阅读器。真正干净 Android APK 尚未实现；不合并/发布，G1–G4 OPEN。

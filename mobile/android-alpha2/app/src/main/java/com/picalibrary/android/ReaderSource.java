@@ -10,8 +10,8 @@ interface ReaderSource {
     default boolean emitsRecommendationEvidence(){return true;}
     String kind();
     String scope();
-    List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception;
-    BridgeClient.ChapterData chapter(String comicId,String episodeId) throws Exception;
+    List<? extends ReaderContent.Chapter> chapters(String comicId) throws Exception;
+    ReaderContent.ChapterData chapter(String comicId,String episodeId) throws Exception;
     String recentChapter(String comicId) throws Exception;
     HttpURLConnection image(String path) throws Exception;
     void saveProgress(String comicId,String episodeId,int pageIndex);

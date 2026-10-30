@@ -130,6 +130,7 @@ android {
 
 dependencies {
     implementation project(':local-core')
+    implementation project(':local-storage')
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation('io.github.jukomu:jmcomic-core:v1.1.12') {
         exclude group: 'io.github.darkxanter', module: 'webp-imageio'

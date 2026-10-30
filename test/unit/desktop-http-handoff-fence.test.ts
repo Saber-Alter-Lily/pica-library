@@ -202,6 +202,32 @@ describe('actual original local web server uses the new Desktop-only admission p
             expect(pre.status).toBe(200)
             expect(chooser).toHaveBeenCalledTimes(1)
             expect(fence.pendingRequests).toBe(0)
+            // Hold one REAL original Desktop HTTP handler inside an awaited
+            // native directory-picker operation. A pending request cannot be
+            // misclassified as idle and raced by the helper handoff.
+            let signalEntered!: () => void
+            let releasePicker!: (value: string | null) => void
+            const entered = new Promise<void>(resolve => { signalEntered = resolve })
+            chooser.mockImplementationOnce(async () => {
+                signalEntered()
+                return await new Promise<string | null>(resolve => {
+                    releasePicker = resolve
+                })
+            })
+            const pendingPicker = fetch(base+'/api/v1/desktop/choose-folder',{
+                method:'POST',headers
+            })
+            await entered
+            try {
+                expect(fence.pendingRequests).toBe(1)
+                expect(() => fence.freezeForHandoff())
+                    .toThrow('Finish active Reader and library requests')
+            } finally {
+                releasePicker(null)
+            }
+            expect((await pendingPicker).status).toBe(200)
+            expect(fence.pendingRequests).toBe(0)
+            expect(chooser).toHaveBeenCalledTimes(2)
             const originalCount=db.listShelves().length
             const restore=fence.freezeForHandoff()
             expect(fence.frozen).toBe(true)
@@ -240,7 +266,7 @@ describe('actual original local web server uses the new Desktop-only admission p
                 method:'POST',headers
             })
             expect(next.status).toBe(200)
-            expect(chooser).toHaveBeenCalledTimes(2)
+            expect(chooser).toHaveBeenCalledTimes(3)
         } finally {
             if(started)
                 await new Promise<void>((resolve,reject)=>

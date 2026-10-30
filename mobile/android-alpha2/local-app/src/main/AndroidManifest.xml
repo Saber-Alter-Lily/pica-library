@@ -9,6 +9,9 @@
             android:name="com.picalibrary.android.LocalHistoryActivity"
             android:exported="false" />
         <activity
+            android:name="com.picalibrary.android.LocalShelvesActivity"
+            android:exported="false" />
+        <activity
             android:name="com.picalibrary.android.LocalReaderActivity"
             android:screenOrientation="unspecified"
             android:exported="false" />

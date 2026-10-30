@@ -1,5 +1,11 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-02｜来源无关的本地 Reader Port
+
+- [Draft #257](https://github.com/Saber-Alter-Lily/pica-library/pull/257)：在标准 `:local-storage` Android 模块实现可独立消费的 LocalComicReaderPort，从旧 `LocalComicStore` 读取已导入的本地作品、封面、章节、文件页和页 ID 书签。原 `LocalComicReaderSource` 只保留 BridgeClient 数据形状适配，继续供原 ReaderActivity 阅读，避免第二套阅读器。测试复用已有 Android SAF 合成文件/实际导入场景，且不引入额外测试框架。
+- **下一架构切口**：拆开 `ReaderSource` 原接口与 Network/Provider 具体实现，将原 ReaderActivity 依赖的通用阅读模型从 `BridgeClient` 完整移出，并把原 Reader UI/手势/页缓存移入可独立 APK 引用的来源无关组件；随后构建真实无 Pica/E-H/JM SDK 的本地 Android APK，检查 Gradle 依赖/DEX/manifest，再做真机体验 G1/G2。最终版本与 G1–G4 继续保持 OPEN。
+
+
 ### 2026-10-30 CORE-ANDROID-01｜本地导入和 Android 存储物理分包
 
 - [Draft #256](https://github.com/Saber-Alter-Lily/pica-library/pull/256) 复用 Gradle 官方 `java-library`/`com.android.library`，将原 `LocalComicImporter` + `LocalComicExporter` + `ReaderPolicy` 文件**物理迁移、保持 blob 完全不变**至 `:local-core/src/main/java`，原 `LocalComicStore` + `DeviceIdentity` 同样迁移至 `:local-storage/src/main/java`，不使用 AGP 不可靠的外部源码目录筛选或自定义复制脚本。两模块不依赖 Pica/E-H/JM；原正式 App 与独立本地 Draft App 依赖同一编译产物，清理旧重复 JavaCompile。首批筛选编译失败已按目录迁移纠正，准确新代码 CI 待核。

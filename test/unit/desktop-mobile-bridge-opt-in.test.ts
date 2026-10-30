@@ -46,6 +46,11 @@ function harness() {
         mobileBridge: null,
         mobileBridgeSettingsBusy: false,
         mobileBridgeEpoch: 0,
+        // The extracted *real Desktop* function now depends on the actual
+        // shared update barrier. Supply an explicit synthetic state, not a
+        // silent production guard bypass or a deleted freeze check.
+        updateHttpFence: { frozen: false },
+        externalUpdateIngress: { enter: vi.fn() },
         paths: {
             config: 'synthetic/config.json',
             runtimeState: 'synthetic/runtime'
@@ -202,6 +207,8 @@ describe('optional LAN bridge policy and actual extracted commands, no real sock
         expect(h.ctx.startMobileBridge).toHaveBeenCalledTimes(1)
         expect(h.ctx.config.mobileBridgeEnabled).toBe(true)
         expect(h.ctx.startMobileBridge.mock.calls[0][0].host).toBe('0.0.0.0')
+        expect(h.ctx.startMobileBridge.mock.calls[0][0].requestAdmission)
+            .toBe(h.ctx.externalUpdateIngress)
         expect(
             await h.ctx.setMobileBridgeEnabled({
                 mobileBridgeAction: 'set-enabled',
@@ -213,6 +220,18 @@ describe('optional LAN bridge policy and actual extracted commands, no real sock
         expect(h.ctx.config.externalSources).toEqual(h.config.externalSources)
         expect(h.pairedDevices).toEqual([{ deviceId: 'synthetic-device' }])
         expect(h.ctx.mobileBridge).toBeNull()
+    })
+    it('does not create a new Mobile listener after Desktop update admission freezes', async () => {
+        const h = harness()
+        h.ctx.config.mobileBridgeEnabled = true
+        h.ctx.updateHttpFence.frozen = true
+        await expect(h.ctx.startSelectedMobileBridge())
+            .rejects.toThrow(/not explicitly enabled or the library is not ready/)
+        expect(h.ctx.startMobileBridge).not.toHaveBeenCalled()
+        expect(h.ctx.saveConfig).not.toHaveBeenCalled()
+        expect(text).toContain(
+            "if (mobileBridgeSettingsBusy) leases.push('mobile-bridge-settings')"
+        )
     })
     it('rejects overlapping changes and closes an activation completed after shutdown', async () => {
         const h = harness()

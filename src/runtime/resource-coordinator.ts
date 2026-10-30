@@ -123,10 +123,21 @@ export class RuntimeResourceCoordinator {
     private readonly idleWaiters = new Set<() => void>()
 
     /** Wait on the existing resource leases, including work outliving HTTP. */
-    waitForIdle(): Promise<void> {
+    waitForIdle(timeoutMs = 25_000): Promise<void> {
         if (this.active.size === 0 && this.waiting.length === 0)
             return Promise.resolve()
-        return new Promise<void>((resolve) => this.idleWaiters.add(resolve))
+        return new Promise<void>((resolve, reject) => {
+            const finish = () => {
+                clearTimeout(deadline)
+                this.idleWaiters.delete(finish)
+                resolve()
+            }
+            const deadline = setTimeout(() => {
+                this.idleWaiters.delete(finish)
+                reject(new Error('Timed out waiting for active library tasks to finish'))
+            }, timeoutMs)
+            this.idleWaiters.add(finish)
+        })
     }
 
     private notifyIdle() {

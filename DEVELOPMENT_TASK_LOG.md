@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 Android 本地书库独立安装试验｜Draft #255
+
+- [Draft #255](https://github.com/Saber-Alter-Lily/pica-library/pull/255) 叠加已通过 24/24 工作流的 Windows #254。按**功能优先**继续 Android：通过明确环境变量 `PICA_ANDROID_LOCAL_ONLY_DRAFT=1` 编译独立 `com.picalibrary.android.localdraft` 开发 APK，其 Android 私有漫画、书架、书签和收藏记录与正式包、日常 Dev 包隔离。普通 Android Gradle 构建/签名/默认包名不改。
+- **复用旧产品功能**：原 `HomeActivity`、`ShellNavigation`、`LocalComicImportActivity`（SAF 文件夹/CBZ）、`LocalComicStore`、`UnifiedCatalogStore`、`ShelfStore` 和 `ReaderActivity`。本地模式只显示已导入本地作品、书架和基本设置；点击直接进入原 Reader，本地刷新不访问 Desktop/WebDAV/在线源，Reader source 仅接受 `local`，显示设置不进行云端对账。原免责声明仍在首次启动时显示。
+- 该开发 APK 的 Manifest overlay 删除 INTERNET/CAMERA/安装权限等，仅保留本地用户选择；`PicaLibraryApp` 不启动来源/bootstrap/支持者同步/OTA 后台任务。现有 CI 的 Android job 对该草稿分支额外编译实际 local-only APK，并用 Android `aapt` 验证不同包名、真正启动 Activity 和无联网权限；没有单独测试框架或 UI 重写。
+- **明确阶段限制**：Android 当前仍复用原 App 的完整 Java 编译，故仍包含旧 Pica/E-H/JM SDK 类型和依赖。现在是**离线可用、不同包名的数据隔离开发构建**，而不是实体上已经排除漫画源 SDK 的可发布 clean APK。下一步需要物理拆包/独立源中立 Android 构建并实际检查 dex/lib/资源依赖清单；绝不可宣传已彻底解离或具有版权豁免。CI 未终态前不宣布通过；正式 v0.5.0/main/OTA/用户资料均不变，G1–G4 OPEN。
+
+
 ### 2026-10-30｜S3 CORE-LIB-04e：Windows 无源持久个人书库与启动入口（Draft #254）
 
 - [Draft #254](https://github.com/Saber-Alter-Lily/pica-library/pull/254) 基于已通过全量 CI 的 #253。实际完成：旧 Windows Launcher 新增**显式** `--source-free-local`，复用原独立 `desktop-core-preview.mjs`、完整正式 Web、`LibraryDatabase`、Reader/书架及上一轮原生 Folder/CBZ 导入；普通 `Pica Library.exe` 启动路径完全不改。新模式首次创建并在后续启动复用 `%LOCALAPPDATA%/Pica Library Local`，独立于既有 `%LOCALAPPDATA%/Pica Library`；真实持久 SQLite 书库与单实例锁都复用旧实现。显式模式自动打开原 Web，本地文件不依赖在线账号/漫画源。

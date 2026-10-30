@@ -14,8 +14,17 @@ def isolatedQaSuffix = System.getenv('PICA_ANDROID_QA_PACKAGE_SUFFIX') ?: ''
 if (isolatedQaSuffix && !(isolatedQaSuffix ==~ /^\.s1qa[1-9][0-9]{0,2}$/)) {
     throw new GradleException('Invalid S1 QA application suffix')
 }
+// Optional, separately installed LOCAL workflow. The existing Gradle tasks and
+// default Android app remain unchanged when this flag is absent.
+def localOnlyDraft = System.getenv('PICA_ANDROID_LOCAL_ONLY_DRAFT') == '1'
+if (localOnlyDraft && isolatedQaSuffix)
+    throw new GradleException('Local-only draft and S1 snapshot identity cannot be combined')
 def debugAppSuffix = isolatedQaSuffix ? isolatedQaSuffix : '.dev'
 def debugAppLabel = isolatedQaSuffix ? "Pica Library S1 QA${isolatedQaSuffix.substring(5)}" : 'Pica Library Dev'
+if (localOnlyDraft) {
+    debugAppSuffix = '.localdraft'
+    debugAppLabel = 'Pica Library Local Draft'
+}
 def debugPairScheme = isolatedQaSuffix ? "picalibrary-${isolatedQaSuffix.substring(1)}" : 'picalibrary'
 
 android {
@@ -32,6 +41,11 @@ android {
     }
     // One tracked fixture is consumed by both Vitest and the Android JSON adapter tests.
     sourceSets.test.resources.srcDir '../../../test/fixtures/tag-policy'
+    if (localOnlyDraft) {
+        // Overlay disables internet/pairing and launches only the local shell.
+        sourceSets.debug.manifest.srcFile 'src/localOnly/AndroidManifest.xml'
+    }
+    buildFeatures { buildConfig true }
 
     defaultConfig {
         applicationId 'com.picalibrary.android'
@@ -68,7 +82,9 @@ android {
             // Side-by-side manual QA build. It must never replace the formal app.
             applicationIdSuffix debugAppSuffix
             versionNameSuffix '-dev-pr35'
+            if (localOnlyDraft) versionNameSuffix '-local-draft'
             debuggable true
+            buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', localOnlyDraft ? 'true' : 'false'
             manifestPlaceholders = [
                     appLabel  : debugAppLabel,
                     pairScheme: debugPairScheme
@@ -80,6 +96,7 @@ android {
             }
         }
         release {
+            buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', 'false'
             minifyEnabled true
             shrinkResources true
             debuggable false
@@ -94,6 +111,7 @@ android {
         }
         benchmark {
             initWith release
+            buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', 'false'
             // Release-like code path, signed locally so Macrobenchmark can install it on QA devices.
             signingConfig signingConfigs.debug
             debuggable false

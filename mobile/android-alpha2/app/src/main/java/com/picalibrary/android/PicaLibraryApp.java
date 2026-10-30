@@ -14,11 +14,11 @@ public final class PicaLibraryApp extends Application {
     @Override protected void attachBaseContext(Context base){super.attachBaseContext(LocaleStore.wrap(base));}
     @Override public void onCreate(){
         super.onCreate();
-        SourceAccess.get(this); // before a new install accepts the disclaimer
+        if(!BuildConfig.LOCAL_ONLY_DRAFT)SourceAccess.get(this); // no providers in the local-only entry
         LocalizedText.init(this);
         ThemeStore.applyPlatformNightMode(this,ThemeStore.mode(this));
         Ui.applyTheme(this);
-        PreviewAccess.installIfEligible(this);
+        if(!BuildConfig.LOCAL_ONLY_DRAFT)PreviewAccess.installIfEligible(this);
         Ui.applyTheme(this);
         getSharedPreferences("alpha81-ui",MODE_PRIVATE).edit().remove("libraryRefreshed").apply();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks(){
@@ -30,6 +30,7 @@ public final class PicaLibraryApp extends Application {
             @Override public void onActivitySaveInstanceState(Activity activity,Bundle state){}
             @Override public void onActivityDestroyed(Activity activity){}
         });
+        if(BuildConfig.LOCAL_ONLY_DRAFT)return; // no provider/bootstrap/supporter/OTA jobs
         // Side-by-side Dev builds are manual QA artifacts and must not consume the formal OTA channel.
         boolean debuggable=(getApplicationInfo().flags&ApplicationInfo.FLAG_DEBUGGABLE)!=0;
         if(!debuggable)UpdateCheckJobs.schedule(this);

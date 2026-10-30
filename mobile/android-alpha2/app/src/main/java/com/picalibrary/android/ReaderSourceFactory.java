@@ -12,6 +12,11 @@ final class ReaderSourceFactory {
         }
     }
     static ReaderSource create(Context context, String value) {
+        if(BuildConfig.LOCAL_ONLY_DRAFT){
+            if(!"local".equals(value))
+                throw new IllegalArgumentException("This local-only build opens imported comics only");
+            return new LocalComicReaderSource(context);
+        }
         switch (kind(value)) {
             case "host": return new HostReaderSource(context);
             case "local": return new LocalComicReaderSource(context);

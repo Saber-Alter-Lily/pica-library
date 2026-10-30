@@ -210,6 +210,8 @@ function activeDesktopWorkLeases() {
         )
     )
         leases.push('remote-sync')
+    if (remoteStorageManager?.busy)
+        leases.push('remote-storage-write')
     if (browserLiteExportProgress.state === 'running')
         leases.push('browser-lite-export')
     if (mobileBridgeHasActiveLease()) leases.push('mobile-bridge-activity')
@@ -388,6 +390,13 @@ async function closeEngine() {
         errors
     )
     mobileBridge = null
+
+    log.write('Shutdown: draining WebDAV mutations')
+    await shutdownStep(
+        'remote storage quiesce',
+        async () => { await remoteStorageManager?.quiesce() },
+        errors
+    )
 
     log.write('Shutdown: closing managed E-H login')
     await shutdownStep(
@@ -1368,7 +1377,7 @@ async function startEngine(preferredPort: number) {
     )
         remoteStorageManager = new RemoteStorageDesktopManager(
             paths.remoteStorageConfig, credentialsStore, credentials, database, dataDir,
-            (value) => { credentials = value }
+            (value) => { credentials = value }, runtimeResources
         )
         const started = await startLibraryServer({
             database,

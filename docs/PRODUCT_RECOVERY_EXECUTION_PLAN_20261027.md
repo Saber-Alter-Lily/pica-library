@@ -1,6 +1,14 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
 
+### 2026-10-29 CORE-LIB-04c-02c-02a｜原 Desktop HTTP 及 RuntimeResourceCoordinator 升级交接准入冻结
+
+- [Draft #248](https://github.com/Saber-Alter-Lily/pica-library/pull/248) 基于 #247，接入**原 `src/library/server.ts` 所有普通 HTTP 路由**，对实际读写请求采集在途数并在原 `UpdateManager.apply` 启动前阻止新请求；原 Host/Origin/CSRF 检查仍先行。用现有 ResourceCoordinator 冻结新 `acquire/withLease`（含尚未开始的背景任务），并于 helper 启动失败时恢复 HTTP 与资源准入；helper ACK 后由原退出流程接管。没有新调度器/数据库/升级器。
+- 最初 HTTP-only [Linux/Windows #40981591695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981591695) **各79/79 SUCCESS**。后续真实源码增加 `RuntimeResourceCoordinator` 屏障，独立 [双平台 #40981944161](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981944161) 与 [完整 CI #40981949826](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981949826) 必须按精确源码核对，不提前标 PASS。技术审计：[S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md](S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md)。
+- **下一步 04c-02c-02b**：盘点并实际阻断不经过原本机 HTTP/共享 ResourceCoordinator 的写者（Mobile Bridge、独立 source worker、外部 WebDAV、异步任务），需要有界 drain/退出 ACK 才能制作跨 SQLite/媒体/凭据的强一致性备份及真实升级失败回退。G1–G4 全 OPEN；禁用自动发布。
+
+
+
 ### 2026-10-29 CORE-LIB-04c-02c-01｜正式 Desktop 更新前防活动任务交接（第一阶段门禁）
 
 #### 新发现的覆盖缺口和更严格的上线门禁

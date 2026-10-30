@@ -13,7 +13,7 @@ final class ReaderImages extends ReaderImageLoader {
         public String disabledMessage(Context context){return context.getString(R.string.source_disabled);}
     };
 
-    ReaderImages(Context context,ReaderSource source){super(context,source,STORAGE);}
+    ReaderImages(Context context,ReaderChapterSource source){super(context,source,STORAGE);}
     static long cacheBytes(Context context){return ReaderImageLoader.cacheBytes(context,STORAGE);}
     static void clearCache(Context context){ReaderImageLoader.clearCache(context,STORAGE);}
 }

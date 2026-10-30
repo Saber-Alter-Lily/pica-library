@@ -16,14 +16,14 @@ final class ReaderProgress {
     private static final String ONE_SHOT_PREF="reader-history-one-shot-v1";
     private final Context context;
     private final SharedPreferences store;
-    private final ReaderSource source;
+    private final ReaderChapterSource source;
     private final String prefix;
     private boolean syncing;
     private String historySessionId="",historyDay="",historyChapterId="",historyStartedAt="",historyMetadataChapterId="",historyChapterTitle="章节";
     private String historyComicId="",historyComicTitle="漫画",historyComicAuthor="未知作者",historyComicProvider="";
     private int historyChapterOrder;
 
-    ReaderProgress(Context context, ReaderSource source) {
+    ReaderProgress(Context context, ReaderChapterSource source) {
         this.context=context.getApplicationContext();
         store = this.context.getSharedPreferences("reader-bookmarks-v1", Context.MODE_PRIVATE);
         this.source = source;

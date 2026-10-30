@@ -62,7 +62,7 @@ jobs:
         # Keep every test enabled; bound hangs and preserve verbose per-test progress.
         run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon --stacktrace --info --max-workers=2
       - name: Assemble opt-in local-only Android draft and inspect its manifest
-        if: ${{ github.head_ref == 'codex/s3-android-local-only-draft-20261030' || github.head_ref == 'codex/s3-android-reader-view-module-20261030' || github.head_ref == 'codex/s3-android-reader-image-pipeline-20261030' }}
+        if: ${{ github.head_ref == 'codex/s3-android-local-only-draft-20261030' || github.head_ref == 'codex/s3-android-reader-view-module-20261030' || github.head_ref == 'codex/s3-android-reader-image-pipeline-20261030' || github.head_ref == 'codex/s3-android-reader-chapter-contract-20261030' }}
         working-directory: mobile/android-alpha2
         timeout-minutes: 10
         env:

@@ -26,7 +26,7 @@ public class ReaderActivity extends LocaleAwareActivity {
     private SeekBar seek;
     private ViewPager2 pager;
     private RecyclerView continuous;
-    private ReaderSource source;
+    private ReaderChapterSource source;
     private ReaderImages images;
     private ReaderProgress progress;
     private final Handler main = new Handler(Looper.getMainLooper());

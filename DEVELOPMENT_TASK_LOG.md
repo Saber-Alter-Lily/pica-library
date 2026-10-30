@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-LIB-04e：Windows 无源持久个人书库与启动入口（Draft #254）
+
+- [Draft #254](https://github.com/Saber-Alter-Lily/pica-library/pull/254) 基于已通过全量 CI 的 #253。实际完成：旧 Windows Launcher 新增**显式** `--source-free-local`，复用原独立 `desktop-core-preview.mjs`、完整正式 Web、`LibraryDatabase`、Reader/书架及上一轮原生 Folder/CBZ 导入；普通 `Pica Library.exe` 启动路径完全不改。新模式首次创建并在后续启动复用 `%LOCALAPPDATA%/Pica Library Local`，独立于既有 `%LOCALAPPDATA%/Pica Library`；真实持久 SQLite 书库与单实例锁都复用旧实现。显式模式自动打开原 Web，本地文件不依赖在线账号/漫画源。
+- 新目录必须由本模式独占创建并含固定身份标记，旧/外部/非本模式目录不会被自动当成数据源；未进行 v0.5.0 原用户资料迁移，也未装载原账号或内容。仅在既有 `core-desktop-preview-entry.test.ts` 添加 **1 项**“写入→关闭→重开、旧目录字节不变、拒绝认领不明目录”的实际 SQLite 回归，物理无源依赖图白名单只扩展这一小型 profile 模块，禁止原 Provider/Host/JM/E-H/Pica/额外依赖。
+- 本轮属于 Draft 功能候选，CI 和 Windows 实体启动证据按当前源码单独核定；**不合并 main、不发布/安装、不改正式 OTA**。G1–G4 仍 OPEN。下一步以可用的独立 Windows 无源客户端、Android 纯核心与可选来源适配为主，避免新增无必要的测试框架。
+
+
 ### 2026-10-29｜S3 CORE-LIB-04d：无源 Desktop 原生文件夹/CBZ 导入（Draft #253）
 
 - [Draft #253](https://github.com/Saber-Alter-Lily/pica-library/pull/253) 叠加 #252。**功能直接接线**：旧 `DesktopNativePicker` → 旧 `CoreLocalImportController`/`LocalLibraryIngestion` → 原始 Web 的 `web/local-import.js` 按钮，源中立核心允许预览、明确确认导入、刷新书库和立即阅读本地 Folder/CBZ。复用旧 Session/Origin/CSRF；Web 请求绝不接收绝对路径。开启条件仅是明确启动的 source-free OS Temp 预览、实际原生选择器可用；无源认证/推荐仍保持禁用。

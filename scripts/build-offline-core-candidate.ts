@@ -100,11 +100,12 @@ export async function buildOfflineCoreCandidate(
     ]) if (!sourceInputs.includes(required))
         throw new Error('Offline core lost an actual local Reader dependency: ' + required)
     for (const item of sourceInputs) {
-        // Only the explicit, audited Desktop preview entry and existing
-        // single-instance lock can enter this preview executable. Other
-        // Desktop, source SDK, Host and plugin runtime code remains forbidden.
+        // Audit the original native picker/OS launcher utility as well as
+        // the preview entry and instance lock. No source SDK or Host code.
         const allowedPreviewDesktop = kind === 'desktop-core-preview' &&
-            [PREVIEW_ENTRY, 'src/desktop/instance.ts'].includes(item)
+            [PREVIEW_ENTRY, 'src/desktop/instance.ts',
+                'src/desktop/pickers.ts', 'src/desktop/child-process.ts',
+                'src/desktop/platform.ts'].includes(item)
         if (!allowedPreviewDesktop && PROHIBITED.some(pattern => pattern.test(item)))
             throw new Error('Offline core includes executable source/Host code: ' + item)
     }

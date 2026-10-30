@@ -139,15 +139,12 @@ describe('actual Mobile Bridge and Remote API share original Desktop update hand
         const fence = new DesktopHttpHandoffFence()
         const ingress = externalIngress(fence)
         let targets = 0
-        let reachTarget!: () => void
-        const reached = new Promise<void>(resolve => { reachTarget = resolve })
         let releaseTarget!: () => void
         const allowTarget = new Promise<void>(resolve => {
             releaseTarget = resolve
         })
         const upstream = http.createServer(async (_req, res) => {
             targets++
-            reachTarget()
             await allowTarget
             res.writeHead(200, { 'content-type': 'application/json' })
             res.end(JSON.stringify({ synthetic: true }))
@@ -175,12 +172,8 @@ describe('actual Mobile Bridge and Remote API share original Desktop update hand
         const headers = { authorization: 'Bearer ' + token }
         const pending = fetch(url + '/api/v1/capabilities', { headers })
         try {
-            await Promise.race([
-                reached,
-                new Promise<never>((_resolve, reject) =>
-                    setTimeout(() => reject(
-                        new Error('SYNTHETIC_REMOTE_UPSTREAM_TIMEOUT')), 5_000))
-            ])
+            await vi.waitFor(() => expect(targets).toBe(1),
+                { timeout: 5_000, interval: 25 })
             expect(fence.pendingRequests).toBe(1)
             expect(() => fence.freezeForHandoff())
                 .toThrow('Finish active Reader and library requests')

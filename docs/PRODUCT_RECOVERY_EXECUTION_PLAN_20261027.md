@@ -2,7 +2,8 @@
 
 ### 2026-10-30 CORE-LIB-04e｜可跨重启的无源 Windows 个人书库
 
-- [Draft #254](https://github.com/Saber-Alter-Lily/pica-library/pull/254)：继续 #253 的本地/CBZ 导入，保留旧 v0.5.0 默认启动，添加用户主动选择的 `--source-free-local` 模式与独立持久 profile `%LOCALAPPDATA%/Pica Library Local`。复用原 SQLite、Reader、书架、文件对话框和完整 Web；原用户凭据、文件及旧目录不参与。自动打开原网页，支持重启续用该新书库。只新增一个既有套件内测试，当前仍不正式发布，CI/真实 Windows 启动待核实。
+- [Draft #254](https://github.com/Saber-Alter-Lily/pica-library/pull/254)：继续 #253 的本地/CBZ 导入，保留旧 v0.5.0 默认启动，添加用户主动选择的 `--source-free-local` 模式与独立持久 profile `%LOCALAPPDATA%/Pica Library Local`。复用原 SQLite、Reader、书架、文件对话框和完整 Web；原用户凭据、文件及旧目录不参与。自动打开原网页，支持重启续用该新书库。原 Windows QA 完整网页包增加双击启动脚本，无需额外参数。仅新增一个既有套件内持久化测试，不发布。
+- 首次 [CI #41018450901](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41018450901) 因旧临时目录无效输入检查优先级改变造成 1 项 Web/Desktop 失败，Android 通过。现已修改实际启动顺序，旧 QA 模式先验证目录、新持久模式先验证 Web 完整性再创建用户目录；精确新代码和已有 Windows Portable workflow 的结果待终态，不提前标 PASS。
 - **下一产品硬关口**：真实独立 Windows 成品启动/导入/保存/重启验收，以及 Android 纯核心个人书库启动、必要的 trusted source 接入；旧用户 v0.5.0 安全迁移及 G1–G4 仍未完成。已实现的图鉴 BLOCK/LESS 过滤无需重复开发。
 
 

@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-08｜Reader 通用章节、进度及展示契约进入真正独立模块（Draft #263）
+
+- [Draft #263](https://github.com/Saber-Alter-Lily/pica-library/pull/263) 继续 #262 已验证的旧图片缓存实现：**不是再造 Reader**，而是把原 ReaderSource 中已有的章节、页面、阅读进度、显示名称、可选诊断方法搬到现有 `:reader-view` 中的 `ReaderChapterSource`，依赖已抽出的纯 Java `ReaderContent` 与 `ReaderImageTransport`。通用接口不依赖 Pica/E-H/JM、BridgeClient、账户、来源权限或网盘实现。
+- 原 App 的 `ReaderSource` 继续扩展通用接口，只留 `sourceAccess`、原 `SourceAccess.commit` 缓存写授权和撤销判断；原 `ReaderActivity`、`ReaderProgress` 和 `ReaderImages` 改为消费通用接口，既有所有真实来源类、章节下载、图片读取和书签行为不变。参考 Mihon Reader 模型分离设计（Apache-2.0，仅借鉴架构，无第三方源码复制或新依赖）。
+- 复用旧 CI；该 Draft 另外复用**已有**独立本地 APK `assembleDebug` 与 `aapt` 包名/权限门禁，验证模块重构不影响原离线开发构建。当前仍没有物理剔除完整 Reader UI 与 Pica/E-H/JM SDK 的最终安装包，G1–G4 OPEN，保持 Draft，不合并/发布/操作真实用户资料。
+
+
 ### 2026-10-30 CORE-ANDROID-07｜原图片解码/缓存管线迁入来源无关 Reader View（Draft #262）
 
 - [Draft #262](https://github.com/Saber-Alter-Lily/pica-library/pull/262) 遵循已写入 S0–S6 的 OSS 优先复用规则：借鉴 Mihon 的 PageLoader/Viewer 分离设计（Apache-2.0、仅参考），**实际复用本项目原 ReaderImages 一份生产实现**。其网络/文件页面加载、解码、缓存、预载、取消、限额与错误回报移入现有 `:reader-view/ReaderImageLoader`；原 App `ReaderImages` 仅为兼容原 UI/测试/缓存管理的极薄接线。无第二套阅读器、缓存或新外部依赖。

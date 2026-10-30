@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-02：Android 本地 Reader 数据与来源接口解耦（Draft #257）
+
+- [Draft #257](https://github.com/Saber-Alter-Lily/pica-library/pull/257) 叠加通过 21/21 CI 的 #256。基于既有 `:local-storage` 实际增加 **LocalComicReaderPort**，直接复用已搬迁的 `LocalComicStore` 与 `ReaderPolicy`，提供应用私有漫画列表、封面、按原章节顺序分组、本地 `file://` 页清单和按原页面 ID 恢复书签。端口不引用 BridgeClient、Pica/E-H/JM、Desktop、WebDAV、HTTP 或网络来源 SDK，源代码是真正的独立模块业务路径。
+- 原 `LocalComicReaderSource` 收缩为 Port → 旧 `BridgeClient.ChapterItem/PageItem/ChapterData` 的轻量适配，供**同一个旧 ReaderActivity** 使用；漫画内容、原文件、阅读 UI、缩放、章节切换和进度存储逻辑不变。无第二个 Reader、无第二个导入器或数据库。只在既有 `LocalComicImportTest` 使用真实合成 SAF 文件新增 1 项导入→章节→文件页→重建 Reader Port→原适配层书签一致性的回归。
+- 当前完整 Android App 仍编译 Pica/E-H/JM 来源实现，仅本地章节/页面数据访问已物理解耦。完整无源 APK、用户数据迁移与真机 G1–G4 验收仍未完成；#257 当前源码 CI 独立判定，绝不借父分支通过结果。main/Release/OTA 不动。
+
+
 ### 2026-10-30｜S3 CORE-ANDROID-01：原生本地导入与持久化存储实际模块拆分（Draft #256）
 
 - [Draft #256](https://github.com/Saber-Alter-Lily/pica-library/pull/256) 叠加 #255；不新增 Reader/Importer，**原生产文件实际移动到模块各自的 `src/main/java`**：`LocalComicImporter.java`、`LocalComicExporter.java`、`ReaderPolicy.java` 进入 Gradle 官方 `java-library` 的 `:local-core`；`LocalComicStore.java`、`DeviceIdentity.java` 进入官方 `com.android.library` 的 `:local-storage`。五份文件 Git Blob SHA 与原文件逐一相同（内容没有改写），原 App 旧文件位置删除、由 Gradle 依赖共享。同一份代码不重复编译。原 `compileLocalImportBoundary` 自定义 JavaCompile task 删除。

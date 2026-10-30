@@ -38,10 +38,6 @@ android {
     sourceSets.main.java {
         srcDir '../../../source-jvm/src/main/java'
         exclude '**/JmProtocolMain.java'
-        exclude 'com/picalibrary/android/local/**/*.java'
-        exclude 'com/picalibrary/android/ReaderPolicy.java'
-        exclude 'com/picalibrary/android/LocalComicStore.java'
-        exclude 'com/picalibrary/android/DeviceIdentity.java'
     }
     // One tracked fixture is consumed by both Vitest and the Android JSON adapter tests.
     sourceSets.test.resources.srcDir '../../../test/fixtures/tag-policy'

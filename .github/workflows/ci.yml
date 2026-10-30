@@ -72,7 +72,7 @@ jobs:
           apk=app/build/outputs/apk/debug/app-debug.apk
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
           "$aapt" dump badging "$apk" | grep -F "package: name='com.picalibrary.android.localdraft'"
-          "$aapt" dump badging "$apk" | grep -F "launchable-activity: name='com.picalibrary.android.HomeActivity'"
+          "$aapt" dump badging "$apk" | grep -F "launchable-activity: name='com.picalibrary.android.DisclaimerActivity'"
           if "$aapt" dump permissions "$apk" | grep -E 'android.permission.(INTERNET|CAMERA|REQUEST_INSTALL_PACKAGES)'; then
             echo "Local-only APK still requests a forbidden runtime capability"
             exit 1

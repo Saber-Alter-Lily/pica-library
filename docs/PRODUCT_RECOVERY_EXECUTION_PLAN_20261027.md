@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-30 CORE-ANDROID-07｜原图片解码/缓存管线迁入来源无关 Reader View（Draft #262）
+
+- [Draft #262](https://github.com/Saber-Alter-Lily/pica-library/pull/262) 遵循已写入 S0–S6 的 OSS 优先复用规则：借鉴 Mihon 的 PageLoader/Viewer 分离设计（Apache-2.0、仅参考），**实际复用本项目原 ReaderImages 一份生产实现**。其网络/文件页面加载、解码、缓存、预载、取消、限额与错误回报移入现有 `:reader-view/ReaderImageLoader`；原 App `ReaderImages` 仅为兼容原 UI/测试/缓存管理的极薄接线。无第二套阅读器、缓存或新外部依赖。
+- 两个小接口 `ReaderImageTransport` 和 `ReaderPageStorage` 只将原权限/缓存配置从图像加载器剥离。原 `ReaderSource` 仍在缓存写入点调用 `SourceAccess.commit(sourceAccess(), ...)`，禁用来源后不得提交新缓存，原已缓存页面、E-H 诊断和本地图片处理行为保留。使用现有 Android 测试和 CI，不创建额外测试框架。
+- 后续实际关口是 `ReaderProgress`/阅读历史与原 `ReaderActivity` 的物理编译拆分，再对真正单独构建的本地 Android APK 进行依赖/DEX/Manifest 检查与真机阅读验收。关闭联网权限不等于物理无源；G1–G4 OPEN，保持 Draft，不合并/发布、不触及原用户资料。
+
+
 ### 2026-10-30 CORE-ANDROID-06｜原 Reader Viewer/手势 UI 迁入标准独立模块
 
 - [Draft #261](https://github.com/Saber-Alter-Lily/pica-library/pull/261)：复用 Mihon viewer 与 loader 职责划分的**设计**（仅参考、不拷贝），**实际不重做**本项目 `ZoomImageView`/手势策略。原 4 份源码物理迁入 `:reader-view` Android library 和现有 `:local-core` 纯 Java library；内容 hash 完全不变，原 Android ViewPager2/RecyclerView、书签和阅读 UI 继续复用。用标准 Gradle 依赖替代之前的临时 gesture 编译任务，无新框架或第三方依赖。

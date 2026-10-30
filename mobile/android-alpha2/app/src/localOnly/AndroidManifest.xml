@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" tools:node="remove" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
-    <application android:usesCleartextTraffic="false">
+    <application android:usesCleartextTraffic="false" tools:replace="android:usesCleartextTraffic">
         <!-- Keep the original explicit first-use disclaimer/consent gate.
              It goes to the existing HomeActivity, now in local-only mode. -->
         <activity android:name=".PairingActivity" tools:node="remove" />

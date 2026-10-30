@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import { applyUpdateAndScheduleShutdown } from './update-command'
 import { collectDesktopUpgradeWorkLeases, requireDesktopUpgradeQuiescence } from './update-quiescence'
+import { DesktopHttpHandoffFence } from './update-http-fence'
 import { exportRecommendationAuditV5 } from '../services/recommendation-audit-export'
 import path from 'node:path'
 import type { Server } from 'node:http'
@@ -130,6 +131,7 @@ const platformCapabilities = {
     managedEhWebLogin: Boolean(managedEhBrowser)
 }
 const instance = new InstanceLock(paths.lock, paths.instance)
+const updateHttpFence = new DesktopHttpHandoffFence()
 let config = loadConfig(paths.config)
 const sources = new SourceRuntime(sourcePolicyForConfig(config))
 // Constructor performs no network, discovery, process launch or persistence.
@@ -1263,20 +1265,40 @@ async function startEngine(preferredPort: number) {
                 desktopHomeRoot: paths.root,
                 libraryDirectory: config?.libraryDirectory ?? paths.data,
                 currentUrl
-            },stop,() => requireDesktopUpgradeQuiescence({
-                ownership: instance,
-                engineReady,
-                stopping,
-                hasDatabase: database !== null,
-                hasService: service !== null,
-                // The same actual task inventory that already prevents
-                // idle-browser shutdown during active downloads/sync/work.
-                activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
-                    activeDesktopWorkLeases(),
-                    service?.runtimeTaskDiagnostics(),
-                    service?.runtimeResourceProfile()
-                )
-            })),
+            },stop,() => {
+                const ready = () => requireDesktopUpgradeQuiescence({
+                    ownership: instance,
+                    engineReady,
+                    stopping,
+                    hasDatabase: database !== null,
+                    hasService: service !== null,
+                    activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
+                        activeDesktopWorkLeases(),
+                        service?.runtimeTaskDiagnostics(),
+                        service?.runtimeResourceProfile()
+                    )
+                })
+                // No await can allow a new local HTTP request between the
+                // first activity check, admission freeze, and second check.
+                ready()
+                const restoreHttp = updateHttpFence.freezeForHandoff()
+                let restoreResources: (() => void) | undefined
+                try {
+                    // This is the SAME runtime resource coordinator already
+                    // passed to LibraryService, WebDAV and host-library tasks.
+                    // It blocks new/queued leases in BOTH observe/enforce modes.
+                    restoreResources = runtimeResources.freezeAcquisitionsForUpdate()
+                    ready()
+                    return () => {
+                        restoreResources?.()
+                        restoreHttp()
+                    }
+                } catch (error) {
+                    restoreResources?.()
+                    restoreHttp()
+                    throw error
+                }
+            }),
         updateProgress: () => updateManager.progress(),
         runtimeTasks: () => {
             if (!service)
@@ -1315,7 +1337,8 @@ async function startEngine(preferredPort: number) {
             host: '127.0.0.1',
             port: preferredPort,
             desktop,
-            cacheDir: paths.cache
+            cacheDir: paths.cache,
+            requestAdmission: updateHttpFence
         })
         server = started.server
         currentUrl = started.url
@@ -1345,7 +1368,8 @@ async function startEngine(preferredPort: number) {
             host: '127.0.0.1',
             port: 0,
             desktop,
-            cacheDir: paths.cache
+            cacheDir: paths.cache,
+            requestAdmission: updateHttpFence
         })
         server = started.server
         currentUrl = started.url

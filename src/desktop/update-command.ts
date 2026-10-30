@@ -20,8 +20,12 @@ export function applyUpdateAndScheduleShutdown(
     id: string,
     context: DesktopUpdateContext,
     shutdown: () => void | Promise<void>,
-    /** Optional owner/activity admission. Never authorizes a data snapshot. */
-    preflight?: () => void
+    /**
+     * Optional synchronous update admission with a rollback release hook.
+     * The acquired fence stays held after helper ACK and is restored ONLY if
+     * the helper rejects, leaving the old working app alive.
+     */
+    preflight?: () => void | (() => void)
 ) {
     let pending = pendingByHost.get(commands)
     if (!pending) {
@@ -35,8 +39,17 @@ export function applyUpdateAndScheduleShutdown(
         // Reject without invoking the existing helper when real Desktop work
         // or lock ownership is unsafe. Only the first request is admitted;
         // deduplicated callers receive the same in-flight promise.
-        preflight?.()
-        const accepted = await commands.apply(id, context)
+        const restoreOnFailure = preflight?.()
+        let accepted: Record<string, unknown>
+        try {
+            accepted = await commands.apply(id, context)
+        } catch (error) {
+            if (typeof restoreOnFailure === 'function')
+                restoreOnFailure()
+            throw error
+        }
+        // The accepted helper owns the upgrade; keep HTTP admission frozen
+        // until the existing shutdown+process-exit transaction takes over.
         setTimeout(() => void shutdown(), 150)
         return accepted
     })().catch((error) => {

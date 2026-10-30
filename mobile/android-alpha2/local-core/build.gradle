@@ -1,0 +1,18 @@
+plugins {
+    id 'java-library'
+}
+
+// Use the unchanged production importer. It is already a pure-Java source
+// boundary and depends only on the JDK (no Android, provider SDK or network).
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+sourceSets {
+    main {
+        java {
+            srcDirs = ['../app/src/main/java']
+            include 'com/picalibrary/android/local/**/*.java'
+        }
+    }
+}

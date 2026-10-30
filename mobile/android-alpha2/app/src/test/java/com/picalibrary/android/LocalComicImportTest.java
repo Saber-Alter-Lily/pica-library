@@ -119,7 +119,7 @@ public class LocalComicImportTest {
             assertEquals(1,saved.chapterOrder);
             assertEquals(0,saved.firstPage);
             assertEquals(2,saved.lastPage);
-            assertEquals(1,new JSONObject(Files.readString(isolated.toPath())).getInt("schemaVersion"));
+            assertEquals(1,new JSONObject(new String(Files.readAllBytes(isolated.toPath()),java.nio.charset.StandardCharsets.UTF_8)).getInt("schemaVersion"));
             assertArrayEquals(before,official.isFile()?Files.readAllBytes(official.toPath()):new byte[0]);
         } finally {isolated.delete();}
     }

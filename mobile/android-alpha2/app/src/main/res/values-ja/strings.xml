@@ -155,6 +155,9 @@
     <string name="local_import_folder">漫画フォルダを選択</string>
     <string name="local_import_cbz">CBZ/ZIP漫画を選択</string>
     <string name="local_import_working">端末内で処理中… 大きなファイルには時間がかかります。</string>
+    <string name="local_import_progress">画像を取り込み中：%1$d / %2$d</string>
+    <string name="local_import_cancelling">取り込みをキャンセル中…</string>
+    <string name="local_import_cancelled">取り込みをキャンセルしました。</string>
     <string name="local_import_failed">取り込みを完了できませんでした</string>
     <string name="local_import_catalog_pending">コピーは保存済みです。ライブラリを開き直して一覧を更新してください。</string>
     <string name="local_import_preview">%1$dページ · %2$d章 · %3$.1f MiB。ライブラリには未登録です。同じ場所を再選択すると、作品IDと読書位置を保ってコピーを更新します。</string>

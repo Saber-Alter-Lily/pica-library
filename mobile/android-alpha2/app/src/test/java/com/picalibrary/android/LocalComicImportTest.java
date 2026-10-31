@@ -54,6 +54,22 @@ public class LocalComicImportTest {
     @Test public void previewIsNotLibraryAndCancelOnlyRemovesOwnScratch() throws Exception {
         LocalComicStore.Preview preview=preview();assertEquals(2,preview.prepared.pages.size());assertEquals(0,LocalComicStore.list(context).size());assertFalse(UnifiedCatalogStore.load(context).byId.containsKey(preview.id));preview.close();assertFalse(preview.work.exists());assertArrayEquals(PNG,Files.readAllBytes(new File(original,"2.png").toPath()));assertEquals(0,LocalComicStore.list(context).size());
     }
+    @Test public void originalFolderImportEmitsActualCopiedPageProgressAndCancels() throws Exception {
+        List<String> progress=new ArrayList<>();
+        LocalComicStore.Preview staged=LocalComicStore.prepare(context,tree,"folder",()->{},
+                (complete,total)->progress.add(complete+"/"+total));
+        try{
+            assertEquals(Arrays.asList("1/2","2/2"),progress);
+            assertEquals(2,staged.prepared.pages.size());
+        }finally{staged.close();}
+        AtomicInteger copied=new AtomicInteger();
+        assertThrows(IOException.class,()->LocalComicStore.prepare(context,tree,"folder",
+                ()->{if(copied.get()>=1)throw new IOException("Import cancelled");},
+                (complete,total)->copied.set(complete)));
+        assertEquals(1,copied.get());
+        assertTrue("Cancellation never publishes an incomplete comic",LocalComicStore.list(context).isEmpty());
+        assertArrayEquals(PNG,Files.readAllBytes(new File(original,"2.png").toPath()));
+    }
     @Test public void confirmedFolderReadsOfflineAndDoesNotExposeOriginalUris() throws Exception {
         LocalComicStore.Comic comic=imported();UnifiedCatalogStore.Entry entry=UnifiedCatalogStore.reconcileLocalReferences(context).byId.get(comic.id);assertTrue(entry.localImported);assertEquals("local",entry.providerId);assertFalse(entry.phoneDownloaded);assertFalse(entry.picaAvailable);assertFalse(entry.ehAvailable);
         LocalComicReaderSource source=new LocalComicReaderSource(context);assertNull(source.sourceAccess());assertEquals(context.getString(R.string.local_import_label),source.readerLabel(context,true));assertFalse(source.canDiagnosePage());assertEquals("",source.chapterDiagnosticPath(comic.id));List<BridgeClient.ChapterItem> chapters=source.chapters(comic.id);assertEquals(1,chapters.size());BridgeClient.ChapterData data=source.chapter(comic.id,chapters.get(0).id);assertEquals(2,data.pages.size());assertTrue(data.pages.get(0).url.startsWith("file://"));assertNotNull(LocalComicStore.cover(context,comic.id));assertNotNull(CoverRepository.cacheNow(context,entry));

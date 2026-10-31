@@ -1,5 +1,15 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-31 S1/S2 CORE-ANDROID-17｜原本地导入器真实逐页进度接入双 Android 客户端
+
+- 补齐取消后的状态：单独使用中日英原生资源显示“已取消”而非“导入失败”，不改变取消后的目录清理或真实故障的错误展示；不增加新测试框架。\n
+
+- 接续 Draft #271 `6f112db` 的 **21/21 Actions SUCCESS**、Android35 实际 SAF/书架/阅读/历史/重启模拟器 PASS；本轮直接解决长时间大漫画导入仅显示不透明加载圈的问题，不再重复分拆 Reader/历史/来源接口。
+- **复用而非重造**：`:local-core/LocalComicImporter` 原本已有 `Progress.page(complete,total)` 并在逐页写入/CRC 校验成功后调用，只是普通 folder/CBZ `prepare` 以前固定传空回调。本次在原生产接口新增可选 `Progress` 重载，原四参调用仍能兼容；`:local-storage/LocalComicStore.prepare` 同样保留旧签名并向普通 SAF folder/CBZ 导入透传实际页数。
+- **正式 Android 原界面** `LocalComicImportActivity` 在现有保留态 Session/工作线程中获取拷贝页码，以 Android 原生水平 ProgressBar + 中日英既有资源系统显示 `N / 总页数`，并在真正导入/复制时增加可取消按钮。每8页/首末页才向 UI 发送增量以减少刷屏，不重复渲染整页；提交阶段仍用原加载状态，不修改原预览/确认/原子保存/文件位置。
+- **独立无源 Android** `:local-app/LocalLibraryActivity` 也直接消费同一 `Progress`，将可见页数文字与水平进度条接入原 spinner + 取消入口；保持已有源 SDK 物理隔离和独立数据根。无新依赖、框架、数据库或任务系统，继续复用 Android 原生组件。
+- **本轮验收**：原 `LocalComicImportTest` 只增加一条实际 DocumentsProvider 的 2页逐页回调/取消后无不完整作品定向测试；原 Android/Web/Desktop CI、独立 APK 6 DEX/权限与 S3 真实模拟器端到端回归以新精确 SHA 为准。未发生的真实大书库或物理手机压测不能标 G1/G2；G3/G4 继续 OPEN。Draft 不合并 main、不发布、OTA/用户资料不动。
+
 ### 2026-10-31 S1/CORE-ANDROID-16｜原 Reader UI 使用 Android 原生三语资源（叠加 Draft #270）
 
 - 先确认 #270 `a0a1fcd` 已经 **21/21 GitHub Actions 全部 SUCCESS**，Android35 模拟器实际完成 CBZ/文件夹 SAF 导入、书架、原 Reader 图片翻页、历史、强制停止/重启同章节同页恢复及移出不删漫画。人工检查真实截图时发现：英文系统中 QA 书库/历史为英文，但原 Reader 顶部返回/章节及底部翻页按钮仍是中文；这属于 S1 用户可见 UI 缺陷，不能因本地操作功能通过而标 G1 完成。

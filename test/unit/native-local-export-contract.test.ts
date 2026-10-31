@@ -43,9 +43,22 @@ describe('native local body export source contracts, not native runtime proof', 
         expect(createHash('sha256').update(prefix).digest('hex')).toBe(authority.sharedImporterParts.prefixWithoutAddedProgressPort)
         expect(createHash('sha256').update(signature).digest('hex')).toBe(authority.sharedImporterParts.signatureThroughEnd)
         const sort = 'pages.sort((a,b)->naturalCompare(a.name,b.name));'
-        const inventory = importer.slice(importer.indexOf('    public static Prepared prepare('), importer.indexOf(sort) + sort.length)
+        // Preserve the frozen original inventory algorithm verbatim. Only strip
+        // the new optional-progress *entry* before applying the existing hash.
+        // Never update the authoritative hash to match arbitrary changes.
+        const legacySignature = '    public static Prepared prepare(String title, Source source, File staging, Cancellation cancel) throws IOException {'
+        const progressEntry = [
+            legacySignature,
+            '        return prepare(title,source,staging,cancel,(complete,total)->{});',
+            '    }',
+            '    public static Prepared prepare(String title, Source source, File staging, Cancellation cancel,',
+            '                                   Progress progress) throws IOException {'
+        ].join('\n')
+        expect(importer).toContain(progressEntry)
+        const inventory = importer.slice(importer.indexOf(legacySignature), importer.indexOf(sort) + sort.length)
+            .replace(progressEntry, legacySignature)
         expect(createHash('sha256').update(inventory).digest('hex')).toBe(authority.sharedImporterParts.legacyInventoryThroughNaturalSort)
-        expect(importer).toContain('return copyPages(title,pages,staging,cancel,false,')
+        expect(importer).toContain('return copyPages(title,pages,staging,cancel,false,progress)')
         expect(importer).toContain('return copyPages(title,pages,staging,cancel,true,progress)')
         for (const check of ['count>MAX_PAGE||total>MAX_TOTAL', 'input.size>=0&&count!=input.size', 'input.crc>=0&&crc.getValue()!=input.crc', '!signature(header,headerLength,ext)', 'out.getFD().sync()', 'cancel.check();return new Prepared'])
             expect(importer).toContain(check)

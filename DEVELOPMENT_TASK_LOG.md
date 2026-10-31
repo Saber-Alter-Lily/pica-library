@@ -2,6 +2,9 @@
 
 ### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
 
+- **第二轮真实模拟器结果**：run [41171406333](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171406333) 已用 Android 系统 SAF 成功导入四页 CBZ，UI 明确显示 `Imported comics:1` 和 `S3-QA-Comic / 4 pages`，证明先前 Android App 私有目录别名路径错误已经修复；但旧脚本等待毫秒级 `Import complete` 瞬时提示，正常刷新为书库数量后发生测试误判。更正仅改 UI 验收为稳定四页/两页书库条目 + 原 manifest，并适配原 Reader 自动隐藏工具栏；不修改应用源、数据格式或回退安全规则。此轮的书架/Reader/历史/重启/目录导入仍**尚未执行**，待下次实际作业证据。
+
+
 - **首次真实模拟器失败并保留证据**：GitHub Actions run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41170950196) 已用系统 SAF 真实选中 `S3-QA-Comic.cbz`，但原 `LocalComicStore.inside` 的 `getAbsoluteFile()==getCanonicalFile()` 绝对等式将 Android 系统级 `/data/user/0` 别名误判为非法路径，页面明确显示 `Import failed: Unsafe owned comic path`，所以 CBZ 导入失败，后续书架/阅读/历史/文件夹流程**未执行**。修复同时覆盖 `deleteTree`，避免同一系统别名导致合法取消/删除清理失败；只比较 App 自有目录内部相对路径的规范化结果并检查实际下级 symlink。已有 `LocalComicImportTest` 增加唯一一项系统别名可用、目录内部 symlink 仍拒绝且不跟随删除的定向回归；不关闭路径安全规则或新增解析器。
 
 

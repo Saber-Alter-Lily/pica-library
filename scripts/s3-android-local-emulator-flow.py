@@ -187,7 +187,8 @@ def import_cbz():
     page("02-system-picker")
     locate_document("S3-QA-Comic.cbz")
     tap(("Save to library", "保存到书库", "書庫に保存"), seconds=55)
-    wait(("Import complete", "导入完成", "取込が完了しました"), seconds=55)
+    # The post-commit status is intentionally transient; the library row is stable.
+    wait(("4 pages", "4 页", "4 ページ"), seconds=55)
     comic = ledger("local-comics-v1/" + local_manifest_id() + "/manifest.json")
     assert comic["kind"] == "cbz" and len(comic["pages"]) == 4, comic
     page("03-cbz-imported")
@@ -233,15 +234,22 @@ def shelf_flow(comic):
     record("original shelf schema-2 create/add membership persists locally")
 
 
+def wait_page_counter(value, seconds=35):
+    # The original Reader automatically hides its chrome after page display.
+    if not wait(value, seconds=6, required=False):
+        adb("shell", "input", "tap", "360", "480")
+        wait(value, seconds=seconds)
+
+
 def reader_flow():
     tap("S3-QA-Comic")
-    wait(("1 / 3",), seconds=35)
+    wait_page_counter("1 / 3", seconds=35)
     page("05-reader-first-page")
     # Original Reader chrome auto-hides. A center tap reveals the existing controls.
     if not wait("下一页", seconds=3, required=False):
         adb("shell", "input", "tap", "360", "480")
     tap("下一页", seconds=12)
-    wait("2 / 3", seconds=28)
+    wait_page_counter("2 / 3", seconds=28)
     time.sleep(1.2)  # Save only after the original bitmap holder completed loading.
     page("06-reader-second-page")
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
@@ -259,7 +267,7 @@ def restart_history(comic):
     wait("S3-QA-Comic", seconds=25)
     page("07-history-after-force-stop")
     tap("S3-QA-Comic")
-    wait("2 / 3", seconds=30)
+    wait_page_counter("2 / 3", seconds=30)
     page("08-reader-resumed-from-history")
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
@@ -291,7 +299,7 @@ def import_folder():
     if wait(("Allow", "允许", "許可"), seconds=12, required=False):
         tap(("Allow", "允许", "許可"))
     tap(("Save to library", "保存到书库", "書庫に保存"), seconds=50)
-    wait(("Import complete", "导入完成", "取込が完了しました"), seconds=45)
+    wait(("2 pages", "2 页", "2 ページ"), seconds=45)
     found = [x for x in book_rows() if x["kind"] == "folder" and len(x["pages"]) == 2]
     assert found, book_rows()
     page("11-folder-imported")

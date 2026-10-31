@@ -41,3 +41,9 @@ fixtures or this QA APK to a formal Release.
 ## First actual emulator finding
 
 Run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41170950196) reached the Android system SAF picker and selected the CBZ. The existing LocalComicStore rejected the Android platform app-data alias with `Import failed: Unsafe owned comic path`. No comic was imported and later scenarios were not executed. The failure screenshots, UI XML and exact log are retained in the Actions artifact. The follow-up code change fixes only the root/descendant path comparison and symlink-safe cleanup, then reruns the **same real emulator** flow; do not mark this run as PASS.
+
+## Second emulator result and non-product test correction
+
+The rerun [41171406333](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171406333) **successfully selected and imported the actual CBZ** after the app-owned Android path-alias fix. Android accessibility evidence confirms `Imported comics:1` plus `S3-QA-Comic / 4 pages`; the original previous import failure is absent. The script then falsely failed because it waited for a transient `Import complete` status that is immediately replaced by the normal persistent library count.
+
+The check now waits for the **persisted four-page library row** and reads the actual original manifest. Its folder check likewise waits for a stable two-page library row, while native Reader page checks can reveal chrome when the original auto-hide operates normally. This is a test script correction, not a change to correct production UI behavior. Shelf, Reader, history, restart and folder stages were **not yet run** in that failed attempt.

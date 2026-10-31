@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+### 2026-10-31｜S3 CORE-ANDROID-18：无源 Android 本地书库共享正式版 CBZ 导出
+
+- 接续 #272 精确源 `f4e40d5a`（21/21 GitHub Actions SUCCESS），从正式 Android 的 `app/LocalComicExports` **原样物理迁移**到 `:local-storage`；原 app 的 `LocalComicExportActivity` / `LocalComicExportTest` 原有接口不变，导出器仍是已存在的纯 Java `:local-core/LocalComicExporter`，**绝不开发第二套压缩器或备份系统**。
+- 给真实可独立安装 `:local-app` 的本地作品长按菜单加入「导出 CBZ／删除副本」，使用 Android 系统 `ACTION_CREATE_DOCUMENT` 明确选保存位置，只传所选作品 ID；仍采用同一源文件/CRC/长度校验、私有暂存、export lease、SHA-256 回执、按块可取消写入。不索取网络/存储广域权限，不读旧正式用户资料。
+- 原书架/历史/阅读器不变；CBZ **只包含页面，不是个人书架/历史/标签/偏好备份**。取消或写出失败不删除用户选择的外部目标，提示可能存在不完整文件；原已导入漫画和历史不因导出改变。
+- 在现有 `native-local-export-contract` 调整被迁移的文件定位并断言 QA 真正调用共享导出；Android/Web/Desktop 原 CI/纯核心 APK 依赖闭包、已有 Android35 模拟器 SAF→导出 ZIP 实体校验必须按**新精确 SHA**执行。不引入第二套测试框架。此分支仅 Draft，G1–G4、正式用户资料迁移/回滚、来源独立安装撤销与正式发布仍 OPEN。
+
+
 ### 2026-10-31｜S1/S2 CORE-ANDROID-17：复用原本地拷贝逐页进度，正式版/无源 QA 均显示实际导入进度
 
 - 首个带真实进度的源码 `1cd3dbec` 经确切 [CI #41193119984](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41193119984) Android 全量测试/构建通过，但 Web/Desktop 旧 `native-local-export-contract.test.ts` 对原 `LocalComicImporter.prepare` 的冻结库存排序片段哈希仍从原方法入口连续截取；新增可选 Progress 重载虽未改变原库存算法，却被包含进片段导致哈希不匹配。**保留原 authoritative SHA 和原前缀/尾部安全哈希完全不改**，只在旧断言内精确核对并剥离新增进度入口后继续校验原清单/自然排序片段的旧哈希，同时确认真正的 `copyPages(...,progress)`。未删旧测试、未换哈希或放宽路径/图像安全。新提交继续完整 CI/Android 实机模拟回归。

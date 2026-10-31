@@ -370,6 +370,28 @@ def import_folder():
     record("system SAF folder picker -> original local storage with two valid pages")
 
 
+def export_cbz():
+    global STEP
+    STEP = "export-cbz"
+    x, y, _ = wait("S3-QA-Comic", seconds=30)
+    adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "1300")
+    tap(("Export CBZ", "导出 CBZ", "CBZ に書き出す"), seconds=18, exact=True)
+    page("12-export-system-picker")
+    tap(("Save", "保存", "保存する"), seconds=35, exact=True, only_class="Button")
+    wait(("CBZ exported", "CBZ 导出完成", "CBZ を書き出しました"), seconds=55)
+    path = "/sdcard/Download/Comic-S3-QA-Comic.cbz"
+    local = ROOT / "exported-by-original-adapter.cbz"
+    adb("pull", path, str(local), timeout=40)
+    with zipfile.ZipFile(local, "r") as archive:
+        names = sorted(archive.namelist())
+        assert names == ["Chapter01/001.png", "Chapter01/002.png",
+                         "Chapter01/003.png", "Chapter02/001.png"], names
+        assert all(archive.read(name).startswith(b"\\x89PNG\\r\\n\\x1a\\n") for name in names)
+        assert "manifest.json" not in names
+    page("13-export-complete")
+    record("system SAF create-document -> original exported 4-page CBZ; no profile data")
+
+
 def main():
     global STEP
     try:
@@ -387,6 +409,7 @@ def main():
         restart_history(comic)
         remove_member_without_deleting(comic)
         import_folder()
+        export_cbz()
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",

@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-31 S3 CORE-ANDROID-18｜无源 Android 共用原正式 CBZ 导出
+
+- **功能薄片而非新备份产品**：把正式 App 原 `LocalComicExports` 适配器移动到 `:local-storage`，由原 app 与 source-free `:local-app` 共用；底层只使用原 `LocalComicExporter`、现有 `LocalComicStore`、Android SAF，不改变标准 CBZ/ZIP 页面文件、不写新 schema、不复制第三方来源代码。
+- 独立本地客户端长按作品可导出 CBZ，来源仍是本 app 已确认的私有导入正文；可取消的后台原流程、私有 staging/lease、SHA256 回执、外部保存器权限隔离保持。导出不包含书架/历史/账号/收藏/标签，也不能替代 v0.5.0 正式数据迁移。
+- 按分支当前精确提交完成 Android 原完整 CI、独立无源六 DEX 与 Android35 系统 SAF 保存、真实 ZIP 页内容核对后才认定工程薄片通过；真实手机/G1、来源生命周期/G2、旧数据回滚/G3、正式发布/G4 均开放。只保留 Draft，不改 main、OTA、Release 或用户真实文件。
+
+
 ### 2026-10-31 S1/S2 CORE-ANDROID-17｜原本地导入器真实逐页进度接入双 Android 客户端
 
 - 补齐取消后的状态：单独使用中日英原生资源显示“已取消”而非“导入失败”，不改变取消后的目录清理或真实故障的错误展示；不增加新测试框架。\n

@@ -2,6 +2,9 @@
 
 ### 2026-10-31｜S1/CORE-ANDROID-16：Reader 唯一界面物理三语资源修正
 
+- 原首次三语 Reader 提交 `cbaac6d` 已经 **21/21 Actions SUCCESS**，Android 35 emulator 真正点击英文 `Next` 并完成 S3 全链路。人工目测其 360dp 截图发现底部 `Reading settings` 因长度换行，影响按钮占位；仅将按钮语义文案单独缩为英文 `Settings`、日文 `設定`，弹窗完整标题仍为 `Reading settings`，中文保持 `阅读设置`。沿用 Android 原有 R.string，不增加新 UI/库/框架，现有模拟器脚本仅核对窄屏存在 `Settings` Button 后继续点 `Next`，真实视觉整体 G1 仍需后续多屏/真机。
+
+
 - #270 `a0a1fcd254f7cf70c7650b1428a3850c5729f3a7` 精确提交 21/21 Actions SUCCESS，真实 Android 35 emulator `S3 LOCAL END-TO-END PASS`。实际截图检查发现独立 local-app 系统语言英语，但唯一原 Reader 主界面导航及选项存在中文控件；旧 Reader 引导使用字符串字面量，不能假装全部三语一致。
 - 只在已有 `:reader-view` 加 Android 原生 `values/values-en/values-ja` 字符串资源，并替换原 Reader 主控件、模式、预载/页码、章节/失败等 42 组文案；对 full app 继续使用已有 `LocaleStore.wrap`，对 local-only APK 使用系统语言。无新翻译系统、没有第二个 Reader 或新 SDK。
 - 旧源码契约只修正一个章节标题断言，原 Android35 操作脚本把实际下一页动作断言升级为英文系统下精确 `Next` Button；继续对真实 CBZ/文件夹/历史/书架重跑原闭环，不新建大量快照。此项新增代码提交前尚未得到 CI、英文 Reader 截图或窄屏/日文验收，不声称 G1 PASS。全部生产 main/Release/OTA/真实用户数据保持未操作。

@@ -9,6 +9,7 @@
     <string name="reader_next_page">下一页</string>
     <string name="reader_next_chapter">下一章</string>
     <string name="reader_options">阅读设置</string>
+    <string name="reader_options_button">阅读设置</string>
     <string name="reader_no_chapters">没有可读章节</string>
     <string name="reader_failure_details">读取失败 · 点此查看</string>
     <string name="reader_cannot_load_chapter">无法读取章节 · %1$s</string>

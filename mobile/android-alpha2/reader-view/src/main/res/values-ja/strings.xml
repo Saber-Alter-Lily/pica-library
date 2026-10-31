@@ -10,6 +10,7 @@
     <string name="reader_next_page">次のページ</string>
     <string name="reader_next_chapter">次の章</string>
     <string name="reader_options">閲覧設定</string>
+    <string name="reader_options_button">設定</string>
     <string name="reader_no_chapters">読める章がありません</string>
     <string name="reader_failure_details">読み込み失敗・詳細を見る</string>
     <string name="reader_cannot_load_chapter">章を読み込めません · %1$s</string>

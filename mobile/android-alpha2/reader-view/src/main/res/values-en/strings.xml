@@ -10,6 +10,7 @@
     <string name="reader_next_page">Next</string>
     <string name="reader_next_chapter">Next chapter</string>
     <string name="reader_options">Reading settings</string>
+    <string name="reader_options_button">Settings</string>
     <string name="reader_no_chapters">No readable chapters</string>
     <string name="reader_failure_details">Unable to load · view details</string>
     <string name="reader_cannot_load_chapter">Cannot load chapter · %1$s</string>

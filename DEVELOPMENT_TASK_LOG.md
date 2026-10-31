@@ -2,6 +2,9 @@
 
 ### 2026-10-31｜S1/S2 CORE-ANDROID-17：复用原本地拷贝逐页进度，正式版/无源 QA 均显示实际导入进度
 
+- 首个带真实进度的源码 `1cd3dbec` 经确切 [CI #41193119984](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41193119984) Android 全量测试/构建通过，但 Web/Desktop 旧 `native-local-export-contract.test.ts` 对原 `LocalComicImporter.prepare` 的冻结库存排序片段哈希仍从原方法入口连续截取；新增可选 Progress 重载虽未改变原库存算法，却被包含进片段导致哈希不匹配。**保留原 authoritative SHA 和原前缀/尾部安全哈希完全不改**，只在旧断言内精确核对并剥离新增进度入口后继续校验原清单/自然排序片段的旧哈希，同时确认真正的 `copyPages(...,progress)`。未删旧测试、未换哈希或放宽路径/图像安全。新提交继续完整 CI/Android 实机模拟回归。
+
+
 - 同轮补充取消提示语义：正式 Android 用户主动取消时，沿用原 CANCEL 路径与清理，但完成后显示三语“导入已取消”，不再把主动取消错误归类为导入失败；真实损坏/权限/CRC 错误仍保留原失败说明。\n
 
 - 上游 `LocalComicImporter.Progress.page(complete,total)` 已存在、原大多数普通导入却丢掉回调。本轮只补两个保留旧签名的重载，folder/CBZ 原复制完成后真实页数直达正式版保留态 Session 和无源 local-app；复用原验证/CRC/原子 manifest，无第二套上传/调度任务、无新框架。

@@ -127,8 +127,8 @@ public final class LocalLibraryActivity extends Activity {
                 TextView item=convertView instanceof TextView?(TextView)convertView:label("",16);
                 LocalComicReaderPort.Book book=getItem(position);
                 if(book!=null)item.setText(book.title+"\n"+book.pageCount+
-                    copy(" 页 · 点击阅读，长按删除"," pages · Tap to read; hold to remove",
-                         " ページ · タップで読む、長押しで削除"));
+                    copy(" 页 · 点击阅读，长按操作"," pages · Tap to read; hold for actions",
+                         " ページ · タップで読む、長押しで操作"));
                 item.setPadding(dp(10),dp(13),dp(10),dp(13));
                 item.setMinHeight(dp(64));
                 return item;
@@ -276,7 +276,7 @@ public final class LocalLibraryActivity extends Activity {
                     status.setText(copy("CBZ 导出完成（仅包含漫画图片）：",
                         "CBZ exported (comic pages only):",
                         "CBZ を書き出しました（画像のみ）：")
-                        +receipt.pages+copy(" 页"," pages"," ページ")
+                        +" "+receipt.pages+copy(" 页"," pages"," ページ")
                         +"\nSHA-256: "+receipt.sha256);
                 });
             }catch(Exception|OutOfMemoryError error){

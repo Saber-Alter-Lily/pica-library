@@ -475,7 +475,7 @@ describe('Android Library / Author / History V2 contracts', () => {
     const progress = fs.readFileSync('mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderProgressLedger.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/local-storage/src/main/java/com/picalibrary/android/ReaderHistoryLedger.java','utf8')
     const history = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HistoryActivity.java','utf8')
-    expect(reader).toContain('chapterAdvance.setText(translateReaderText("下一章 · ")+target.title)')
+    expect(reader).toContain('chapterAdvance.setText(getString(R.string.reader_next_chapter_title,target.title))')
     expect(reader).toContain('progress.chapterMetadata(data.episode.id,data.episode.title,data.episode.order)')
     expect(reader).toContain('if(atChapterEnd())setChrome(true)')
     expect(progress).toContain('void chapterMetadata(String chapterId,String chapterTitle,int chapterOrder)')

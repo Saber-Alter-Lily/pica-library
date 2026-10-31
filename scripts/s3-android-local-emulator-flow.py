@@ -242,14 +242,64 @@ def wait_page_counter(value, seconds=35):
         wait(value, seconds=seconds)
 
 
+def button_in_snapshot(snapshot, label):
+    for text, description, bounds, kind in snapshot:
+        if not kind.endswith("Button") or not (
+                text.casefold() == label.casefold() or
+                description.casefold() == label.casefold()):
+            continue
+        match = re.search(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds)
+        if match:
+            x1, y1, x2, y2 = map(int, match.groups())
+            if x1 < x2 and y1 < y2:
+                return ((x1 + x2) // 2, (y1 + y2) // 2)
+    return None
+
+
+def dismiss_immersive_help():
+    snapshot = nodes()
+    for label in ("Got it", "知道了", "了解"):
+        pos = button_in_snapshot(snapshot, label)
+        if pos is not None:
+            adb("shell", "input", "tap", str(pos[0]), str(pos[1]))
+            print("UI tap: Android system immersive help confirmation", flush=True)
+            return True
+    return False
+
+
+def advance_reader_english():
+    # One native UI snapshot prevents original Reader chrome (which auto-hides)
+    # from disappearing between separate Settings and Next lookups.
+    for _ in range(7):
+        snapshot = nodes()
+        help_button = None
+        for label in ("Got it", "知道了", "了解"):
+            help_button = button_in_snapshot(snapshot, label)
+            if help_button is not None:
+                break
+        if help_button is not None:
+            adb("shell", "input", "tap", str(help_button[0]), str(help_button[1]))
+            continue
+        settings = button_in_snapshot(snapshot, "Settings")
+        next_page = button_in_snapshot(snapshot, "Next")
+        if settings is not None and next_page is not None:
+            adb("shell", "input", "tap", str(next_page[0]), str(next_page[1]))
+            print("UI tap: native English Next with single-line Settings", flush=True)
+            return
+        # Original Reader auto-hides controls and a center tap reveals them.
+        adb("shell", "input", "tap", "360", "480")
+    raise AssertionError("Original Reader did not expose English Settings and Next controls")
+
+
 def reader_flow():
     tap("S3-QA-Comic")
+    # A fresh emulator may show Android's immersive-mode education on the FIRST
+    # Reader entry, not only after force-stop/relaunch.
+    dismiss_immersive_help()
     wait_page_counter("1 / 3", seconds=35)
+    dismiss_immersive_help()
     page("05-reader-first-page")
-    # Original Reader chrome auto-hides. A center tap reveals the existing controls.
-    if not wait("下一页", seconds=3, required=False):
-        adb("shell", "input", "tap", "360", "480")
-    tap("下一页", seconds=12)
+    advance_reader_english()
     wait_page_counter("2 / 3", seconds=28)
     time.sleep(1.2)  # Save only after the original bitmap holder completed loading.
     page("06-reader-second-page")

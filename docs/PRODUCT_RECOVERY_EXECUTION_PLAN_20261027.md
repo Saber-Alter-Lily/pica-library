@@ -2,6 +2,9 @@
 
 ### 2026-10-30 CORE-ANDROID-15｜独立无源 Android APK 真实模拟器操作证据（叠加 Draft #269）
 
+- **首次真实模拟器失败并保留证据**：GitHub Actions run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41170950196) 已用系统 SAF 真实选中 `S3-QA-Comic.cbz`，但原 `LocalComicStore.inside` 的 `getAbsoluteFile()==getCanonicalFile()` 绝对等式将 Android 系统级 `/data/user/0` 别名误判为非法路径，页面明确显示 `Import failed: Unsafe owned comic path`，所以 CBZ 导入失败，后续书架/阅读/历史/文件夹流程**未执行**。修复同时覆盖 `deleteTree`，避免同一系统别名导致合法取消/删除清理失败；只比较 App 自有目录内部相对路径的规范化结果并检查实际下级 symlink。已有 `LocalComicImportTest` 增加唯一一项系统别名可用、目录内部 symlink 仍拒绝且不跟随删除的定向回归；不关闭路径安全规则或新增解析器。
+
+
 - 以 #269 已经 **20/20 Actions SUCCESS** 的 `:local-app` 为基础，**不再造导入、阅读、历史、书架或后台测试框架**；复用仓库既有 `reactivecircus/android-emulator-runner@v2`、Gradle 和 Android 原生 `adb`/UI hierarchy。增加仅一个按 `local-app/local-storage/reader-view` 相关改动触发的 S3 Android 35 模拟器工作流。
 - 每次运行用纯本地标准 Python 随机无关的测试图片，生成四页两章的 CBZ 和两页文件夹；实际操作系统 SAF 文件/目录选择器、原 LocalComicStore 的 staging/confirm、原 ShelfLedger 创建/加入/移出、原 Reader 翻页/页码记录、ReaderHistoryLedger 会话历史、强制停止/重新启动/从历史恢复章节页码，最后核对原 Shelf tombstone 不删除漫画文件。
 - 通过截图、Android UI XML、真正 QA 应用 `run-as` 下的原 `local-comics-v1` manifest、`portable-shelves-v1.json`、`reading-history-v1.json` 校验；保留短期证据包，失败时保留相应屏幕供复核。严禁真实账号/网盘登录/源流量或访问正式 v0.5.0 私人资料。不替代既有独立 APK 六 DEX/权限检查。

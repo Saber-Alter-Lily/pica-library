@@ -37,3 +37,7 @@ source closure check remains authoritative for the source-free binary.
 CI cannot establish G1 real handset acceptance, signing/upgrade compatibility
 or G3/G4 release approval. Keep the workflow Draft-only and never promote
 fixtures or this QA APK to a formal Release.
+
+## First actual emulator finding
+
+Run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41170950196) reached the Android system SAF picker and selected the CBZ. The existing LocalComicStore rejected the Android platform app-data alias with `Import failed: Unsafe owned comic path`. No comic was imported and later scenarios were not executed. The failure screenshots, UI XML and exact log are retained in the Actions artifact. The follow-up code change fixes only the root/descendant path comparison and symlink-safe cleanup, then reruns the **same real emulator** flow; do not mark this run as PASS.

@@ -62,11 +62,25 @@ final class LocalComicStore {
     // Deliberately pinned internal. Changing cache/data preferences never strands owned comic bodies.
     static File root(Context c){return new File(c.getFilesDir(),"local-comics-v1");}
     private static File comicRoot(Context c,String id) throws IOException {if(id==null||!id.matches("local:[0-9a-f]{64}"))throw new IOException("Invalid local comic id");return inside(root(c),new File(root(c),id.substring(6)));}
-    static File inside(File root,File target) throws IOException {String base=root.getCanonicalPath()+File.separator;if(!target.getCanonicalPath().startsWith(base)||!target.getAbsoluteFile().equals(target.getCanonicalFile()))throw new IOException("Unsafe owned comic path");return target;}
+    static File inside(File root,File target) throws IOException {
+        // Android may expose its trusted app-data ancestor via /data/user/0 -> /data/data.
+        // Compare only the path *beneath* the owned root; reject actual owned symlinks.
+        java.nio.file.Path base=root.getAbsoluteFile().toPath();
+        java.nio.file.Path path=target.getAbsoluteFile().toPath();
+        java.nio.file.Path normalized=path.normalize();
+        if(java.nio.file.Files.isSymbolicLink(base)||!path.equals(normalized)||
+           !normalized.startsWith(base.normalize())||normalized.equals(base.normalize()))
+            throw new IOException("Unsafe owned comic path");
+        File expected=new File(root.getCanonicalFile(),base.normalize().relativize(normalized).toString());
+        if(!target.getCanonicalFile().equals(expected))
+            throw new IOException("Unsafe owned comic path");
+        return target;
+    }
     static void removeOwned(File parent,File target){try{inside(parent,target);deleteTree(target);}catch(IOException ignored){}}
     private static void deleteTree(File file) throws IOException {
-        // Never follow links; every descendant must still resolve to exactly its lexical location.
-        if(!file.getAbsoluteFile().equals(file.getCanonicalFile()))throw new IOException("Owned comic link rejected");
+        // Reject links we control, not the Android-managed alias above app files.
+        if(java.nio.file.Files.isSymbolicLink(file.toPath()))
+            throw new IOException("Owned comic link rejected");
         if(file.isDirectory()){File[] children=file.listFiles();if(children==null)throw new IOException("Unreadable owned directory");for(File child:children)deleteTree(child);}
         if(file.exists()&&!file.delete())throw new IOException("Cannot remove owned comic file");
     }

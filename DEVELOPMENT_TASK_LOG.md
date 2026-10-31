@@ -2,6 +2,9 @@
 
 ### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
 
+- **首次真实模拟器失败并保留证据**：GitHub Actions run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41170950196) 已用系统 SAF 真实选中 `S3-QA-Comic.cbz`，但原 `LocalComicStore.inside` 的 `getAbsoluteFile()==getCanonicalFile()` 绝对等式将 Android 系统级 `/data/user/0` 别名误判为非法路径，页面明确显示 `Import failed: Unsafe owned comic path`，所以 CBZ 导入失败，后续书架/阅读/历史/文件夹流程**未执行**。修复同时覆盖 `deleteTree`，避免同一系统别名导致合法取消/删除清理失败；只比较 App 自有目录内部相对路径的规范化结果并检查实际下级 symlink。已有 `LocalComicImportTest` 增加唯一一项系统别名可用、目录内部 symlink 仍拒绝且不跟随删除的定向回归；不关闭路径安全规则或新增解析器。
+
+
 - #269 `987223346dd19f108e044b92483f7b5f12c6ff89` 的 20/20 Actions 已重新核实 SUCCESS，正式 main 仍为 v0.5.0 基线。前阶段实现的原书架、阅读、历史、无源 DEX 验收仍有效。
 - 只新增一条针对 `:local-app` 的 Android 35 UI 模拟器 workflow，重用现有 Gradle/Android Emulator/KVM，不依赖 Appium、Espresso 新套件、额外服务或模拟 Reader；从系统 SAF 导入原 PNG/CBZ 和文件夹，操作书架、阅读页、历史、退出重启恢复、移出书架 tombstone，记录截图/UI 树和真实原数据文件，不触碰用户或正式安装。
 - 证据边界：只有 GitHub exact-head workflow + 真实运行截图/UI/原 ledger 校验均过才能声称 emulator 操作 PASS；即使通过也不会自动关掉真实物理手机 G1/G2、v0.5.0 迁移 G3、正式发布 G4。失败需针对缺陷修复，避免造轮子。

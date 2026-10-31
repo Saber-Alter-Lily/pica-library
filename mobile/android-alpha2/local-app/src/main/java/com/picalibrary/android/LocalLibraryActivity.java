@@ -58,6 +58,7 @@ public final class LocalLibraryActivity extends Activity {
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
+        if(saved!=null)exportComicId=saved.getString("pendingExportComicId","");
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(16),dp(20),dp(16),dp(12));
@@ -165,6 +166,11 @@ public final class LocalLibraryActivity extends Activity {
         setContentView(root);
         setWorking(false,false);
         refresh();
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state){
+        state.putString("pendingExportComicId",exportComicId);
+        super.onSaveInstanceState(state);
     }
 
     @Override protected void onResume(){

@@ -386,7 +386,7 @@ def export_cbz():
         names = sorted(archive.namelist())
         assert names == ["Chapter01/001.png", "Chapter01/002.png",
                          "Chapter01/003.png", "Chapter02/001.png"], names
-        assert all(archive.read(name).startswith(b"\\x89PNG\\r\\n\\x1a\\n") for name in names)
+        assert all(archive.read(name).startswith(b"\x89PNG\r\n\x1a\n") for name in names)
         assert "manifest.json" not in names
     page("13-export-complete")
     record("system SAF create-document -> original exported 4-page CBZ; no profile data")

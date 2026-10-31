@@ -1,6 +1,8 @@
 # Pica Library Development Task Log
 
 ### 2026-10-31｜S3 CORE-ANDROID-18：无源 Android 本地书库共享正式版 CBZ 导出
+- **第二次精确模拟器失败（保留 FAIL）**：测试 `87a6550` 的 Android35 [run #41222007662](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222007662) 仍成功走完原导入、Reader、历史、书架及系统 SAF 的 `SAVE`，原 app 显示已导出四页及 SHA-256；但 `adb shell find /sdcard` 未找到文件。Android 文档提供者可能把用户创建的文件保存在 shell 不可枚举的位置。**导出数据可用性尚未经外部重新读取验收**；仅调整现有模拟器脚本：在系统 `ACTION_OPEN_DOCUMENT` 中重新选取刚写出的 CBZ，调用原 `LocalComicStore` 再导入，然后从本 QA 私有页面数据逐页与初始 fixture 按字节比较。禁止把 UI 完成提示当成文件字节通过；不新增导出实现、直接访问外部提供者私有目录或更改正常用户存储权限。
+
 - **模拟器真实截图的直接 UI 修正**：此前本地作品行仍写「长按删除」，但当前长按已是「导出 CBZ／删除」双选项；同步改成「长按操作」，保留三语言和原长按确认删除，并给导出成功回执的页码补空格。以原 Android 35 截图为缺陷证据，不新增截图框架或业务流程。
 
 - **第一次精确 SHA 验收回执**：`e0b62c9` 的完整 Android/Web/Desktop [CI #41221408228](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41221408228) 两项 SUCCESS，Android 原生构建/测试与独立无源 APK Manifest/DEX 检查均通过；但 Android35 [模拟器 #41221408290](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41221408290) 明确 FAIL。模拟器实操通过原 CBZ 导入、书架、Reader、重启恢复、文件夹导入，并在导出时成功点击系统保存键、实际 UI 显示 `CBZ exported`；失败源于验收脚本随后假定文件一定保存到 `/sdcard/Download`，`adb pull` 返回文件不存在。**不能凭 UI 成功把实体 ZIP 已读取验证说成 PASS**。只修正既有脚本在 Android 系统用户可访问文档根实际查找指定导出文件，再独立拉回校验四张 PNG 与 ZIP 清单。没有修改导出应用代码、安全权限或放宽 ZIP 内容要求。

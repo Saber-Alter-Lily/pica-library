@@ -376,27 +376,33 @@ def export_cbz():
     x, y, _ = wait("S3-QA-Comic", seconds=30)
     adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "1300")
     tap(("Export CBZ", "导出 CBZ", "CBZ に書き出す"), seconds=18, exact=True)
+    wait(("Save", "保存", "保存する"), seconds=35, exact=True, only_class="Button")
     page("12-export-system-picker")
     tap(("Save", "保存", "保存する"), seconds=35, exact=True, only_class="Button")
     wait(("CBZ exported", "CBZ 导出完成", "CBZ を書き出しました"), seconds=55)
-    # ACTION_CREATE_DOCUMENT owns its destination. The Android system picker
-    # may save to Documents or Download; never assume a provider's default root.
-    paths = [p.strip() for p in adb("shell", "find", "/sdcard", "-type", "f",
-                                   "-name", "Comic-S3-QA-Comic.cbz",
-                                   timeout=35, check=False).splitlines()
-             if p.strip().startswith("/sdcard/")]
-    assert len(paths) == 1, f"Saved CBZ not found in emulator document roots: {paths}"
-    path = paths[0]
-    local = ROOT / "exported-by-original-adapter.cbz"
-    adb("pull", path, str(local), timeout=40)
-    with zipfile.ZipFile(local, "r") as archive:
-        names = sorted(archive.namelist())
-        assert names == ["Chapter01/001.png", "Chapter01/002.png",
-                         "Chapter01/003.png", "Chapter02/001.png"], names
-        assert all(archive.read(name).startswith(b"\x89PNG\r\n\x1a\n") for name in names)
-        assert "manifest.json" not in names
     page("13-export-complete")
-    record("system SAF create-document -> original exported 4-page CBZ; no profile data")
+    # Android's system document provider owns the destination; it need not be
+    # a shell-visible /sdcard file. Reopen it through the same real SAF picker.
+    tap(("Import CBZ", "导入 CBZ", "CBZ 取込"))
+    page("14-export-roundtrip-picker")
+    locate_document("Comic-S3-QA-Comic.cbz")
+    tap(("Save to library", "保存到书库", "書庫に保存"), seconds=65)
+    wait(("Comic-S3-QA-Comic",), seconds=45)
+    restored = [x for x in book_rows()
+                if x["title"] == "Comic-S3-QA-Comic" and len(x["pages"]) == 4]
+    assert len(restored) == 1, book_rows()
+    expected = ROOT / "fixture" / "S3-QA-Comic.cbz"
+    with zipfile.ZipFile(expected, "r") as original:
+        names = sorted(original.namelist())
+        assert [page["name"] for page in restored[0]["pages"]] == names
+        for image in restored[0]["pages"]:
+            comic = restored[0]
+            path = ("files/local-comics-v1/" + comic["id"].removeprefix("local:") +
+                    "/" + comic["generation"] + "/" + image["file"])
+            actual = adb("exec-out", "run-as", PACKAGE, "cat", path, binary=True)
+            assert actual == original.read(image["name"]), image["name"]
+    page("15-export-roundtrip-complete")
+    record("system SAF save/reopen -> original CBZ writer/readback; 4 raster bytes identical")
 
 
 def main():

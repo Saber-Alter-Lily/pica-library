@@ -2,6 +2,8 @@
 
 ### 2026-10-31｜S1/S2 CORE-ANDROID-17：复用原本地拷贝逐页进度，正式版/无源 QA 均显示实际导入进度
 
+- 同轮补充取消提示语义：正式 Android 用户主动取消时，沿用原 CANCEL 路径与清理，但完成后显示三语“导入已取消”，不再把主动取消错误归类为导入失败；真实损坏/权限/CRC 错误仍保留原失败说明。\n
+
 - 上游 `LocalComicImporter.Progress.page(complete,total)` 已存在、原大多数普通导入却丢掉回调。本轮只补两个保留旧签名的重载，folder/CBZ 原复制完成后真实页数直达正式版保留态 Session 和无源 local-app；复用原验证/CRC/原子 manifest，无第二套上传/调度任务、无新框架。
 - 正式 Android `LocalComicImportActivity` 显示原生水平进度和三语 `N/总数`，导入时允许主动取消，旧 Session 旋转保留与完成阶段不变。独立本地 APK 显示相同真实页数及细水平进度条，当前按钮/Reader/历史/书架保持不变。回调按首/末/每8页更新可见 UI，数据实际每页都由核心计算。
 - 只在现有 `LocalComicImportTest` 增一条真实 DocumentsProvider 回调序列与取消后不写入书库验证。当前属于实现候选，**新提交的 CI/DEX/模拟器不得借用 #271 旧成功记录**。真实手机/大文件耗时、旧版升级和来源外置发布仍需独立核验。

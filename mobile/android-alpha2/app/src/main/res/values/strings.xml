@@ -157,6 +157,7 @@
     <string name="local_import_working">Processing locally… Large comics may take a while.</string>
     <string name="local_import_progress">Importing pages: %1$d / %2$d</string>
     <string name="local_import_cancelling">Cancelling import…</string>
+    <string name="local_import_cancelled">Import cancelled.</string>
     <string name="local_import_failed">Import could not be completed</string>
     <string name="local_import_catalog_pending">Copy saved. Reopen Library to retry refreshing the catalog.</string>
     <string name="local_import_preview">%1$d pages · %2$d chapters · %3$.1f MiB. Nothing is in your library yet. Reimporting the same selection updates its owned copy while retaining identity and reading position.</string>

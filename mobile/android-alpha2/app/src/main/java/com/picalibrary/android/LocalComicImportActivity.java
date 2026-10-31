@@ -81,7 +81,12 @@ public class LocalComicImportActivity extends LocaleAwareActivity {
                 body.addView(cancel);
             }
         }
-        if(!session.error.isEmpty()){body.addView(Ui.text(this,getString(R.string.local_import_failed),15,Ui.TEXT,true));body.addView(Ui.text(this,session.error,13,Ui.MUTED,false));}
+        if(!session.error.isEmpty()){
+            body.addView(Ui.text(this,getString(session.cancelled?
+                    R.string.local_import_cancelled:R.string.local_import_failed),15,Ui.TEXT,true));
+            if(!session.cancelled)
+                body.addView(Ui.text(this,session.error,13,Ui.MUTED,false));
+        }
         LocalComicStore.Preview preview=session.preview;
         if(preview!=null){body.addView(Ui.text(this,preview.title,20,Ui.TEXT,true));body.addView(Ui.text(this,getString(R.string.local_import_preview,preview.prepared.pages.size(),preview.prepared.chapters,preview.prepared.bytes/1048576.0),14,Ui.MUTED,false));body.addView(action(getString(R.string.local_import_confirm),"local-confirm",session::confirm));body.addView(action(getString(R.string.local_import_cancel),"local-cancel",()->{session.discard();render();}));}
         body.addView(Ui.text(this,getString(R.string.local_import_owned,session.comics.size()),19,Ui.TEXT,true));int shown=0;

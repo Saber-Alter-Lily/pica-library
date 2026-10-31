@@ -157,6 +157,7 @@
     <string name="local_import_working">正在本地处理… 大文件需要一些时间。</string>
     <string name="local_import_progress">正在导入图片：%1$d / %2$d</string>
     <string name="local_import_cancelling">正在取消导入…</string>
+    <string name="local_import_cancelled">导入已取消。</string>
     <string name="local_import_failed">未能完成导入</string>
     <string name="local_import_catalog_pending">副本已保存。请重新进入书库以重试刷新目录。</string>
     <string name="local_import_preview">%1$d 页 · %2$d 章 · %3$.1f MiB。尚未加入书库。再次选择同一位置会更新副本，保留作品身份和阅读位置。</string>

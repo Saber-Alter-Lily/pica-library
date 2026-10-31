@@ -2,6 +2,8 @@
 
 ### 2026-10-31 S1/S2 CORE-ANDROID-17｜原本地导入器真实逐页进度接入双 Android 客户端
 
+- 补齐取消后的状态：单独使用中日英原生资源显示“已取消”而非“导入失败”，不改变取消后的目录清理或真实故障的错误展示；不增加新测试框架。\n
+
 - 接续 Draft #271 `6f112db` 的 **21/21 Actions SUCCESS**、Android35 实际 SAF/书架/阅读/历史/重启模拟器 PASS；本轮直接解决长时间大漫画导入仅显示不透明加载圈的问题，不再重复分拆 Reader/历史/来源接口。
 - **复用而非重造**：`:local-core/LocalComicImporter` 原本已有 `Progress.page(complete,total)` 并在逐页写入/CRC 校验成功后调用，只是普通 folder/CBZ `prepare` 以前固定传空回调。本次在原生产接口新增可选 `Progress` 重载，原四参调用仍能兼容；`:local-storage/LocalComicStore.prepare` 同样保留旧签名并向普通 SAF folder/CBZ 导入透传实际页数。
 - **正式 Android 原界面** `LocalComicImportActivity` 在现有保留态 Session/工作线程中获取拷贝页码，以 Android 原生水平 ProgressBar + 中日英既有资源系统显示 `N / 总页数`，并在真正导入/复制时增加可取消按钮。每8页/首末页才向 UI 发送增量以减少刷屏，不重复渲染整页；提交阶段仍用原加载状态，不修改原预览/确认/原子保存/文件位置。

@@ -2,6 +2,9 @@
 
 ### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
 
+- **第三次模拟器验收细节**：run [41171776774](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171776774) 已真正完成系统 SAF → CBZ 预览确认 → 原 `local-comics-v1` 四页 manifest 校验 **PASS**。之后 ADB 脚本用模糊文本定位误点 `Create shelf` 对话框标题而非 `CREATE` 确认键，未发生真实书架提交；截图/UI 树显示标题、输入文本、CANCEL/CREATE 原样，属脚本误判。仅对原生 Button 精确匹配并等待持久化列表行；不改任何应用生产代码。此 run 的书架/Reader/历史/目录等后续验证仍未完成。
+
+
 - **既有 CI 仓库规范回归**：在 `ffe8c728` 上，原 Android CI 全部通过；Web/Desktop 唯一失败来自现有 `test/unit/workflow-entrypoint.test.ts` 强制每个 Actions 工件 `retention-days: 1`，而新 S3 证据工作流误设为 2。现仅将该工作流改回 `1`，不删除/禁用旧约束，不影响真实产品代码。该失败与前述瞬时 UI 文案误判分开记录；须以新精确提交重新确认完整 CI 和实际模拟器。
 
 

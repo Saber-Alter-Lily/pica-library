@@ -96,8 +96,8 @@ def wait(terms, seconds=35, exact=False, required=True, only_class=None):
     return None
 
 
-def tap(terms, seconds=35, exact=False):
-    x, y, label = wait(terms, seconds=seconds, exact=exact)
+def tap(terms, seconds=35, exact=False, only_class=None):
+    x, y, label = wait(terms, seconds=seconds, exact=exact, only_class=only_class)
     adb("shell", "input", "tap", str(x), str(y))
     print(f"UI tap: {label!r} ({x},{y})", flush=True)
 
@@ -219,9 +219,10 @@ def shelf_flow(comic):
     editable = wait(("",), seconds=12, only_class="EditText")
     adb("shell", "input", "tap", str(editable[0]), str(editable[1]))
     adb("shell", "input", "text", "QA_Shelf")
-    tap(("Create", "创建", "作成"), seconds=15)
-    wait("QA_Shelf", seconds=30)
-    tap("QA_Shelf")
+    # Do not mistake the "Create shelf" dialog TITLE for its CREATE button.
+    tap(("Create", "创建", "作成"), seconds=15, exact=True, only_class="Button")
+    wait("QA_Shelf ·", seconds=30)
+    tap("QA_Shelf ·")
     tap(("Add comic", "加入作品", "作品を追加"))
     tap("S3-QA-Comic")
     shelf = until_data("portable-shelves-v1.json",
@@ -279,7 +280,7 @@ def remove_member_without_deleting(comic):
     tap("QA_Shelf")
     x, y, _ = wait("S3-QA-Comic")
     adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "1400")
-    tap(("Remove", "移出", "外す"))
+    tap(("Remove", "移出", "外す"), exact=True, only_class="Button")
     shelf = until_data("portable-shelves-v1.json",
         lambda root: bool(root["shelves"][0]["items"]) and
             all(item["deletedAt"] for item in root["shelves"][0]["items"]))

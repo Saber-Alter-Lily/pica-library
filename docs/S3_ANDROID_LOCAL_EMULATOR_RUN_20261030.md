@@ -47,3 +47,9 @@ Run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/
 The rerun [41171406333](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171406333) **successfully selected and imported the actual CBZ** after the app-owned Android path-alias fix. Android accessibility evidence confirms `Imported comics:1` plus `S3-QA-Comic / 4 pages`; the original previous import failure is absent. The script then falsely failed because it waited for a transient `Import complete` status that is immediately replaced by the normal persistent library count.
 
 The check now waits for the **persisted four-page library row** and reads the actual original manifest. Its folder check likewise waits for a stable two-page library row, while native Reader page checks can reveal chrome when the original auto-hide operates normally. This is a test script correction, not a change to correct production UI behavior. Shelf, Reader, history, restart and folder stages were **not yet run** in that failed attempt.
+
+## Third run: durable CBZ import accepted; shelf dialog locator corrected
+
+Run [41171776774](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171776774) actually completed system SAF selection, confirmed the original CBZ staging/commit and read `local-comics-v1` manifest with four pages (**PASS**). The flow subsequently tapped the **"Create shelf" title** instead of the **"CREATE" button**, leaving the dialog open. The failure screenshot/UI hierarchy exposed title, entered `QA_Shelf`, CANCEL and CREATE. No shelf was created, so no later Reader/history/folder claim is made.
+
+The runner now selects the exact positive button by widget type and waits for the committed shelf-list row `QA_Shelf · 0` before opening it; other dialog-positive actions use exact matching. This changes *only the ADB UI driver*, not application code or the verified schema.

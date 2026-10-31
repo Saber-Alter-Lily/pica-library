@@ -1,5 +1,31 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
+
+- **第七次真实 Android 模拟器阶段验证**：run [41173063767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41173063767) 继续确认 CBZ/书架/原 Reader/会话历史/强制停止后恢复/移出书架墓碑与原文件仍在全部 PASS；系统 SAF 文件夹已从 `Download` 进入 `S3-QA-Folder` 并点击 `USE THIS FOLDER`。最后 Android 系统原生授权弹窗标题 `Allow Pica Library Local QA ...` 被脚本模糊匹配，误点标题而未按下原 `ALLOW` 按钮，文件夹导入未执行。仅将 ADB 定位改成精确 Button，无业务端、权限或数据逻辑变更；必须在下一精确 SHA 真正导入成功后才能标完整 PASS。
+
+
+- **第六次模拟器阶段性实际验收**：run [41172551035](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172551035) 再次真实 PASS CBZ 四页导入、原 Shelf 创建加入、Reader 翻至第二页、历史与强制停止后恢复、系统 `Got it` 全屏指引消除，且新增 PASS **长按移出书架写原 schema2 tombstone，同时原已导入文件仍存在**。最后一步 Android35 文件夹 SAF 选择器根目录显示 `Download`（单数），脚本只识别 `Downloads` 而未进入测试目录；后续文件夹导入未执行。修正仅扩展系统原生目录的已见标签，不触碰应用代码/数据/权限，不冒充整套 PASS。
+
+
+- **第五次真实 Android 35 模拟器阶段性验收**：run [41172161597](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172161597) 已实际 PASS 系统 SAF 选 CBZ/原四页两章 manifest、书架创建+加入及 schema2 成员持久化、原 Reader 图片翻至第2页、原历史会话落盘、强制停止/重启后从历史恢复同章节第2页。退出时 Android 系统首次沉浸式全屏教育层 `Viewing full screen / Got it` 拦截 BACK，后续书架移出及文件夹导入未执行；仅修改 ADB 脚本显式关闭系统提示并确认回到书库，不改应用 Reader/UI。该 run 的真正成功阶段与后续未完成阶段分别记录，不冒充完整 PASS。
+
+
+- **第三次模拟器验收细节**：run [41171776774](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171776774) 已真正完成系统 SAF → CBZ 预览确认 → 原 `local-comics-v1` 四页 manifest 校验 **PASS**。之后 ADB 脚本用模糊文本定位误点 `Create shelf` 对话框标题而非 `CREATE` 确认键，未发生真实书架提交；截图/UI 树显示标题、输入文本、CANCEL/CREATE 原样，属脚本误判。仅对原生 Button 精确匹配并等待持久化列表行；不改任何应用生产代码。此 run 的书架/Reader/历史/目录等后续验证仍未完成。
+
+
+- **既有 CI 仓库规范回归**：在 `ffe8c728` 上，原 Android CI 全部通过；Web/Desktop 唯一失败来自现有 `test/unit/workflow-entrypoint.test.ts` 强制每个 Actions 工件 `retention-days: 1`，而新 S3 证据工作流误设为 2。现仅将该工作流改回 `1`，不删除/禁用旧约束，不影响真实产品代码。该失败与前述瞬时 UI 文案误判分开记录；须以新精确提交重新确认完整 CI 和实际模拟器。
+
+
+- **第二轮真实模拟器结果**：run [41171406333](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171406333) 已用 Android 系统 SAF 成功导入四页 CBZ，UI 明确显示 `Imported comics:1` 和 `S3-QA-Comic / 4 pages`，证明先前 Android App 私有目录别名路径错误已经修复；但旧脚本等待毫秒级 `Import complete` 瞬时提示，正常刷新为书库数量后发生测试误判。更正仅改 UI 验收为稳定四页/两页书库条目 + 原 manifest，并适配原 Reader 自动隐藏工具栏；不修改应用源、数据格式或回退安全规则。此轮的书架/Reader/历史/重启/目录导入仍**尚未执行**，待下次实际作业证据。
+
+
+- **首次真实模拟器失败并保留证据**：GitHub Actions run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41170950196) 已用系统 SAF 真实选中 `S3-QA-Comic.cbz`，但原 `LocalComicStore.inside` 的 `getAbsoluteFile()==getCanonicalFile()` 绝对等式将 Android 系统级 `/data/user/0` 别名误判为非法路径，页面明确显示 `Import failed: Unsafe owned comic path`，所以 CBZ 导入失败，后续书架/阅读/历史/文件夹流程**未执行**。修复同时覆盖 `deleteTree`，避免同一系统别名导致合法取消/删除清理失败；只比较 App 自有目录内部相对路径的规范化结果并检查实际下级 symlink。已有 `LocalComicImportTest` 增加唯一一项系统别名可用、目录内部 symlink 仍拒绝且不跟随删除的定向回归；不关闭路径安全规则或新增解析器。
+
+
+- #269 `987223346dd19f108e044b92483f7b5f12c6ff89` 的 20/20 Actions 已重新核实 SUCCESS，正式 main 仍为 v0.5.0 基线。前阶段实现的原书架、阅读、历史、无源 DEX 验收仍有效。
+- 只新增一条针对 `:local-app` 的 Android 35 UI 模拟器 workflow，重用现有 Gradle/Android Emulator/KVM，不依赖 Appium、Espresso 新套件、额外服务或模拟 Reader；从系统 SAF 导入原 PNG/CBZ 和文件夹，操作书架、阅读页、历史、退出重启恢复、移出书架 tombstone，记录截图/UI 树和真实原数据文件，不触碰用户或正式安装。
+- 证据边界：只有 GitHub exact-head workflow + 真实运行截图/UI/原 ledger 校验均过才能声称 emulator 操作 PASS；即使通过也不会自动关掉真实物理手机 G1/G2、v0.5.0 迁移 G3、正式发布 G4。失败需针对缺陷修复，避免造轮子。
 ### 2026-10-30｜S3 CORE-ANDROID-14：原 ShelfStore 数据模型及操作移入共享 core
 
 - 真正的 `:local-storage/ShelfLedger` 承接正式版原 `portable-shelves-v1.json` schema 2、命名/成员 CRUD 和删除 tombstone；`app/ShelfStore` 保留原 Context 接口、统一目录副作用及 Desktop 互同步，避免另造数据库或丢失原元信息。无新库/框架，保持原旧版键/字段及迁移能力。

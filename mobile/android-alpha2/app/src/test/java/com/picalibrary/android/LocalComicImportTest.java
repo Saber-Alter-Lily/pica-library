@@ -102,6 +102,39 @@ public class LocalComicImportTest {
         assertArrayEquals(PNG,Files.readAllBytes(new File(original,"2.png").toPath()));
     }
 
+    @Test public void ownedComicPathsAllowAndroidAppDataAliasButRejectOwnedLinks() throws Exception {
+        // Real Android has /data/user/0 -> /data/data above the app-owned root.
+        // A trusted ancestor alias is not a symlink *inside* our comic directory.
+        Assume.assumeFalse("Windows requires symlink privileges",
+                System.getProperty("os.name","").startsWith("Windows"));
+        File trusted=new File(context.getCacheDir(),"saf-trusted-"+UUID.randomUUID());
+        assertTrue(trusted.mkdir());
+        File alias=new File(context.getCacheDir(),"saf-alias-"+UUID.randomUUID());
+        Files.createSymbolicLink(alias.toPath(),trusted.toPath());
+        try {
+            File root=new File(alias,"local-comic-staging-v1");
+            assertTrue(root.mkdir());
+            File owned=new File(root,"owned-pages");
+            assertEquals(owned,LocalComicStore.inside(root,owned));
+            assertTrue(owned.mkdir());
+            Files.write(new File(owned,"001.png").toPath(),PNG);
+            LocalComicStore.removeOwned(root,owned);
+            assertFalse("Alias must not block owned cleanup",owned.exists());
+
+            File real=new File(trusted,"outside-owned");
+            assertTrue(real.mkdir());
+            File link=new File(root,"linked");
+            Files.createSymbolicLink(link.toPath(),real.toPath());
+            assertThrows(IOException.class,()->LocalComicStore.inside(root,new File(link,"page.png")));
+            assertThrows(IOException.class,()->LocalComicStore.inside(link,new File(link,"page.png")));
+            LocalComicStore.removeOwned(root,link);
+            assertTrue("Unsafe link is never followed or removed by owned cleanup",link.exists());
+            assertTrue(real.isDirectory());
+        } finally {
+            Files.deleteIfExists(alias.toPath());
+        }
+    }
+
     @Test public void sharedV1HistoryWritesIsolatedQaSessionsWithoutTouchingOriginalAppFile() throws Exception {
         File official=MobileStoragePaths.dataFile(context,ReaderHistoryLedger.FILE);
         byte[] before=official.isFile()?Files.readAllBytes(official.toPath()):new byte[0];

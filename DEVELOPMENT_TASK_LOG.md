@@ -2,6 +2,9 @@
 
 ### 2026-10-31｜S1/CORE-ANDROID-16：Reader 唯一界面物理三语资源修正
 
+- `9d68f0b` 的原 Android 构建/Web Desktop 主测试仍通过；S3 实际模拟器英文窄屏检查在进入 Reader 后被 Android 35 原生首次沉浸式全屏教育 `Viewing full screen / Got it` 遮挡，`Next`/ `Settings` 文本并未在该失败 UI 树出现，因此**不能**据此判定翻译或布局失败。将已有同一 ADB 脚本的阅读按钮定位改为：进入 Reader 时关闭系统一次性浮层、从**同一份 native UI hierarchy 快照**同时确认短 `Settings` 和 `Next`，随后直接点击英文 Next；如果原 Reader 自动隐藏控件，复用已有点击阅读画面中心显示控件的行为。无需 App 权限、业务或界面回退，不添加测试框架。必须在新精确 SHA 模拟器实际 PASS/截图后才关闭此项工程薄片。
+
+
 - 原首次三语 Reader 提交 `cbaac6d` 已经 **21/21 Actions SUCCESS**，Android 35 emulator 真正点击英文 `Next` 并完成 S3 全链路。人工目测其 360dp 截图发现底部 `Reading settings` 因长度换行，影响按钮占位；仅将按钮语义文案单独缩为英文 `Settings`、日文 `設定`，弹窗完整标题仍为 `Reading settings`，中文保持 `阅读设置`。沿用 Android 原有 R.string，不增加新 UI/库/框架，现有模拟器脚本仅核对窄屏存在 `Settings` Button 后继续点 `Next`，真实视觉整体 G1 仍需后续多屏/真机。
 
 

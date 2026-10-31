@@ -2,6 +2,9 @@
 
 ### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
 
+- **第七次真实 Android 模拟器阶段验证**：run [41173063767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41173063767) 继续确认 CBZ/书架/原 Reader/会话历史/强制停止后恢复/移出书架墓碑与原文件仍在全部 PASS；系统 SAF 文件夹已从 `Download` 进入 `S3-QA-Folder` 并点击 `USE THIS FOLDER`。最后 Android 系统原生授权弹窗标题 `Allow Pica Library Local QA ...` 被脚本模糊匹配，误点标题而未按下原 `ALLOW` 按钮，文件夹导入未执行。仅将 ADB 定位改成精确 Button，无业务端、权限或数据逻辑变更；必须在下一精确 SHA 真正导入成功后才能标完整 PASS。
+
+
 - **第六次模拟器阶段性实际验收**：run [41172551035](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172551035) 再次真实 PASS CBZ 四页导入、原 Shelf 创建加入、Reader 翻至第二页、历史与强制停止后恢复、系统 `Got it` 全屏指引消除，且新增 PASS **长按移出书架写原 schema2 tombstone，同时原已导入文件仍存在**。最后一步 Android35 文件夹 SAF 选择器根目录显示 `Download`（单数），脚本只识别 `Downloads` 而未进入测试目录；后续文件夹导入未执行。修正仅扩展系统原生目录的已见标签，不触碰应用代码/数据/权限，不冒充整套 PASS。
 
 

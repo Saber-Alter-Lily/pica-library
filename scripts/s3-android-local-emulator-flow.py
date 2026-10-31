@@ -310,8 +310,8 @@ def import_folder():
     page("10-folder-picker")
     locate_document("S3-QA-Folder")
     tap(("Use this folder", "使用此文件夹", "このフォルダを使用"), seconds=18)
-    if wait(("Allow", "允许", "許可"), seconds=12, required=False):
-        tap(("Allow", "允许", "許可"))
+    if wait(("Allow", "允许", "許可"), seconds=12, required=False, exact=True, only_class="Button"):
+        tap(("Allow", "允许", "許可"), seconds=12, exact=True, only_class="Button")
     tap(("Save to library", "保存到书库", "書庫に保存"), seconds=50)
     wait(("2 pages", "2 页", "2 ページ"), seconds=45)
     found = [x for x in book_rows() if x["kind"] == "folder" and len(x["pages"]) == 2]

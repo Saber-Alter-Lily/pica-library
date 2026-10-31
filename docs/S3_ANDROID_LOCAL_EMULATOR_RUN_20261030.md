@@ -53,3 +53,13 @@ The check now waits for the **persisted four-page library row** and reads the ac
 Run [41171776774](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171776774) actually completed system SAF selection, confirmed the original CBZ staging/commit and read `local-comics-v1` manifest with four pages (**PASS**). The flow subsequently tapped the **"Create shelf" title** instead of the **"CREATE" button**, leaving the dialog open. The failure screenshot/UI hierarchy exposed title, entered `QA_Shelf`, CANCEL and CREATE. No shelf was created, so no later Reader/history/folder claim is made.
 
 The runner now selects the exact positive button by widget type and waits for the committed shelf-list row `QA_Shelf · 0` before opening it; other dialog-positive actions use exact matching. This changes *only the ADB UI driver*, not application code or the verified schema.
+
+## Fifth run: actual CBZ → shelf → Reader → history/restart accepted
+
+Run [41172161597](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172161597) on Android 35 produced the following **real, successful** stages:
+- System SAF CBZ picker; the original LocalComicStore committed **four pages** in two chapters.
+- Original `ShelfLedger` create/add membership, verified against the real schema-2 JSON.
+- Opened the original `ViewPager2` Reader from the shelf, displayed real PNG images, navigated from page 1 to page 2, and verified the original history/page JSON.
+- Forced app stop, relaunched, opened real History UI and resumed the **same chapter/page 2**.
+
+Next, the emulator's legitimate **first-use immersive fullscreen education** (`Viewing full screen / To exit, swipe down / Got it`) appeared above the app during navigation back to the library. This interrupted only the test driver: it intercepted Back and hid the expected Shelves button. The driver now dismisses the *system* education panel and verifies return to the actual library before continuing. No production UI changes. Membership tombstones and normal-folder SAF import **were not executed** on this run, and remain unaccepted.

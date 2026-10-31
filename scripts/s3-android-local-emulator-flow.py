@@ -260,6 +260,19 @@ def reader_flow():
     record("original ViewPager2 Reader advanced a real image and persisted session/page")
 
 
+def return_to_library():
+    # Android 35 can show its one-time immersive-mode education after a Reader
+    # screen. That is system UI, not the application's shelf or Reader content.
+    for _ in range(5):
+        if wait(("Shelves", "书架", "本棚"), seconds=4, required=False):
+            return
+        if wait(("Got it", "知道了", "了解"), seconds=3, required=False):
+            tap(("Got it", "知道了", "了解"), seconds=4, exact=True)
+            continue
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    wait(("Shelves", "书架", "本棚"), seconds=12)
+
+
 def restart_history(comic):
     adb("shell", "am", "force-stop", PACKAGE)
     adb("shell", "am", "start", "-W", "-n",
@@ -270,8 +283,7 @@ def restart_history(comic):
     tap("S3-QA-Comic")
     wait_page_counter("2 / 3", seconds=30)
     page("08-reader-resumed-from-history")
-    adb("shell", "input", "keyevent", "KEYCODE_BACK")
-    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    return_to_library()
     record("force-stop/relaunch -> original history record -> same chapter and page")
 
 
@@ -289,6 +301,7 @@ def remove_member_without_deleting(comic):
     assert comic["id"] in [x["id"] for x in book_rows()]
     page("09-shelf-tombstone")
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    return_to_library()
     record("shelf removal writes original tombstone without deleting the imported comic")
 
 

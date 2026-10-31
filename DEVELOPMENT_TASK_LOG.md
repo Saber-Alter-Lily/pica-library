@@ -2,6 +2,9 @@
 
 ### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
 
+- **第五次真实 Android 35 模拟器阶段性验收**：run [41172161597](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172161597) 已实际 PASS 系统 SAF 选 CBZ/原四页两章 manifest、书架创建+加入及 schema2 成员持久化、原 Reader 图片翻至第2页、原历史会话落盘、强制停止/重启后从历史恢复同章节第2页。退出时 Android 系统首次沉浸式全屏教育层 `Viewing full screen / Got it` 拦截 BACK，后续书架移出及文件夹导入未执行；仅修改 ADB 脚本显式关闭系统提示并确认回到书库，不改应用 Reader/UI。该 run 的真正成功阶段与后续未完成阶段分别记录，不冒充完整 PASS。
+
+
 - **第三次模拟器验收细节**：run [41171776774](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171776774) 已真正完成系统 SAF → CBZ 预览确认 → 原 `local-comics-v1` 四页 manifest 校验 **PASS**。之后 ADB 脚本用模糊文本定位误点 `Create shelf` 对话框标题而非 `CREATE` 确认键，未发生真实书架提交；截图/UI 树显示标题、输入文本、CANCEL/CREATE 原样，属脚本误判。仅对原生 Button 精确匹配并等待持久化列表行；不改任何应用生产代码。此 run 的书架/Reader/历史/目录等后续验证仍未完成。
 
 

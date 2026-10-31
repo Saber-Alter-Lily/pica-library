@@ -56,5 +56,5 @@ jobs:
         with:
           name: s3-local-emulator-${{ github.sha }}
           path: mobile/android-alpha2/s3-local-emulator-evidence/
-          retention-days: 2
+          retention-days: 1
           if-no-files-found: warn

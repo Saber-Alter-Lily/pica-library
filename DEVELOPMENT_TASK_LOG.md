@@ -2,6 +2,9 @@
 
 ### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
 
+- **既有 CI 仓库规范回归**：在 `ffe8c728` 上，原 Android CI 全部通过；Web/Desktop 唯一失败来自现有 `test/unit/workflow-entrypoint.test.ts` 强制每个 Actions 工件 `retention-days: 1`，而新 S3 证据工作流误设为 2。现仅将该工作流改回 `1`，不删除/禁用旧约束，不影响真实产品代码。该失败与前述瞬时 UI 文案误判分开记录；须以新精确提交重新确认完整 CI 和实际模拟器。
+
+
 - **第二轮真实模拟器结果**：run [41171406333](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171406333) 已用 Android 系统 SAF 成功导入四页 CBZ，UI 明确显示 `Imported comics:1` 和 `S3-QA-Comic / 4 pages`，证明先前 Android App 私有目录别名路径错误已经修复；但旧脚本等待毫秒级 `Import complete` 瞬时提示，正常刷新为书库数量后发生测试误判。更正仅改 UI 验收为稳定四页/两页书库条目 + 原 manifest，并适配原 Reader 自动隐藏工具栏；不修改应用源、数据格式或回退安全规则。此轮的书架/Reader/历史/重启/目录导入仍**尚未执行**，待下次实际作业证据。
 
 

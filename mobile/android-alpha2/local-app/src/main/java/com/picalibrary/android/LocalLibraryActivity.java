@@ -33,7 +33,7 @@ public final class LocalLibraryActivity extends Activity {
     private LocalComicStore.Preview pending;
     private Button folderButton,cbzButton,cancelButton;
     private TextView status;
-    private ProgressBar indicator;
+    private ProgressBar indicator,pageProgress;
     private ArrayAdapter<LocalComicReaderPort.Book> adapter;
     private boolean busy;
 
@@ -108,6 +108,11 @@ public final class LocalLibraryActivity extends Activity {
             status.setText(copy("正在取消导入…","Cancelling import…","取り込みを中止中…"));
         });
         root.addView(taskBar);
+        // Reuse the original importer's per-page callback; keep the spinner for
+        // SAF inventory and CBZ staging, and show determinate copy progress.
+        pageProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
+        pageProgress.setVisibility(View.GONE);
+        root.addView(pageProgress,new LinearLayout.LayoutParams(-1,dp(4)));
 
         ListView list=new ListView(this);
         list.setDividerHeight(dp(1));
@@ -159,6 +164,7 @@ public final class LocalLibraryActivity extends Activity {
         folderButton.setEnabled(!working&&pending==null);
         cbzButton.setEnabled(!working&&pending==null);
         indicator.setVisibility(working?View.VISIBLE:View.GONE);
+        if(!working)pageProgress.setVisibility(View.GONE);
         cancelButton.setVisibility(working&&canCancel?View.VISIBLE:View.GONE);
         cancelButton.setEnabled(canCancel);
     }
@@ -203,6 +209,7 @@ public final class LocalLibraryActivity extends Activity {
 
     private void startImport(Uri uri,String kind){
         cancelImport=false;
+        pageProgress.setVisibility(View.GONE);
         setWorking(true,true);
         status.setText(copy("正在导入并检查图片…","Importing and checking pages…",
                             "ページを取り込み・確認中…"));
@@ -212,6 +219,15 @@ public final class LocalLibraryActivity extends Activity {
                 staged=LocalComicStore.prepare(getApplicationContext(),uri,kind,()->{
                     if(cancelImport||destroyed||Thread.currentThread().isInterrupted())
                         throw new IOException("Import cancelled");
+                },(complete,total)->{
+                    if(complete!=1&&complete!=total&&complete%8!=0)return;
+                    runOnUiThread(()->{
+                        if(destroyed||cancelImport||pending!=null||!busy)return;
+                        pageProgress.setVisibility(View.VISIBLE);
+                        pageProgress.setMax(total);
+                        pageProgress.setProgress(complete);
+                        status.setText(copy("正在导入图片 ","Importing pages ","画像を取り込み中 ")+complete+"/"+total);
+                    });
                 });
                 LocalComicStore.Preview ready=staged;
                 staged=null;
@@ -251,6 +267,7 @@ public final class LocalLibraryActivity extends Activity {
 
     private void commit(LocalComicStore.Preview ready){
         pending=null;
+        pageProgress.setVisibility(View.GONE);
         setWorking(true,false);
         status.setText(copy("正在保存到书库…","Saving comic…","書庫に保存中…"));
         worker.execute(()->{
@@ -278,6 +295,7 @@ public final class LocalLibraryActivity extends Activity {
     }
 
     private void remove(String comicId){
+        pageProgress.setVisibility(View.GONE);
         setWorking(true,false);
         status.setText(copy("正在删除本地副本…","Removing local copy…","ローカルコピーを削除中…"));
         worker.execute(()->{

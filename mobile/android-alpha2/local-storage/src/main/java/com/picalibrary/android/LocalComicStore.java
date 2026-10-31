@@ -86,6 +86,10 @@ final class LocalComicStore {
     }
     private static String title(String name){String value=name==null?"Local comic":name;if(value.toLowerCase(Locale.ROOT).matches(".*\\.(cbz|zip)$"))value=value.substring(0,value.lastIndexOf('.'));return value.trim().isEmpty()?"Local comic":value.substring(0,Math.min(200,value.length()));}
     static Preview prepare(Context context,Uri uri,String kind,LocalComicImporter.Cancellation cancel) throws Exception {
+        return prepare(context,uri,kind,cancel,(complete,total)->{});
+    }
+    static Preview prepare(Context context,Uri uri,String kind,LocalComicImporter.Cancellation cancel,
+                           LocalComicImporter.Progress progress) throws Exception {
         if(uri==null||!"content".equals(uri.getScheme())||!("folder".equals(kind)||"cbz".equals(kind)))throw new IOException("Choose a local folder or CBZ with the system picker");
         Context app=context.getApplicationContext();DocumentFile selected="folder".equals(kind)?DocumentFile.fromTreeUri(app,uri):DocumentFile.fromSingleUri(app,uri);
         if(selected==null||!selected.canRead()||("folder".equals(kind)?!selected.isDirectory():!selected.isFile()))throw new IOException("Selected document is not readable");
@@ -95,7 +99,7 @@ final class LocalComicStore {
             String label=title(selected.getName());File pages=new File(work,"pages");if(!pages.mkdir())throw new IOException("Cannot stage pages");LocalComicImporter.Prepared prepared;
             if("folder".equals(kind)){
                 List<LocalComicImporter.Input> inventory=new ArrayList<>();walk(app,selected,"",0,inventory,new HashSet<>(),cancel);
-                prepared=LocalComicImporter.prepare(label,()->inventory,pages,cancel);
+                prepared=LocalComicImporter.prepare(label,()->inventory,pages,cancel,progress);
             } else {
                 String filename=String.valueOf(selected.getName()).toLowerCase(Locale.ROOT);if(!(filename.endsWith(".cbz")||filename.endsWith(".zip")))throw new IOException("Choose a CBZ/ZIP comic, not CBR/PDF/EPUB");
                 File archive=new File(work,"archive.cbz");
@@ -103,7 +107,7 @@ final class LocalComicStore {
                     if(in==null)throw new IOException("Cannot read CBZ");byte[] buffer=new byte[32768];int n;long bytes=0;
                     while((n=in.read(buffer))!=-1){cancel.check();bytes+=n;if(bytes>LocalComicImporter.MAX_ARCHIVE)throw new IOException("CBZ exceeds 256 MiB");out.write(buffer,0,n);}out.getFD().sync();
                 }
-                try(LocalComicImporter.Source source=LocalComicImporter.zip(archive)){prepared=LocalComicImporter.prepare(label,source,pages,cancel);}
+                try(LocalComicImporter.Source source=LocalComicImporter.zip(archive)){prepared=LocalComicImporter.prepare(label,source,pages,cancel,progress);}
                 if(!archive.delete())throw new IOException("Cannot remove staging archive");
             }
             validatePages(prepared,cancel);

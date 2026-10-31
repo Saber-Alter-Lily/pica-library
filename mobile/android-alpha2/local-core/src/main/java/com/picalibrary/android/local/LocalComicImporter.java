@@ -98,13 +98,17 @@ public final class LocalComicImporter {
         };
     }
     public static Prepared prepare(String title, Source source, File staging, Cancellation cancel) throws IOException {
+        return prepare(title,source,staging,cancel,(complete,total)->{});
+    }
+    public static Prepared prepare(String title, Source source, File staging, Cancellation cancel,
+                                   Progress progress) throws IOException {
         if(!staging.isDirectory()||staging.list()==null||staging.list().length!=0)throw new IOException("Expected empty import staging");
         List<Input> all=source.entries(); if(all.size()>MAX_ENTRIES)throw new IOException("Too many comic entries");
         ArrayList<Input> pages=new ArrayList<>(); Set<String> names=new HashSet<>();
         for(Input input:all) { cancel.check();String name=safeName(input.name);if(!names.add(name.toLowerCase(Locale.ROOT)))throw new IOException("Duplicate local comic path");if(!input.directory&&!extension(name).isEmpty()){if(input.size>MAX_PAGE)throw new IOException("Page exceeds 20 MiB");pages.add(input);} }
         if(pages.isEmpty()||pages.size()>MAX_PAGES)throw new IOException("Comic must contain 1–2000 raster pages");
         pages.sort((a,b)->naturalCompare(a.name,b.name));
-        return copyPages(title,pages,staging,cancel,false,(complete,total)->{});
+        return copyPages(title,pages,staging,cancel,false,progress);
     }
     /** Explicit generated chapter: same bounded ingestion, with type inferred from raster bytes. */
     public static Prepared prepareRasterPages(String title,List<Open> streams,File staging,Cancellation cancel,Progress progress) throws IOException {

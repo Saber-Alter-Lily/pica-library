@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reader_retry_load">读取失败，点此重试</string>
+    <string name="reader_back">返回</string>
+    <string name="reader_title">阅读</string>
+    <string name="reader_chapters">章节</string>
+    <string name="reader_loading_chapter">正在读取章节…</string>
+    <string name="reader_prev_page">上一页</string>
+    <string name="reader_next_page">下一页</string>
+    <string name="reader_next_chapter">下一章</string>
+    <string name="reader_options">阅读设置</string>
+    <string name="reader_no_chapters">没有可读章节</string>
+    <string name="reader_failure_details">读取失败 · 点此查看</string>
+    <string name="reader_cannot_load_chapter">无法读取章节 · %1$s</string>
+    <string name="reader_comic">漫画</string>
+    <string name="reader_no_pages">该章节尚无可读取页面</string>
+    <string name="reader_next_chapter_title">下一章 · %1$s</string>
+    <string name="reader_final_chapter">已读完 · 最后一章</string>
+    <string name="reader_finished">已结束</string>
+    <string name="reader_counter">%1$d / %2$d · %3$s · 预载 %4$d</string>
+    <string name="reader_last_chapter">已经到最后一章</string>
+    <string name="reader_first_chapter">已经到第一章</string>
+    <string name="reader_mode_ltr">横向翻页（从左到右）</string>
+    <string name="reader_mode_rtl">横向翻页（从右到左）</string>
+    <string name="reader_mode_vertical">纵向连续阅读</string>
+    <string name="reader_keep_on">屏幕常亮：%1$s</string>
+    <string name="reader_on">开</string>
+    <string name="reader_off">关</string>
+    <string name="reader_cache_prefetch">缓存与预加载 · 当前 %1$d 页</string>
+    <string name="reader_unavailable">暂时无法读取</string>
+    <string name="reader_source_failed">%1$s 读取失败</string>
+    <string name="reader_image_failed">图片读取失败</string>
+    <string name="reader_image_failure_details">图片读取失败 · 点此查看</string>
+    <string name="reader_diagnosing">正在诊断 %1$s 阅读链路…</string>
+    <string name="reader_diagnostic_title">%1$s 阅读诊断</string>
+    <string name="reader_close">关闭</string>
+    <string name="reader_retry">重试</string>
+    <string name="reader_diagnose">诊断</string>
+    <string name="reader_reload">重新加载</string>
+    <string name="reader_error_rate_limited">请求过于频繁，请稍后重试</string>
+    <string name="reader_error_denied">站点暂时拒绝访问</string>
+    <string name="reader_error_incomplete">漫画页列表读取不完整</string>
+    <string name="reader_error_image_url">图片地址解析失败</string>
+    <string name="reader_error_timeout">网络请求超时</string>
+</resources>

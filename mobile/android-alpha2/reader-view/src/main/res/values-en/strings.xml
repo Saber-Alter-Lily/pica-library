@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Android platform locale; the official app's LocaleStore wraps its Context. -->
+    <string name="reader_retry_load">Unable to load · tap to retry</string>
+    <string name="reader_back">Back</string>
+    <string name="reader_title">Reader</string>
+    <string name="reader_chapters">Chapters</string>
+    <string name="reader_loading_chapter">Loading chapter…</string>
+    <string name="reader_prev_page">Previous</string>
+    <string name="reader_next_page">Next</string>
+    <string name="reader_next_chapter">Next chapter</string>
+    <string name="reader_options">Reading settings</string>
+    <string name="reader_no_chapters">No readable chapters</string>
+    <string name="reader_failure_details">Unable to load · view details</string>
+    <string name="reader_cannot_load_chapter">Cannot load chapter · %1$s</string>
+    <string name="reader_comic">Comic</string>
+    <string name="reader_no_pages">No readable pages in this chapter</string>
+    <string name="reader_next_chapter_title">Next chapter · %1$s</string>
+    <string name="reader_final_chapter">Finished · final chapter</string>
+    <string name="reader_finished">Finished</string>
+    <string name="reader_counter">%1$d / %2$d · %3$s · prefetch %4$d</string>
+    <string name="reader_last_chapter">Already at the last chapter</string>
+    <string name="reader_first_chapter">Already at the first chapter</string>
+    <string name="reader_mode_ltr">Horizontal · left to right</string>
+    <string name="reader_mode_rtl">Horizontal · right to left</string>
+    <string name="reader_mode_vertical">Vertical continuous</string>
+    <string name="reader_keep_on">Keep screen on: %1$s</string>
+    <string name="reader_on">On</string>
+    <string name="reader_off">Off</string>
+    <string name="reader_cache_prefetch">Cache and prefetch · %1$d pages</string>
+    <string name="reader_unavailable">Temporarily unavailable</string>
+    <string name="reader_source_failed">%1$s could not load</string>
+    <string name="reader_image_failed">Image failed to load</string>
+    <string name="reader_image_failure_details">Image failed · view details</string>
+    <string name="reader_diagnosing">Diagnosing %1$s reading…</string>
+    <string name="reader_diagnostic_title">%1$s reader diagnostics</string>
+    <string name="reader_close">Close</string>
+    <string name="reader_retry">Retry</string>
+    <string name="reader_diagnose">Diagnose</string>
+    <string name="reader_reload">Reload</string>
+    <string name="reader_error_rate_limited">Too many requests; retry later</string>
+    <string name="reader_error_denied">Source temporarily denied access</string>
+    <string name="reader_error_incomplete">Incomplete page list</string>
+    <string name="reader_error_image_url">Unable to resolve image address</string>
+    <string name="reader_error_timeout">Request timed out</string>
+</resources>

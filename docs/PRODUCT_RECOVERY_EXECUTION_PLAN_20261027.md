@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-31 S1/CORE-ANDROID-16｜原 Reader UI 使用 Android 原生三语资源（叠加 Draft #270）
+
+- 先确认 #270 `a0a1fcd` 已经 **21/21 GitHub Actions 全部 SUCCESS**，Android35 模拟器实际完成 CBZ/文件夹 SAF 导入、书架、原 Reader 图片翻页、历史、强制停止/重启同章节同页恢复及移出不删漫画。人工检查真实截图时发现：英文系统中 QA 书库/历史为英文，但原 Reader 顶部返回/章节及底部翻页按钮仍是中文；这属于 S1 用户可见 UI 缺陷，不能因本地操作功能通过而标 G1 完成。
+- 本次直接修改**唯一**正式版 Reader 实现 `:reader-view/ReaderScreenActivity`，复用系统自带 Android `strings.xml`、`values-en`、`values-ja`（42 组实际 Reader 控件/设置/空状态/诊断文案）。旧 App 既有 `LocaleStore.wrap` 支持用户选择语言；独立无源 QA APK 使用系统语言，底层数据/翻页/ReaderSource/下载/书签与目录业务逻辑全部不变。
+- 将旧 Reader 固定中文按钮、章节切换、设置列表和动态页码/缓存文本改成原生 Android resources；只更新已有的一个源码契约断言和已有 S3 模拟器操作中对英文 Next 按钮的精确点击，**不新增翻译引擎、测试框架、页面或依赖**。该资源模块无漫画源 SDK、无额外许可和帐号权限，继续参考 Mihon（Apache-2.0）“Viewer 自治展示资源”的职责划分，不复制第三方代码。
+- 仅在本新提交完整 Android/Web/Desktop CI、独立 APK 6 DEX/manifest 源闭包和**真实 Android35 英文按钮操作截图**通过之后接受本薄片；尚未单独核验完整英文/日文/中文字号/狭屏排版，G1/G2 物理手机、可选在线来源、G3 旧资料迁移与 G4 发布仍 OPEN。不合并正式 main、不发布/OTA、不读取真实用户资料。
+
 ### 2026-10-30 CORE-ANDROID-15｜独立无源 Android APK 真实模拟器操作证据（叠加 Draft #269）
 
 - **首次真实模拟器失败并保留证据**：GitHub Actions run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41170950196) 已用系统 SAF 真实选中 `S3-QA-Comic.cbz`，但原 `LocalComicStore.inside` 的 `getAbsoluteFile()==getCanonicalFile()` 绝对等式将 Android 系统级 `/data/user/0` 别名误判为非法路径，页面明确显示 `Import failed: Unsafe owned comic path`，所以 CBZ 导入失败，后续书架/阅读/历史/文件夹流程**未执行**。修复同时覆盖 `deleteTree`，避免同一系统别名导致合法取消/删除清理失败；只比较 App 自有目录内部相对路径的规范化结果并检查实际下级 symlink。已有 `LocalComicImportTest` 增加唯一一项系统别名可用、目录内部 symlink 仍拒绝且不跟随删除的定向回归；不关闭路径安全规则或新增解析器。

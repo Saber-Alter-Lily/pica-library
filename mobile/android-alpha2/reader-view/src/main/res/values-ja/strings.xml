@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Android platform locale; the official app's LocaleStore wraps its Context. -->
+    <string name="reader_retry_load">読み込み失敗・タップで再試行</string>
+    <string name="reader_back">戻る</string>
+    <string name="reader_title">リーダー</string>
+    <string name="reader_chapters">章</string>
+    <string name="reader_loading_chapter">章を読み込み中…</string>
+    <string name="reader_prev_page">前のページ</string>
+    <string name="reader_next_page">次のページ</string>
+    <string name="reader_next_chapter">次の章</string>
+    <string name="reader_options">閲覧設定</string>
+    <string name="reader_no_chapters">読める章がありません</string>
+    <string name="reader_failure_details">読み込み失敗・詳細を見る</string>
+    <string name="reader_cannot_load_chapter">章を読み込めません · %1$s</string>
+    <string name="reader_comic">漫画</string>
+    <string name="reader_no_pages">この章に読めるページはありません</string>
+    <string name="reader_next_chapter_title">次の章 · %1$s</string>
+    <string name="reader_final_chapter">読了・最終章</string>
+    <string name="reader_finished">読了</string>
+    <string name="reader_counter">%1$d / %2$d · %3$s · 先読み %4$d</string>
+    <string name="reader_last_chapter">最終章です</string>
+    <string name="reader_first_chapter">最初の章です</string>
+    <string name="reader_mode_ltr">横めくり・左から右</string>
+    <string name="reader_mode_rtl">横めくり・右から左</string>
+    <string name="reader_mode_vertical">縦スクロール</string>
+    <string name="reader_keep_on">画面点灯を維持：%1$s</string>
+    <string name="reader_on">オン</string>
+    <string name="reader_off">オフ</string>
+    <string name="reader_cache_prefetch">キャッシュと先読み・%1$dページ</string>
+    <string name="reader_unavailable">一時的に読み込めません</string>
+    <string name="reader_source_failed">%1$s を読み込めません</string>
+    <string name="reader_image_failed">画像の読み込みに失敗</string>
+    <string name="reader_image_failure_details">画像エラー・詳細を見る</string>
+    <string name="reader_diagnosing">%1$s の読み込み経路を診断中…</string>
+    <string name="reader_diagnostic_title">%1$s 読み込み診断</string>
+    <string name="reader_close">閉じる</string>
+    <string name="reader_retry">再試行</string>
+    <string name="reader_diagnose">診断</string>
+    <string name="reader_reload">再読み込み</string>
+    <string name="reader_error_rate_limited">リクエスト過多です。後で再試行してください</string>
+    <string name="reader_error_denied">ソースがアクセスを一時拒否しました</string>
+    <string name="reader_error_incomplete">ページ一覧が不完全です</string>
+    <string name="reader_error_image_url">画像の参照先を解決できません</string>
+    <string name="reader_error_timeout">リクエストがタイムアウトしました</string>
+</resources>

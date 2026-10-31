@@ -1,5 +1,11 @@
 # Pica Library Development Task Log
 
+### 2026-10-31｜S1/CORE-ANDROID-16：Reader 唯一界面物理三语资源修正
+
+- #270 `a0a1fcd254f7cf70c7650b1428a3850c5729f3a7` 精确提交 21/21 Actions SUCCESS，真实 Android 35 emulator `S3 LOCAL END-TO-END PASS`。实际截图检查发现独立 local-app 系统语言英语，但唯一原 Reader 主界面导航及选项存在中文控件；旧 Reader 引导使用字符串字面量，不能假装全部三语一致。
+- 只在已有 `:reader-view` 加 Android 原生 `values/values-en/values-ja` 字符串资源，并替换原 Reader 主控件、模式、预载/页码、章节/失败等 42 组文案；对 full app 继续使用已有 `LocaleStore.wrap`，对 local-only APK 使用系统语言。无新翻译系统、没有第二个 Reader 或新 SDK。
+- 旧源码契约只修正一个章节标题断言，原 Android35 操作脚本把实际下一页动作断言升级为英文系统下精确 `Next` Button；继续对真实 CBZ/文件夹/历史/书架重跑原闭环，不新建大量快照。此项新增代码提交前尚未得到 CI、英文 Reader 截图或窄屏/日文验收，不声称 G1 PASS。全部生产 main/Release/OTA/真实用户数据保持未操作。
+
 ### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
 
 - **第七次真实 Android 模拟器阶段验证**：run [41173063767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41173063767) 继续确认 CBZ/书架/原 Reader/会话历史/强制停止后恢复/移出书架墓碑与原文件仍在全部 PASS；系统 SAF 文件夹已从 `Download` 进入 `S3-QA-Folder` 并点击 `USE THIS FOLDER`。最后 Android 系统原生授权弹窗标题 `Allow Pica Library Local QA ...` 被脚本模糊匹配，误点标题而未按下原 `ALLOW` 按钮，文件夹导入未执行。仅将 ADB 定位改成精确 Button，无业务端、权限或数据逻辑变更；必须在下一精确 SHA 真正导入成功后才能标完整 PASS。

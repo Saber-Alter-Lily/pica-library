@@ -249,7 +249,9 @@ def reader_flow():
     # Original Reader chrome auto-hides. A center tap reveals the existing controls.
     if not wait("下一页", seconds=3, required=False):
         adb("shell", "input", "tap", "360", "480")
-    tap("下一页", seconds=12)
+    # Android 35 emulator locale is English. This is a real localization acceptance
+    # for the original Reader, not just a source-level string lookup.
+    tap("Next", seconds=12, exact=True, only_class="Button")
     wait_page_counter("2 / 3", seconds=28)
     time.sleep(1.2)  # Save only after the original bitmap holder completed loading.
     page("06-reader-second-page")

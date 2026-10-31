@@ -63,3 +63,9 @@ Run [41172161597](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/
 - Forced app stop, relaunched, opened real History UI and resumed the **same chapter/page 2**.
 
 Next, the emulator's legitimate **first-use immersive fullscreen education** (`Viewing full screen / To exit, swipe down / Got it`) appeared above the app during navigation back to the library. This interrupted only the test driver: it intercepted Back and hid the expected Shelves button. The driver now dismisses the *system* education panel and verifies return to the actual library before continuing. No production UI changes. Membership tombstones and normal-folder SAF import **were not executed** on this run, and remain unaccepted.
+
+## Sixth run: original shelf removal and retained file accepted; folder picker navigation pending
+
+Run [41172551035](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172551035) completed the original CBZ four-page manifest, real shelf create/add, Reader next page, session history, force-stop and page-2 resume again. It then successfully dismissed the **Android OS fullscreen education**, navigated back into the local shelf, long-pressed the entry, pressed REMOVE, verified the **original schema-2 deletion tombstone** and proved the imported comic still exists. All of those are genuine operation PASSES, backed by real app-private storage checks.
+
+The remaining failure was UI driver navigation in the Android 35 `ACTION_OPEN_DOCUMENT_TREE` picker: the root called its storage directory `Download` (singular) rather than `Downloads`. The fixture folder remained beneath this visible Download root, but the script did not enter it; no claim is made about successful folder import. The only correction is to accept Android's actual `Download` directory label before selecting the QA folder. The app, storage, SAF permission model and existing assertions are unchanged.

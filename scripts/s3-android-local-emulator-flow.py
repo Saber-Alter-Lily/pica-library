@@ -173,7 +173,7 @@ def locate_document(name):
         tap(name)
         return
     for picker in (("Show roots", "Show navigation drawer", "Open navigation drawer",
-                    "Navigate up", "Browse"), ("Downloads",)):
+                    "Navigate up", "Browse"), ("Downloads", "Download")):
         found = wait(picker, seconds=8, required=False)
         if found:
             tap(picker)

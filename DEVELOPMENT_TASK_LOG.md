@@ -2,6 +2,9 @@
 
 ### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
 
+- **第六次模拟器阶段性实际验收**：run [41172551035](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172551035) 再次真实 PASS CBZ 四页导入、原 Shelf 创建加入、Reader 翻至第二页、历史与强制停止后恢复、系统 `Got it` 全屏指引消除，且新增 PASS **长按移出书架写原 schema2 tombstone，同时原已导入文件仍存在**。最后一步 Android35 文件夹 SAF 选择器根目录显示 `Download`（单数），脚本只识别 `Downloads` 而未进入测试目录；后续文件夹导入未执行。修正仅扩展系统原生目录的已见标签，不触碰应用代码/数据/权限，不冒充整套 PASS。
+
+
 - **第五次真实 Android 35 模拟器阶段性验收**：run [41172161597](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172161597) 已实际 PASS 系统 SAF 选 CBZ/原四页两章 manifest、书架创建+加入及 schema2 成员持久化、原 Reader 图片翻至第2页、原历史会话落盘、强制停止/重启后从历史恢复同章节第2页。退出时 Android 系统首次沉浸式全屏教育层 `Viewing full screen / Got it` 拦截 BACK，后续书架移出及文件夹导入未执行；仅修改 ADB 脚本显式关闭系统提示并确认回到书库，不改应用 Reader/UI。该 run 的真正成功阶段与后续未完成阶段分别记录，不冒充完整 PASS。
 
 

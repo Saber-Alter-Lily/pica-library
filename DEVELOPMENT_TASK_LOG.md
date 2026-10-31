@@ -1,5 +1,10 @@
 # Pica Library Development Task Log
 
+### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
+
+- #269 `987223346dd19f108e044b92483f7b5f12c6ff89` 的 20/20 Actions 已重新核实 SUCCESS，正式 main 仍为 v0.5.0 基线。前阶段实现的原书架、阅读、历史、无源 DEX 验收仍有效。
+- 只新增一条针对 `:local-app` 的 Android 35 UI 模拟器 workflow，重用现有 Gradle/Android Emulator/KVM，不依赖 Appium、Espresso 新套件、额外服务或模拟 Reader；从系统 SAF 导入原 PNG/CBZ 和文件夹，操作书架、阅读页、历史、退出重启恢复、移出书架 tombstone，记录截图/UI 树和真实原数据文件，不触碰用户或正式安装。
+- 证据边界：只有 GitHub exact-head workflow + 真实运行截图/UI/原 ledger 校验均过才能声称 emulator 操作 PASS；即使通过也不会自动关掉真实物理手机 G1/G2、v0.5.0 迁移 G3、正式发布 G4。失败需针对缺陷修复，避免造轮子。
 ### 2026-10-30｜S3 CORE-ANDROID-14：原 ShelfStore 数据模型及操作移入共享 core
 
 - 真正的 `:local-storage/ShelfLedger` 承接正式版原 `portable-shelves-v1.json` schema 2、命名/成员 CRUD 和删除 tombstone；`app/ShelfStore` 保留原 Context 接口、统一目录副作用及 Desktop 互同步，避免另造数据库或丢失原元信息。无新库/框架，保持原旧版键/字段及迁移能力。

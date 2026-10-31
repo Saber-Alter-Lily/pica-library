@@ -1,6 +1,8 @@
 # Pica Library Development Task Log
 
 ### 2026-10-31｜S3 CORE-ANDROID-18：无源 Android 本地书库共享正式版 CBZ 导出
+- **第一次精确 SHA 验收回执**：`e0b62c9` 的完整 Android/Web/Desktop [CI #41221408228](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41221408228) 两项 SUCCESS，Android 原生构建/测试与独立无源 APK Manifest/DEX 检查均通过；但 Android35 [模拟器 #41221408290](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41221408290) 明确 FAIL。模拟器实操通过原 CBZ 导入、书架、Reader、重启恢复、文件夹导入，并在导出时成功点击系统保存键、实际 UI 显示 `CBZ exported`；失败源于验收脚本随后假定文件一定保存到 `/sdcard/Download`，`adb pull` 返回文件不存在。**不能凭 UI 成功把实体 ZIP 已读取验证说成 PASS**。只修正既有脚本在 Android 系统用户可访问文档根实际查找指定导出文件，再独立拉回校验四张 PNG 与 ZIP 清单。没有修改导出应用代码、安全权限或放宽 ZIP 内容要求。
+
 
 - 接续 #272 精确源 `f4e40d5a`（21/21 GitHub Actions SUCCESS），从正式 Android 的 `app/LocalComicExports` **原样物理迁移**到 `:local-storage`；原 app 的 `LocalComicExportActivity` / `LocalComicExportTest` 原有接口不变，导出器仍是已存在的纯 Java `:local-core/LocalComicExporter`，**绝不开发第二套压缩器或备份系统**。
 - 给真实可独立安装 `:local-app` 的本地作品长按菜单加入「导出 CBZ／删除副本」，使用 Android 系统 `ACTION_CREATE_DOCUMENT` 明确选保存位置，只传所选作品 ID；仍采用同一源文件/CRC/长度校验、私有暂存、export lease、SHA-256 回执、按块可取消写入。不索取网络/存储广域权限，不读旧正式用户资料。

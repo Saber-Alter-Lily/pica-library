@@ -379,7 +379,14 @@ def export_cbz():
     page("12-export-system-picker")
     tap(("Save", "保存", "保存する"), seconds=35, exact=True, only_class="Button")
     wait(("CBZ exported", "CBZ 导出完成", "CBZ を書き出しました"), seconds=55)
-    path = "/sdcard/Download/Comic-S3-QA-Comic.cbz"
+    # ACTION_CREATE_DOCUMENT owns its destination. The Android system picker
+    # may save to Documents or Download; never assume a provider's default root.
+    paths = [p.strip() for p in adb("shell", "find", "/sdcard", "-type", "f",
+                                   "-name", "Comic-S3-QA-Comic.cbz",
+                                   timeout=35, check=False).splitlines()
+             if p.strip().startswith("/sdcard/")]
+    assert len(paths) == 1, f"Saved CBZ not found in emulator document roots: {paths}"
+    path = paths[0]
     local = ROOT / "exported-by-original-adapter.cbz"
     adb("pull", path, str(local), timeout=40)
     with zipfile.ZipFile(local, "r") as archive:

@@ -1,6 +1,8 @@
 # Pica Library Development Task Log
 
 ### 2026-10-31｜S3 CORE-DESKTOP-19：无源 Windows 阅读器接通原 ZIP/CBZ 导出按钮
+- 实际显示验收时注意到原 `#reader-message` 是最大宽 720px 的固定提示条，核心模式新显示的 Windows 长目录路径可能溢出；直接复用其现有 CSS，单加 `overflow-wrap: anywhere`，不增加新对话框/布局系统或影响正常按钮功能。
+
 
 - **实际功能缺口**：Source-free Windows 的完整正式 Web UI 已展示 Reader “导出 ZIP/CBZ”按钮，而 source-free HTTP 仅处理 Reader 查询/阅读进度，点按钮返回 405。复用原正式 `ReaderService.exportZip/exportCbz`、现有 `AdmZip` 和应用私有 `exports/archives`，只在独立 Full-Web Local Core 显式 POST 时开放相同的原接口；零来源本地书库不带 Pica/E-H/JM、Host 或源 SDK。
 - 原 `qa-http.ts` 保留 cookie、loopback、Origin、CSRF 与 4096B JSON 界限；仅接受已知 `local:<sha>` 漫画与对应 `local:<sha>:chapter:<sha>`，不接收客户端传来的文件路径或远程 ID。旧正式 Desktop 的已有路由、Writer/Reader 模块及格式不变，无新压缩器/运行框架。

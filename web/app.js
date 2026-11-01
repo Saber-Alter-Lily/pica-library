@@ -851,7 +851,10 @@ async function loadDesktop() {
             document.querySelector('nav').hidden = false
         }
     } catch {
-        $('#signed-source-manager').hidden = true
+        // Standalone source-free bootstrap also calls this function without
+        // a browser DOM. Never let an optional source UI break core startup.
+        if (typeof document !== 'undefined')
+            document.getElementById('signed-source-manager')?.setAttribute('hidden', '')
         desktop = null
         // An existing Desktop host with a failed capabilities request must
         // stay fail-closed and must not retry or partially advertise features.

@@ -1,6 +1,11 @@
 # Pica Library Development Task Log
 
 ### 2026-11-01｜S3 SIGNED-SRC-08：可信签名来源接入原 Desktop 来源管理界面（隔离 Draft）
+
+- **保留首轮失败并精准修复**：`32342add` [完整 CI #41322889664](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41322889664) 的 Web/Desktop 测试 366/367 文件通过、单个 `test/unit/web-source-free-bootstrap.test.ts` 失败：不带 DOM 的实际 `loadDesktop()` 初始化路径捕获了原 Desktop status 404，而新 UI 在 catch 使用 `# Pica Library Development Task Log
+
+ 导致 `ReferenceError: $ is not defined`；这是抽取函数的旧测试中真实发现的无源启动兼容倒退。只把该 catch 分支改为 DOM 存在时关闭签名面板，完全保留旧无源 capabilities fallback、Reader 和来源权限。未新增测试框架或放宽测试断言；以精确新提交重新验收。
+
 - **实际交互衔接补齐**：签名来源管理明确启用/连接/停用时，原统一阅读历史 `reading-library.js` 现复用既有 `scopeChanged` 逻辑，收到 `pica-signed-reading-scope-changed` 后刷新当前可见阅读路线，避免旧连接被撤销仍显示可阅读或已连接却没有同步原记录；此事件不会启动来源或全量重算。即使命令可能已生效、只是后续库存刷新失败，UI 改为“无法确认，请刷新状态”，不虚报操作未发生。
 
 

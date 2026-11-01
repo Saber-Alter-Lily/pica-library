@@ -3,6 +3,8 @@ package com.picalibrary.android;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.ActivityNotFoundException;
+import com.picalibrary.android.local.LocalComicExporter;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -26,7 +28,7 @@ import java.util.concurrent.Executors;
  * Separate app identity and storage; no second importer, reader, account or source SDK.
  */
 public final class LocalLibraryActivity extends Activity {
-    private static final int PICK_FOLDER=7101, PICK_CBZ=7102;
+    private static final int PICK_FOLDER=7101, PICK_CBZ=7102, CREATE_CBZ=7103;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ArrayList<LocalComicReaderPort.Book> books=new ArrayList<>();
     private volatile boolean destroyed, cancelImport;
@@ -35,7 +37,8 @@ public final class LocalLibraryActivity extends Activity {
     private TextView status;
     private ProgressBar indicator,pageProgress;
     private ArrayAdapter<LocalComicReaderPort.Book> adapter;
-    private boolean busy;
+    private boolean busy,exporting;
+    private String exportComicId="";
 
     private String copy(String zh,String en,String ja){return LocalCopy.ui(this,zh,en,ja);}
     private int dp(int number){return Math.round(number*getResources().getDisplayMetrics().density);}
@@ -55,6 +58,7 @@ public final class LocalLibraryActivity extends Activity {
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
+        if(saved!=null)exportComicId=saved.getString("pendingExportComicId","");
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(16),dp(20),dp(16),dp(12));
@@ -105,7 +109,9 @@ public final class LocalLibraryActivity extends Activity {
             if(!busy)return;
             cancelImport=true;
             cancelButton.setEnabled(false);
-            status.setText(copy("正在取消导入…","Cancelling import…","取り込みを中止中…"));
+            status.setText(exporting?
+                copy("正在取消导出…","Cancelling export…","書き出しを中止中…"):
+                copy("正在取消导入…","Cancelling import…","取り込みを中止中…"));
         });
         root.addView(taskBar);
         // Reuse the original importer's per-page callback; keep the spinner for
@@ -121,8 +127,8 @@ public final class LocalLibraryActivity extends Activity {
                 TextView item=convertView instanceof TextView?(TextView)convertView:label("",16);
                 LocalComicReaderPort.Book book=getItem(position);
                 if(book!=null)item.setText(book.title+"\n"+book.pageCount+
-                    copy(" 页 · 点击阅读，长按删除"," pages · Tap to read; hold to remove",
-                         " ページ · タップで読む、長押しで削除"));
+                    copy(" 页 · 点击阅读，长按操作"," pages · Tap to read; hold for actions",
+                         " ページ · タップで読む、長押しで操作"));
                 item.setPadding(dp(10),dp(13),dp(10),dp(13));
                 item.setMinHeight(dp(64));
                 return item;
@@ -142,16 +148,29 @@ public final class LocalLibraryActivity extends Activity {
             if(busy||position<0||position>=books.size())return true;
             LocalComicReaderPort.Book book=books.get(position);
             new AlertDialog.Builder(this)
-                .setTitle(copy("删除此本地副本？","Remove local copy?","ローカルコピーを削除しますか？"))
-                .setMessage(book.title)
-                .setNegativeButton(android.R.string.cancel,null)
-                .setPositiveButton(copy("删除","Remove","削除"),(dialog,which)->remove(book.id)).show();
+                .setTitle(book.title)
+                .setItems(new String[]{
+                    copy("导出 CBZ","Export CBZ","CBZ に書き出す"),
+                    copy("删除本地副本","Remove local copy","ローカルコピーを削除")
+                },(dialog,choice)->{
+                    if(choice==0){chooseExport(book);return;}
+                    new AlertDialog.Builder(this)
+                        .setTitle(copy("删除此本地副本？","Remove local copy?","ローカルコピーを削除しますか？"))
+                        .setMessage(book.title)
+                        .setNegativeButton(android.R.string.cancel,null)
+                        .setPositiveButton(copy("删除","Remove","削除"),(confirm,which)->remove(book.id)).show();
+                }).show();
             return true;
         });
         root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
         setWorking(false,false);
         refresh();
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state){
+        state.putString("pendingExportComicId",exportComicId);
+        super.onSaveInstanceState(state);
     }
 
     @Override protected void onResume(){
@@ -161,6 +180,7 @@ public final class LocalLibraryActivity extends Activity {
 
     private void setWorking(boolean working,boolean canCancel){
         busy=working;
+        if(!working)exporting=false;
         folderButton.setEnabled(!working&&pending==null);
         cbzButton.setEnabled(!working&&pending==null);
         indicator.setVisibility(working?View.VISIBLE:View.GONE);
@@ -185,6 +205,14 @@ public final class LocalLibraryActivity extends Activity {
 
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
+        if(request==CREATE_CBZ){
+            String id=exportComicId;exportComicId="";
+            if(!id.isEmpty()&&result==RESULT_OK&&data!=null&&data.getData()!=null&&!busy&&pending==null)
+                startExport(id,data.getData());
+            else if(!id.isEmpty())
+                status.setText(copy("未开始导出","Export not started","書き出しを開始しませんでした"));
+            return;
+        }
         if(result!=RESULT_OK||data==null||data.getData()==null||busy||pending!=null)return;
         if(request!=PICK_FOLDER&&request!=PICK_CBZ)return;
         startImport(data.getData(),request==PICK_FOLDER?"folder":"cbz");
@@ -204,6 +232,69 @@ public final class LocalLibraryActivity extends Activity {
                          "書庫は空です。フォルダーか CBZ を取り込んでください。"):
                     copy("本地作品：","Imported comics:","取込済み作品：")+found.size());
             });
+        });
+    }
+
+    private void chooseExport(LocalComicReaderPort.Book book){
+        if(busy||pending!=null||!exportComicId.isEmpty())return;
+        exportComicId=book.id;
+        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/vnd.comicbook+zip");
+        intent.putExtra(Intent.EXTRA_TITLE,LocalComicExports.filename(book.title));
+        intent.putExtra(Intent.EXTRA_LOCAL_ONLY,true);
+        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        try{startActivityForResult(intent,CREATE_CBZ);}
+        catch(ActivityNotFoundException error){
+            exportComicId="";
+            status.setText(copy("没有可用的文件保存选择器","No document save picker available",
+                                "保存先の選択画面がありません"));
+        }
+    }
+
+    private void startExport(String id,Uri destination){
+        cancelImport=false;
+        exporting=true;
+        pageProgress.setVisibility(View.GONE);
+        setWorking(true,true);
+        status.setText(copy("正在准备并导出 CBZ…","Preparing and exporting CBZ…",
+                            "CBZ を準備して書き出しています…"));
+        worker.execute(()->{
+            try(LocalComicExports.Stage stage=LocalComicExports.prepare(
+                    getApplicationContext(),id,()->{
+                        if(cancelImport||destroyed||Thread.currentThread().isInterrupted())
+                            throw new IOException("Export cancelled");
+                    })){
+                LocalComicExports.copyToDocument(getApplicationContext(),stage,destination,()->{
+                    if(cancelImport||destroyed||Thread.currentThread().isInterrupted())
+                        throw new IOException("Export cancelled");
+                });
+                LocalComicExporter.Result receipt=stage.result;
+                runOnUiThread(()->{
+                    if(destroyed)return;
+                    setWorking(false,false);
+                    status.setText(copy("CBZ 导出完成（仅包含漫画图片）：",
+                        "CBZ exported (comic pages only):",
+                        "CBZ を書き出しました（画像のみ）：")
+                        +" "+receipt.pages+copy(" 页"," pages"," ページ")
+                        +"\nSHA-256: "+receipt.sha256);
+                });
+            }catch(Exception|OutOfMemoryError error){
+                String message=error.getMessage();
+                runOnUiThread(()->{
+                    if(destroyed)return;
+                    boolean cancelled=cancelImport;
+                    setWorking(false,false);
+                    status.setText(cancelled?
+                        copy("导出已取消。所选位置可能留有未完成文件。",
+                            "Export cancelled. The destination may contain an incomplete file.",
+                            "書き出しを中止しました。保存先に不完全なファイルが残る場合があります。"):
+                        copy("导出失败，所选位置可能留有未完成文件：",
+                             "Export failed; destination may contain an incomplete file: ",
+                             "書き出しに失敗しました。保存先に不完全なファイルが残る場合があります：")
+                        +(message==null?"":message.substring(0,Math.min(180,message.length()))));
+                });
+            }
         });
     }
 

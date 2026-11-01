@@ -370,6 +370,46 @@ def import_folder():
     record("system SAF folder picker -> original local storage with two valid pages")
 
 
+def export_cbz():
+    global STEP
+    STEP = "export-cbz"
+    x, y, _ = wait("S3-QA-Comic", seconds=30)
+    adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "1300")
+    tap(("Export CBZ", "导出 CBZ", "CBZ に書き出す"), seconds=18, exact=True)
+    wait(("Save", "保存", "保存する"), seconds=35, exact=True, only_class="Button")
+    page("12-export-system-picker")
+    tap(("Save", "保存", "保存する"), seconds=35, exact=True, only_class="Button")
+    wait(("CBZ exported", "CBZ 导出完成", "CBZ を書き出しました"), seconds=55)
+    page("13-export-complete")
+    # Android's system document provider owns the destination; it need not be
+    # a shell-visible /sdcard file. Reopen it through the same real SAF picker.
+    tap(("Import CBZ", "导入 CBZ", "CBZ 取込"))
+    # The picker remembered the containing folder, but its grid lays out
+    # the file label below the Android navigation bar. Use its native list
+    # mode to make the exact document row genuinely visible and tappable.
+    wait("List view", seconds=30, exact=True, only_class="Button")
+    tap("List view", exact=True, only_class="Button")
+    page("14-export-roundtrip-picker")
+    tap("Comic-S3-QA-Comic.cbz", seconds=30, exact=True, only_class="TextView")
+    tap(("Save to library", "保存到书库", "書庫に保存"), seconds=65)
+    wait(("Comic-S3-QA-Comic",), seconds=45)
+    restored = [x for x in book_rows()
+                if x["title"] == "Comic-S3-QA-Comic" and len(x["pages"]) == 4]
+    assert len(restored) == 1, book_rows()
+    expected = ROOT / "fixture" / "S3-QA-Comic.cbz"
+    with zipfile.ZipFile(expected, "r") as original:
+        names = sorted(original.namelist())
+        assert [page["name"] for page in restored[0]["pages"]] == names
+        for image in restored[0]["pages"]:
+            comic = restored[0]
+            path = ("files/local-comics-v1/" + comic["id"].removeprefix("local:") +
+                    "/" + comic["generation"] + "/" + image["file"])
+            actual = adb("exec-out", "run-as", PACKAGE, "cat", path, binary=True)
+            assert actual == original.read(image["name"]), image["name"]
+    page("15-export-roundtrip-complete")
+    record("system SAF save/reopen -> original CBZ writer/readback; 4 raster bytes identical")
+
+
 def main():
     global STEP
     try:
@@ -387,6 +427,7 @@ def main():
         restart_history(comic)
         remove_member_without_deleting(comic)
         import_folder()
+        export_cbz()
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",

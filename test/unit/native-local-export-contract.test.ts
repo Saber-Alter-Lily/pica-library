@@ -7,7 +7,7 @@ const root = 'mobile/android-alpha2/app/src/'
 const java = (name: string) =>
     fs.readFileSync(
         (name.startsWith('local/') ? 'mobile/android-alpha2/local-core/src/' :
-         name === 'LocalComicStore.java' ? 'mobile/android-alpha2/local-storage/src/' :
+         (name === 'LocalComicStore.java' || name === 'LocalComicExports.java') ? 'mobile/android-alpha2/local-storage/src/' :
          root) + 'main/java/com/picalibrary/android/' + name, 'utf8'
     )
 const read = (name: string) => fs.readFileSync(name, 'utf8')
@@ -90,6 +90,10 @@ describe('native local body export source contracts, not native runtime proof', 
         expect(adapter).toContain('if(!handedOff)')
         expect(adapter).toContain('LocalComicStore.removeOwned(stagingRoot,work)')
         expect(ui).toMatch(/try\(LocalComicExports.Stage stage=LocalComicExports.prepare\([\s\S]*?LocalComicExports.copyToDocument\(/)
+        // The independently installable local APK consumes this same production adapter.
+        const local = read('mobile/android-alpha2/local-app/src/main/java/com/picalibrary/android/LocalLibraryActivity.java')
+        expect(local).toContain('LocalComicExports.prepare(')
+        expect(local).toContain('LocalComicExports.copyToDocument(')
     })
     it('keeps the export lease through document copy and prevents concurrent removal', () => {
         const store = java('LocalComicStore.java')

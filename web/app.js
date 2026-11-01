@@ -3370,6 +3370,10 @@ async function exportReaderArchive(format) {
             comicId: state.reader.comicId,
             episodeId: state.reader.episodeId
         })
+        if (value.cancelled === true) {
+            $('#reader-message').textContent = t('reader.exportCancelled')
+            return
+        }
         const name = value.path.split(/[\\/]/).pop()
         const coreOnly = desktop?.coreOnly === true
         $('#reader-message').textContent = t('reader.exported', {

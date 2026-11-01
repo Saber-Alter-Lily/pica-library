@@ -15,6 +15,11 @@ export interface CoreLocalPicker {
     configured(): boolean
     status(): Record<string, unknown>
     chooseLocalComic?: (kind: CoreLocalKind) => Promise<string | null>
+    /** User-chosen native Save As destination; never supplied by a Web request. */
+    chooseSaveArchive?: (input: {
+        format: 'zip' | 'cbz'
+        defaultName: string
+    }) => Promise<string | null>
 }
 export interface CoreLocalReply {
     status: 200 | 400 | 404 | 409

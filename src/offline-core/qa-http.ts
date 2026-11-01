@@ -4,6 +4,7 @@ import http, {
     type IncomingMessage, type Server, type ServerResponse
 } from 'node:http'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { safePathSegment } from '../library/path-template'
 import { verifiedFullWebQaAssets } from './full-web-qa-assets'
 import { createCoreLibraryPorts, type CoreLocalRuntime } from '../library/core-runtime-composition'
 import { localReaderGet } from '../reader/local-http-read'
@@ -423,9 +424,35 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                     !CHAPTER_ID.test(input.episodeId) ||
                     !input.episodeId.startsWith(input.comicId + ':chapter:'))
                     throw new Error('Invalid source-free Reader export')
+                const comic = options.database.getComic(input.comicId)
+                const chapter = options.reader.chapters(input.comicId)
+                    .find(row => row.id === input.episodeId)
+                if (!comic || comic.providerId !== 'local' || !chapter)
+                    throw new Error('Local Reader export is unavailable')
+                // The native dialog is injected only by the trusted Desktop
+                // composition root. Web never sends a destination path.
+                const chooseSave = options.localPicker?.chooseSaveArchive
+                let selected: string | null = null
+                if (chooseSave) {
+                    const defaultName = safePathSegment(
+                        comic.title + ' - ' + chapter.title, 'Pica Library Comic'
+                    ) + '.' + localExportFormat
+                    selected = await chooseSave({
+                        format: localExportFormat, defaultName
+                    })
+                    if (selected === null)
+                        return json(response, 200, { cancelled: true })
+                    if (typeof selected !== 'string' || !path.isAbsolute(selected) ||
+                        path.extname(selected).toLowerCase() !== '.' + localExportFormat)
+                        throw new Error('Invalid native export destination')
+                }
                 const value = localExportFormat === 'cbz'
                     ? options.reader.exportCbz(input.comicId, input.episodeId)
                     : options.reader.exportZip(input.comicId, input.episodeId)
+                if (selected) {
+                    await fs.promises.copyFile(value.path, selected)
+                    return json(response, 200, { ...value, path: selected })
+                }
                 return json(response, 200, value)
             }
             if (localImportRoute && options.coreRuntime) {

@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+### 2026-10-31｜S3 CORE-DESKTOP-20：复用系统“另存为”，完成无源 Windows 漫画导出用户流程
+
+- 在已通过 24/24 GitHub Actions 的 Draft #274 后继续原功能，不新起压缩器/文件管理器。正式 Web 阅读器已有 ZIP/CBZ 按钮；原 `DesktopNativePicker.chooseSaveFile` 已支持 Windows WinForms、macOS 原生和 Linux 可用桌面文件选择器。只给原 `CoreLocalPicker` 增加一项信任域内 `chooseSaveArchive` 可选能力，并从 `core-preview-main.ts` 真实注入。
+- Source-free Full-Web 的原 `/api/v1/reader/export-zip|cbz` 请求继续严格保留会话 Cookie、Origin、CSRF、LOCAL 作品/章节关系、不可传文件路径；获用户系统保存位置后调用原 `ReaderService.exportZip/exportCbz`，以 `fs.promises.copyFile` 将**已生成的应用私有漫画页面档案**复制到用户确选目标。取消选择立即返回 `cancelled`，不会先生成文件。无头 QA 未提供保存器时保留旧的隔离私有导出方式。
+- 原 Web 仅识别 `cancelled` 并用现有中英日 i18n 提示“未保存”；正式含源 Desktop 原导出和外部文件打开询问不改。路径仍由系统原生弹窗决定，不以 HTTP 中的路径字符串为准；原长路径换行继续有效。
+- 仅在原 `offline-full-web-http.test.ts` 加一条真实 PNG→原 CBZ→受控系统保存目标的字节检查、未授权/任意路径拒绝、用户取消无虚假成功。真实 Windows 文件对话框人工验收、大文件同步 ZIP 性能、断电时目标文件完整性、正式 v0.5.0 迁移和 G1–G4 仍 OPEN。Draft 未发布、main/OTA/正式用户资料不动。
+
+
 ### 2026-10-31｜S3 CORE-DESKTOP-19：无源 Windows 阅读器接通原 ZIP/CBZ 导出按钮
 - 实际显示验收时注意到原 `#reader-message` 是最大宽 720px 的固定提示条，核心模式新显示的 Windows 长目录路径可能溢出；直接复用其现有 CSS，单加 `overflow-wrap: anywhere`，不增加新对话框/布局系统或影响正常按钮功能。
 

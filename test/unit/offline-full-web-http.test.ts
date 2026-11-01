@@ -182,6 +182,61 @@ describe('real original full Web HTML behind source-free, cookie-protected local
         expect(fs.existsSync(path.join(chosen, '02.png'))).toBe(true)
     }, 60_000)
 
+    it('saves a real local CBZ via the trusted native picker and cancels without writing', async () => {
+        const { home, root, db, web, comic } = await fixture()
+        const reader = new ReaderService(db, root)
+        const episodeId = reader.chapters(comic.comicId)[0].id
+        const selected = path.join(home, 'saved-from-native.cbz')
+        let pickerCalls = 0
+        let cancel = false
+        const http = await startOfflineCoreHttp({
+            database: db, reader, webRoot: web,
+            localPicker: {
+                configured: () => true,
+                status: () => ({
+                    runtime: { mode: 'interactive' },
+                    nativePicker: { folderPicker: true, savePicker: true }
+                }),
+                chooseSaveArchive: async ({ format, defaultName }) => {
+                    pickerCalls++
+                    expect(format).toBe('cbz')
+                    expect(defaultName).toMatch(/\.cbz$/)
+                    return cancel ? null : selected
+                }
+            }
+        })
+        cleanup.push(() => http.close())
+        const base = new URL(http.url).origin
+        const entry = await fetch(http.url, { redirect: 'manual' })
+        const cookie = entry.headers.get('set-cookie')!.split(';')[0]
+        const html = await (await fetch(base + '/', { headers: { cookie } })).text()
+        const csrf = /name="pica-core-qa-csrf" content="([a-f0-9]{64})"/.exec(html)![1]
+        const request = (input: unknown, token = csrf) => fetch(
+            base + '/api/v1/reader/export-cbz', {
+                method: 'POST',
+                headers: { cookie, origin: base,
+                    'content-type': 'application/json', 'x-pica-csrf': token },
+                body: JSON.stringify(input)
+            }
+        )
+        const input = { comicId: comic.comicId, episodeId }
+        expect((await request(input, 'wrong')).status).toBe(403)
+        expect((await request({ ...input, path: selected })).status).toBe(400)
+        expect(pickerCalls).toBe(0)
+        const response = await request(input)
+        expect(response.status).toBe(200)
+        const value = await response.json()
+        expect(value).toMatchObject({ path: selected, format: 'cbz', pages: 1 })
+        expect(new AdmZip(selected).getEntry('001.png')?.getData()).toEqual(png)
+        cancel = true
+        const stopped = await request(input)
+        expect(stopped.status).toBe(200)
+        expect(await stopped.json()).toEqual({ cancelled: true })
+        expect(pickerCalls).toBe(2)
+        expect(fs.readFileSync(selected)).toEqual(fs.readFileSync(value.path))
+        expect(fs.existsSync(path.join(home, 'Pica Library Comic.zip'))).toBe(false)
+    }, 60_000)
+
     it('never serves a mutated full Web script with a stale staged checksum', async () => {
         const { db, web } = await fixture()
         fs.appendFileSync(path.join(web, 'app.js'), '\n// tampered after stage')

@@ -143,6 +143,17 @@ export class SignedSourceDesktopReader {
                 connected: this.connectedSource(id, state.revision)
             }
         }
+        if (op === 'versions') {
+            if (!exact(raw, ['operation', 'sourceId']))
+                throw new SignedReaderInputError()
+            const id = field(raw.sourceId)
+            const state = this.store.state(id)
+            return {
+                sourceId: id, ...state,
+                versions: this.store.installedVersions(id),
+                connected: this.connectedSource(id, state.revision)
+            }
+        }
         if (op === 'activate' || op === 'rollback') {
             if (!exact(raw, ['operation', 'sourceId', 'version', 'expectedRevision']))
                 throw new SignedReaderInputError()
@@ -170,6 +181,21 @@ export class SignedSourceDesktopReader {
             return {
                 sourceId: id, ...state,
                 connected: this.connectedSource(id, state.revision)
+            }
+        }
+        if (op === 'uninstall') {
+            if (!exact(raw, [
+                'operation', 'sourceId', 'version', 'expectedRevision', 'consent'
+            ]) || raw.consent !== true)
+                throw new SignedReaderInputError()
+            const id = field(raw.sourceId)
+            const version = field(raw.version)
+            const current = this.store.uninstall(
+                id, version, revision(raw.expectedRevision)
+            )
+            return {
+                ...current, versions: this.store.installedVersions(id),
+                connected: this.connectedSource(id, current.revision)
             }
         }
         if (op === 'connect') {
@@ -235,6 +261,7 @@ export class SignedSourceDesktopReader {
             return { disconnected: true }
         }
         // Deliberately no "install" operation or arbitrary file/URL/key path.
+        // The only new mutation removes a verified INACTIVE installed version.
         throw new SignedReaderInputError()
     }
 

@@ -236,6 +236,39 @@ describe('S3 signed source generations: real worker lifecycle', () => {
         expect(third.state('demo').revision).toBe(2)
     })
 
+
+    it('lists signed generations and uninstalls inactive versions without interrupting the active Reader', async () => {
+        const f = fixture()
+        f.store.install(f.signed('1.0.0'), workerBytes)
+        f.store.install(f.signed('1.1.0'), workerBytes)
+        expect(f.store.installedVersions('demo')).toEqual(['1.0.0', '1.1.0'])
+        f.store.activate('demo', '1.0.0', 0)
+        const worker = await f.store.openActive('demo')
+        expect((await worker.episodes('demo:book1')).length).toBe(1)
+        expect(() => f.store.uninstall('demo', '1.0.0', 1))
+            .toThrow('Disable the active source')
+        expect(() => f.store.uninstall('demo', '1.1.0', 0))
+            .toThrow('selection changed')
+        const removed = f.store.uninstall('demo', '1.1.0', 1)
+        expect(removed).toMatchObject({
+            sourceId: 'demo', version: '1.1.0', removed: true,
+            revision: 1, activeVersion: '1.0.0'
+        })
+        expect(f.store.installedVersions('demo')).toEqual(['1.0.0'])
+        expect((await worker.pages('demo:book1', 'chapter-1')).length).toBe(6)
+        expect(f.store.state('demo').revision).toBe(1)
+        f.store.disable('demo', 1)
+        expect(() => worker.assertEnabled()).toThrow('Source process is disabled')
+        expect(f.store.uninstall('demo', '1.0.0', 2)).toMatchObject({
+            removed: true, activeVersion: null, revision: 2
+        })
+        expect(f.store.installedVersions('demo')).toEqual([])
+        expect(f.store.state('demo')).toMatchObject({
+            revision: 2, activeVersion: null
+        })
+        await expect(f.store.openActive('demo')).rejects.toThrow('not enabled')
+    })
+
     it('refuses dangling generation and active-pointer symlinks instead of resetting trust state', () => {
         if (process.platform === 'win32') return // Creating symlinks needs Windows privileges.
         const f = fixture()

@@ -3364,7 +3364,13 @@ document.addEventListener('keydown', (event) => {
     if (action === 'exit') void exitReader()
     else moveReader(action)
 })
+let readerArchiveExportBusy = false
 async function exportReaderArchive(format) {
+    if (readerArchiveExportBusy) return
+    readerArchiveExportBusy = true
+    const controls = [$('#reader-export-zip'), $('#reader-export-cbz')]
+    for (const control of controls) control.disabled = true
+    $('#reader-message').textContent = t('reader.exportWorking')
     try {
         const value = await post(`/api/v1/reader/export-${format}`, {
             comicId: state.reader.comicId,
@@ -3393,6 +3399,9 @@ async function exportReaderArchive(format) {
             await post('/api/v1/reader/open-default', { path: value.path })
     } catch (error) {
         $('#reader-message').textContent = localizeError(language, error)
+    } finally {
+        readerArchiveExportBusy = false
+        for (const control of controls) control.disabled = false
     }
 }
 $('#reader-export-zip').onclick = () => void exportReaderArchive('zip')

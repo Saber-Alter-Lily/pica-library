@@ -228,12 +228,13 @@ describe('real original full Web HTML behind source-free, cookie-protected local
         const value = await response.json()
         expect(value).toMatchObject({ path: selected, format: 'cbz', pages: 1 })
         expect(new AdmZip(selected).getEntry('001.png')?.getData()).toEqual(png)
+        const exportedBytes = fs.readFileSync(selected)
         cancel = true
         const stopped = await request(input)
         expect(stopped.status).toBe(200)
         expect(await stopped.json()).toEqual({ cancelled: true })
         expect(pickerCalls).toBe(2)
-        expect(fs.readFileSync(selected)).toEqual(fs.readFileSync(value.path))
+        expect(fs.readFileSync(selected)).toEqual(exportedBytes)
         expect(fs.existsSync(path.join(home, 'Pica Library Comic.zip'))).toBe(false)
     }, 60_000)
 

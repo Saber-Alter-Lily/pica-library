@@ -107,6 +107,7 @@ export const jaReaderUpdateTranslations = {
     'reader.noChapters': 'この作品にはダウンロード済みチャプターがありません。',
     'reader.exported': '{name} を書き出しました · {pages} ページ · {bytes}',
     'reader.exportCancelled': '書き出しをキャンセルしました。ファイルは保存されていません。',
+    'reader.exportWorking': '書き出し用のアーカイブを準備中…',
     'reader.openExport': '{format} を書き出しました。既定のリーダーで開きますか？',
     'downloaded.read': '読む',
     'sync.quickStarting': 'お気に入りの更新を確認中…',

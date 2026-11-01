@@ -1,6 +1,8 @@
 # Pica Library Development Task Log
 
 ### 2026-10-31｜S3 CORE-DESKTOP-20：复用系统“另存为”，完成无源 Windows 漫画导出用户流程
+- 本轮补原用户可见导出反馈：沿用 `#reader-message` 增加中英日“正在准备导出档案”，一次导出期间临时禁用原两个 ZIP/CBZ 按钮，成功/主动取消/失败都在同一 `finally` 恢复；防止双击出现并行的原同步 ZIP 工作。无新任务模型、Worker 或 UI 面板。现有 HTTP 回归的取消分支同步修正为导出前后文件字节真正比较，不做自比较。
+
 
 - 在已通过 24/24 GitHub Actions 的 Draft #274 后继续原功能，不新起压缩器/文件管理器。正式 Web 阅读器已有 ZIP/CBZ 按钮；原 `DesktopNativePicker.chooseSaveFile` 已支持 Windows WinForms、macOS 原生和 Linux 可用桌面文件选择器。只给原 `CoreLocalPicker` 增加一项信任域内 `chooseSaveArchive` 可选能力，并从 `core-preview-main.ts` 真实注入。
 - Source-free Full-Web 的原 `/api/v1/reader/export-zip|cbz` 请求继续严格保留会话 Cookie、Origin、CSRF、LOCAL 作品/章节关系、不可传文件路径；获用户系统保存位置后调用原 `ReaderService.exportZip/exportCbz`，以 `fs.promises.copyFile` 将**已生成的应用私有漫画页面档案**复制到用户确选目标。取消选择立即返回 `cancelled`，不会先生成文件。无头 QA 未提供保存器时保留旧的隔离私有导出方式。

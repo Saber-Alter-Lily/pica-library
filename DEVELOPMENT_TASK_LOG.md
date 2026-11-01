@@ -1,6 +1,8 @@
 # Pica Library Development Task Log
 
 ### 2026-10-31｜S3 CORE-ANDROID-18：无源 Android 本地书库共享正式版 CBZ 导出
+- **真实截图/Android UI 层级定位并修复第三轮模拟器选择失败**：精确源 `bc7d3d3` 的 [Android35 #41261400635](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41261400635) FAIL；`Download/S3-QA-Folder` 的系统 DocumentsUI 网格确有导出文件，原测试已改为点确切文件文本，然而网格中该 TextView 的中心实际落在屏幕底部导航区域（ADB 记录 y=1226），于是误触返回上层 `Download`，应用没有收到 URI。真实失败截图及 XML 已读取，**不是文件不存在或导出器数据损坏的证据**。当前只复用 Android 原生 DocumentsUI 右上「List view」按钮先切列表显示，再点确切文件名；保留原四张 PNG 字节对照。未改任何生产 Reader/导出/文件所有权权限或引入测试框架。原完整 CI #41261400692 SUCCESS 不能代替此修正后的精确提交。
+
 - **第三次精确模拟器失败记录（不隐去）**：`d42a0f0` 的 [完整 CI #41222583049](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222583049) SUCCESS；但 [真实 Android35 #41222583055](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222583055) FAIL。系统已实际列出 `Comic-S3-QA-Comic.cbz`（1.04 kB）；原有 `locate_document` 宽松模糊匹配先选中 `Preview the file Comic-S3-QA-Comic.cbz` 内容描述，点的是系统预览图标，不是精确文件行；故导入确认页从未出现。当前只改这**一个测试选取动作**为对真实文件文本 `exact=True`，继续要求重新导入后四张原图按字节一致。没有改文件数据、安全规则、模拟器工作流框架或产品端实现。
 
 - **第二次精确模拟器失败（保留 FAIL）**：测试 `87a6550` 的 Android35 [run #41222007662](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222007662) 仍成功走完原导入、Reader、历史、书架及系统 SAF 的 `SAVE`，原 app 显示已导出四页及 SHA-256；但 `adb shell find /sdcard` 未找到文件。Android 文档提供者可能把用户创建的文件保存在 shell 不可枚举的位置。**导出数据可用性尚未经外部重新读取验收**；仅调整现有模拟器脚本：在系统 `ACTION_OPEN_DOCUMENT` 中重新选取刚写出的 CBZ，调用原 `LocalComicStore` 再导入，然后从本 QA 私有页面数据逐页与初始 fixture 按字节比较。禁止把 UI 完成提示当成文件字节通过；不新增导出实现、直接访问外部提供者私有目录或更改正常用户存储权限。

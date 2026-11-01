@@ -252,6 +252,44 @@ export class SignedWorkerStore {
         return { release, folder, workerPath: path.join(folder, 'worker.cjs') }
     }
 
+    /** List only verified, application-pinned generations; never start them. */
+    installedVersions(id: string): string[] {
+        const folder = this.versionsFolder(id)
+        return fs.readdirSync(folder)
+            .filter(version => VERSION.test(version))
+            .map(version => this.readInstalled(id, version).release.version)
+            .sort((left, right) => left.localeCompare(right, 'en', { numeric: true }))
+    }
+
+    /**
+     * Explicitly remove an INACTIVE signed generation. Do not disable or
+     * restart a different active generation, and never touch the user's
+     * catalogue, downloaded pages, saved progress or credentials.
+     */
+    uninstall(id: string, version: string, expectedRevision: number) {
+        sourceId(id)
+        validVersion(version)
+        const current = this.state(id)
+        if (current.revision !== expectedRevision)
+            throw new Error('Source worker selection changed; refresh')
+        if (current.activeVersion === version)
+            throw new Error('Disable the active source before uninstalling it')
+        const installed = this.readInstalled(id, version)
+        // Remove from version selection first, then delete the exact owned
+        // generation. Keep the source's active pointer/revision untouched.
+        const removed = path.join(this.versionsFolder(id),
+            '.removed-' + randomUUID())
+        fs.renameSync(installed.folder, removed)
+        if (process.platform === 'win32') {
+            // Windows readonly flags on immutable signed payloads can block
+            // deleting these two known, verified application-owned files.
+            for (const name of ['worker.cjs', 'release.json'])
+                fs.chmodSync(path.join(removed, name), 0o600)
+        }
+        fs.rmSync(removed, { recursive: true, force: false })
+        return { sourceId: id, version, removed: true as const, ...current }
+    }
+
     state(id: string): SourceWorkerState {
         const folder = this.sourceFolder(id)
         const location = path.join(folder, 'active.json')

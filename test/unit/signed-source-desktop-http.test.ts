@@ -447,4 +447,64 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
         })).status).toBe(200)
         expect((await get(endpoint + '/' + fresh.sessionId + '/progress')).status).toBe(409)
     })
+
+    it('lists and removes only inactive signed versions through the existing authorized Desktop route', async () => {
+        const initial = await post(endpoint, { operation: 'status', sourceId: 'demo' })
+        const current = await initial.json() as {
+            revision: number; activeVersion: string | null
+        }
+        expect(current.activeVersion).toBeNull()
+        const inventory = await post(endpoint, { operation: 'versions', sourceId: 'demo' })
+        expect(inventory.status).toBe(200)
+        expect((await inventory.json()).versions).toEqual(['1.0.0', '1.1.0'])
+        const activate = await post(endpoint, {
+            operation: 'activate', sourceId: 'demo', version: '1.0.0',
+            expectedRevision: current.revision
+        })
+        expect(activate.status).toBe(200)
+        const selected = await activate.json() as { revision: number }
+        const connected = await post(endpoint, { operation: 'connect', sourceId: 'demo' })
+        expect(connected.status).toBe(200)
+        const session = await connected.json() as { sessionId: string }
+        const chaptersUrl = endpoint + '/' + session.sessionId +
+            '/comics/demo%3Abook1/chapters'
+        expect((await get(chaptersUrl)).status).toBe(200)
+        const missingConsent = await post(endpoint, {
+            operation: 'uninstall', sourceId: 'demo', version: '1.1.0',
+            expectedRevision: selected.revision
+        })
+        expect(missingConsent.status).toBe(400)
+        const denyActive = await post(endpoint, {
+            operation: 'uninstall', sourceId: 'demo', version: '1.0.0',
+            expectedRevision: selected.revision, consent: true
+        })
+        expect(denyActive.status).toBe(409)
+        const removeInactive = await post(endpoint, {
+            operation: 'uninstall', sourceId: 'demo', version: '1.1.0',
+            expectedRevision: selected.revision, consent: true
+        })
+        expect(removeInactive.status).toBe(200)
+        expect(await removeInactive.json()).toMatchObject({
+            versions: ['1.0.0'], connected: true,
+            activeVersion: '1.0.0', revision: selected.revision
+        })
+        expect((await get(chaptersUrl)).status).toBe(200)
+        const disabled = await post(endpoint, {
+            operation: 'disable', sourceId: 'demo',
+            expectedRevision: selected.revision
+        })
+        expect(disabled.status).toBe(200)
+        expect((await get(chaptersUrl)).status).toBe(409)
+        const state = await disabled.json() as { revision: number }
+        const removed = await post(endpoint, {
+            operation: 'uninstall', sourceId: 'demo', version: '1.0.0',
+            expectedRevision: state.revision, consent: true
+        })
+        expect(removed.status).toBe(200)
+        expect((await removed.json()).toMatchObject({
+            versions: [], activeVersion: null, connected: false
+        })
+        expect(db.getAppState('signed-source-progress-v1:demo')).toBeDefined()
+    })
+
 })

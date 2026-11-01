@@ -385,7 +385,10 @@ def export_cbz():
     # a shell-visible /sdcard file. Reopen it through the same real SAF picker.
     tap(("Import CBZ", "导入 CBZ", "CBZ 取込"))
     page("14-export-roundtrip-picker")
-    locate_document("Comic-S3-QA-Comic.cbz")
+    # The Files UI exposes two nodes: "Preview the file …" (icon) and the
+    # exact filename (selectable document). A substring match taps Preview
+    # and never returns an ACTION_OPEN_DOCUMENT result.
+    tap("Comic-S3-QA-Comic.cbz", seconds=30, exact=True)
     tap(("Save to library", "保存到书库", "書庫に保存"), seconds=65)
     wait(("Comic-S3-QA-Comic",), seconds=45)
     restored = [x for x in book_rows()

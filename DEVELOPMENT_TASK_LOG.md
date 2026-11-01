@@ -1,6 +1,8 @@
 # Pica Library Development Task Log
 
 ### 2026-10-31｜S3 CORE-ANDROID-18：无源 Android 本地书库共享正式版 CBZ 导出
+- **第三次精确模拟器失败记录（不隐去）**：`d42a0f0` 的 [完整 CI #41222583049](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222583049) SUCCESS；但 [真实 Android35 #41222583055](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222583055) FAIL。系统已实际列出 `Comic-S3-QA-Comic.cbz`（1.04 kB）；原有 `locate_document` 宽松模糊匹配先选中 `Preview the file Comic-S3-QA-Comic.cbz` 内容描述，点的是系统预览图标，不是精确文件行；故导入确认页从未出现。当前只改这**一个测试选取动作**为对真实文件文本 `exact=True`，继续要求重新导入后四张原图按字节一致。没有改文件数据、安全规则、模拟器工作流框架或产品端实现。
+
 - **第二次精确模拟器失败（保留 FAIL）**：测试 `87a6550` 的 Android35 [run #41222007662](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222007662) 仍成功走完原导入、Reader、历史、书架及系统 SAF 的 `SAVE`，原 app 显示已导出四页及 SHA-256；但 `adb shell find /sdcard` 未找到文件。Android 文档提供者可能把用户创建的文件保存在 shell 不可枚举的位置。**导出数据可用性尚未经外部重新读取验收**；仅调整现有模拟器脚本：在系统 `ACTION_OPEN_DOCUMENT` 中重新选取刚写出的 CBZ，调用原 `LocalComicStore` 再导入，然后从本 QA 私有页面数据逐页与初始 fixture 按字节比较。禁止把 UI 完成提示当成文件字节通过；不新增导出实现、直接访问外部提供者私有目录或更改正常用户存储权限。
 
 - **模拟器真实截图的直接 UI 修正**：此前本地作品行仍写「长按删除」，但当前长按已是「导出 CBZ／删除」双选项；同步改成「长按操作」，保留三语言和原长按确认删除，并给导出成功回执的页码补空格。以原 Android 35 截图为缺陷证据，不新增截图框架或业务流程。

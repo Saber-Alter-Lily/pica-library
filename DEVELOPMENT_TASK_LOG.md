@@ -1,6 +1,8 @@
 # Pica Library Development Task Log
 
 ### 2026-10-31｜S3 SIGNED-SRC-07：已签名漫画源版本的真实列举与显式卸载（隔离 Draft）
+- 首轮精确 `d04e62b` 的 [CI #41281284735](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41281284735) Web/Desktop 作业 **FAIL** 于 TypeScript 语法解析：新增 HTTP 集成测试中 `expect((await removed.json()).toMatchObject(...)` 少一个右括号（TS1005 两处），还未运行至功能回归。只修正为 `expect(await removed.json()).toMatchObject(...)`，且测试自己经原真实章节/进度 POST 写入一条记录后再检验卸载保留，而不是依赖前一测试的持久化结果；不修改生产签名卸载逻辑或门禁。
+
 
 - 参考上游 [Mihon 扩展更新/管理](https://mihon.app/download/) 与 [Suwayomi 可选扩展](https://github.com/Suwayomi/Suwayomi-Server/wiki/Getting-Extensions) 的扩展生命周期语义，**直接复用**本项目已存在 `SignedWorkerStore` (Ed25519 签名、版本目录、启用/停用/回滚、只在明确连接时启动的 Node worker) 及 `SignedSourceDesktopReader` 原同源 CSRF HTTP 控制器，不另造插件宿主或执行格式。
 - 修复既有实际缺口：`installedVersions(sourceId)` 列举每个已验证的本地版本，不启动服务或访问网络；`uninstall(sourceId,version,expectedRevision)` 真正移除**非当前启用的**签名版本目录。仍拒绝直接删除运行中的当前版本，必须先用户停用。对旧版本卸载不改正在使用版本的指针/revision、不会中断已有 Reader 请求或删除图片、进度与标签数据。

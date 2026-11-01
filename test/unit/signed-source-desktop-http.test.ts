@@ -469,6 +469,13 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
         const chaptersUrl = endpoint + '/' + session.sessionId +
             '/comics/demo%3Abook1/chapters'
         expect((await get(chaptersUrl)).status).toBe(200)
+        const chapter = await get(endpoint + '/' + session.sessionId +
+            '/comics/demo%3Abook1/chapters/chapter-1')
+        expect(chapter.status).toBe(200)
+        const saved = await post(endpoint + '/' + session.sessionId + '/progress', {
+            comicId: 'demo:book1', episodeId: 'chapter-1', pageIndex: 1
+        })
+        expect(saved.status).toBe(200)
         const missingConsent = await post(endpoint, {
             operation: 'uninstall', sourceId: 'demo', version: '1.1.0',
             expectedRevision: selected.revision
@@ -501,7 +508,7 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
             expectedRevision: state.revision, consent: true
         })
         expect(removed.status).toBe(200)
-        expect((await removed.json()).toMatchObject({
+        expect(await removed.json()).toMatchObject({
             versions: [], activeVersion: null, connected: false
         })
         expect(db.getAppState('signed-source-progress-v1:demo')).toBeDefined()

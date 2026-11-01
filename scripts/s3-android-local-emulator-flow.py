@@ -384,11 +384,13 @@ def export_cbz():
     # Android's system document provider owns the destination; it need not be
     # a shell-visible /sdcard file. Reopen it through the same real SAF picker.
     tap(("Import CBZ", "导入 CBZ", "CBZ 取込"))
+    # The picker remembered the containing folder, but its grid lays out
+    # the file label below the Android navigation bar. Use its native list
+    # mode to make the exact document row genuinely visible and tappable.
+    wait("List view", seconds=30, exact=True, only_class="Button")
+    tap("List view", exact=True, only_class="Button")
     page("14-export-roundtrip-picker")
-    # The Files UI exposes two nodes: "Preview the file …" (icon) and the
-    # exact filename (selectable document). A substring match taps Preview
-    # and never returns an ACTION_OPEN_DOCUMENT result.
-    tap("Comic-S3-QA-Comic.cbz", seconds=30, exact=True)
+    tap("Comic-S3-QA-Comic.cbz", seconds=30, exact=True, only_class="TextView")
     tap(("Save to library", "保存到书库", "書庫に保存"), seconds=65)
     wait(("Comic-S3-QA-Comic",), seconds=45)
     restored = [x for x in book_rows()

@@ -156,3 +156,215 @@ $('source-choices-form').onsubmit = async (event) => {
 localize()
 document.addEventListener('pica-language-change', localize)
 // Explicit load only: opening a normal page never probes a provider or starts a worker.
+
+/**
+ * Optional trusted signed-source UI. The normal release has no signed worker
+ * controller, so the panel remains hidden and does not probe a provider.
+ * This reuses the existing authenticated Desktop command API; it does NOT
+ * install scripts or accept a worker path / publisher key from the browser.
+ */
+const signedPanel = $('signed-source-manager')
+let signedCsrf = '', signedBusy = false, signedRows = []
+const signedSessions = new Map()
+const signedText = (tag, value) => {
+    const element = document.createElement(tag)
+    if (value !== undefined) element.textContent = value
+    return element
+}
+function signedLabels() {
+    for (const [id, zh, en, ja] of [
+        ['summary', '已验证的独立来源组件（实验）', 'Verified source components (experimental)', '検証済み配信元コンポーネント（実験）'],
+        ['help', '这里只管理应用已预置并验证签名的组件，不提供来源商店或脚本安装。操作均需主动确认，移除组件不会删除漫画和阅读记录。', 'Manage only app-provisioned, signature-verified components. No source marketplace or script installer. Actions require explicit selection; removing a component does not delete books or reading history.', 'アプリにより事前配置され署名検証されたコンポーネントのみ管理します。配信元ストアやスクリプト導入はありません。操作は明示的に選択し、削除しても漫画と読書履歴は保持されます。'],
+        ['refresh', '查看已安装的签名来源', 'Show installed signed sources', 'インストール済み署名ソースを表示']
+    ]) $('signed-source-' + id).textContent = t(zh, en, ja)
+}
+async function signedCommand(input) {
+    const response = await fetch('/api/v1/desktop/signed-reader', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-pica-csrf': signedCsrf },
+        body: JSON.stringify(input),
+        cache: 'no-store'
+    })
+    const value = await response.json()
+    if (!response.ok) throw new Error(value.error ||
+        t('来源操作失败，请刷新版本状态。', 'Source operation failed; refresh the versions.', 'ソース操作に失敗しました。バージョンを再読み込みしてください。'))
+    return value
+}
+function signedInventory(value) {
+    if (value?.schemaVersion !== 1 || value.installAvailable !== false ||
+        !Array.isArray(value.sources) || value.sources.length > 64 ||
+        value.sources.some(source =>
+            !/^[a-z][a-z0-9-]{2,31}$/.test(source.sourceId) ||
+            !Number.isSafeInteger(source.revision) ||
+            !Array.isArray(source.versions) || source.versions.length > 100 ||
+            source.versions.some(version => !/^(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})$/.test(version)) ||
+            !(source.activeVersion === null || source.versions.includes(source.activeVersion)) ||
+            typeof source.connected !== 'boolean'))
+        throw new Error('Invalid signed source inventory')
+    signedRows = value.sources
+    for (const [id] of signedSessions)
+        if (!signedRows.some(row => row.sourceId === id && row.connected))
+            signedSessions.delete(id)
+}
+function signedRender() {
+    const root = $('signed-source-list')
+    root.replaceChildren()
+    if (!signedRows.length) root.append(signedText('p', t(
+        '尚无已安装的可信来源组件。此处不会从网络自动寻找或下载来源。',
+        'No trusted source component is installed. Nothing is discovered or downloaded automatically.',
+        '信頼済みソースはまだありません。ネットから自動で検索・取得しません。'
+    )))
+    for (const row of signedRows) {
+        const item = signedText('section')
+        item.className = 'panel'
+        item.append(signedText('h4', row.sourceId))
+        item.append(signedText('p',
+            (row.activeVersion
+                ? t('已启用', 'Enabled', '有効') + ': ' + row.activeVersion
+                : t('已停用', 'Disabled', '無効')) + ' · ' +
+            (row.connected
+                ? t('已连接', 'Connected', '接続中')
+                : t('未连接', 'Disconnected', '未接続'))))
+        if (!row.versions.length) {
+            item.append(signedText('p', t('没有已安装版本', 'No installed versions', 'インストール済みバージョンなし')))
+            root.append(item)
+            continue
+        }
+        const label = signedText('label', t('选择已安装版本', 'Choose installed version', 'インストール済みバージョンを選択'))
+        const select = signedText('select')
+        select.setAttribute('aria-label', label.textContent + ' · ' + row.sourceId)
+        for (const version of row.versions) {
+            const option = signedText('option', version)
+            option.value = version
+            select.append(option)
+        }
+        select.value = row.activeVersion || row.versions[row.versions.length - 1]
+        label.append(select)
+        item.append(label)
+        const actions = signedText('div')
+        actions.className = 'actions'
+        const action = (caption, input, shouldConfirm = false) => {
+            const button = signedText('button', caption)
+            button.type = 'button'
+            button.onclick = () => {
+                if (shouldConfirm && !window.confirm(t(
+                    '确认删除此已验证版本？漫画与阅读记录不会被删除。',
+                    'Remove this verified version? Books and reading history will remain.',
+                    'この検証済みバージョンを削除しますか？漫画と読書履歴は保持されます。'
+                ))) return
+                void signedOperate(input())
+            }
+            actions.append(button)
+            return button
+        }
+        const activate = action(t('启用／切换版本', 'Enable / switch version', '有効化／バージョン切替'), () => ({
+            operation: row.activeVersion &&
+                select.value.localeCompare(row.activeVersion, 'en', { numeric: true }) < 0
+                ? 'rollback' : 'activate',
+            sourceId: row.sourceId, version: select.value,
+            expectedRevision: row.revision
+        }))
+        if (row.activeVersion) action(t('停用来源', 'Disable source', 'ソースを無効化'), () => ({
+            operation: 'disable', sourceId: row.sourceId,
+            expectedRevision: row.revision
+        }))
+        if (row.activeVersion && !row.connected)
+            action(t('连接已启用来源', 'Connect enabled source', '有効なソースに接続'), () => ({
+                operation: 'connect', sourceId: row.sourceId
+            }))
+        if (row.connected && signedSessions.has(row.sourceId))
+            action(t('断开本次连接', 'Disconnect this session', '今回の接続を解除'), () => ({
+                operation: 'disconnect', sessionId: signedSessions.get(row.sourceId)
+            }))
+        const remove = action(t('卸载所选旧版本', 'Uninstall selected inactive version', '選択した非稼働版を削除'), () => ({
+            operation: 'uninstall', sourceId: row.sourceId,
+            version: select.value, expectedRevision: row.revision, consent: true
+        }), true)
+        const update = () => {
+            select.disabled = signedBusy
+            activate.disabled = signedBusy || select.value === row.activeVersion
+            remove.disabled = signedBusy || select.value === row.activeVersion
+            for (const button of actions.querySelectorAll('button'))
+                if (button !== activate && button !== remove) button.disabled = signedBusy
+        }
+        select.addEventListener('change', update)
+        update()
+        item.append(actions)
+        root.append(item)
+    }
+    $('signed-source-refresh').disabled = signedBusy
+}
+async function signedOperate(input) {
+    if (signedBusy || !signedCsrf || signedPanel.hidden) return
+    signedBusy = true
+    signedRender()
+    try {
+        const result = await signedCommand(input)
+        if (input.operation === 'connect' && typeof result.sessionId === 'string')
+            signedSessions.set(input.sourceId, result.sessionId)
+        if (['disable', 'activate', 'rollback', 'uninstall', 'disconnect'].includes(input.operation)) {
+            if (input.sourceId) signedSessions.delete(input.sourceId)
+            if (input.operation === 'disconnect') {
+                for (const [id, sessionId] of signedSessions)
+                    if (sessionId === input.sessionId) signedSessions.delete(id)
+            }
+        }
+        signedInventory(await signedCommand({ operation: 'inventory' }))
+        $('signed-source-status').textContent = t(
+            '操作已完成；没有修改本地漫画与阅读记录。',
+            'Action completed. Local books and reading history were unchanged.',
+            '操作完了。ローカル漫画と読書履歴は変更されていません。'
+        )
+        document.dispatchEvent(new Event('pica-signed-reading-scope-changed'))
+    } catch (error) {
+        $('signed-source-status').textContent = t(
+            '操作未完成。请重新查看已安装来源。',
+            'Action not completed. Refresh installed sources.',
+            '操作は完了していません。ソース一覧を再読込してください。'
+        ) + ' ' + error.message
+    } finally {
+        signedBusy = false
+        signedRender()
+    }
+}
+async function signedRefresh() {
+    if (signedBusy || signedPanel.hidden) return
+    signedBusy = true
+    signedRender()
+    try {
+        const response = await fetch('/api/v1/desktop/status', { cache: 'no-store' })
+        const status = await response.json()
+        if (!response.ok || !status.configured ||
+            status.signedSourceManagement?.available !== true ||
+            !status.csrfToken)
+            throw new Error('Trusted source control is unavailable')
+        signedCsrf = status.csrfToken
+        signedInventory(await signedCommand({ operation: 'inventory' }))
+        $('signed-source-status').textContent = t(
+            '已读取本机签名组件。只有主动连接才会启动来源进程。',
+            'Local signed components loaded. Source processes start only when you connect.',
+            '署名コンポーネントを読み込みました。明示的に接続するまでプロセスは起動しません。'
+        )
+    } catch (error) {
+        signedRows = []
+        signedCsrf = ''
+        $('signed-source-status').textContent = t(
+            '无法读取可信来源组件。', 'Unable to load trusted source components.', '信頼済みソースを読み込めません。'
+        ) + ' ' + error.message
+    } finally {
+        signedBusy = false
+        signedRender()
+    }
+}
+if (signedPanel) {
+    $('signed-source-refresh').onclick = () => void signedRefresh()
+    signedPanel.addEventListener('toggle', () => {
+        if (signedPanel.open && !signedPanel.hidden) void signedRefresh()
+    })
+    document.addEventListener('pica-language-change', () => {
+        signedLabels()
+        signedRender()
+    })
+    signedLabels()
+}
+// No source discovery, worker activation or network access on page load.

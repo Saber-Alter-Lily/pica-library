@@ -828,6 +828,8 @@ async function loadDesktop() {
         $('#settings-nav').hidden = false
         $('#settings-version').textContent = `Pica Library ${desktop.version}`
         $('#update-current-version').textContent = `v${desktop.version}`
+        $('#signed-source-manager').hidden =
+            !(desktop.configured && desktop.signedSourceManagement?.available === true)
         $('#settings-directory').value = desktop.libraryDirectory || ''
         $('#settings-profile').value = desktop.profile || 'balanced'
         $('#settings-proxy').value = desktop.proxyUrl || ''
@@ -849,6 +851,7 @@ async function loadDesktop() {
             document.querySelector('nav').hidden = false
         }
     } catch {
+        $('#signed-source-manager').hidden = true
         desktop = null
         // An existing Desktop host with a failed capabilities request must
         // stay fail-closed and must not retry or partially advertise features.

@@ -413,7 +413,12 @@ export async function startLibraryServer(options: {
                     version: PRODUCT_VERSION,
                     configured: options.desktop.configured(),
                     csrfToken: options.desktop.csrfToken,
-                    ...options.desktop.status()
+                    ...options.desktop.status(),
+                    // Only a trusted application composition can inject this.
+                    // A source manifest or ordinary Desktop settings cannot.
+                    signedSourceManagement: {
+                        available: Boolean(options.desktop.signedSourceReader)
+                    }
                 })
             }
             if (url.pathname === '/api/v1/desktop/reading-library/query') {

@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+### 2026-11-01｜S3 SIGNED-SRC-08：可信签名来源接入原 Desktop 来源管理界面（隔离 Draft）
+
+- **实际使用缺口**：上一阶段签名来源 `SignedWorkerStore` 具备安装、启用、回滚、停用、卸载，但原 Web 设置页没有查看已安装组件和操作入口；只靠 QA 手写 HTTP 命令无法算用户可用。复用原 `web/index.html` 的「外部漫画来源」区域、`source-choices.js` 的三语言/状态交互、原受控 `/api/v1/desktop/signed-reader`，不建立新应用、插件市场、压缩/阅读器或 source SDK。
+- `SignedWorkerStore.installedSources` 只读列举原应用已安装且签名/哈希验证的版本目录，不运行 worker、不扫描互联网、不下载；原 `SignedSourceDesktopReader` 增 `inventory` 命令，包含版本、激活与运行状态；客户端通过已存在的 `activate/rollback/disable/connect/disconnect/uninstall` 控制。卸载按钮仅允许非当前启用版本且需要用户在系统对话框确认，不传脚本、安装路径、公钥、账户或内容到 HTTP。
+- **明确能力暴露**：只有 Desktop Composition 真实注入 `signedSourceReader` 时 `/api/v1/desktop/status` 才返回 `signedSourceManagement.available=true`，原 `web/app.js` 才展示高级折叠面板；普通正式程序没有注入该控制器，因此默认完全隐藏，不能仅凭来源 manifest 开启。打开设置和仅加载页面不发起来源进程/网络请求。原 Core-only Web QA 继续裁剪 `source-choices.js`，避免纯核心被拉入来源管理依赖。
+- 原签名生命周期单元测试加空库存及真实已安装签名版本映射；原 Desktop HTTP 集成测试验证已注入权限状态与零请求库存结果。尚待同一精确 HEAD 的完整 CI、实际 Chromium UI 与 Windows 可信发布根物理操作。**不宣称正式版已支持用户自行安装插件或真实来源帐号；G2、Android Service/Binder、正式签名、旧资料迁移和 G1–G4 继续 OPEN。** 保持 Draft，不合并 main/发布/OTA/真实用户资料。
+
+
 ### 2026-10-31｜S3 SIGNED-SRC-07：已签名漫画源版本的真实列举与显式卸载（隔离 Draft）
 - 首轮精确 `d04e62b` 的 [CI #41281284735](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41281284735) Web/Desktop 作业 **FAIL** 于 TypeScript 语法解析：新增 HTTP 集成测试中 `expect((await removed.json()).toMatchObject(...)` 少一个右括号（TS1005 两处），还未运行至功能回归。只修正为 `expect(await removed.json()).toMatchObject(...)`，且测试自己经原真实章节/进度 POST 写入一条记录后再检验卸载保留，而不是依赖前一测试的持久化结果；不修改生产签名卸载逻辑或门禁。
 

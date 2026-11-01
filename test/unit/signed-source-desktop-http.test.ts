@@ -149,6 +149,21 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
     })
 
     it('has an explicitly installed generation but no implicitly running source', async () => {
+        const desktop = await get('/api/v1/desktop/status')
+        expect(desktop.status).toBe(200)
+        expect(await desktop.json()).toMatchObject({
+            signedSourceManagement: { available: true }
+        })
+        const inventory = await post(endpoint, { operation: 'inventory' })
+        expect(inventory.status).toBe(200)
+        expect(await inventory.json()).toEqual({
+            schemaVersion: 1, installAvailable: false,
+            sources: [{
+                sourceId: 'demo', schemaVersion: 1, revision: 0,
+                activeVersion: null, versions: ['1.0.0', '1.1.0'],
+                connected: false
+            }]
+        })
         const status = await post(endpoint, { operation: 'status', sourceId: 'demo' })
         expect(status.status).toBe(200)
         expect(await status.json()).toEqual({

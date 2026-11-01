@@ -252,6 +252,22 @@ export class SignedWorkerStore {
         return { release, folder, workerPath: path.join(folder, 'worker.cjs') }
     }
 
+    /**
+     * Passive inventory for a trusted Desktop UI. It enumerates only the
+     * application's pinned, verified source generations, never a download
+     * catalog and never executes any worker.
+     */
+    installedSources() {
+        const root = fs.lstatSync(this.root, { throwIfNoEntry: false })
+        if (!root) return []
+        directory(this.root)
+        return fs.readdirSync(this.root).sort().map(id => ({
+            sourceId: id,
+            ...this.state(id),
+            versions: this.installedVersions(id)
+        }))
+    }
+
     /** List only verified, application-pinned generations; never start them. */
     installedVersions(id: string): string[] {
         const folder = this.versionsFolder(id)

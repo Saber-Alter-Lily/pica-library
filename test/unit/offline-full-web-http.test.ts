@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import AdmZip from 'adm-zip'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LocalLibraryIngestion } from '../../src/local-library/ingestion'
@@ -181,6 +182,62 @@ describe('real original full Web HTML behind source-free, cookie-protected local
         expect(fs.existsSync(path.join(chosen, '02.png'))).toBe(true)
     }, 60_000)
 
+    it('saves a real local CBZ via the trusted native picker and cancels without writing', async () => {
+        const { home, root, db, web, comic } = await fixture()
+        const reader = new ReaderService(db, root)
+        const episodeId = reader.chapters(comic.comicId)[0].id
+        const selected = path.join(home, 'saved-from-native.cbz')
+        let pickerCalls = 0
+        let cancel = false
+        const http = await startOfflineCoreHttp({
+            database: db, reader, webRoot: web,
+            localPicker: {
+                configured: () => true,
+                status: () => ({
+                    runtime: { mode: 'interactive' },
+                    nativePicker: { folderPicker: true, savePicker: true }
+                }),
+                chooseSaveArchive: async ({ format, defaultName }) => {
+                    pickerCalls++
+                    expect(format).toBe('cbz')
+                    expect(defaultName).toMatch(/\.cbz$/)
+                    return cancel ? null : selected
+                }
+            }
+        })
+        cleanup.push(() => http.close())
+        const base = new URL(http.url).origin
+        const entry = await fetch(http.url, { redirect: 'manual' })
+        const cookie = entry.headers.get('set-cookie')!.split(';')[0]
+        const html = await (await fetch(base + '/', { headers: { cookie } })).text()
+        const csrf = /name="pica-core-qa-csrf" content="([a-f0-9]{64})"/.exec(html)![1]
+        const request = (input: unknown, token = csrf) => fetch(
+            base + '/api/v1/reader/export-cbz', {
+                method: 'POST',
+                headers: { cookie, origin: base,
+                    'content-type': 'application/json', 'x-pica-csrf': token },
+                body: JSON.stringify(input)
+            }
+        )
+        const input = { comicId: comic.comicId, episodeId }
+        expect((await request(input, 'wrong')).status).toBe(403)
+        expect((await request({ ...input, path: selected })).status).toBe(400)
+        expect(pickerCalls).toBe(0)
+        const response = await request(input)
+        expect(response.status).toBe(200)
+        const value = await response.json()
+        expect(value).toMatchObject({ path: selected, format: 'cbz', pages: 1 })
+        expect(new AdmZip(selected).getEntry('001.png')?.getData()).toEqual(png)
+        const exportedBytes = fs.readFileSync(selected)
+        cancel = true
+        const stopped = await request(input)
+        expect(stopped.status).toBe(200)
+        expect(await stopped.json()).toEqual({ cancelled: true })
+        expect(pickerCalls).toBe(2)
+        expect(fs.readFileSync(selected)).toEqual(exportedBytes)
+        expect(fs.existsSync(path.join(home, 'Pica Library Comic.zip'))).toBe(false)
+    }, 60_000)
+
     it('never serves a mutated full Web script with a stale staged checksum', async () => {
         const { db, web } = await fixture()
         fs.appendFileSync(path.join(web, 'app.js'), '\n// tampered after stage')
@@ -189,4 +246,48 @@ describe('real original full Web HTML behind source-free, cookie-protected local
             webRoot: web
         })).rejects.toThrow(/SHA mismatch|changed after staging/)
     })
+    it('exports actual local pages through original Reader in the source-free full Web', async () => {
+        const { db, root, web, comic } = await fixture()
+        const reader = new ReaderService(db, root)
+        const chapter = reader.chapters(comic.comicId)[0]
+        expect(chapter.id).toMatch(/^local:[0-9a-f]{64}:chapter:[0-9a-f]{64}$/)
+        const http = await startOfflineCoreHttp({ database: db, reader, webRoot: web })
+        cleanup.push(() => http.close())
+        const home = new URL(http.url).origin
+        const opened = await fetch(http.url, { redirect: 'manual' })
+        const cookie = opened.headers.get('set-cookie')!.split(';')[0]
+        const html = await (await fetch(home + '/', { headers: { cookie } })).text()
+        const csrf = /name="pica-core-qa-csrf" content="([a-f0-9]{64})"/.exec(html)![1]
+        const post = (route: string, body: unknown, token = csrf) =>
+            fetch(home + route, {
+                method: 'POST',
+                headers: { cookie, origin: home,
+                    'content-type': 'application/json', 'x-pica-csrf': token },
+                body: JSON.stringify(body)
+            })
+        const selection = { comicId: comic.comicId, episodeId: chapter.id }
+        expect((await post('/api/v1/reader/export-cbz', selection, 'bad')).status)
+            .toBe(403)
+        expect((await post('/api/v1/reader/export-cbz', {
+            ...selection, episodeId: 'pica:foreign'
+        })).status).toBe(400)
+        const response = await post('/api/v1/reader/export-cbz', selection)
+        expect(response.status).toBe(200)
+        const result = await response.json()
+        expect(result).toMatchObject({ format: 'cbz', pages: 1 })
+        expect(path.dirname(result.path)).toBe(path.join(root, 'exports', 'archives'))
+        const archive = new AdmZip(result.path)
+        expect(archive.getEntries().map((row: {entryName: string}) => row.entryName))
+            .toEqual(['001.png'])
+        expect(archive.getEntry('001.png')?.getData()).toEqual(png)
+        const zip = await post('/api/v1/reader/export-zip', selection)
+        expect(zip.status).toBe(200)
+        expect((await zip.json()).format).toBe('zip')
+        expect((await post('/api/v1/reader/open-default', {
+            path: result.path
+        })).status).toBe(405)
+        expect((await fetch(home + '/api/v1/reader/export-cbz', {
+            headers: { cookie }
+        })).status).toBe(404)
+    }, 60_000)
 })

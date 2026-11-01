@@ -4,6 +4,7 @@ import http, {
     type IncomingMessage, type Server, type ServerResponse
 } from 'node:http'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { safePathSegment } from '../library/path-template'
 import { verifiedFullWebQaAssets } from './full-web-qa-assets'
 import { createCoreLibraryPorts, type CoreLocalRuntime } from '../library/core-runtime-composition'
 import { localReaderGet } from '../reader/local-http-read'
@@ -283,6 +284,12 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         const localImportRoute = fullWeb && options.coreRuntime && options.localPicker
             ? coreLocalImportMatch(request.method ?? '', url.pathname)
             : null
+        // Original Reader export, not another archive implementation. Only
+        // source-free full Web's explicit user action may invoke it.
+        const localExportFormat = fullWeb && request.method === 'POST'
+            ? url.pathname === '/api/v1/reader/export-cbz' ? 'cbz'
+                : url.pathname === '/api/v1/reader/export-zip' ? 'zip' : null
+            : null
         if (request.method === 'GET') {
             if (fullWeb && url.pathname === '/') {
                 const original = fullWeb.get('index.html')!.data.toString('utf8')
@@ -392,7 +399,8 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             }
             return json(response, 404, { error: 'No source routes in offline QA' })
         }
-        if (!shelfRoute && !localImportRoute && (request.method !== 'POST' ||
+        if (!shelfRoute && !localImportRoute && !localExportFormat &&
+            (request.method !== 'POST' ||
             !['/api/v1/reader/progress', '/api/v1/library/query']
                 .includes(url.pathname)))
             return json(response, 405, { error: 'Unsupported QA operation' })
@@ -407,6 +415,46 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             !secureEqual(csrfHeader, csrf))
             return json(response, 403, { error: 'QA CSRF rejected' })
         try {
+            if (localExportFormat) {
+                const input = await readJsonObject(request)
+                if (Object.keys(input).sort().join(',') !== 'comicId,episodeId' ||
+                    typeof input.comicId !== 'string' ||
+                    !LOCAL_ID.test(input.comicId) ||
+                    typeof input.episodeId !== 'string' ||
+                    !CHAPTER_ID.test(input.episodeId) ||
+                    !input.episodeId.startsWith(input.comicId + ':chapter:'))
+                    throw new Error('Invalid source-free Reader export')
+                const comic = options.database.getComic(input.comicId)
+                const chapter = options.reader.chapters(input.comicId)
+                    .find(row => row.id === input.episodeId)
+                if (!comic || comic.providerId !== 'local' || !chapter)
+                    throw new Error('Local Reader export is unavailable')
+                // The native dialog is injected only by the trusted Desktop
+                // composition root. Web never sends a destination path.
+                const chooseSave = options.localPicker?.chooseSaveArchive
+                let selected: string | null = null
+                if (chooseSave) {
+                    const defaultName = safePathSegment(
+                        comic.title + ' - ' + chapter.title, 'Pica Library Comic'
+                    ) + '.' + localExportFormat
+                    selected = await chooseSave({
+                        format: localExportFormat, defaultName
+                    })
+                    if (selected === null)
+                        return json(response, 200, { cancelled: true })
+                    if (typeof selected !== 'string' || !path.isAbsolute(selected) ||
+                        path.extname(selected).toLowerCase() !== '.' + localExportFormat)
+                        throw new Error('Invalid native export destination')
+                }
+                const value = localExportFormat === 'cbz'
+                    ? options.reader.exportCbz(input.comicId, input.episodeId)
+                    : options.reader.exportZip(input.comicId, input.episodeId)
+                if (selected) {
+                    await fs.promises.copyFile(value.path, selected)
+                    return json(response, 200, { ...value, path: selected })
+                }
+                return json(response, 200, value)
+            }
             if (localImportRoute && options.coreRuntime) {
                 const input = await readJsonObject(request)
                 const reply = await options.coreRuntime.localImport.http(

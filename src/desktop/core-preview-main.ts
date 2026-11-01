@@ -77,7 +77,15 @@ async function runCoreDesktopPreview(
                 }),
                 chooseLocalComic: kind => kind === 'folder'
                     ? nativePicker.chooseFolder('选择漫画文件夹 / Choose comic folder')
-                    : nativePicker.chooseComicArchive()
+                    : nativePicker.chooseComicArchive(),
+                // Reuse the original OS Save As dialog for the same Reader ZIP/CBZ.
+                chooseSaveArchive: nativePicker.status.savePicker
+                    ? ({ format, defaultName }) => nativePicker.chooseSaveFile({
+                        title: '保存漫画档案 / Save comic archive',
+                        defaultName,
+                        extension: format
+                    })
+                    : undefined
             } : undefined
         running = await startOfflineCoreHttp({
             database,

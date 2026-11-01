@@ -505,6 +505,8 @@ export const translations = {
         'reader.resume': ' · Resume at page {page}',
         'reader.noChapters': 'This manga has no downloaded chapters.',
         'reader.exported': 'Exported {name} · {pages} pages · {bytes}',
+        'reader.exportCancelled': 'Export cancelled. No file was saved.',
+        'reader.exportWorking': 'Preparing archive…',
         'reader.openExport':
             '{format} exported. Open it with the default reader?',
         'downloaded.read': 'Read',
@@ -1322,6 +1324,8 @@ export const translations = {
         'reader.resume': ' · 继续阅读：第 {page} 页',
         'reader.noChapters': '该漫画尚无已下载章节。',
         'reader.exported': '已导出 {name} · {pages} 页 · {bytes}',
+        'reader.exportCancelled': '已取消导出，未保存文件。',
+        'reader.exportWorking': '正在准备导出档案…',
         'reader.openExport': '{format} 已导出。用系统默认阅读器打开？',
         'downloaded.read': '阅读',
         'sync.quickStarting': '正在检查收藏更新…',

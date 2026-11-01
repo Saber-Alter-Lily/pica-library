@@ -1,5 +1,25 @@
 # Pica Library Development Task Log
 
+### 2026-10-31｜S3 CORE-DESKTOP-20：复用系统“另存为”，完成无源 Windows 漫画导出用户流程
+- 本轮补原用户可见导出反馈：沿用 `#reader-message` 增加中英日“正在准备导出档案”，一次导出期间临时禁用原两个 ZIP/CBZ 按钮，成功/主动取消/失败都在同一 `finally` 恢复；防止双击出现并行的原同步 ZIP 工作。无新任务模型、Worker 或 UI 面板。现有 HTTP 回归的取消分支同步修正为导出前后文件字节真正比较，不做自比较。
+
+
+- 在已通过 24/24 GitHub Actions 的 Draft #274 后继续原功能，不新起压缩器/文件管理器。正式 Web 阅读器已有 ZIP/CBZ 按钮；原 `DesktopNativePicker.chooseSaveFile` 已支持 Windows WinForms、macOS 原生和 Linux 可用桌面文件选择器。只给原 `CoreLocalPicker` 增加一项信任域内 `chooseSaveArchive` 可选能力，并从 `core-preview-main.ts` 真实注入。
+- Source-free Full-Web 的原 `/api/v1/reader/export-zip|cbz` 请求继续严格保留会话 Cookie、Origin、CSRF、LOCAL 作品/章节关系、不可传文件路径；获用户系统保存位置后调用原 `ReaderService.exportZip/exportCbz`，以 `fs.promises.copyFile` 将**已生成的应用私有漫画页面档案**复制到用户确选目标。取消选择立即返回 `cancelled`，不会先生成文件。无头 QA 未提供保存器时保留旧的隔离私有导出方式。
+- 原 Web 仅识别 `cancelled` 并用现有中英日 i18n 提示“未保存”；正式含源 Desktop 原导出和外部文件打开询问不改。路径仍由系统原生弹窗决定，不以 HTTP 中的路径字符串为准；原长路径换行继续有效。
+- 仅在原 `offline-full-web-http.test.ts` 加一条真实 PNG→原 CBZ→受控系统保存目标的字节检查、未授权/任意路径拒绝、用户取消无虚假成功。真实 Windows 文件对话框人工验收、大文件同步 ZIP 性能、断电时目标文件完整性、正式 v0.5.0 迁移和 G1–G4 仍 OPEN。Draft 未发布、main/OTA/正式用户资料不动。
+
+
+### 2026-10-31｜S3 CORE-DESKTOP-19：无源 Windows 阅读器接通原 ZIP/CBZ 导出按钮
+- 实际显示验收时注意到原 `#reader-message` 是最大宽 720px 的固定提示条，核心模式新显示的 Windows 长目录路径可能溢出；直接复用其现有 CSS，单加 `overflow-wrap: anywhere`，不增加新对话框/布局系统或影响正常按钮功能。
+
+
+- **实际功能缺口**：Source-free Windows 的完整正式 Web UI 已展示 Reader “导出 ZIP/CBZ”按钮，而 source-free HTTP 仅处理 Reader 查询/阅读进度，点按钮返回 405。复用原正式 `ReaderService.exportZip/exportCbz`、现有 `AdmZip` 和应用私有 `exports/archives`，只在独立 Full-Web Local Core 显式 POST 时开放相同的原接口；零来源本地书库不带 Pica/E-H/JM、Host 或源 SDK。
+- 原 `qa-http.ts` 保留 cookie、loopback、Origin、CSRF 与 4096B JSON 界限；仅接受已知 `local:<sha>` 漫画与对应 `local:<sha>:chapter:<sha>`，不接收客户端传来的文件路径或远程 ID。旧正式 Desktop 的已有路由、Writer/Reader 模块及格式不变，无新压缩器/运行框架。
+- Full-Web Core 的保存成功状态显示真实目录路径，不再询问“用默认程序打开”这种当前 source-free OS opener 根本不支持的动作；正式 Desktop 保持原按钮行为。导出仅漫画页不是私人书架/历史/账号备份。
+- 仅在已有 Full-Web HTTP 集成测试内追加一次源无关 CBZ/ZIP 出口、真实 1 页字节、登录/CSRF 与非 LOCAL ID 拒绝回归。不声称大章节同步 ZIP 打包不会阻塞，性能/取消用户验收继续 OPEN；当前代码只在隔离 Draft，无 main/Release/OTA/正式用户 Profile 或真实账号接触。
+
+
 ### 2026-10-31｜S3 CORE-ANDROID-18：无源 Android 本地书库共享正式版 CBZ 导出
 - **真实截图/Android UI 层级定位并修复第三轮模拟器选择失败**：精确源 `bc7d3d3` 的 [Android35 #41261400635](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41261400635) FAIL；`Download/S3-QA-Folder` 的系统 DocumentsUI 网格确有导出文件，原测试已改为点确切文件文本，然而网格中该 TextView 的中心实际落在屏幕底部导航区域（ADB 记录 y=1226），于是误触返回上层 `Download`，应用没有收到 URI。真实失败截图及 XML 已读取，**不是文件不存在或导出器数据损坏的证据**。当前只复用 Android 原生 DocumentsUI 右上「List view」按钮先切列表显示，再点确切文件名；保留原四张 PNG 字节对照。未改任何生产 Reader/导出/文件所有权权限或引入测试框架。原完整 CI #41261400692 SUCCESS 不能代替此修正后的精确提交。
 

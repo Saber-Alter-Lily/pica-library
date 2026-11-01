@@ -3364,28 +3364,44 @@ document.addEventListener('keydown', (event) => {
     if (action === 'exit') void exitReader()
     else moveReader(action)
 })
+let readerArchiveExportBusy = false
 async function exportReaderArchive(format) {
+    if (readerArchiveExportBusy) return
+    readerArchiveExportBusy = true
+    const controls = [$('#reader-export-zip'), $('#reader-export-cbz')]
+    for (const control of controls) control.disabled = true
+    $('#reader-message').textContent = t('reader.exportWorking')
     try {
         const value = await post(`/api/v1/reader/export-${format}`, {
             comicId: state.reader.comicId,
             episodeId: state.reader.episodeId
         })
+        if (value.cancelled === true) {
+            $('#reader-message').textContent = t('reader.exportCancelled')
+            return
+        }
         const name = value.path.split(/[\\/]/).pop()
+        const coreOnly = desktop?.coreOnly === true
         $('#reader-message').textContent = t('reader.exported', {
             name,
             pages: value.pages,
             bytes: formatBytes(value.bytes)
-        })
-        if (
+        }) + (coreOnly ? ' · ' + value.path : '')
+        // The isolated local-only runtime has no OS-shell opener.
+        // Show the exact saved path instead of offering a nonfunctional action.
+        if (!coreOnly && (
             await askConfirm(
                 t('reader.openExport', {
                     format: format.toUpperCase()
                 })
             )
-        )
+        ))
             await post('/api/v1/reader/open-default', { path: value.path })
     } catch (error) {
         $('#reader-message').textContent = localizeError(language, error)
+    } finally {
+        readerArchiveExportBusy = false
+        for (const control of controls) control.disabled = false
     }
 }
 $('#reader-export-zip').onclick = () => void exportReaderArchive('zip')

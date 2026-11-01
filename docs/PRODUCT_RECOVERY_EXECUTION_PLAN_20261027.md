@@ -1,5 +1,19 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-31 S3 CORE-DESKTOP-20｜直接使用现有原生另存为选择器
+
+- 消除 #274 无源 Windows Reader 导出档案只能显示内部路径的最后一步用户体验缺口：现有正式 `ReaderService` 继续压缩，原 `DesktopNativePicker.chooseSaveFile` 负责用户确定目标，出品经原离线 Full-Web HTTP 控制面复制。仅扩展一个可选受信任 Picker 能力，不引入 Source SDK、任意脚本或第二套 ZIP 处理。
+- 导出请求仍只传 LOCAL 漫画及对应章节，不接收网页指定的 OS 路径；用户取消系统保存选择器时不发布成功或生成多余档案。正式版导出交互不受影响；原 UI 三语使用现有国际化资源。
+- 当前只认可功能源码/原 CI/隔离模拟；必须有最终精确提交的 Android/Web/Desktop CI、无源安装包闭包、保存文件字节证据。实际 Windows 原生弹窗、目标权限/文件系统异常与大章节卡顿以及 G1–G4 均需后续确认。未合并/未发布。
+
+
+### 2026-10-31 S3 CORE-DESKTOP-19｜原 Windows Reader 导出功能在无源本地模式可用
+
+- 在原正式 Web 保留的“导出 ZIP/CBZ”按钮之后复用正式 `ReaderService.exportZip/exportCbz`，补通独立 Full-Web Core 的同名 POST；受 cookie + 同源/CSRF 保护且只接受纯 LOCAL 身份和配套章节。文件仅写入已标记的独立 local profile 内 `exports/archives`，不允许 HTTP 指定任意路径。
+- 未配置可信外部系统打开能力的 source-free 模式直接显示导出绝对路径而不弹出必定失败的“打开文件”询问；原正式 Desktop 路径不变。复用现有开源 AdmZip、原数据库/Reader 与 Web，不另做 ZIP 生成器。
+- 本次只补一条真实本地图片经 HTTP 到 ZIP/CBZ 字节验证，完整 CI/核心无来源闭包须按精确 HEAD 通过。大型导出时事件循环同步处理的性能仍为 OPEN，不能冒充完全异步；G1–G4、真用户迁移和真实来源独立安装仍未完成。Draft 未发布。
+
+
 ### 2026-10-31 S3 CORE-ANDROID-18｜无源 Android 共用原正式 CBZ 导出
 
 - **功能薄片而非新备份产品**：把正式 App 原 `LocalComicExports` 适配器移动到 `:local-storage`，由原 app 与 source-free `:local-app` 共用；底层只使用原 `LocalComicExporter`、现有 `LocalComicStore`、Android SAF，不改变标准 CBZ/ZIP 页面文件、不写新 schema、不复制第三方来源代码。

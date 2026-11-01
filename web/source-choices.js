@@ -318,9 +318,9 @@ async function signedOperate(input) {
         document.dispatchEvent(new Event('pica-signed-reading-scope-changed'))
     } catch (error) {
         $('signed-source-status').textContent = t(
-            '操作未完成。请重新查看已安装来源。',
-            'Action not completed. Refresh installed sources.',
-            '操作は完了していません。ソース一覧を再読込してください。'
+            '未能确认操作结果。请重新读取状态后再操作。',
+            'Could not verify the result. Refresh status before trying again.',
+            '操作結果を確認できません。再操作する前に状態を読み直してください。'
         ) + ' ' + error.message
     } finally {
         signedBusy = false

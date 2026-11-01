@@ -1,6 +1,8 @@
 # Pica Library Development Task Log
 
 ### 2026-11-01｜S3 SIGNED-SRC-08：可信签名来源接入原 Desktop 来源管理界面（隔离 Draft）
+- **实际交互衔接补齐**：签名来源管理明确启用/连接/停用时，原统一阅读历史 `reading-library.js` 现复用既有 `scopeChanged` 逻辑，收到 `pica-signed-reading-scope-changed` 后刷新当前可见阅读路线，避免旧连接被撤销仍显示可阅读或已连接却没有同步原记录；此事件不会启动来源或全量重算。即使命令可能已生效、只是后续库存刷新失败，UI 改为“无法确认，请刷新状态”，不虚报操作未发生。
+
 
 - **实际使用缺口**：上一阶段签名来源 `SignedWorkerStore` 具备安装、启用、回滚、停用、卸载，但原 Web 设置页没有查看已安装组件和操作入口；只靠 QA 手写 HTTP 命令无法算用户可用。复用原 `web/index.html` 的「外部漫画来源」区域、`source-choices.js` 的三语言/状态交互、原受控 `/api/v1/desktop/signed-reader`，不建立新应用、插件市场、压缩/阅读器或 source SDK。
 - `SignedWorkerStore.installedSources` 只读列举原应用已安装且签名/哈希验证的版本目录，不运行 worker、不扫描互联网、不下载；原 `SignedSourceDesktopReader` 增 `inventory` 命令，包含版本、激活与运行状态；客户端通过已存在的 `activate/rollback/disable/connect/disconnect/uninstall` 控制。卸载按钮仅允许非当前启用版本且需要用户在系统对话框确认，不传脚本、安装路径、公钥、账户或内容到 HTTP。

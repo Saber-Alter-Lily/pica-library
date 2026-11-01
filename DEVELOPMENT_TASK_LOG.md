@@ -1,6 +1,9 @@
 # Pica Library Development Task Log
 
 ### 2026-11-01｜S3 SIGNED-SRC-08：可信签名来源接入原 Desktop 来源管理界面（隔离 Draft）
+
+- **第二轮独立源无关回归失败**：`446ef216` [CI #41323223846](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41323223846) 与新增浏览器用例提交 `f190f2a5` [CI #41323475391](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41323475391) Web/Desktop 实测都在旧 `reading-library-shell.test.ts` 的受控 VM 环境中失败：传入简化的 `document` 对象，但没有 `getElementById`（TypeError）；366/367 测试文件 PASS，故此处不是签名来源/服务错误。精确只补 `typeof document.getElementById === 'function'` 后再处理可选管理面板，其他启动/书库 API 不改，不替换或跳过现有测试。
+
 - 真实入口验收限于**一个已有 Playwright Browser Smoke 案例**：普通源设置页下签名面板默认隐藏；配置端注入可信控制器后，模拟原签名 HTTP 命令的返回，在 390px 英文原设置页实际点击展开→已验证来源列表→启用→连接→停用→确认卸载，确保页面无 JS error、无横向溢出，且展开之前没有任何 `signed-reader` 调用。继续通过原 `scripts/run-web-browser-smoke.sh` 运行，不建立新的浏览器测试框架；该案例仍属于模拟 HTTP，不替代真实签名二进制/物理 Windows 安装及真机 G1/G2。
 
 

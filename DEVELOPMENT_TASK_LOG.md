@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+### 2026-10-31｜S3 CORE-DESKTOP-19：无源 Windows 阅读器接通原 ZIP/CBZ 导出按钮
+
+- **实际功能缺口**：Source-free Windows 的完整正式 Web UI 已展示 Reader “导出 ZIP/CBZ”按钮，而 source-free HTTP 仅处理 Reader 查询/阅读进度，点按钮返回 405。复用原正式 `ReaderService.exportZip/exportCbz`、现有 `AdmZip` 和应用私有 `exports/archives`，只在独立 Full-Web Local Core 显式 POST 时开放相同的原接口；零来源本地书库不带 Pica/E-H/JM、Host 或源 SDK。
+- 原 `qa-http.ts` 保留 cookie、loopback、Origin、CSRF 与 4096B JSON 界限；仅接受已知 `local:<sha>` 漫画与对应 `local:<sha>:chapter:<sha>`，不接收客户端传来的文件路径或远程 ID。旧正式 Desktop 的已有路由、Writer/Reader 模块及格式不变，无新压缩器/运行框架。
+- Full-Web Core 的保存成功状态显示真实目录路径，不再询问“用默认程序打开”这种当前 source-free OS opener 根本不支持的动作；正式 Desktop 保持原按钮行为。导出仅漫画页不是私人书架/历史/账号备份。
+- 仅在已有 Full-Web HTTP 集成测试内追加一次源无关 CBZ/ZIP 出口、真实 1 页字节、登录/CSRF 与非 LOCAL ID 拒绝回归。不声称大章节同步 ZIP 打包不会阻塞，性能/取消用户验收继续 OPEN；当前代码只在隔离 Draft，无 main/Release/OTA/正式用户 Profile 或真实账号接触。
+
+
 ### 2026-10-31｜S3 CORE-ANDROID-18：无源 Android 本地书库共享正式版 CBZ 导出
 - **第三次精确模拟器失败记录（不隐去）**：`d42a0f0` 的 [完整 CI #41222583049](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222583049) SUCCESS；但 [真实 Android35 #41222583055](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222583055) FAIL。系统已实际列出 `Comic-S3-QA-Comic.cbz`（1.04 kB）；原有 `locate_document` 宽松模糊匹配先选中 `Preview the file Comic-S3-QA-Comic.cbz` 内容描述，点的是系统预览图标，不是精确文件行；故导入确认页从未出现。当前只改这**一个测试选取动作**为对真实文件文本 `exact=True`，继续要求重新导入后四张原图按字节一致。没有改文件数据、安全规则、模拟器工作流框架或产品端实现。
 

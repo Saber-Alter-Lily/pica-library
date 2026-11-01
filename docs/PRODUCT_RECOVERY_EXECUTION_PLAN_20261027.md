@@ -1,5 +1,12 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-10-31 S3 CORE-DESKTOP-19｜原 Windows Reader 导出功能在无源本地模式可用
+
+- 在原正式 Web 保留的“导出 ZIP/CBZ”按钮之后复用正式 `ReaderService.exportZip/exportCbz`，补通独立 Full-Web Core 的同名 POST；受 cookie + 同源/CSRF 保护且只接受纯 LOCAL 身份和配套章节。文件仅写入已标记的独立 local profile 内 `exports/archives`，不允许 HTTP 指定任意路径。
+- 未配置可信外部系统打开能力的 source-free 模式直接显示导出绝对路径而不弹出必定失败的“打开文件”询问；原正式 Desktop 路径不变。复用现有开源 AdmZip、原数据库/Reader 与 Web，不另做 ZIP 生成器。
+- 本次只补一条真实本地图片经 HTTP 到 ZIP/CBZ 字节验证，完整 CI/核心无来源闭包须按精确 HEAD 通过。大型导出时事件循环同步处理的性能仍为 OPEN，不能冒充完全异步；G1–G4、真用户迁移和真实来源独立安装仍未完成。Draft 未发布。
+
+
 ### 2026-10-31 S3 CORE-ANDROID-18｜无源 Android 共用原正式 CBZ 导出
 
 - **功能薄片而非新备份产品**：把正式 App 原 `LocalComicExports` 适配器移动到 `:local-storage`，由原 app 与 source-free `:local-app` 共用；底层只使用原 `LocalComicExporter`、现有 `LocalComicStore`、Android SAF，不改变标准 CBZ/ZIP 页面文件、不写新 schema、不复制第三方来源代码。

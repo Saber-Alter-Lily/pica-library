@@ -3371,18 +3371,21 @@ async function exportReaderArchive(format) {
             episodeId: state.reader.episodeId
         })
         const name = value.path.split(/[\\/]/).pop()
+        const coreOnly = desktop?.coreOnly === true
         $('#reader-message').textContent = t('reader.exported', {
             name,
             pages: value.pages,
             bytes: formatBytes(value.bytes)
-        })
-        if (
+        }) + (coreOnly ? ' · ' + value.path : '')
+        // The isolated local-only runtime has no OS-shell opener.
+        // Show the exact saved path instead of offering a nonfunctional action.
+        if (!coreOnly && (
             await askConfirm(
                 t('reader.openExport', {
                     format: format.toUpperCase()
                 })
             )
-        )
+        ))
             await post('/api/v1/reader/open-default', { path: value.path })
     } catch (error) {
         $('#reader-message').textContent = localizeError(language, error)

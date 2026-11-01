@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import AdmZip from 'adm-zip'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LocalLibraryIngestion } from '../../src/local-library/ingestion'
@@ -189,4 +190,48 @@ describe('real original full Web HTML behind source-free, cookie-protected local
             webRoot: web
         })).rejects.toThrow(/SHA mismatch|changed after staging/)
     })
+    it('exports actual local pages through original Reader in the source-free full Web', async () => {
+        const { db, root, web, comic } = await fixture()
+        const reader = new ReaderService(db, root)
+        const chapter = reader.chapters(comic.comicId)[0]
+        expect(chapter.id).toMatch(/^local:[0-9a-f]{64}:chapter:[0-9a-f]{64}$/)
+        const http = await startOfflineCoreHttp({ database: db, reader, webRoot: web })
+        cleanup.push(() => http.close())
+        const home = new URL(http.url).origin
+        const opened = await fetch(http.url, { redirect: 'manual' })
+        const cookie = opened.headers.get('set-cookie')!.split(';')[0]
+        const html = await (await fetch(home + '/', { headers: { cookie } })).text()
+        const csrf = /name="pica-core-qa-csrf" content="([a-f0-9]{64})"/.exec(html)![1]
+        const post = (route: string, body: unknown, token = csrf) =>
+            fetch(home + route, {
+                method: 'POST',
+                headers: { cookie, origin: home,
+                    'content-type': 'application/json', 'x-pica-csrf': token },
+                body: JSON.stringify(body)
+            })
+        const selection = { comicId: comic.comicId, episodeId: chapter.id }
+        expect((await post('/api/v1/reader/export-cbz', selection, 'bad')).status)
+            .toBe(403)
+        expect((await post('/api/v1/reader/export-cbz', {
+            ...selection, episodeId: 'pica:foreign'
+        })).status).toBe(400)
+        const response = await post('/api/v1/reader/export-cbz', selection)
+        expect(response.status).toBe(200)
+        const result = await response.json()
+        expect(result).toMatchObject({ format: 'cbz', pages: 1 })
+        expect(path.dirname(result.path)).toBe(path.join(root, 'exports', 'archives'))
+        const archive = new AdmZip(result.path)
+        expect(archive.getEntries().map((row: {entryName: string}) => row.entryName))
+            .toEqual(['001.png'])
+        expect(archive.getEntry('001.png')?.getData()).toEqual(png)
+        const zip = await post('/api/v1/reader/export-zip', selection)
+        expect(zip.status).toBe(200)
+        expect((await zip.json()).format).toBe('zip')
+        expect((await post('/api/v1/reader/open-default', {
+            path: result.path
+        })).status).toBe(405)
+        expect((await fetch(home + '/api/v1/reader/export-cbz', {
+            headers: { cookie }
+        })).status).toBe(404)
+    }, 60_000)
 })

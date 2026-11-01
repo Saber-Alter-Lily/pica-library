@@ -283,6 +283,12 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         const localImportRoute = fullWeb && options.coreRuntime && options.localPicker
             ? coreLocalImportMatch(request.method ?? '', url.pathname)
             : null
+        // Original Reader export, not another archive implementation. Only
+        // source-free full Web's explicit user action may invoke it.
+        const localExportFormat = fullWeb && request.method === 'POST'
+            ? url.pathname === '/api/v1/reader/export-cbz' ? 'cbz'
+                : url.pathname === '/api/v1/reader/export-zip' ? 'zip' : null
+            : null
         if (request.method === 'GET') {
             if (fullWeb && url.pathname === '/') {
                 const original = fullWeb.get('index.html')!.data.toString('utf8')
@@ -392,7 +398,8 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             }
             return json(response, 404, { error: 'No source routes in offline QA' })
         }
-        if (!shelfRoute && !localImportRoute && (request.method !== 'POST' ||
+        if (!shelfRoute && !localImportRoute && !localExportFormat &&
+            (request.method !== 'POST' ||
             !['/api/v1/reader/progress', '/api/v1/library/query']
                 .includes(url.pathname)))
             return json(response, 405, { error: 'Unsupported QA operation' })
@@ -407,6 +414,20 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             !secureEqual(csrfHeader, csrf))
             return json(response, 403, { error: 'QA CSRF rejected' })
         try {
+            if (localExportFormat) {
+                const input = await readJsonObject(request)
+                if (Object.keys(input).sort().join(',') !== 'comicId,episodeId' ||
+                    typeof input.comicId !== 'string' ||
+                    !LOCAL_ID.test(input.comicId) ||
+                    typeof input.episodeId !== 'string' ||
+                    !CHAPTER_ID.test(input.episodeId) ||
+                    !input.episodeId.startsWith(input.comicId + ':chapter:'))
+                    throw new Error('Invalid source-free Reader export')
+                const value = localExportFormat === 'cbz'
+                    ? options.reader.exportCbz(input.comicId, input.episodeId)
+                    : options.reader.exportZip(input.comicId, input.episodeId)
+                return json(response, 200, value)
+            }
             if (localImportRoute && options.coreRuntime) {
                 const input = await readJsonObject(request)
                 const reply = await options.coreRuntime.localImport.http(

@@ -95,6 +95,7 @@ describe('S3 signed source generations: real worker lifecycle', () => {
 
     it('stages verified payload without activation and refuses replacing generations', () => {
         const f = fixture()
+        expect(f.store.installedSources()).toEqual([])
         const release = f.signed('1.0.0')
         expect(f.store.install(release, workerBytes)).toEqual({
             sourceId: 'demo', version: '1.0.0', installed: true
@@ -102,6 +103,10 @@ describe('S3 signed source generations: real worker lifecycle', () => {
         expect(f.store.state('demo')).toEqual({
             schemaVersion: 1, revision: 0, activeVersion: null
         })
+        expect(f.store.installedSources()).toEqual([{
+            sourceId: 'demo', schemaVersion: 1, revision: 0,
+            activeVersion: null, versions: ['1.0.0']
+        }])
         expect(f.store.install(release, workerBytes).installed).toBe(false)
         const installed = f.store.readInstalled('demo', '1.0.0')
         expect(installed.release.sha256).toBe(release.sha256)

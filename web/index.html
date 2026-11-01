@@ -923,6 +923,13 @@
                         <button id="source-choices-refresh" type="button">读取当前选择</button>
                         <p id="source-choices-state" role="status" aria-live="polite"></p>
                     </form>
+                    <details id="signed-source-manager" hidden>
+                        <summary id="signed-source-summary">已验证的独立来源组件（实验）</summary>
+                        <p id="signed-source-help">这里只管理应用已经预置并验证签名的组件，不提供来源商店或脚本安装。启用、连接、停用和卸载都需要你主动操作；本地漫画及阅读记录不会随组件卸载删除。</p>
+                        <button id="signed-source-refresh" type="button">查看已安装的签名来源</button>
+                        <p id="signed-source-status" role="status" aria-live="polite"></p>
+                        <div id="signed-source-list" class="list"></div>
+                    </details>
                     <details id="saved-host-panel">
                         <summary id="saved-host-summary">我的外部宿主配置（实验）</summary>
                         <p id="saved-host-boundary">这是本地阅读器，不经营漫画内容平台。外部宿主由你自行选择和管理；本软件不会提供默认内容目录、源仓库或托管服务。此配置目前只授权检查，尚不能阅读或导入。</p>

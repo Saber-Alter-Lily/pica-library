@@ -132,6 +132,20 @@ export class SignedSourceDesktopReader {
         if (!raw || typeof raw !== 'object' || Array.isArray(raw))
             throw new SignedReaderInputError()
         const op = (raw as Record<string, unknown>).operation
+        if (op === 'inventory') {
+            if (!exact(raw, ['operation']))
+                throw new SignedReaderInputError()
+            return {
+                schemaVersion: 1,
+                installAvailable: false,
+                sources: this.store.installedSources().map(source => ({
+                    ...source,
+                    connected: this.connectedSource(
+                        source.sourceId, source.revision
+                    )
+                }))
+            }
+        }
         if (op === 'status') {
             if (!exact(raw, ['operation', 'sourceId']))
                 throw new SignedReaderInputError()

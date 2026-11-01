@@ -1,5 +1,25 @@
 # Pica Library Development Task Log
 
+### 2026-11-01｜S3 SIGNED-SRC-08：可信签名来源接入原 Desktop 来源管理界面（隔离 Draft）
+
+- **第二轮独立源无关回归失败**：`446ef216` [CI #41323223846](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41323223846) 与新增浏览器用例提交 `f190f2a5` [CI #41323475391](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41323475391) Web/Desktop 实测都在旧 `reading-library-shell.test.ts` 的受控 VM 环境中失败：传入简化的 `document` 对象，但没有 `getElementById`（TypeError）；366/367 测试文件 PASS，故此处不是签名来源/服务错误。精确只补 `typeof document.getElementById === 'function'` 后再处理可选管理面板，其他启动/书库 API 不改，不替换或跳过现有测试。
+
+- 真实入口验收限于**一个已有 Playwright Browser Smoke 案例**：普通源设置页下签名面板默认隐藏；配置端注入可信控制器后，模拟原签名 HTTP 命令的返回，在 390px 英文原设置页实际点击展开→已验证来源列表→启用→连接→停用→确认卸载，确保页面无 JS error、无横向溢出，且展开之前没有任何 `signed-reader` 调用。继续通过原 `scripts/run-web-browser-smoke.sh` 运行，不建立新的浏览器测试框架；该案例仍属于模拟 HTTP，不替代真实签名二进制/物理 Windows 安装及真机 G1/G2。
+
+
+- **保留首轮失败并精准修复**：`32342add` [完整 CI #41322889664](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41322889664) 的 Web/Desktop 测试 366/367 文件通过、单个 `test/unit/web-source-free-bootstrap.test.ts` 失败：不带 DOM 的实际 `loadDesktop()` 初始化路径捕获了原 Desktop status 404，而新 UI 在 catch 使用 `# Pica Library Development Task Log
+
+ 导致 `ReferenceError: $ is not defined`；这是抽取函数的旧测试中真实发现的无源启动兼容倒退。只把该 catch 分支改为 DOM 存在时关闭签名面板，完全保留旧无源 capabilities fallback、Reader 和来源权限。未新增测试框架或放宽测试断言；以精确新提交重新验收。
+
+- **实际交互衔接补齐**：签名来源管理明确启用/连接/停用时，原统一阅读历史 `reading-library.js` 现复用既有 `scopeChanged` 逻辑，收到 `pica-signed-reading-scope-changed` 后刷新当前可见阅读路线，避免旧连接被撤销仍显示可阅读或已连接却没有同步原记录；此事件不会启动来源或全量重算。即使命令可能已生效、只是后续库存刷新失败，UI 改为“无法确认，请刷新状态”，不虚报操作未发生。
+
+
+- **实际使用缺口**：上一阶段签名来源 `SignedWorkerStore` 具备安装、启用、回滚、停用、卸载，但原 Web 设置页没有查看已安装组件和操作入口；只靠 QA 手写 HTTP 命令无法算用户可用。复用原 `web/index.html` 的「外部漫画来源」区域、`source-choices.js` 的三语言/状态交互、原受控 `/api/v1/desktop/signed-reader`，不建立新应用、插件市场、压缩/阅读器或 source SDK。
+- `SignedWorkerStore.installedSources` 只读列举原应用已安装且签名/哈希验证的版本目录，不运行 worker、不扫描互联网、不下载；原 `SignedSourceDesktopReader` 增 `inventory` 命令，包含版本、激活与运行状态；客户端通过已存在的 `activate/rollback/disable/connect/disconnect/uninstall` 控制。卸载按钮仅允许非当前启用版本且需要用户在系统对话框确认，不传脚本、安装路径、公钥、账户或内容到 HTTP。
+- **明确能力暴露**：只有 Desktop Composition 真实注入 `signedSourceReader` 时 `/api/v1/desktop/status` 才返回 `signedSourceManagement.available=true`，原 `web/app.js` 才展示高级折叠面板；普通正式程序没有注入该控制器，因此默认完全隐藏，不能仅凭来源 manifest 开启。打开设置和仅加载页面不发起来源进程/网络请求。原 Core-only Web QA 继续裁剪 `source-choices.js`，避免纯核心被拉入来源管理依赖。
+- 原签名生命周期单元测试加空库存及真实已安装签名版本映射；原 Desktop HTTP 集成测试验证已注入权限状态与零请求库存结果。尚待同一精确 HEAD 的完整 CI、实际 Chromium UI 与 Windows 可信发布根物理操作。**不宣称正式版已支持用户自行安装插件或真实来源帐号；G2、Android Service/Binder、正式签名、旧资料迁移和 G1–G4 继续 OPEN。** 保持 Draft，不合并 main/发布/OTA/真实用户资料。
+
+
 ### 2026-10-31｜S3 SIGNED-SRC-07：已签名漫画源版本的真实列举与显式卸载（隔离 Draft）
 - 首轮精确 `d04e62b` 的 [CI #41281284735](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41281284735) Web/Desktop 作业 **FAIL** 于 TypeScript 语法解析：新增 HTTP 集成测试中 `expect((await removed.json()).toMatchObject(...)` 少一个右括号（TS1005 两处），还未运行至功能回归。只修正为 `expect(await removed.json()).toMatchObject(...)`，且测试自己经原真实章节/进度 POST 写入一条记录后再检验卸载保留，而不是依赖前一测试的持久化结果；不修改生产签名卸载逻辑或门禁。
 

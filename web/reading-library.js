@@ -83,6 +83,14 @@ export function installReadingLibrary({ target, canQuery, isVisible, query, host
     function clearRecords() { list.replaceChildren(); source.replaceChildren(); count.textContent = ''; total = offset = 0; previous.disabled = next.disabled = true }
     const scopeChanged = () => { ownership++; invalidate(); clearRecords(); if (ready()) void load() }
     const pagehide = () => { ownership++; invalidate(); clearRecords() }
-    document.addEventListener('pica-hosted-reading-scope-changed', scopeChanged); window.addEventListener('pagehide', pagehide)
-    return { refresh: load, dispose() { disposed = true; ownership++; invalidate(); document.removeEventListener('pica-hosted-reading-scope-changed', scopeChanged); window.removeEventListener('pagehide', pagehide); target.replaceChildren() } }
+    document.addEventListener('pica-hosted-reading-scope-changed', scopeChanged)
+    document.addEventListener('pica-signed-reading-scope-changed', scopeChanged)
+    window.addEventListener('pagehide', pagehide)
+    return { refresh: load, dispose() {
+        disposed = true; ownership++; invalidate()
+        document.removeEventListener('pica-hosted-reading-scope-changed', scopeChanged)
+        document.removeEventListener('pica-signed-reading-scope-changed', scopeChanged)
+        window.removeEventListener('pagehide', pagehide)
+        target.replaceChildren()
+    } }
 }

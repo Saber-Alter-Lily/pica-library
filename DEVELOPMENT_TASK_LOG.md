@@ -1,6 +1,8 @@
 # Pica Library Development Task Log
 
 ### 2026-11-01｜S3 SIGNED-SRC-08：可信签名来源接入原 Desktop 来源管理界面（隔离 Draft）
+- 真实入口验收限于**一个已有 Playwright Browser Smoke 案例**：普通源设置页下签名面板默认隐藏；配置端注入可信控制器后，模拟原签名 HTTP 命令的返回，在 390px 英文原设置页实际点击展开→已验证来源列表→启用→连接→停用→确认卸载，确保页面无 JS error、无横向溢出，且展开之前没有任何 `signed-reader` 调用。继续通过原 `scripts/run-web-browser-smoke.sh` 运行，不建立新的浏览器测试框架；该案例仍属于模拟 HTTP，不替代真实签名二进制/物理 Windows 安装及真机 G1/G2。
+
 
 - **保留首轮失败并精准修复**：`32342add` [完整 CI #41322889664](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41322889664) 的 Web/Desktop 测试 366/367 文件通过、单个 `test/unit/web-source-free-bootstrap.test.ts` 失败：不带 DOM 的实际 `loadDesktop()` 初始化路径捕获了原 Desktop status 404，而新 UI 在 catch 使用 `# Pica Library Development Task Log
 

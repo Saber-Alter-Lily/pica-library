@@ -112,7 +112,8 @@ async function startServerThroughPortableLauncher(
 }
 
 async function verifyOriginalNativeLauncherCorePreview(
-    folder: string, root: string, expectedComicId: string
+    folder: string, root: string, expectedComicId: string,
+    userHostQa = false
 ) {
     const launcher = path.join(folder, 'Pica-Library-Core-Preview.exe')
     const infoFile = path.join(root, 'runtime-state',
@@ -123,7 +124,7 @@ async function verifyOriginalNativeLauncherCorePreview(
         // The default legacy desktop.js is intentionally ABSENT from this ZIP.
         // Only the explicit preview flag may select the SDK-free executable.
         const start = spawnSync(launcher, [
-            '--source-free-preview',
+            userHostQa ? '--source-free-host-preview' : '--source-free-preview',
             '--owned-temp-root', root, '--explicit-preview-only'
         ], {
             // The GUI Launcher starts Node and exits immediately. If capture
@@ -171,8 +172,20 @@ async function verifyOriginalNativeLauncherCorePreview(
         const books = await (await get('/api/v1/comics?limit=5000')).json() as any[]
         if (books.length !== 1 || books[0].comicId !== expectedComicId)
             throw new Error('Native core-only process lost its local SQLite data')
-        if ((await get('/source-hosts.js')).status !== 404)
-            throw new Error('Native source-free process exposed a source runtime')
+        if ((await get('/source-hosts.js')).status !==
+                (userHostQa ? 200 : 404))
+            throw new Error('Host Web entry does not match runtime selection')
+        if (userHostQa) {
+            const status = await (await get('/api/v1/desktop/status')).json() as any
+            if (!status.coreOnly || !status.hostedLibraryReader?.available ||
+                !status.hostedSourceBrowser?.available ||
+                status.externalSources?.enabled?.length !== 0 ||
+                status.picaAccount?.enabled || status.ehAccount?.enabled)
+                throw new Error('Optional Host runtime status lost its source boundary')
+            if ((await get('/eh-account.js')).status !== 404 ||
+                (await get('/jm-account.js')).status !== 404)
+                throw new Error('Optional Host mode exposed site provider scripts')
+        }
         return true
     } finally {
         // Windows may force-terminate Node without dispatching SIGTERM. The
@@ -240,7 +253,9 @@ async function forgedHost(host: string, port: number, cookie: string) {
 }
 
 export async function verifyWindowsOfflinePortableQa(zipFile: string,
-    expectedSourceSha: string, fullWebQa = false) {
+    expectedSourceSha: string, fullWebQa = false, userHostQa = false) {
+    if (userHostQa && !fullWebQa)
+        throw new Error('Optional Host requires the original full Web')
     if (process.platform !== 'win32' || process.arch !== 'x64')
         throw new Error('This executable ZIP test requires Windows x64')
     if (!/^[0-9a-f]{40}$/.test(expectedSourceSha))
@@ -260,9 +275,11 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         throw new Error('Untrusted QA ZIP inventory')
     const manifest = readJson(contents.get('BUILD-MANIFEST.json')!)
     if (manifest.schemaVersion !== 1 ||
-        manifest.label !== (fullWebQa
-            ? 'UNSIGNED_S3_WINDOWS_X64_FULL_WEB_QA_ONLY'
-            : 'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY') ||
+        manifest.label !== (userHostQa
+            ? 'UNSIGNED_S3_WINDOWS_X64_USER_HOST_QA_ONLY'
+            : fullWebQa
+                ? 'UNSIGNED_S3_WINDOWS_X64_FULL_WEB_QA_ONLY'
+                : 'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY') ||
         manifest.sourceSha !== expectedSourceSha ||
         manifest.runtimeVersion !== '24.15.0' ||
         manifest.sourceCount !== 0 ||
@@ -291,10 +308,13 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         throw new Error('Unaccounted executable bytes in QA ZIP')
     for (const forbidden of [
         'app/desktop.js', 'app/pica-library.js', 'web/index.html',
-        'app/web/eh-account.js', 'app/web/source-hosts.js',
+        'app/web/eh-account.js',
         'app/web/source-choices.js',
         'app/web/jm-account.js', 'app/web/recommendation-v5.js',
         'runtime/jm/bin/java.exe', '.env.local', 'library.db',
+        ...(userHostQa ? [] : ['app/web/source-hosts.js',
+            'app/desktop-core-host-preview.mjs',
+            'Start-User-Host-Draft.cmd', 'README-USER-HOST-DRAFT.txt']),
         ...(fullWebQa ? ['app/web/offline-core-reader-qa.js'] :
             ['app/web/app.js'])
     ]) if (contents.has(forbidden))
@@ -308,7 +328,13 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             ? ['app/web/index.html', 'app/web/app.js',
                 'app/web/full-web-qa-manifest.json', 'app/web/alpha7-cloud.js',
                 'app/desktop-core-preview.mjs', 'Pica-Library-Core-Preview.exe',
-                'Start-Local-Only-Draft.cmd', 'README-LOCAL-ONLY-DRAFT.txt']
+                'Start-Local-Only-Draft.cmd', 'README-LOCAL-ONLY-DRAFT.txt',
+                ...(userHostQa ? [
+                    'app/web/source-hosts.js', 'app/web/saved-source-hosts.js',
+                    'app/web/host-library.js',
+                    'app/desktop-core-host-preview.mjs',
+                    'Start-User-Host-Draft.cmd', 'README-USER-HOST-DRAFT.txt'
+                ] : [])]
             : ['app/web/reader-fragment.html',
                 'app/web/offline-core-reader-qa.js'])
     ]) if (!contents.has(required))
@@ -456,7 +482,8 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             fullWebQa ? 'loadDesktop' : 'createReaderViewportTracker'))
             throw new Error('Portable original Web/Reader browser asset unavailable')
         if ((await get(fullWebQa
-                ? '/source-hosts.js' : '/app.js')).status !== 404 ||
+                ? '/source-hosts.js' : '/app.js')).status !==
+                (userHostQa ? 200 : 404) ||
             (await get('/api/v1/online-reader/progress')).status !== 404)
             throw new Error('Portable QA exposed online/source UI modules')
         const chaptersHttp = await get('/api/v1/reader/comics/' +
@@ -557,6 +584,10 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             ? await verifyOriginalNativeLauncherCorePreview(
                 unpacked, root, book.comicId
             ) : false
+        const nativeHostPreview = userHostQa
+            ? await verifyOriginalNativeLauncherCorePreview(
+                unpacked, root, book.comicId, true
+            ) : false
         const persisted = succeeded(runtime, core, 'chapter', root, [
             '--comic-id', book.comicId, '--episode-id', episodeId
         ])
@@ -565,11 +596,14 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         if (!fs.readFileSync(path.join(originals, '01.png')).equals(png))
             throw new Error('Portable QA modified original page input')
         return {
-            status: fullWebQa
-                ? 'WINDOWS_X64_EXTRACTED_FULL_WEB_QA_PASS'
-                : 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS',
+            status: userHostQa
+                ? 'WINDOWS_X64_EXTRACTED_USER_HOST_QA_PASS'
+                : fullWebQa
+                    ? 'WINDOWS_X64_EXTRACTED_FULL_WEB_QA_PASS'
+                    : 'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS',
             verifiedFullWeb: fullWebQa,
             nativeWindowsCorePreview: nativePreview,
+            verifiedUserHostOptIn: nativeHostPreview,
             files: contents.size,
             zipSha256: digest(fs.readFileSync(zipFile)),
             runtimeVersion: manifest.runtimeVersion,
@@ -590,12 +624,15 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
 }
 async function main() {
     const args = process.argv.slice(2)
-    const fullWebQa = args.length === 5 && args[4] === '--full-web'
+    const userHostQa = args.length === 6 && args[4] === '--full-web' &&
+        args[5] === '--user-host'
+    const fullWebQa = userHostQa || args.length === 5 && args[4] === '--full-web'
     if ((!fullWebQa && args.length !== 4) ||
         args[0] !== '--zip' || args[2] !== '--source-sha')
         throw new Error('Expected fixed temporary ZIP and exact source SHA')
     process.stdout.write(JSON.stringify(
-        await verifyWindowsOfflinePortableQa(args[1], args[3], fullWebQa), null, 2
+        await verifyWindowsOfflinePortableQa(
+            args[1], args[3], fullWebQa, userHostQa), null, 2
     ) + '\n')
 }
 if (process.argv[1] &&

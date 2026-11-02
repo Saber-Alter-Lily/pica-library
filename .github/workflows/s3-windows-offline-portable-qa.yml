@@ -64,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flavor: [reader, full-web]
+        flavor: [reader, full-web, user-host]
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
@@ -137,10 +137,11 @@ jobs:
           $build=Join-Path $env:RUNNER_TEMP 'S3_OFFLINE_PORTABLE_BUILD.json'
           $extraArgs=@()
           if ('${{ matrix.flavor }}' -eq 'full-web'){ $extraArgs=@('--full-web') }
+          if ('${{ matrix.flavor }}' -eq 'user-host'){ $extraArgs=@('--full-web','--user-host') }
           & pnpm exec tsx scripts/build-windows-offline-portable-qa.ts --runtime $env:S3_NODE_EXE --runtime-license $env:S3_NODE_LICENSE --archive-sha256 $env:S3_NODE_ARCHIVE_SHA256 --source-sha $env:GITHUB_SHA @extraArgs | Set-Content -LiteralPath $build -Encoding utf8
           if($LASTEXITCODE -ne 0){ throw 'Source-free Windows portable assembly failed' }
           $result=Get-Content -Raw -LiteralPath $build | ConvertFrom-Json
-          $expected=if ('${{ matrix.flavor }}' -eq 'full-web') {'UNSIGNED_S3_WINDOWS_X64_FULL_WEB_QA_ONLY'} else {'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY'}
+          $expected=if ('${{ matrix.flavor }}' -eq 'user-host') {'UNSIGNED_S3_WINDOWS_X64_USER_HOST_QA_ONLY'} elseif ('${{ matrix.flavor }}' -eq 'full-web') {'UNSIGNED_S3_WINDOWS_X64_FULL_WEB_QA_ONLY'} else {'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY'}
           if($result.status -ne $expected -or $result.publishAuthorized -or $result.artifactUploaded){
             throw 'Unexpected Windows source-free QA package state'
           }
@@ -154,11 +155,12 @@ jobs:
           $verification=Join-Path $env:RUNNER_TEMP 'S3_OFFLINE_PORTABLE_VERIFY.json'
           $extraArgs=@()
           if ('${{ matrix.flavor }}' -eq 'full-web'){ $extraArgs=@('--full-web') }
+          if ('${{ matrix.flavor }}' -eq 'user-host'){ $extraArgs=@('--full-web','--user-host') }
           & pnpm exec tsx scripts/verify-windows-offline-portable-qa.ts --zip $env:S3_PORTABLE_ZIP --source-sha $env:GITHUB_SHA @extraArgs | Set-Content -LiteralPath $verification -Encoding utf8
           if($LASTEXITCODE -ne 0){ throw 'Extracted Windows source-free QA ZIP execution failed' }
           $result=Get-Content -Raw -LiteralPath $verification | ConvertFrom-Json
-          $expected=if ('${{ matrix.flavor }}' -eq 'full-web') {'WINDOWS_X64_EXTRACTED_FULL_WEB_QA_PASS'} else {'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS'}
-          if($result.status -ne $expected -or $result.sourceCount -ne 0 -or $result.publishAuthorized -or -not $result.verifiedProgressRestart -or -not $result.verifiedShelfRestart -or ('${{ matrix.flavor }}' -eq 'full-web' -and (-not $result.verifiedFullWeb -or -not $result.nativeWindowsCorePreview))) {
+          $expected=if ('${{ matrix.flavor }}' -eq 'user-host') {'WINDOWS_X64_EXTRACTED_USER_HOST_QA_PASS'} elseif ('${{ matrix.flavor }}' -eq 'full-web') {'WINDOWS_X64_EXTRACTED_FULL_WEB_QA_PASS'} else {'WINDOWS_X64_EXTRACTED_PORTABLE_QA_PASS'}
+          if($result.status -ne $expected -or $result.sourceCount -ne 0 -or $result.publishAuthorized -or -not $result.verifiedProgressRestart -or -not $result.verifiedShelfRestart -or ('${{ matrix.flavor }}' -ne 'reader' -and (-not $result.verifiedFullWeb -or -not $result.nativeWindowsCorePreview)) -or ('${{ matrix.flavor }}' -eq 'user-host' -and -not $result.verifiedUserHostOptIn)) {
             throw 'Source-free portable ZIP acceptance did not pass'
           }
           "S3_PORTABLE_VERIFY_REPORT=$verification" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -182,6 +184,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pica-r1-local-core-windows-x64-${{ github.sha }}
+          path: ${{ env.S3_PORTABLE_ZIP }}
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
+      - name: Keep R2 optional user-owned Host Windows QA candidate
+        if: success() && github.ref == 'refs/heads/codex/product-integration-r1-20261102' && matrix.flavor == 'user-host'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-r2-optional-user-host-windows-x64-${{ github.sha }}
           path: ${{ env.S3_PORTABLE_ZIP }}
           retention-days: 3
           compression-level: 0

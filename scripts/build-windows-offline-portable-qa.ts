@@ -246,7 +246,7 @@ export async function buildWindowsOfflinePortableQa(
     add(NOTICE_PATHS[0], license)
     add(NOTICE_PATHS[1], admZipLicense())
     add('Start-Offline-Reader-QA.cmd', Buffer.from(LAUNCHER))
-    add('README-OFFLINE-QA.txt', Buffer.from(options.fullWebQa
+    add('README-OFFLINE-QA.txt', Buffer.from((options.fullWebQa
         ? README.replace(
             'Pica Library - OFFLINE READER PORTABLE ENGINEERING QA ONLY',
             'Pica Library - ORIGINAL FULL WEB PORTABLE ENGINEERING QA ONLY'
@@ -255,7 +255,7 @@ export async function buildWindowsOfflinePortableQa(
             'This original full Web UI is a disposable, source-free QA fixture only.\r\n' +
             'It does not prove production Windows app UI, source isolation as an OS'
           )
-        : README).toString().replace(
+        : README).replace(
             'No Pica, EH, ExH, JM, online sources, downloader, account, Host or updater.',
             options.userHostQa
                 ? 'No provider SDK, source installer or updater. User-owned Host is optional.'

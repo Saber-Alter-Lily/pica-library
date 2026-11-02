@@ -14,7 +14,7 @@ import java.util.List;
  * Real original Reader UI with original local-import chapter/page and bookmark ports.
  * No provider classes, network, BridgeClient, replacement image renderer or database.
  */
-public final class LocalReaderActivity extends ReaderScreenActivity {
+public class LocalReaderActivity extends ReaderScreenActivity {
     private static final ReaderHistoryPort HISTORY=new ReaderHistoryPort() {
         public Metadata resolve(Context context,ReaderChapterSource source,String comicId){
             return new Metadata(source.displayTitle(comicId),"", "local");

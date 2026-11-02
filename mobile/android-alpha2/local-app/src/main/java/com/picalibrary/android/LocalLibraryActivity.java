@@ -93,7 +93,18 @@ public final class LocalLibraryActivity extends Activity {
         });
         TextView title=label(copy("本地漫画书库","Local library","ローカル書庫"),22);
         root.addView(title);
-        TextView description=label(copy(
+        // The pure-local APK never declares a Host activity. The independently
+        // installable optional-Host APK alone exposes this entry.
+        boolean optionalHost=false;
+        try {
+            getPackageManager().getActivityInfo(new android.content.ComponentName(
+                this,"com.picalibrary.android.HostBrowserActivity"),0);
+            optionalHost=true;
+        } catch(android.content.pm.PackageManager.NameNotFoundException absent){}
+        TextView description=label(optionalHost?copy(
+            "本地漫画离线可读；外部 Host 必须由你选择并授权。",
+            "Local books stay offline; external Host requires your consent.",
+            "ローカル読書はオフライン。外部 Host は許可が必要です。"):copy(
             "仅管理本应用导入的文件；不需要账号或网络。",
             "Only imported files in this app; no account or network.",
             "このアプリに取り込んだファイルのみ。アカウントや通信は不要です。"),12);
@@ -113,6 +124,13 @@ public final class LocalLibraryActivity extends Activity {
         localSections.addView(shelvesButton,new LinearLayout.LayoutParams(0,dp(48),1));
         localSections.addView(historyButton,new LinearLayout.LayoutParams(0,dp(48),1));
         root.addView(localSections);
+        if(optionalHost){
+            Button host=action(copy("连接我的外部 Host","My external Host","外部 Host"));
+            host.setTag("local-host-opt-in");
+            host.setOnClickListener(v->startActivity(new Intent()
+                .setClassName(this,"com.picalibrary.android.HostBrowserActivity")));
+            root.addView(host,new LinearLayout.LayoutParams(-1,dp(48)));
+        }
         historyButton.setOnClickListener(v->startActivity(new Intent(this,LocalHistoryActivity.class)));
         shelvesButton.setOnClickListener(v->startActivity(new Intent(this,LocalShelvesActivity.class)));
         folderButton.setOnClickListener(v->choose(PICK_FOLDER));

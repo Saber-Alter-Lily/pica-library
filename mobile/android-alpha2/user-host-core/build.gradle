@@ -16,4 +16,5 @@ android {
 dependencies {
     // Existing source-neutral Reader models and progress identity.
     implementation project(':local-core')
+    implementation project(':local-storage')
 }

@@ -1,0 +1,28 @@
+plugins { id 'com.android.application' }
+
+// Original local-app Java sources and original :reader-view are shared,
+// not copied. Host transport is from the independently compiled original
+// :user-host-core; there is NO provider-specific SDK dependency.
+android {
+    namespace 'com.picalibrary.android.hostapp'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.picalibrary.android.userhost.qa'
+        minSdk 28
+        targetSdk 35
+        versionCode 1
+        versionName '0.5.0-user-host-qa'
+    }
+    sourceSets.main.java.srcDir '../local-app/src/main/java'
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation project(':local-core')
+    implementation project(':local-storage')
+    implementation project(':reader-view')
+    implementation project(':user-host-core')
+}

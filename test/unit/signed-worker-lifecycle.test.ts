@@ -3,6 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import AdmZip from 'adm-zip'
+import { LocalSignedSourceInstaller } from '../../src/source-extensions/local-signed-package'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OnlineReaderService } from '../../src/services/online-reader-service'
 import { bindExternalReader } from '../../src/source-extensions/desktop-reader-adapter'
@@ -116,6 +118,47 @@ describe('S3 signed source generations: real worker lifecycle', () => {
         const inventory = fs.readdirSync(installed.folder).sort()
         expect(inventory).toEqual(['release.json', 'worker.cjs'])
         awaitNoWorkerRequired(f)
+    })
+
+
+    it('accepts only a user-selected Ed25519-signed ZIP; never starts its source', async () => {
+        const f = fixture()
+        const location = path.join(f.folder, 'selected-source.zip')
+        const pack = (release: unknown, extra = false) => {
+            const archive = new AdmZip()
+            archive.addFile('release.json', Buffer.from(JSON.stringify(release)))
+            archive.addFile('worker.cjs', workerBytes)
+            if (extra) archive.addFile('../untrusted.cjs', Buffer.from('bad'))
+            fs.writeFileSync(location, archive.toBuffer())
+        }
+        let chosen: string | null = null
+        const installer = new LocalSignedSourceInstaller(f.store, async () => chosen)
+        expect(await installer.installChosen()).toEqual({ cancelled: true })
+        expect(fs.existsSync(f.root)).toBe(false)
+        const good = f.signed('1.2.0')
+        chosen = location
+        pack(good, true)
+        await expect(installer.installChosen()).rejects.toThrow('must contain')
+        expect(fs.existsSync(f.root)).toBe(false)
+        const other = generateKeyPairSync('ed25519')
+        pack({ ...good, signature: sign(
+            null, sourceWorkerSignaturePayload(good),
+            other.privateKey
+        ).toString('base64') })
+        await expect(installer.installChosen()).rejects.toThrow('publisher verification')
+        expect(fs.existsSync(f.root)).toBe(false)
+        pack(good)
+        expect(await installer.installChosen()).toEqual({
+            sourceId: 'demo', version: '1.2.0', installed: true
+        })
+        expect(f.store.installedVersions('demo')).toEqual(['1.2.0'])
+        expect(f.store.state('demo')).toMatchObject({
+            revision: 0, activeVersion: null
+        })
+        await expect(f.store.openActive('demo')).rejects.toThrow('not enabled')
+        expect(await installer.installChosen()).toMatchObject({
+            sourceId: 'demo', version: '1.2.0', installed: false
+        })
     })
 
     it('activates explicitly and runs the signed worker in the unchanged Reader', async () => {

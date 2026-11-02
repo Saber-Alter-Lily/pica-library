@@ -55,6 +55,23 @@ describe('Desktop native picker P4B-2', () => {
             expect(invocation).toMatch(platform==='win32'?/OpenFileDialog/:platform==='darwin'?/choose file/:/--file-selection/)
         }
     })
+
+    it('opens the existing native OpenFileDialog for signed ZIP selection, never a save dialog', async () => {
+        for (const platform of ['win32', 'darwin', 'linux'] as const) {
+            const calls: string[] = []
+            const chosen = platform === 'win32' ? 'C:\\qa\\signed.zip' : '/qa/signed.zip'
+            const picker = new DesktopNativePicker(
+                platform, ((command: string, args: string[]) => {
+                    calls.push([command, ...args].join(' '))
+                    return childResult({ stdout: chosen })
+                }) as never, (() => syncResult(0)) as never
+            )
+            expect(await picker.chooseSignedSourceArchive()).toBe(chosen)
+            expect(calls[0]).not.toMatch(/SaveFileDialog|--save|--getsavefilename/)
+            expect(calls[0]).toMatch(/zip/i)
+        }
+    })
+
     it('detects Windows/macOS and Linux picker backends without claiming a missing Linux backend', () => {
         expect(desktopPickerStatus('win32')).toEqual({
             backend: 'windows-winforms',

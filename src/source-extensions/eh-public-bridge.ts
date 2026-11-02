@@ -4,7 +4,8 @@ import type { SignedReaderIdentityBridge } from '../desktop/signed-source-reader
 import {
     EH_PUBLIC_WORKER_ID,
     ownsLegacyEhId,
-    toEhPublicWorkerId
+    toEhPublicWorkerId,
+    fromEhPublicWorkerId
 } from './eh-public-identity'
 
 /**

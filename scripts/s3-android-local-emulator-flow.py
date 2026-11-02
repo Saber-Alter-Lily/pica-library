@@ -535,7 +535,14 @@ def original_app_flow():
     adb("shell", "am", "force-stop", PACKAGE)
     adb("shell", "am", "start", "-W", "-n",
         PACKAGE + "/com.picalibrary.android.DisclaimerActivity", timeout=45)
-    # Consent was accepted in this disposable emulator: no forced new login.
+    # Consent is persisted, but "Later" on the original first-use tour is
+    # deliberately session-only. After force-stop, close that real dialog
+    # rather than hiding it with test data edits or pretending it did not recur.
+    tour = wait(("稍后再看", "Later", "後で"), seconds=10,
+                required=False, only_class="Button")
+    if tour:
+        adb("shell", "input", "tap", str(tour[0]), str(tour[1]))
+        print("UI tap: original onboarding Later after force stop", flush=True)
     tap(("Continue local reading", "继续本地阅读", "ローカル読書を再開"),
         seconds=50, only_class="Button")
     dismiss_immersive_help()

@@ -119,6 +119,12 @@ async function verifyOriginalNativeLauncherCorePreview(
     const infoFile = path.join(root, 'runtime-state',
         'core-preview-instance.json')
     let ownedPid: number | undefined
+    // The prior original native preview is force-stopped on this same disposable
+    // fixture. Windows may retain its instance.json until the next owner
+    // recovers that lock; never mistake the stale URL for a newly started Host.
+    const oldInstance = fs.existsSync(infoFile)
+        ? readJson(fs.readFileSync(infoFile)) : null
+    const launchedAfter = Date.now() - 1500
     try {
         // A real native Windows launcher, not a test-created JS subprocess.
         // The default legacy desktop.js is intentionally ABSENT from this ZIP.
@@ -143,7 +149,14 @@ async function verifyOriginalNativeLauncherCorePreview(
                 const info = readJson(fs.readFileSync(infoFile))
                 if (Number.isSafeInteger(info.pid) && info.pid > 0 &&
                     typeof info.url === 'string' &&
-                    /^http:\/\/127\.0\.0\.1:\d+\/qa\/[a-f0-9]{64}$/.test(info.url)) {
+                    /^http:\/\/127\.0\.0\.1:\d+\/qa\/[a-f0-9]{64}$/.test(info.url) &&
+                    typeof info.startedAt === 'string' &&
+                    Date.parse(info.startedAt) >= launchedAfter &&
+                    !(oldInstance && oldInstance.pid === info.pid &&
+                        oldInstance.startedAt === info.startedAt &&
+                        oldInstance.url === info.url)) {
+                    // A valid-looking file may belong to a dead Node process.
+                    try { process.kill(info.pid, 0) } catch { continue }
                     ownedPid = info.pid
                     selectedUrl = info.url
                     break

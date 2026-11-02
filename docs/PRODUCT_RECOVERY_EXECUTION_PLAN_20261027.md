@@ -1,5 +1,14 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-11-02｜S3 CORE-HOST-24：完整 Web 原书库统一续读（本地 + 本次授权 Host）
+
+- 接续 #281 纯核心/用户自管 Suwayomi Host 的 **24/24 精确 HEAD CI 通过**，发现原完整 Web 仍存在真实产品缺口：已有 `installReadingLibrary` 续读面板，但纯核心端 `/api/v1/desktop/reading-library/query` 返回 405。此批一次打通**原核心 SQLite 历史 → 同一原书库视图 → 本地续读，以及用户明确选择的 Host 作品/进度 → 同一书库视图 → 原 Host Reader 续读**，不再另建一个 QA 书库页面。
+- **优先复用**项目既有 `ReadingLibrary`、`catalogueReadingPort`、`LibraryDatabase.recentReadingProgress`、`HostedLibraryReader.readingLibraryRows` 和 `web/reading-library.js`。Suwayomi 是用户自管远端（复用现有 Host GraphQL），Mihon 的源/阅读器分离仅作交互架构参照，不复制第三方代码。不引入数据库、推荐模块、另一套 Reader、来源 SDK、额外 HTTP Host 实现或新增依赖。
+- 原 `startOfflineCoreHttp` 仅增加一个与正式原 Desktop 对齐的**只读 POST 查询**，继承已验证的 loopback、QA Cookie、Origin 和 CSRF。普通零 Host 核心只读取本地下载作品的既存页码；只有注入了可信 UserHost 组合且请求包含有效本次会话 ID 时，才把**已选作品**的 Host 投影加入查询。该投影既不 RPC 联网也不扫描/同步来源，不接触其他 Provider/账号。来源停用/旧 session 失效时结果为局部不可用，本地阅读记录不受影响。
+- 继续使用 `web/reading-library.js` 原组件实现搜索、来源过滤、分页、两条阅读入口与错误提示；原 `app.js` 页面激活/阅读位置刷新逻辑保持不变。真正的页面显示由原 Playwright Chromium 用例补一条定位确认；没有新建浏览器框架、runner 或独立 UI。
+- 原 `test/unit/offline-user-host-http.test.ts` 用真实 loopback/原 SQLite/原 Reader/合成 Suwayomi HTTP 答复检查：本地历史先可读、未经同意无法访问 Host、明确选中并记录页码后两个来源同屏投影、历史查询不发网络、停用后本地仍可读；`test/unit/offline-full-web-http.test.ts` 检查普通无 Host 情况；原 `test/e2e/offline-full-web.spec.mjs` 检查渲染与状态。所有外部 HTTP 均为合成响应，不声称实网认证。
+- **当前状态：Draft #282 / IMPLEMENTED_IN_BRANCH / EXACT_HEAD_CI_PENDING / USER_NOT_ACCEPTED / NO_RELEASE。** 必须以最终 SHA 的完整 Android/Web/Desktop/Chromium/专项门禁为准，历史 #281 绿灯不可继承。G1 真机多语言布局、G2 正式可信签名/物理 OS 隔离/Android Binder/第二真实来源、G3 真正 v0.5.0 用户库无痛升级、G4 正式签名发布均 OPEN。不得合并 main、发 Release/OTA 或操作实际私人账号、目录和数据。详见 `docs/S3_CORE_HOST_READING_LIBRARY_20261102.md`。
+
 ### 2026-11-01｜S3 CORE-HOST-23：纯核心 Windows + 用户自管 Suwayomi 宿主（独立可选，工程 Draft）
 
 - 在 #280 已完成的受签名 Worker 搜索/原 Reader 接口之外，解决另一条**实际用户所需的可扩展来源路径**：用户已有自行运行的 Suwayomi，可在**独立、无站点 SDK 的完整 Windows Web 核心**中手动输入/保存/启用 Host，单独授权本次连接，选择来源搜索/读章节与图片、保存进度。核心仍负责书库/阅读器，本批不引入官方内容目录、内嵌源 SDK、自动下载扩展或强制 Host。

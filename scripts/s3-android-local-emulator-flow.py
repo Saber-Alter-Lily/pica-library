@@ -409,7 +409,10 @@ def import_folder():
 def export_cbz():
     global STEP
     STEP = "export-cbz"
-    x, y, _ = wait("S3-QA-Comic", seconds=30)
+    # Target the original four-page list row, not the Continue Reading button
+    # which also includes S3-QA-Comic in its accessible label. The previous
+    # exact run opened the Reader by long-pressing that button.
+    x, y, _ = wait(("4 pages", "4 页", "4 ページ"), seconds=30)
     adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "1300")
     tap(("Export CBZ", "导出 CBZ", "CBZ に書き出す"), seconds=18, exact=True)
     wait(("Save", "保存", "保存する"), seconds=35, exact=True, only_class="Button")

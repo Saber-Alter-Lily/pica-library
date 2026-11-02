@@ -48,7 +48,10 @@ export async function runCoreDesktopPreview(
     // Preserve original disposable-preview validation order. The persistent
     // root is created only after a complete application Web stage is proven.
     const temporaryRoot = persistentLocal ? undefined : previewRoot(baseline)
-    const webRoot = path.join(path.dirname(path.resolve(entryFile)), 'web')
+    // The optional Host uses an independently staged copy of the ORIGINAL Web.
+    // The default zero-Host entry never receives its source management scripts.
+    const webRoot = path.join(path.dirname(path.resolve(entryFile)),
+        userHostFactory ? 'web-host' : 'web')
     // A real full-page app is required. Never silently fall back to the
     // Reader-only QA shell or load a user-selected arbitrary Web directory.
     const fullManifest = path.join(webRoot, 'full-web-qa-manifest.json')

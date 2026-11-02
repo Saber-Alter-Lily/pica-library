@@ -308,11 +308,12 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
         throw new Error('Unaccounted executable bytes in QA ZIP')
     for (const forbidden of [
         'app/desktop.js', 'app/pica-library.js', 'web/index.html',
-        'app/web/eh-account.js',
+        'app/web/eh-account.js', 'app/web/source-hosts.js',
+        'app/web/saved-source-hosts.js',
         'app/web/source-choices.js',
         'app/web/jm-account.js', 'app/web/recommendation-v5.js',
         'runtime/jm/bin/java.exe', '.env.local', 'library.db',
-        ...(userHostQa ? [] : ['app/web/source-hosts.js',
+        ...(userHostQa ? [] : ['app/web-host/source-hosts.js',
             'app/desktop-core-host-preview.mjs',
             'Start-User-Host-Draft.cmd', 'README-USER-HOST-DRAFT.txt']),
         ...(fullWebQa ? ['app/web/offline-core-reader-qa.js'] :
@@ -330,8 +331,9 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
                 'app/desktop-core-preview.mjs', 'Pica-Library-Core-Preview.exe',
                 'Start-Local-Only-Draft.cmd', 'README-LOCAL-ONLY-DRAFT.txt',
                 ...(userHostQa ? [
-                    'app/web/source-hosts.js', 'app/web/saved-source-hosts.js',
-                    'app/web/host-library.js',
+                    'app/web-host/source-hosts.js', 'app/web-host/saved-source-hosts.js',
+                    'app/web-host/host-library.js',
+                    'app/web-host/full-web-qa-manifest.json',
                     'app/desktop-core-host-preview.mjs',
                     'Start-User-Host-Draft.cmd', 'README-USER-HOST-DRAFT.txt'
                 ] : [])]
@@ -482,8 +484,7 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             fullWebQa ? 'loadDesktop' : 'createReaderViewportTracker'))
             throw new Error('Portable original Web/Reader browser asset unavailable')
         if ((await get(fullWebQa
-                ? '/source-hosts.js' : '/app.js')).status !==
-                (userHostQa ? 200 : 404) ||
+                ? '/source-hosts.js' : '/app.js')).status !== 404 ||
             (await get('/api/v1/online-reader/progress')).status !== 404)
             throw new Error('Portable QA exposed online/source UI modules')
         const chaptersHttp = await get('/api/v1/reader/comics/' +

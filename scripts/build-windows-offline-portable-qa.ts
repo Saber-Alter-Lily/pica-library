@@ -264,10 +264,9 @@ export async function buildWindowsOfflinePortableQa(
     if (options.fullWebQa) {
         // Actual original full HTML and its verified, source-neutral ES module
         // closure. This does not reimplement the Reader or package an SDK.
-        const staged = stageOfflineFullWebQa(path.join(root, 'app', 'web'),
-            { userHost: options.userHostQa === true })
+        const staged = stageOfflineFullWebQa(path.join(root, 'app', 'web'))
         if (staged.sourceSdkIncluded || staged.distributable ||
-            Boolean(staged.userHostIncluded) !== Boolean(options.userHostQa) ||
+            Boolean(staged.userHostIncluded) ||
             !staged.files.some(row => row.name === 'app.js') ||
             !staged.files.some(row => row.name === 'index.html'))
             throw new Error('Original full Web QA stage is incomplete')
@@ -280,6 +279,23 @@ export async function buildWindowsOfflinePortableQa(
         }
         const name = 'app/web/full-web-qa-manifest.json'
         bytes.set(name, checkedFile(path.join(root, ...name.split('/')), 32 * 1024))
+        if (options.userHostQa) {
+            const hosted = stageOfflineFullWebQa(
+                path.join(root, 'app', 'web-host'), { userHost: true })
+            if (!hosted.userHostIncluded || hosted.sourceSdkIncluded ||
+                hosted.distributable)
+                throw new Error('Optional Host original Web is not isolated')
+            for (const row of hosted.files) {
+                const file = 'app/web-host/' + row.name
+                const data = fs.readFileSync(path.join(root, ...file.split('/')))
+                if (sha256(data) !== row.sha256 || data.byteLength !== row.size)
+                    throw new Error('Optional Host original Web assets changed')
+                bytes.set(file, data)
+            }
+            const hostManifest = 'app/web-host/full-web-qa-manifest.json'
+            bytes.set(hostManifest, checkedFile(
+                path.join(root, ...hostManifest.split('/')), 32 * 1024))
+        }
     } else {
         const staged = stageOfflineReaderAssetsQa(path.join(root, 'app', 'web'))
         if (staged.count !== OFFLINE_READER_ASSETS.length + 1 ||
@@ -299,11 +315,13 @@ export async function buildWindowsOfflinePortableQa(
     })).sort((a, b) => a.path.localeCompare(b.path, 'en'))
     const providerFiles = /(?:^|\/)(?:node_modules|\.git|library\.db|eh-account\.js|jm-account\.js|source-choices\.js)(?:\/|$)/i
     if (entries.some(item => providerFiles.test(item.path)) ||
-        (!options.userHostQa && entries.some(item =>
-            item.path === 'app/web/source-hosts.js' ||
-            item.path === 'app/desktop-core-host-preview.mjs')) ||
+        (entries.some(item => item.path === 'app/web/source-hosts.js' ||
+            item.path === 'app/web/saved-source-hosts.js') ||
+            !options.userHostQa && entries.some(item =>
+                item.path.startsWith('app/web-host/') ||
+                item.path === 'app/desktop-core-host-preview.mjs')) ||
         (options.userHostQa && ![
-            'app/web/source-hosts.js', 'app/desktop-core-host-preview.mjs',
+            'app/web-host/source-hosts.js', 'app/desktop-core-host-preview.mjs',
             'Start-User-Host-Draft.cmd', 'README-USER-HOST-DRAFT.txt'
         ].every(name => entries.some(row => row.path === name))) ||
         (options.fullWebQa

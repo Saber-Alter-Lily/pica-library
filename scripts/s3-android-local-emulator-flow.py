@@ -550,6 +550,18 @@ def original_app_flow():
     page("20-original-restart-resume")
     record("force-stop/relaunch original Home retains local book and saved page")
 
+    # Exercise the ORIGINAL app’s new, source-neutral Host entry.
+    # Navigating there must not depend on a provider account or start a Host.
+    STEP = "original-app-external-host-entry"
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    tap(("在线", "Online", "オンライン"), seconds=25, exact=True,
+        only_class="Button")
+    tap(("我的外接来源", "My external sources", "外部ソース"),
+        seconds=25)
+    wait(("我的外部 Host", "My external Host", "自分の外部 Host"), seconds=25)
+    page("21-original-user-host-entry")
+    record("original Android Online tab opens user-owned Host config without provider login")
+
 def main():
     global STEP
     try:

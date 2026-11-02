@@ -123,11 +123,17 @@ public final class HostBrowserActivity extends Activity {
         basicAuth.setText(t("此 Host 使用 Basic 认证",
             "This Host uses Basic authentication","Basic 認証を使用"));
         basicAuth.setTextColor(Color.WHITE);setupPanel.addView(basicAuth);
-        username=field(setupPanel,t("Basic 用户名（如有）","Basic username (if needed)","ユーザー名"),false);
-        password=field(setupPanel,t("Basic 密码（如有）","Basic password (if needed)","パスワード"),true);
+        username=field(root,t("Basic 用户名（如有）","Basic username (if needed)","ユーザー名"),false);
+        password=field(root,t("Basic 密码（如有）","Basic password (if needed)","パスワード"),true);
         username.setSaveEnabled(false);password.setSaveEnabled(false);
         username.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
         password.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        // Auth mode is persisted; credentials remain visible only for a
+        // user-authorized session and are never persisted or autofilled.
+        basicAuth.setOnCheckedChangeListener((view,checked)->{
+            username.setVisibility(checked?View.VISIBLE:View.GONE);
+            password.setVisibility(checked?View.VISIBLE:View.GONE);
+        });
         permission=new CheckBox(this);
         permission.setText(t("我授权本次连接自己的 Host","Authorize this Host session",
             "この接続を許可します"));
@@ -225,6 +231,8 @@ public final class HostBrowserActivity extends Activity {
         label.setText(config.label);endpoint.setText(config.endpoint);
         allowLan.setChecked(config.allowLan);
         basicAuth.setChecked("basic".equals(config.authMode));
+        username.setVisibility(basicAuth.isChecked()?View.VISIBLE:View.GONE);
+        password.setVisibility(basicAuth.isChecked()?View.VISIBLE:View.GONE);
         setupPanel.setVisibility(config.configured()?View.GONE:View.VISIBLE);
         status.setText(manager.hasSession()?t("会话已连接","Host session connected","接続済み"):
             t("尚未连接 Host","No Host connected","未接続"));

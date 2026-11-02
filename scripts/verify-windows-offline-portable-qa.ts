@@ -138,7 +138,7 @@ async function verifyOriginalNativeLauncherCorePreview(
         if (start.error || start.status !== 0)
             throw new Error('Original native Windows source-free launch failed')
         let selectedUrl: string | undefined
-        for (let attempt = 0; attempt < 60; attempt++) {
+        for (let attempt = 0; attempt < (userHostQa ? 180 : 60); attempt++) {
             if (fs.existsSync(infoFile)) {
                 const info = readJson(fs.readFileSync(infoFile))
                 if (Number.isSafeInteger(info.pid) && info.pid > 0 &&
@@ -344,6 +344,7 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
 
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-s3-qa-extract-'))
     let running: Awaited<ReturnType<typeof startServerThroughPortableLauncher>> | undefined
+    let primaryError: unknown
     try {
         const unpacked = path.join(temp, 'unpacked')
         fs.mkdirSync(unpacked)
@@ -617,10 +618,21 @@ export async function verifyWindowsOfflinePortableQa(zipFile: string,
             userInstallable: false,
             publishAuthorized: false
         }
+    } catch (error) {
+        primaryError = error
+        throw error
     } finally {
-        await running?.stop()
-        fs.rmSync(temp, { recursive: true, force: true,
-            maxRetries: 40, retryDelay: 250 })
+        try {
+            await running?.stop()
+            fs.rmSync(temp, { recursive: true, force: true,
+                maxRetries: 40, retryDelay: 250 })
+        } catch (cleanupError) {
+            if (!primaryError) throw cleanupError
+            // Preserve the ORIGINAL Windows/Host startup or Reader failure;
+            // cleanup errors previously masked the actual problem as EPERM.
+            process.stderr.write('After original QA failure, disposable cleanup: ' +
+                String(cleanupError instanceof Error ? cleanupError.message : cleanupError) + '\n')
+        }
     }
 }
 async function main() {

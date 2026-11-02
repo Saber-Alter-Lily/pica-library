@@ -14,7 +14,9 @@ import { build } from 'esbuild'
 const ROOT = path.resolve(fileURLToPath(new URL('../', import.meta.url)))
 const ENTRY = 'src/offline-core/qa-cli.ts'
 const PREVIEW_ENTRY = 'src/desktop/core-preview-main.ts'
-export type OfflineCandidateKind = 'qa-cli' | 'desktop-core-preview'
+const USER_HOST_ENTRY = 'src/desktop/core-user-host-preview-main.ts'
+export type OfflineCandidateKind =
+    'qa-cli' | 'desktop-core-preview' | 'desktop-core-host-preview'
 const REQUIRE_SOURCE = [
     ENTRY,
     'src/library/database.ts',
@@ -59,8 +61,11 @@ export interface OfflineCoreCandidate {
 export async function buildOfflineCoreCandidate(
     kind: OfflineCandidateKind = 'qa-cli'
 ): Promise<OfflineCoreCandidate> {
-    const entry = kind === 'qa-cli' ? ENTRY : PREVIEW_ENTRY
-    const filename = kind === 'qa-cli' ? 'core.mjs' : 'desktop-core-preview.mjs'
+    const entry = kind === 'qa-cli' ? ENTRY
+        : kind === 'desktop-core-host-preview' ? USER_HOST_ENTRY : PREVIEW_ENTRY
+    const filename = kind === 'qa-cli' ? 'core.mjs'
+        : kind === 'desktop-core-host-preview' ? 'desktop-core-host-preview.mjs'
+        : 'desktop-core-preview.mjs'
     const compiled = await build({
         absWorkingDir: ROOT,
         entryPoints: [entry],
@@ -96,21 +101,35 @@ export async function buildOfflineCoreCandidate(
     const packageInputs = inputs.filter(item => !item.startsWith('src/'))
     for (const required of [
         ...REQUIRE_SOURCE.filter(item => item !== ENTRY),
-        ...(kind === 'qa-cli' ? [ENTRY] : [PREVIEW_ENTRY, 'src/desktop/instance.ts'])
+        ...(kind === 'qa-cli' ? [ENTRY] :
+            [PREVIEW_ENTRY, 'src/desktop/instance.ts',
+                ...(kind === 'desktop-core-host-preview' ? [USER_HOST_ENTRY] : [])])
     ]) if (!sourceInputs.includes(required))
         throw new Error('Offline core lost an actual local Reader dependency: ' + required)
     for (const item of sourceInputs) {
         // Audit the original native picker/OS launcher utility as well as
         // the preview entry and instance lock. No source SDK or Host code.
-        const allowedPreviewDesktop = kind === 'desktop-core-preview' &&
+        const allowedPreviewDesktop = kind !== 'qa-cli' &&
             [PREVIEW_ENTRY, 'src/desktop/instance.ts',
                 'src/desktop/core-local-profile.ts',
                 'src/desktop/pickers.ts', 'src/desktop/child-process.ts',
-                'src/desktop/platform.ts'].includes(item)
-        if (!allowedPreviewDesktop && PROHIBITED.some(pattern => pattern.test(item)))
+                'src/desktop/platform.ts',
+                ...(kind === 'desktop-core-host-preview' ?
+                    [USER_HOST_ENTRY, 'src/desktop/source-host-store.ts'] : [])
+            ].includes(item)
+        // The separate HOST preview is still site-provider free: the only
+        // extra sources are the already-audited generic Suwayomi host port,
+        // never an app's Pica/E-H/JM implementation or the extension host.
+        const allowedUserHost = kind === 'desktop-core-host-preview' && (
+            item.startsWith('src/source-hosts/') ||
+            ['src/services/online-reader-service.ts',
+                'src/services/preview-cache-manager.ts'].includes(item)
+        )
+        if (!allowedPreviewDesktop && !allowedUserHost &&
+            PROHIBITED.some(pattern => pattern.test(item)))
             throw new Error('Offline core includes executable source/Host code: ' + item)
     }
-    if (kind === 'desktop-core-preview' && sourceInputs.includes(ENTRY))
+    if (kind !== 'qa-cli' && sourceInputs.includes(ENTRY))
         throw new Error('Desktop core preview cannot contain the QA CLI startup')
     // The actual PRODUCT_VERSION in src/version.ts imports exactly the root
     // package.json as inert build-time version metadata. This is NOT blanket
@@ -120,7 +139,9 @@ export async function buildOfflineCoreCandidate(
         !sourceInputs.includes('src/version.ts'))
         throw new Error('Original version metadata is missing from core bootstrap')
     for (const item of packageInputs)
-        if (item !== 'package.json' && !/node_modules\/adm-zip\//.test(item))
+        if (item !== 'package.json' && !/node_modules\/adm-zip\//.test(item) &&
+            !(kind === 'desktop-core-host-preview' &&
+                /node_modules\/(?:p-limit|yocto-queue)\//.test(item)))
             throw new Error('Offline core gained an unreviewed runtime dependency: ' + item)
 
     const externalImports = output[0].imports.map(item => item.path).sort()

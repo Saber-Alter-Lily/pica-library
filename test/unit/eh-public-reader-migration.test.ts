@@ -28,6 +28,8 @@ afterEach(() => {
 function fixtureFetch() {
     return vi.fn(async (request: string | URL | Request, init?: RequestInit) => {
         const url = String(request)
+        if (url.startsWith('https://e-hentai.org/?f_search='))
+            return new Response('<a href="/g/123/abcdef1234/">Fixture</a>', { status: 200 })
         if (url === 'https://api.e-hentai.org/api.php') {
             expect(init?.method).toBe('POST')
             expect(new Headers(init?.headers).has('cookie')).toBe(false)
@@ -70,6 +72,13 @@ describe('S3 first real existing-Provider extraction (no account)', () => {
         const fakeFetch = fixtureFetch()
         const provider = new EhProvider(undefined, fakeFetch as typeof fetch)
         const transport = createEhPublicReaderTransport(provider)
+        const results = await transport.search!('Fixture')
+        expect(results).toEqual([
+            { comicId: album, title: 'Anonymous test gallery' }
+        ])
+        await expect(transport.search!('a')).rejects.toThrow(
+            'Invalid signed source search query'
+        )
         const chapters = await transport.episodes(album)
         expect(chapters).toEqual([{ id: 'eh-123', title: 'Anonymous test gallery', order: 1 }])
         const pages = await transport.pages(album, chapters[0].id)

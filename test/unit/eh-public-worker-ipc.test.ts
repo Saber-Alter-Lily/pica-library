@@ -26,6 +26,8 @@ globalThis.fetch = async (request, init) => {
     const url = String(request)
     if (new Headers(init && init.headers).has('cookie'))
         throw new Error('Public E-H worker must not send cookies')
+    if (url.startsWith('https://e-hentai.org/?f_search='))
+        return new Response('<a href="/g/123/abcdef1234/">Owned gallery</a>', {status: 200})
     if (url === 'https://api.e-hentai.org/api.php')
         return new Response(JSON.stringify({gmetadata: [{
             gid: 123, token: 'abcdef1234', title: 'E-H IPC gallery',
@@ -120,6 +122,18 @@ describe('S3 E-H existing Provider bundled in a real signed child process', () =
                 operation: 'connect', sourceId: EH_PUBLIC_WORKER_ID
             }) as { sessionId: string; connected: boolean }
             expect(session.connected).toBe(true)
+            const found = await controller.command({
+                operation: 'search', sessionId: session.sessionId, query: 'IPC'
+            }) as { sessionId: string; sourceId: string; items: Array<{
+                comicId: string; title: string
+            }> }
+            expect(found).toMatchObject({
+                sessionId: session.sessionId, sourceId: EH_PUBLIC_WORKER_ID,
+                items: [{ comicId: legacyId, title: 'E-H IPC gallery' }]
+            })
+            expect(JSON.stringify(found)).not.toContain(
+                'eh-public-reader:123_abcdef1234'
+            )
             const chapters = await controller.read(session.sessionId, 'chapters', {
                 comicId: legacyId
             }) as Array<{ id: string; title: string }>
@@ -175,6 +189,9 @@ describe('S3 E-H existing Provider bundled in a real signed child process', () =
                 operation: 'disable', sourceId: EH_PUBLIC_WORKER_ID,
                 expectedRevision: 1
             })
+            await expect(controller.command({
+                operation: 'search', sessionId: session.sessionId, query: 'IPC'
+            })).rejects.toThrow()
             expect(controller.readingLibraryRows()).toEqual([])
             await expect(controller.read(session.sessionId, 'picture', {
                 comicId: legacyId, episodeId: 'eh-123', pageIndex: 0

@@ -17,6 +17,11 @@ const ROOT = path.resolve(fileURLToPath(new URL('../', import.meta.url)))
 const WEB = path.join(ROOT, 'web')
 const SOURCE_HTML = 'index.html'
 const MANIFEST = 'full-web-qa-manifest.json'
+// The extra UI is staged ONLY for an explicitly composed, user-owned Host
+// preview. It does not contain any E-H, JM, Pica or plugin executable source.
+const HOST_WEB_UI = new Set([
+    'source-hosts.js', 'saved-source-hosts.js', 'host-library.js'
+])
 const SOURCES_EXCLUDED = new Set([
     'eh-account.js', 'jm-account.js', 'source-choices.js',
     'source-hosts.js', 'saved-source-hosts.js', 'recommendation-v5.js',
@@ -35,6 +40,11 @@ const OPTIONAL_TOP_LEVEL_EXCLUDED = new Set([
 // app.js' own static/dynamic dependency closure is discovered, not guessed.
 export const FULL_WEB_CORE_ENTRIES = Object.freeze([
     'info-tip-v1.js', 'app.js', 'alpha7-cloud.js', 'ui-polish-v5.js'
+])
+export const FULL_WEB_HOST_ENTRIES = Object.freeze([
+    'info-tip-v1.js', 'app.js', 'alpha7-cloud.js',
+    'source-hosts.js', 'saved-source-hosts.js', 'host-library.js',
+    'ui-polish-v5.js'
 ])
 const CSS = new Set([
     'styles.css', 'alpha8-6.css', 'ui-polish-v5.css',
@@ -59,20 +69,21 @@ function sourceBytes(name: string): Buffer {
         throw new Error('Unsafe original full Web asset: ' + name)
     return fs.readFileSync(file)
 }
-function dependency(from: string, specifier: string) {
+function dependency(from: string, specifier: string, userHost = false) {
     // Only the existing web/ local top-level ES modules are acceptable.
     if (!/^\.[/][a-z0-9][a-z0-9_.-]*\.js$/.test(specifier))
         throw new Error('Unreviewed runtime Web import ' + from + ' -> ' + specifier)
     const target = validName(specifier.slice(2))
-    if (SOURCES_EXCLUDED.has(target))
+    if (SOURCES_EXCLUDED.has(target) &&
+        !(userHost && HOST_WEB_UI.has(target)))
         throw new Error('Source-only Web module leaked into core: ' + target)
     return target
 }
-function moduleEdges(name: string, value: Buffer) {
+function moduleEdges(name: string, value: Buffer, userHost = false) {
     const input = value.toString('utf8')
     const ast = ts.createSourceFile(name, input, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
     const edges = new Set<string>()
-    const add = (specifier: string) => edges.add(dependency(name, specifier))
+    const add = (specifier: string) => edges.add(dependency(name, specifier, userHost))
     const walk = (node: ts.Node) => {
         if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
             node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier))
@@ -98,14 +109,15 @@ function moduleEdges(name: string, value: Buffer) {
         add(match[1])
     return [...edges].sort()
 }
-function fullHtml(source: Buffer) {
+function fullHtml(source: Buffer, userHost = false) {
     const raw = source.toString('utf8')
     const scripts: string[] = []
     const next = raw.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, tag => {
         const match = /\bsrc=["']\.\/([^"']+)["']/i.exec(tag)
         if (!match) throw new Error('Unreviewed inline full Web executable script')
         const file = match[1]
-        if (FULL_WEB_CORE_ENTRIES.includes(file)) {
+        if (FULL_WEB_CORE_ENTRIES.includes(file) ||
+            userHost && HOST_WEB_UI.has(file)) {
             if (!/\btype=["']module["']/i.test(tag))
                 throw new Error('Full Web core entry must be an ES module')
             scripts.push(file)
@@ -115,7 +127,8 @@ function fullHtml(source: Buffer) {
             throw new Error('New unreviewed full Web top-level script: ' + file)
         return ''
     })
-    if (scripts.join(',') !== FULL_WEB_CORE_ENTRIES.join(','))
+    if (scripts.join(',') !== (userHost ?
+        FULL_WEB_HOST_ENTRIES : FULL_WEB_CORE_ENTRIES).join(','))
         throw new Error('Original full Web script order or approved entries changed')
     const links = [...next.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/gi)]
     let html = next
@@ -131,7 +144,9 @@ function fullHtml(source: Buffer) {
     }
     for (const match of html.matchAll(/\b(?:src|href)=["']\.\/([^"']+)["']/g)) {
         const file = match[1]
-        if (!CSS.has(file) && file !== ICON && !FULL_WEB_CORE_ENTRIES.includes(file))
+        if (!CSS.has(file) && file !== ICON &&
+            !FULL_WEB_CORE_ENTRIES.includes(file) &&
+            !(userHost && HOST_WEB_UI.has(file)))
             throw new Error('Full Web HTML gained an unreviewed local asset: ' + file)
     }
     for (const id of ['home', 'library', 'shelves', 'reader', 'settings']) {
@@ -155,9 +170,14 @@ export interface FullWebQaManifest {
     appEntrypoints: string[]
     files: FullWebQaAsset[]
     sourceSdkIncluded: false
+    /** User-owned remote Host UI does not embed site-specific source SDKs. */
+    userHostIncluded?: true
     distributable: false
 }
-export function stageOfflineFullWebQa(destination: string): FullWebQaManifest {
+export function stageOfflineFullWebQa(
+    destination: string, options: { userHost?: boolean } = {}
+): FullWebQaManifest {
+    const userHost = options.userHost === true
     const temp = fs.realpathSync.native(os.tmpdir())
     if (typeof destination !== 'string' || !path.isAbsolute(destination))
         throw new Error('Full Web QA destination must be absolute OS temp')
@@ -170,20 +190,22 @@ export function stageOfflineFullWebQa(destination: string): FullWebQaManifest {
     if (fs.lstatSync(folder, { throwIfNoEntry: false }))
         throw new Error('Full Web QA destination is not disposable')
     const source = sourceBytes(SOURCE_HTML)
-    const html = fullHtml(source)
+    const html = fullHtml(source, userHost)
     const files = new Map<string, Buffer>([
         [SOURCE_HTML, html], [ICON, sourceBytes(ICON)]
     ])
     for (const stylesheet of [...CSS]) files.set(stylesheet, sourceBytes(stylesheet))
-    const queue = [...FULL_WEB_CORE_ENTRIES]
+    const queue = [...(userHost ? FULL_WEB_HOST_ENTRIES : FULL_WEB_CORE_ENTRIES)]
     while (queue.length) {
         const file = queue.shift()!
         if (files.has(file)) continue
         if (files.size > 75) throw new Error('Full Web QA module closure is too large')
-        if (SOURCES_EXCLUDED.has(file)) throw new Error('Unreviewed source UI entry')
+        if (SOURCES_EXCLUDED.has(file) &&
+            !(userHost && HOST_WEB_UI.has(file)))
+            throw new Error('Unreviewed source UI entry')
         const bytes = sourceBytes(file)
         files.set(file, bytes)
-        queue.push(...moduleEdges(file, bytes).filter(item => !files.has(item)))
+        queue.push(...moduleEdges(file, bytes, userHost).filter(item => !files.has(item)))
     }
     const total = [...files.values()].reduce((size, file) => size + file.length, 0)
     if (total > 3 * 1024 * 1024) throw new Error('Full Web QA asset budget exceeded')
@@ -200,8 +222,10 @@ export function stageOfflineFullWebQa(destination: string): FullWebQaManifest {
     const result: FullWebQaManifest = {
         kind: 'DISPOSABLE_FULL_WEB_CORE_QA_ONLY',
         sourceHtmlSha256: SHA(source),
-        appEntrypoints: [...FULL_WEB_CORE_ENTRIES],
-        files: rows, sourceSdkIncluded: false, distributable: false
+        appEntrypoints: [...(userHost ? FULL_WEB_HOST_ENTRIES : FULL_WEB_CORE_ENTRIES)],
+        files: rows, sourceSdkIncluded: false,
+        ...(userHost ? { userHostIncluded: true as const } : {}),
+        distributable: false
     }
     fs.writeFileSync(path.join(folder, MANIFEST), JSON.stringify(result, null, 2), {
         mode: 0o600, flag: 'wx'

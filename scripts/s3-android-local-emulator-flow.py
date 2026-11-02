@@ -471,7 +471,17 @@ def original_app_flow():
         adb("shell", "input", "swipe", "360", "1020", "360", "300", "480")
     checkbox = wait("", seconds=12, only_class="CheckBox")
     adb("shell", "input", "tap", str(checkbox[0]), str(checkbox[1]))
-    tap("同意并继续", seconds=12, exact=True, only_class="Button")
+    # Android 35 edge-to-edge may expose the consent button next to the
+    # system gesture bar. A raw tap at y≈1220/1280 returns to the launcher;
+    # scroll the real disclaimer so its button is safely inside app content.
+    confirm = wait("同意并继续", seconds=12, exact=True, only_class="Button")
+    if confirm[1] >= 1100:
+        adb("shell", "input", "swipe", "360", "1030", "360", "380", "480")
+        confirm = wait("同意并继续", seconds=12, exact=True, only_class="Button")
+    if confirm[1] >= 1100:
+        raise AssertionError("Consent button remains obstructed by system navigation")
+    adb("shell", "input", "tap", str(confirm[0]), str(confirm[1]))
+    print(f"UI tap: original app consent at safe ({confirm[0]},{confirm[1]})", flush=True)
     # First-run guide can be dismissed without disabling it in production.
     prompt = wait(("Later", "稍后"), seconds=8, required=False, only_class="Button")
     if prompt:
@@ -558,6 +568,14 @@ def main():
         print("S3 LOCAL END-TO-END PASS", flush=True)
     except Exception as error:
         print(f"S3 LOCAL END-TO-END FAIL at {STEP}: {error}", file=sys.stderr, flush=True)
+        # Preserve whether original Home crashed or the system gesture
+        # intercepted an actual button. This is the existing ADB evidence flow.
+        if STEP.startswith("original-app"):
+            runtime = adb("logcat", "-d", "-s", "AndroidRuntime:E",
+                          "ActivityTaskManager:W", check=False, timeout=25)
+            (ROOT / "original-app-failure.log").write_text(runtime, encoding="utf-8")
+            print("Original-app runtime diagnostics:\n" + runtime[-5000:],
+                  file=sys.stderr, flush=True)
         (ROOT / "results.json").write_text(json.dumps({
             "result": "FAIL", "step": STEP, "error": str(error), "checks": CHECKS
         }, ensure_ascii=False, indent=2), encoding="utf-8")

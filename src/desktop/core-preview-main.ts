@@ -19,6 +19,11 @@ import { DesktopNativePicker } from './pickers'
 import { openWindowsLocalProfile } from './core-local-profile'
 import { launchBrowser } from './child-process'
 import type { CoreLocalPicker } from '../library/core-local-import'
+import type { CoreUserHostPorts } from '../offline-core/qa-http'
+
+/** Runtime-injected optional user Host, NOT linked into default source-free bundle. */
+export type CoreUserHostFactory = (root: string, database: LibraryDatabase) =>
+    CoreUserHostPorts
 
 function previewRoot(argv: string[]) {
     if (argv.length !== 3 || argv[0] !== '--owned-temp-root' ||
@@ -26,15 +31,23 @@ function previewRoot(argv: string[]) {
         throw new Error('Explicit owned temporary root and preview-only consent required')
     return assertTemporaryCorePreviewRoot(argv[1])
 }
-async function runCoreDesktopPreview(
+export async function runCoreDesktopPreview(
     argv: string[] = process.argv.slice(2),
-    entryFile: string = process.argv[1]
+    entryFile: string = process.argv[1],
+    userHostFactory?: CoreUserHostFactory
 ) {
-    const persistentLocal = argv.length === 1 &&
-        argv[0] === '--persistent-local-profile'
+    // A separate, audited executable must explicitly pass this flag and an
+    // app-owned factory. The existing source-free preview and CLI have none.
+    const userHostRequested = argv[argv.length - 1] ===
+        '--explicit-user-host-preview'
+    const baseline = userHostRequested ? argv.slice(0, -1) : argv
+    if (Boolean(userHostFactory) !== userHostRequested)
+        throw new Error('User Host preview needs its separate explicit entrypoint')
+    const persistentLocal = baseline.length === 1 &&
+        baseline[0] === '--persistent-local-profile'
     // Preserve original disposable-preview validation order. The persistent
     // root is created only after a complete application Web stage is proven.
-    const temporaryRoot = persistentLocal ? undefined : previewRoot(argv)
+    const temporaryRoot = persistentLocal ? undefined : previewRoot(baseline)
     const webRoot = path.join(path.dirname(path.resolve(entryFile)), 'web')
     // A real full-page app is required. Never silently fall back to the
     // Reader-only QA shell or load a user-selected arbitrary Web directory.
@@ -55,8 +68,10 @@ async function runCoreDesktopPreview(
         throw new Error('Another owned core-only preview is already running')
     let database: LibraryDatabase | undefined
     let running: Awaited<ReturnType<typeof startOfflineCoreHttp>> | undefined
+    let host: CoreUserHostPorts | undefined
     try {
         database = new LibraryDatabase(path.join(root, 'library.db'))
+        host = userHostFactory?.(root, database)
         const coreRuntime = createCoreLocalRuntime({
             database, dataDir: root
             // Deliberately no Desktop OS opener and no sources.
@@ -92,7 +107,8 @@ async function runCoreDesktopPreview(
             reader: coreRuntime.readerService,
             coreRuntime,
             localPicker,
-            webRoot
+            webRoot,
+            userHost: host
         })
         lock.publish(running.url)
         process.stdout.write(JSON.stringify({
@@ -101,6 +117,7 @@ async function runCoreDesktopPreview(
                 : 'CORE_DESKTOP_PREVIEW_QA_ONLY',
             url: running.url,
             sourceCount: 0,
+            userHostPreview: Boolean(host),
             userProfileOpened: persistentLocal,
             legacyProfileOpened: false,
             persistentLibrary: persistentLocal,
@@ -118,6 +135,9 @@ async function runCoreDesktopPreview(
     } finally {
         try {
             await running?.close()
+            await host?.reader.close()
+            host?.connections.close()
+            host?.inspector.close()
         } finally {
             try {
                 database?.close()

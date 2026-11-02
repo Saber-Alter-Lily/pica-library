@@ -680,8 +680,15 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                 // import occurs on this query.
                 const ports: ReadingLibraryPort[] = [
                     catalogueReadingPort('local',
-                        () => options.database.recentReadingProgress(100),
-                        options.database, () => false)
+                        () => options.database.recentReadingProgress(100)
+                            .filter(row => LOCAL_ID.test(row.comicId)),
+                        {
+                            getComicsByIds: ids =>
+                                options.database.getComicsByIds(ids).filter(
+                                    comic => comic.providerId === 'local' &&
+                                        LOCAL_ID.test(comic.comicId)
+                                )
+                        }, () => false)
                 ]
                 if (typeof hostId === 'string') ports.push({
                     id: 'selected-host',

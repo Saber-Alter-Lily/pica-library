@@ -9,6 +9,7 @@ on:
       - codex/s3-eh-public-reader-20261028
       - codex/s3-eh-worker-package-20261028
       - codex/s3-reader-id-web-20261028
+      - codex/s3-signed-source-search-reader-20261101
     paths:
       - '.github/workflows/s3-trusted-source-process.yml'
       - 'src/source-extensions/**'

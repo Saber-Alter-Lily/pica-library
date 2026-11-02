@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.InputType;
+import android.view.inputmethod.EditorInfo;
 import android.view.View;
 import android.widget.*;
 import java.util.ArrayList;
@@ -25,7 +26,9 @@ public final class HostBrowserActivity extends Activity {
     private EditText label,endpoint,username,password,query;
     private CheckBox allowLan,permission,basicAuth;
     private Spinner sourceChoices;
-    private LinearLayout results;
+    private LinearLayout results,setupPanel;
+    private Button toggleSetup;
+    private ScrollView scroller;
     private TextView status;
     private Button save,enable,start,disconnect,refresh,select,search;
     private boolean busy,destroyed;
@@ -98,21 +101,30 @@ public final class HostBrowserActivity extends Activity {
         root.addView(status);
         Button back=action(root,t("返回书库","Back to library","書庫に戻る"));
         back.setOnClickListener(v->finish());
-        label=field(root,t("连接名称","Host name","接続名"),false);
-        endpoint=field(root,t("Host URL (http:// 或 https://)","Host URL","Host URL"),false);
+        toggleSetup=action(root,t("显示/隐藏 Host 配置","Show / hide Host setup",
+            "Host 設定を表示／隠す"));
+        setupPanel=new LinearLayout(this);setupPanel.setOrientation(LinearLayout.VERTICAL);
+        root.addView(setupPanel);
+        toggleSetup.setOnClickListener(v->{
+            boolean show=setupPanel.getVisibility()!=View.VISIBLE;
+            setupPanel.setVisibility(show?View.VISIBLE:View.GONE);
+            if(show)scroller.smoothScrollTo(0,setupPanel.getTop());
+        });
+        label=field(setupPanel,t("连接名称","Host name","接続名"),false);
+        endpoint=field(setupPanel,t("Host URL (http:// 或 https://)","Host URL","Host URL"),false);
         allowLan=new CheckBox(this);
         allowLan.setText(t("本次允许我明确输入的局域网地址使用 HTTP",
             "Allow HTTP for this explicitly entered private LAN IP",
             "指定した LAN IP で HTTP を許可"));
-        allowLan.setTextColor(Color.WHITE);root.addView(allowLan);
-        save=action(root,t("保存配置","Save configuration","設定を保存"));
+        allowLan.setTextColor(Color.WHITE);setupPanel.addView(allowLan);
+        save=action(setupPanel,t("保存配置","Save configuration","設定を保存"));
         enable=action(root,t("启用 / 停用 Host","Enable / disable Host","Host 有効／無効"));
         basicAuth=new CheckBox(this);
         basicAuth.setText(t("此 Host 使用 Basic 认证",
             "This Host uses Basic authentication","Basic 認証を使用"));
-        basicAuth.setTextColor(Color.WHITE);root.addView(basicAuth);
-        username=field(root,t("Basic 用户名（如有）","Basic username (if needed)","ユーザー名"),false);
-        password=field(root,t("Basic 密码（如有）","Basic password (if needed)","パスワード"),true);
+        basicAuth.setTextColor(Color.WHITE);setupPanel.addView(basicAuth);
+        username=field(setupPanel,t("Basic 用户名（如有）","Basic username (if needed)","ユーザー名"),false);
+        password=field(setupPanel,t("Basic 密码（如有）","Basic password (if needed)","パスワード"),true);
         username.setSaveEnabled(false);password.setSaveEnabled(false);
         username.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
         password.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
@@ -126,10 +138,15 @@ public final class HostBrowserActivity extends Activity {
         sourceChoices=new Spinner(this);root.addView(sourceChoices);
         select=action(root,t("选择此来源","Use selected source","ソースを選択"));
         query=field(root,t("搜索作品","Search works","作品を検索"),false);
+        query.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         search=action(root,t("搜索选中来源","Search selected source","選択ソースで検索"));
+        query.setOnEditorActionListener((view,action,event)->{
+            if(action==EditorInfo.IME_ACTION_SEARCH){search.performClick();return true;}
+            return false;
+        });
         results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);
         root.addView(results);
-        ScrollView scroller=new ScrollView(this);scroller.addView(root);
+        scroller=new ScrollView(this);scroller.setFillViewport(true);scroller.addView(root);
         setContentView(scroller);
 
         save.setOnClickListener(v->{
@@ -142,6 +159,8 @@ public final class HostBrowserActivity extends Activity {
             task(t("保存中…","Saving…","保存中…"),()->{
                 manager.configure(revision,name,url,mode,allow);
                 return ()->{sources.clear();results.removeAllViews();
+                    setupPanel.setVisibility(View.GONE);
+                    scroller.smoothScrollTo(0,0);
                     status.setText(t("已保存；没有自动连接","Saved; no connection started",
                         "保存しました。未接続です。"));};
             });
@@ -188,8 +207,10 @@ public final class HostBrowserActivity extends Activity {
             String id=sources.get(chosen).id;
             task(t("正在绑定来源…","Selecting source…","ソース選択中…"),()->{
                 manager.bind(id,true);
-                return ()->status.setText(t("来源已就绪，可搜索","Source ready to search",
+                return ()->{status.setText(t("来源已就绪，可搜索","Source ready to search",
                     "検索できます"));
+                    query.requestFocus();
+                    scroller.post(()->scroller.smoothScrollTo(0,query.getTop()));};
             });
         });
         search.setOnClickListener(v->{
@@ -204,6 +225,7 @@ public final class HostBrowserActivity extends Activity {
         label.setText(config.label);endpoint.setText(config.endpoint);
         allowLan.setChecked(config.allowLan);
         basicAuth.setChecked("basic".equals(config.authMode));
+        setupPanel.setVisibility(config.configured()?View.GONE:View.VISIBLE);
         status.setText(manager.hasSession()?t("会话已连接","Host session connected","接続済み"):
             t("尚未连接 Host","No Host connected","未接続"));
         controls();

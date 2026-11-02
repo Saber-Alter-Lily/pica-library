@@ -1,5 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- No INTERNET, provider account, package install, camera or broad storage permission. SAF is user-selected. -->
+    <!-- The source-free Reader cannot make network requests. An optional,
+         same-signer companion may provide owned images through Binder only. -->
+    <uses-permission android:name="com.picalibrary.android.remote.BIND_SOURCE"/>
+    <queries>
+        <package android:name="com.picalibrary.android.userhost.qa"/>
+    </queries>
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
@@ -11,6 +17,9 @@
         <activity
             android:name="com.picalibrary.android.LocalShelvesActivity"
             android:exported="false" />
+        <activity android:name="com.picalibrary.android.ExternalReaderActivity"
+            android:exported="true"
+            android:permission="com.picalibrary.android.remote.BIND_SOURCE"/>
         <activity
             android:name="com.picalibrary.android.LocalReaderActivity"
             android:screenOrientation="unspecified"

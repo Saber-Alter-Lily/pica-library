@@ -2,13 +2,27 @@
     <!-- INTERNET is for an explicitly configured user-owned Suwayomi Host.
          No provider SDK, broad storage, install packages or background source. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <permission android:name="com.picalibrary.android.remote.BIND_SOURCE"
+        android:protectionLevel="signature"/>
+    <uses-permission android:name="com.picalibrary.android.remote.BIND_SOURCE"/>
+    <queries>
+        <package android:name="com.picalibrary.android.localcore.qa"/>
+    </queries>
     <application
         android:label="Pica Library User Host QA"
         android:allowBackup="false"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
+        <service android:name="com.picalibrary.android.ExternalSourceService"
+            android:exported="true"
+            android:permission="com.picalibrary.android.remote.BIND_SOURCE">
+            <intent-filter>
+                <action android:name="com.picalibrary.android.remote.BIND_SOURCE"/>
+            </intent-filter>
+        </service>
         <activity android:name="com.picalibrary.android.HostBrowserActivity"
-            android:exported="false"/>
+            android:exported="true"
+            android:permission="com.picalibrary.android.remote.BIND_SOURCE"/>
         <activity android:name="com.picalibrary.android.HostReaderActivity"
             android:exported="false"/>
         <activity android:name="com.picalibrary.android.LocalHistoryActivity"

@@ -25,4 +25,5 @@ dependencies {
     implementation project(':local-storage')
     implementation project(':reader-view')
     implementation project(':user-host-core')
+    implementation project(':source-bridge')
 }

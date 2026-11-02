@@ -95,12 +95,20 @@ public final class LocalLibraryActivity extends Activity {
         root.addView(title);
         // The pure-local APK never declares a Host activity. The independently
         // installable optional-Host APK alone exposes this entry.
-        boolean optionalHost=false;
+        boolean optionalHost=false,remoteCompanion=false;
         try {
             getPackageManager().getActivityInfo(new android.content.ComponentName(
                 this,"com.picalibrary.android.HostBrowserActivity"),0);
             optionalHost=true;
-        } catch(android.content.pm.PackageManager.NameNotFoundException absent){}
+        } catch(android.content.pm.PackageManager.NameNotFoundException absent){
+            try {
+                getPackageManager().getActivityInfo(new android.content.ComponentName(
+                    "com.picalibrary.android.userhost.qa",
+                    "com.picalibrary.android.HostBrowserActivity"),0);
+                remoteCompanion=true;
+                optionalHost=true;
+            } catch(android.content.pm.PackageManager.NameNotFoundException missing){}
+        }
         TextView description=label(optionalHost?copy(
             "本地漫画离线可读；外部 Host 必须由你选择并授权。",
             "Local books stay offline; external Host requires your consent.",
@@ -127,8 +135,19 @@ public final class LocalLibraryActivity extends Activity {
         if(optionalHost){
             Button host=action(copy("连接我的外部 Host","My external Host","外部 Host"));
             host.setTag("local-host-opt-in");
-            host.setOnClickListener(v->startActivity(new Intent()
-                .setClassName(this,"com.picalibrary.android.HostBrowserActivity")));
+            final String hostPackage=remoteCompanion
+                ?"com.picalibrary.android.userhost.qa":getPackageName();
+            host.setOnClickListener(v->{
+                try {
+                    startActivity(new Intent().setClassName(hostPackage,
+                        "com.picalibrary.android.HostBrowserActivity"));
+                } catch(android.content.ActivityNotFoundException|SecurityException failure){
+                    android.widget.Toast.makeText(this,copy(
+                        "请安装同一签名的外接来源组件","Install a matching-signer source companion",
+                        "同じ署名の外部ソースが必要です"),
+                        android.widget.Toast.LENGTH_LONG).show();
+                }
+            });
             root.addView(host,new LinearLayout.LayoutParams(-1,dp(48)));
         }
         historyButton.setOnClickListener(v->startActivity(new Intent(this,LocalHistoryActivity.class)));

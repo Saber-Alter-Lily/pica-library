@@ -8,6 +8,7 @@ import android.os.ParcelFileDescriptor;
  * Only opaque owned identifiers and file descriptors cross this boundary.
  */
 interface ISourceEndpoint {
+    int protocolVersion();
     String sessionScope();
     String chapters(String comicId);
     String chapter(String comicId, String episodeId);

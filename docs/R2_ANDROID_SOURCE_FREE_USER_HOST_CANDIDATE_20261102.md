@@ -42,3 +42,10 @@
 5. 断开 Host 会话、返回原本地书库，在仍不连接 Host 的情况下用原 Reader 打开该章节。
 
 完整 ADB、截图、UI 树、Host 请求操作列表和文件一致性证据随原 s3-local-emulator Action 上传（测试失败则记录 FAIL，不跳过）。**合成 Host PASS 不代表真实公共来源可用、授权或法律合规；实机 G1、真实多来源及签名 G2、旧版升级 G3、Release G4 仍 OPEN。**
+
+## 同签名跨进程 API 合约（R2 当前候选，未获正式验收）
+
+- `:source-bridge` 使用 Android 标准 AIDL `ISourceEndpoint`；`protocolVersion() == 1` 是 Host/Reader 独立安装与升级的明确兼容边界；版本不匹配不得尝试读取章节。
+- `:user-host-app` 仅在独立 Host 进程内运行已有 `HostSourceManager` 及固定 Suwayomi 操作；导出 `ExternalSourceService`，权限 `com.picalibrary.android.remote.BIND_SOURCE` 为 `signature`。Service 每次 Binder 调用核实 caller UID 与签名，仅返回已授权的 opaque chapter/page IDs、会话 scope 和 ParcelFileDescriptor 流。
+- 无 `INTERNET` 权限的 `:local-app` 保持原来 LocalComicStore、ShelfLedger、ReaderScreenActivity 和 ReaderProgressLedger；新增 `BoundSourceClient` 延迟绑定 Host，`ExternalReaderActivity` 在原 Reader 上展示远端图片，`ExternalImportActivity` 在原书库内显式选择并保存单章，服务不写入 Reader 私有目录。
+- 本方案当前只用于同签名第一方 Host companion 与源中立 Reader 的工程候选；它不是任意用户下载的第三方 APK 执行权限，也未验证真实 Source SDK、源站许可证、旧 v0.5.0 签名延续或正式升级。当前 exact-head 实机与 Android 35 端到端验收仍 OPEN。

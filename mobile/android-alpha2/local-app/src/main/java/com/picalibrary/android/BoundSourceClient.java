@@ -85,6 +85,9 @@ final class BoundSourceClient implements AutoCloseable {
     private ISourceEndpoint active()throws IOException{
         try{
             ISourceEndpoint bridge=ready();
+            // Independently installable companion/Reader must share this ABI.
+            if(bridge.protocolVersion()!=1)
+                throw new IOException("SOURCE_HOST_UNSUPPORTED");
             if(!expectedScope.equals(bridge.sessionScope()))
                 throw new IOException("SOURCE_HOST_STALE");
             return bridge;

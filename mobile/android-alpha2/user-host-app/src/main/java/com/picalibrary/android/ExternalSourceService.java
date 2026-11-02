@@ -49,6 +49,9 @@ public final class ExternalSourceService extends Service {
     }
 
     private final ISourceEndpoint.Stub bridge=new ISourceEndpoint.Stub(){
+        @Override public int protocolVersion()throws RemoteException{
+            verifyCaller();return 1;
+        }
         @Override public String sessionScope()throws RemoteException{
             verifyCaller();
             return manager.requireSession().scope;

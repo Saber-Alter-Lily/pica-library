@@ -269,7 +269,7 @@ def dismiss_immersive_help():
     return False
 
 
-def advance_reader_english():
+def advance_reader_next():
     # One native UI snapshot prevents original Reader chrome (which auto-hides)
     # from disappearing between separate Settings and Next lookups.
     for _ in range(7):
@@ -282,15 +282,17 @@ def advance_reader_english():
         if help_button is not None:
             adb("shell", "input", "tap", str(help_button[0]), str(help_button[1]))
             continue
-        settings = button_in_snapshot(snapshot, "Settings")
-        next_page = button_in_snapshot(snapshot, "Next")
+        settings = next((p for label in ("Settings", "阅读设置", "設定")
+                         if (p := button_in_snapshot(snapshot, label))), None)
+        next_page = next((p for label in ("Next", "下一页", "次のページ")
+                          if (p := button_in_snapshot(snapshot, label))), None)
         if settings is not None and next_page is not None:
             adb("shell", "input", "tap", str(next_page[0]), str(next_page[1]))
-            print("UI tap: native English Next with single-line Settings", flush=True)
+            print("UI tap: original Reader Next control (zh/en/ja)", flush=True)
             return
         # Original Reader auto-hides controls and a center tap reveals them.
         adb("shell", "input", "tap", "360", "480")
-    raise AssertionError("Original Reader did not expose English Settings and Next controls")
+    raise AssertionError("Original Reader did not expose localized Settings and Next controls")
 
 
 def reader_flow():
@@ -301,7 +303,7 @@ def reader_flow():
     wait_page_counter("1 / 3", seconds=35)
     dismiss_immersive_help()
     page("05-reader-first-page")
-    advance_reader_english()
+    advance_reader_next()
     wait_page_counter("2 / 3", seconds=28)
     time.sleep(1.2)  # Save only after the original bitmap holder completed loading.
     page("06-reader-second-page")
@@ -509,7 +511,7 @@ def original_app_flow():
         seconds=25, exact=True, only_class="Button")
     dismiss_immersive_help()
     wait_page_counter("1 / 3", seconds=40)
-    advance_reader_english()
+    advance_reader_next()
     wait_page_counter("2 / 3", seconds=40)
     time.sleep(1.2)
     adb("shell", "input", "keyevent", "KEYCODE_BACK")

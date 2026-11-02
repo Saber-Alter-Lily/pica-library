@@ -35,6 +35,11 @@ R1 完成定义：同一固定 HEAD 的 Windows/Android 构建与核心流程测
 - Windows 复用已存在的原完整 Web + Reader + SQLite + NativePicker + Windows Launcher 打包测试。新的集成分支只在全 Web ZIP 的解压、真实本机启动/阅读/书架/重启核验成功后，保留 3 天未签名 QA 产物供人工操作；Reader-only 小壳继续不上传。
 - Android 复用现有独立无源 APK 的正式 CI 构建/DEX 验证与 Android 35 系统 SAF 模拟器；集成分支 push 直接执行真实模拟器流程。APK 与 v0.5.0 的安装包 ID 和资料隔离，不是正式版替代。
 - 双端手工操作和证据见 [R1 同源双端测试候选](R1_LOCAL_CORE_DUAL_PLATFORM_CANDIDATE_20261102.md)。不新增第二套架构、阅读器、测试系统；当前仍需实机 Windows/Android 和用户体验核验。G1–G4 一律 OPEN。
+### R2 开源复用决策与 Windows 可选 Host 候选（2026-11-02）
+
+- 已逐文件核对 Breeze QuickJS/Rust + Bika/JM 插件 API、VeneraNext JS/QuickJS API、Delta Comic 插件安装/协议、现有 Suwayomi Host 与本项目签名 CJS Worker；结论与许可证界限见 [R2 开源兼容审计](R2_OPEN_SOURCE_COMPATIBILITY_DECISION_20261102.md)。Breeze 插件无明确许可，Venera GPL、Delta AGPL 不复制到本 MIT 项目。
+- 按“先复用可工作的服务/插件架构”原则，R2 首批选现有 Suwayomi Host，**作为额外可选组合**接入原 Windows Launcher + Web + Reader，不推翻 R1。严格区分 `app/web` 原无源页面、`app/web-host` 显式 Host 页面；默认从不启用 Host，绝不打包具体站点 SDK。
+- 本轮可运行工程候选仍须通过 exact HEAD Windows 实体 ZIP/两个原生入口与真实用户源端验证；R1、G1–G4 仍 OPEN。
 ## 4. 工程和开源复用纪律
 
 - 首先检查本仓库 v0.5.0 已实现的 Reader、SQLite、LocalLibraryIngestion、ReaderProgress/History、Shelf、Web UI、Upgrade Assistant、NativePicker、SignedWorkerStore 和 SourceHostConnections；其次参考 Mihon（Apache-2.0）来源与核心分离、Suwayomi 用户自管 Host 标准 API、Kavita 的书库检索/状态 UX；未核许可与适配成本，不复制第三方源代码。Kotatsu GPL 工程只能作设计比较，不直接复制。

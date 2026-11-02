@@ -270,6 +270,47 @@ public class LocalComicImportTest {
             HomeActivity activity=controller.get();shadowOf(Looper.getMainLooper()).idle();View button=activity.getWindow().getDecorView().findViewWithTag("library-local-import");assertNotNull(button);assertEquals(1,findCollection(activity.getWindow().getDecorView()).getAdapter().getItemCount());button.performClick();assertEquals(LocalComicImportActivity.class.getName(),shadowOf(activity).getNextStartedActivity().getComponent().getClassName());
         }
     }
+
+    @Test public void originalHomeDirectlyResumesImportedComicAtSavedChapterAndPage() throws Exception {
+        overwriteGate();
+        LocalComicStore.Comic comic=imported();
+        LocalComicReaderPort port=new LocalComicReaderPort(context);
+        String chapter=port.chapters(comic.id).get(0).id;
+        ReadingHistoryStore.record(context,"original-home-local-resume",comic.id,chapter,
+                comic.title,"","Chapter 1",1,"local","local",1,
+                "2026-11-02T10:00:00Z","2026-11-02T10:02:00Z");
+        OnboardingStore.setAutoShow(context,false);
+        context.getSharedPreferences("pica-disclaimer-v1",0).edit()
+                .putString("accepted_version","1").commit();
+        context.getSharedPreferences("alpha81-ui",0).edit()
+                .putBoolean("libraryRefreshed",true).commit();
+        try(ActivityController<HomeActivity> controller=
+                Robolectric.buildActivity(HomeActivity.class).setup()){
+            HomeActivity activity=controller.get();
+            View resume=null;
+            // The Home shortcut is a genuine background read, not a blocking UI scan.
+            for(int tries=0;tries<80;tries++){
+                shadowOf(Looper.getMainLooper()).idle();
+                resume=activity.getWindow().getDecorView().findViewWithTag(
+                        "library-local-resume");
+                if(resume!=null&&resume.getVisibility()==View.VISIBLE)break;
+                Thread.sleep(25);
+            }
+            assertNotNull("Existing Home has the local continue entry",resume);
+            assertEquals("Saved local work is directly resumable",View.VISIBLE,
+                    resume.getVisibility());
+            assertTrue(((Button)resume).getText().toString().contains(comic.title));
+            assertTrue(((Button)resume).getText().toString().contains("2"));
+            resume.performClick();
+            Intent open=shadowOf(activity).getNextStartedActivity();
+            assertNotNull("Tapping local resume launches original Reader",open);
+            assertEquals(ReaderActivity.class.getName(),open.getComponent().getClassName());
+            assertEquals("local",open.getStringExtra("source"));
+            assertEquals(comic.id,open.getStringExtra("comicId"));
+            assertEquals(chapter,open.getStringExtra("episodeId"));
+        }
+    }
+
     private androidx.recyclerview.widget.RecyclerView findCollection(View view){if(view instanceof androidx.recyclerview.widget.RecyclerView)return (androidx.recyclerview.widget.RecyclerView)view;if(view instanceof android.view.ViewGroup)for(int i=0;i<((android.view.ViewGroup)view).getChildCount();i++){androidx.recyclerview.widget.RecyclerView found=findCollection(((android.view.ViewGroup)view).getChildAt(i));if(found!=null)return found;}return null;}
     @Test public void rotationRetainsUncommittedPreviewAndExplicitDiscardIsSafe() throws Exception {
         try(ActivityController<LocalComicImportActivity> controller=Robolectric.buildActivity(LocalComicImportActivity.class).setup()){

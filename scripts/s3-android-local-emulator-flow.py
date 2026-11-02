@@ -15,7 +15,9 @@ import zipfile
 import zlib
 from pathlib import Path
 
-PACKAGE = "com.picalibrary.android.localcore.qa"
+QA_PACKAGE = "com.picalibrary.android.localcore.qa"
+ORIGINAL_PACKAGE = "com.picalibrary.android.dev"
+PACKAGE = QA_PACKAGE
 ROOT = Path("mobile/android-alpha2/s3-local-emulator-evidence")
 ROOT.mkdir(parents=True, exist_ok=True)
 STEP = "setup"
@@ -449,6 +451,86 @@ def export_cbz():
     record("system SAF save/reopen -> original CBZ writer/readback; 4 raster bytes identical")
 
 
+
+def original_app_flow():
+    """R1: the actual v0.5.0-derived Android app, not only the isolated QA shell.
+
+    Use the existing ADB, SAF picker, Reader and fixture helpers; never inspect
+    real user profiles, credentials, online sources or change the formal APK.
+    """
+    global PACKAGE, STEP
+    PACKAGE = ORIGINAL_PACKAGE
+    STEP = "original-app-first-launch"
+    adb("shell", "am", "start", "-W", "-n",
+        PACKAGE + "/com.picalibrary.android.DisclaimerActivity", timeout=50)
+    wait("使用提示与免责声明", seconds=35)
+    # The original disclaimer text is intentionally long and scrollable.
+    for _ in range(3):
+        if wait("", seconds=2, required=False, only_class="CheckBox"):
+            break
+        adb("shell", "input", "swipe", "360", "1020", "360", "300", "480")
+    checkbox = wait("", seconds=12, only_class="CheckBox")
+    adb("shell", "input", "tap", str(checkbox[0]), str(checkbox[1]))
+    tap("同意并继续", seconds=12, exact=True, only_class="Button")
+    # First-run guide can be dismissed without disabling it in production.
+    prompt = wait(("Later", "稍后"), seconds=8, required=False, only_class="Button")
+    if prompt:
+        adb("shell", "input", "tap", str(prompt[0]), str(prompt[1]))
+    wait(("我的书库", "My library"), seconds=40)
+    page("16-original-home")
+    record("original provider-enabled app starts its Home/Library with no source login")
+
+    STEP = "original-app-import"
+    tap(("Import local comics", "导入本地漫画", "ローカル漫画を取り込む"),
+        seconds=28, only_class="Button")
+    tap(("Choose CBZ/ZIP comic", "选择 CBZ", "CBZ を選択"),
+        seconds=25, only_class="Button")
+    locate_document("S3-QA-Comic.cbz")
+    tap(("Confirm import / update copy", "确认导入", "取り込む"),
+        seconds=45, only_class="Button")
+    wait(("Read offline", "离线阅读", "オフラインで読む"), seconds=60)
+    comic = book_rows()
+    assert len(comic) == 1 and len(comic[0]["pages"]) == 4, comic
+    page("17-original-imported")
+    record("original app SAF -> original Import page -> four-page local manifest")
+
+    STEP = "original-app-read"
+    tap(("Read offline", "离线阅读", "オフラインで読む"),
+        seconds=25, exact=True, only_class="Button")
+    dismiss_immersive_help()
+    wait_page_counter("1 / 3", seconds=40)
+    advance_reader_english()
+    wait_page_counter("2 / 3", seconds=40)
+    time.sleep(1.2)
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    until_data("reading-history-v1.json",lambda data:
+        any(s.get("sourceKind") == "local" and s.get("lastPage", 0) >= 1
+            for s in data.get("sessions", [])))
+    page("18-original-reader-progress")
+    record("original Reader persists local chapter and second-page progress")
+
+    STEP = "original-app-home-resume"
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    # Returning to Home reloads the original local-history projection.
+    tap(("Continue local reading", "继续本地阅读", "ローカル読書を再開"),
+        seconds=50, only_class="Button")
+    dismiss_immersive_help()
+    wait_page_counter("2 / 3", seconds=40)
+    page("19-original-home-resume")
+    record("original Home local Continue launches same Reader at saved chapter/page")
+
+    STEP = "original-app-restart"
+    adb("shell", "am", "force-stop", PACKAGE)
+    adb("shell", "am", "start", "-W", "-n",
+        PACKAGE + "/com.picalibrary.android.DisclaimerActivity", timeout=45)
+    # Consent was accepted in this disposable emulator: no forced new login.
+    tap(("Continue local reading", "继续本地阅读", "ローカル読書を再開"),
+        seconds=50, only_class="Button")
+    dismiss_immersive_help()
+    wait_page_counter("2 / 3", seconds=40)
+    page("20-original-restart-resume")
+    record("force-stop/relaunch original Home retains local book and saved page")
+
 def main():
     global STEP
     try:
@@ -468,10 +550,11 @@ def main():
         browse_and_resume_flow(comic)
         import_folder()
         export_cbz()
+        original_app_flow()
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",
-            "package": PACKAGE}, ensure_ascii=False, indent=2), encoding="utf-8")
+            "package": QA_PACKAGE, "also_tested": ORIGINAL_PACKAGE}, ensure_ascii=False, indent=2), encoding="utf-8")
         print("S3 LOCAL END-TO-END PASS", flush=True)
     except Exception as error:
         print(f"S3 LOCAL END-TO-END FAIL at {STEP}: {error}", file=sys.stderr, flush=True)

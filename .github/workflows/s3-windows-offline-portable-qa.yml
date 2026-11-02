@@ -15,6 +15,7 @@ on:
       - codex/product-integration-r1-20261102
     paths:
       - '.github/workflows/s3-windows-offline-portable-qa.yml'
+      - 'docs/R1_LOCAL_CORE_DUAL_PLATFORM_CANDIDATE_20261102.md'
       - 'scripts/build-windows-offline-portable-qa.ts'
       - 'scripts/verify-windows-offline-portable-qa.ts'
       - 'scripts/tsconfig.s3-windows-qa.json'

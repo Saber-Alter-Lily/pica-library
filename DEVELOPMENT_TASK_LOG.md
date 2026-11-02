@@ -1,5 +1,12 @@
 # Pica Library Development Task Log
 
+### 2026-11-02 | R1 first integrated dual-platform local-core candidate (Draft #284)
+
+- Integration engineering baseline: previous #284 `245933d2` reached 28/28 Actions SUCCESS; **not** physical/UX acceptance. New R1 code shares the same original full-Web/native-Windows local Reader and Android local-core/local-storage/reader-view; no new Reader, database, test framework or source SDK.
+- Windows first build at `e65f2860bd126d8c885a8d01973b037e361981cf`: [real Windows ZIP build + extracted run #41433611974](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41433611974) SUCCESS; full-Web QA archive artifact `13135855970`, ~35.7MB, expires 2026-11-05 UTC. Source-free only, unsigned, isolated `%LOCALAPPDATA%/Pica Library Local`, **not** Release/OTA/legacy migration.
+- Source-free Android QA APK still uses existing CI artifact for exact PR SHA; new integration-branch Android 35 real SAF/shelves/Reader/force-stop workflow added. The older `e65f2860` [emulator run #41433612006](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41433612006) was IN_PROGRESS when checked; not counted as PASS. The exact next HEAD reruns both Windows and emulator acceptance to avoid borrowing historical checks.
+- Candidate and explicit manual physical-device workflow: [R1 dual-platform acceptance](docs/R1_LOCAL_CORE_DUAL_PLATFORM_CANDIDATE_20261102.md). Keep G1–G4 OPEN, no main merge, Release/OTA, old profile/data or real user account mutation.
+
 > **2026-11-02 product integration route:** [R0–R4 delivery roadmap](docs/PRODUCT_INTEGRATION_DELIVERY_20261102.md). Stop isolated micro-PR churn. Use a single Draft product-integration branch rooted at #282 (`27ce6f8b`) and deliver complete Windows/Android user journeys. S0–S6, 42+new cases, all historic failures and G1–G4 OPEN remain authoritative. Production main/Release/OTA/user profiles unchanged.
 
 ### 2026-11-02 | S3 CORE-HOST-24: one original Web reading-library for local + authorized Host (stacked Draft #282)

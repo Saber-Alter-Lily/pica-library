@@ -11,6 +11,7 @@ on:
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/LocalComicImportActivity.java'
       - 'scripts/run-s3-android-local-emulator.sh'
       - 'scripts/s3-android-local-emulator-flow.py'
+      - 'docs/R1_LOCAL_CORE_DUAL_PLATFORM_CANDIDATE_20261102.md'
   pull_request:
     paths:
       - '.github/workflows/s3-android-local-emulator.yml'

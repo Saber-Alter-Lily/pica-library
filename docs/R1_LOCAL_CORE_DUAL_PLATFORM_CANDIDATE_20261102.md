@@ -1,6 +1,6 @@
 # R1: Windows + Android local-core candidate (2026-11-02)
 
-Status: IMPLEMENTED_IN_DRAFT. Formal product / physical-device acceptance NOT YET VERIFIED. Integration Draft PR #284; production main, v0.5.0, Release and OTA are unchanged.
+Status: IMPLEMENTED_IN_DRAFT. Windows first physical ZIP and extracted run verified at `e65f2860` ([Actions #41433611974](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41433611974)); exact latest HEAD and physical device acceptance remain independent. Formal product / physical-device acceptance NOT YET VERIFIED. Integration Draft PR #284; production main, v0.5.0, Release and OTA are unchanged.
 
 ## One concrete user journey
 

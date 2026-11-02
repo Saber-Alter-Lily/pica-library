@@ -1,5 +1,14 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-11-01｜S3 CORE-ANDROID-22：正式 Android 的本地书库一体化功能批次
+
+- **推进阶段**：继 #278 独立 QA 的本地书库搜索/排序/已读状态/续读/书架操作已完成且修复模拟器操作定位后，将真实用户需要的这些功能全部接回**原 Android `app/LocalComicImportActivity`**，不继续另造 QA 书库产品。原 Android 的读取和 UI 使用原 `Ui`、`LocalizedText`、`ReaderActivity`、`ReadingHistoryStore`、`ShelfStore`、`UnifiedCatalogStore` 与正式数据路径；隔离 QA 仍使用自己的 `ReaderHistoryLedger.localFile` 和 `ShelfLedger.localFile`，**两者不共享或迁移用户数据文件**。
+- **代码复用**：新增唯一 `:local-storage/LocalLibraryBrowse` 只读查询策略；来源无关的原 `LocalComicReaderPort.books` 返回真实已导入 ID、页数和时间；现有 v1 阅读 session 决定已读/最近章节页。正式 app 与原独立 QA App 都实际调用同一筛选排序/历史合并。Mihon 本地书库/阅读状态和 Kavita 筛选排序作为开源交互参考，无第三方源代码复制、无新 SDK/数据库/网络/运行时/Reader。
+- **用户功能一次成批交付**：标题即时搜索（全库筛选后渲染前100条）、最近/标题/页数排序、全部/已读/未读切换、最近已读快捷入口和原 Reader 同章节同页续读、作品卡片长按直接选已存书架或新建书架并加入。书架操作走正式原 `ShelfStore.setMembership` / schema2 tombstone + Catalog 更新；纯 QA 仍走自身隔离 ShelfLedger。原 SAF 导入/导出、确认删除、双客户端旧元数据/缓存、用户默认网络与账号逻辑均不改变。
+- **回归**：保留原 Android `LocalComicImportTest`，只补一项真实合成 SAF 导入→原阅读历史写入→公用已读/未读/标题过滤→原图片字节不变；原 `native-local-export-contract` 随真实 `book.id` API 名调整但不放宽导出/安全要求。#278 的脚本错误经真实证据确认：长按误命中顶部含同标题的“继续阅读”，非压缩器问题。修正测试对实际四页书库行定位后，#278 最终 21/21 CI/workflows 成功，独立 Emulator 包含 CBZ 真保存重导回字节检查。
+- **本批独立门禁**：Draft #279 的完整 Android/Robolectric/lint/release + Web/Desktop/Chromium、独立无源 APK DEX/Manifest + Android35 SAF/Reader/导出均按最终 SHA 单独验收；**不能继承 #278 绿灯**。原正式安装应用真实 UI/真机与多语言窄屏、旧数据实物升级回滚、可信来源签名/Android Binder/第二真实 Provider、用户最终 G1–G4 均 OPEN。暂不合并 main、发布 Release/OTA 或读取生产用户私有资料。
+- 后续重点：针对已冻结的完整用户业务场景，对原正式 Desktop/Android 做功能对照与跨来源/来源关闭后的真实阅读链路；基于明确缺陷再改，不以继续增加工程薄片数量替代正式可用性验收。详见 `docs/S3_ANDROID_PRODUCTION_LOCAL_BROWSE_20261101.md`。
+
 ### 2026-11-01 S3 CORE-ANDROID-21｜本地真实书库一批次补齐常用浏览与续读（仍为 Draft）
 
 - 不再拆成五个无关小 PR。本轮在原 `:local-app/LocalLibraryActivity` 一次实现**搜索标题、最近/名称/页数排序、全部/已读/未读筛选、最近继续阅读和作品长按直接加入书架**。全部调用已经抽离的 `LocalComicReaderPort.books()`、`ReaderHistoryLedger`、`ReaderProgressLedger.seedOneShotPosition`、`ShelfLedger.setMembership` 和旧 `ReaderScreenActivity`，不新增数据库、阅读器、来源、专用网络或依赖。

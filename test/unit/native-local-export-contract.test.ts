@@ -132,7 +132,7 @@ describe('native local body export source contracts, not native runtime proof', 
         expect(ui).not.toMatch(/getMessage\(\)|printStackTrace|Log\.[deiw]|takePersistableUriPermission/)
     })
     it('routes owned imports from cards and the copy menu, not all provider/cache rows', () => {
-        expect(java('LocalComicImportActivity.java')).toContain('"local-export:"+comic.id')
+        expect(java('LocalComicImportActivity.java')).toContain('"local-export:"+book.id')
         const detail = java('UnifiedComicDetailActivity.java')
         expect(detail).toContain('if(entry.localImported){rows.add(getString(R.string.local_export_title))')
         expect(detail).toContain('Intent export=new Intent(this,LocalComicExportActivity.class)')

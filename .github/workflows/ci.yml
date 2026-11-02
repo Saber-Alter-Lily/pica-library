@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # Only deduplicate the ongoing R1/R2 integration branch; never cancel main.
+  cancel-in-progress: ${{ github.head_ref == 'codex/product-integration-r1-20261102' || github.ref == 'refs/heads/codex/product-integration-r1-20261102' }}
 permissions:
   contents: read
 

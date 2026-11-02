@@ -7,6 +7,7 @@ on:
       - '.github/workflows/s3-android-local-emulator.yml'
       - 'mobile/android-alpha2/local-app/**'
       - 'mobile/android-alpha2/user-host-core/**'
+      - 'mobile/android-alpha2/source-bridge/**'
       - 'mobile/android-alpha2/user-host-app/**'
       - 'mobile/android-alpha2/local-storage/**'
       - 'mobile/android-alpha2/reader-view/**'
@@ -23,11 +24,16 @@ on:
       - 'scripts/s3-android-local-emulator-flow.py'
       - 'mobile/android-alpha2/local-app/**'
       - 'mobile/android-alpha2/user-host-core/**'
+      - 'mobile/android-alpha2/source-bridge/**'
       - 'mobile/android-alpha2/user-host-app/**'
       - 'mobile/android-alpha2/local-storage/**'
       - 'mobile/android-alpha2/reader-view/**'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # Only deduplicate the ongoing R1/R2 integration branch; never cancel main.
+  cancel-in-progress: ${{ github.head_ref == 'codex/product-integration-r1-20261102' || github.ref == 'refs/heads/codex/product-integration-r1-20261102' }}
 permissions:
   contents: read
 

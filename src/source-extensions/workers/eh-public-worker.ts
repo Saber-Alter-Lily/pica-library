@@ -1,5 +1,6 @@
 import { EH_PUBLIC_WORKER_ID } from '../eh-public-identity'
 import { createEhPublicReaderTransport } from '../eh-public-reader-transport'
+import { externalSearchQuery } from '../reader-contract'
 
 /**
  * Standalone OPTIONAL first-party E-H public-read worker.
@@ -42,6 +43,11 @@ async function handle(value: unknown) {
             return
         }
         if (session !== admittedSession) throw new Error('Session is not admitted')
+        if (value.operation === 'search' &&
+            Object.keys(value).sort().join(',') === 'id,operation,query,session,version') {
+            reply(true, await transport.search!(externalSearchQuery(value.query)))
+            return
+        }
         if (value.operation === 'episodes' &&
             Object.keys(value).sort().join(',') === 'comicId,id,operation,session,version') {
             reply(true, await transport.episodes(String(value.comicId)))

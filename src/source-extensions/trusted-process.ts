@@ -6,7 +6,9 @@ import {
     externalComicIdentity,
     externalEpisodeIdentity,
     externalPageLocator,
+    externalSearchQuery,
     normalizeExternalReaderManifest,
+    validateExternalSearchResults,
     validateExternalEpisodes,
     validateExternalMedia,
     validateExternalPages,
@@ -34,13 +36,14 @@ export interface TrustedSourceWorker {
     requestTimeoutMs?: number
 }
 
-type Operation = 'hello' | 'episodes' | 'pages' | 'media'
+type Operation = 'hello' | 'search' | 'episodes' | 'pages' | 'media'
 interface Request {
     version: 1
     session: string
     id: number
     operation: Operation
     comicId?: string
+    query?: string
     episodeId?: string
     pageKey?: string
 }
@@ -242,6 +245,15 @@ export class TrustedSourceProcess implements ExternalReaderTransport, ExternalRe
                 if (error) this.fail(new Error('Source worker IPC send failed'))
             })
         })
+    }
+
+    /** Optional v1 IPC command; old Reader-only workers may reject without losing the session. */
+    async search(query: string) {
+        this.assertEnabled()
+        const requested = externalSearchQuery(query)
+        const response = await this.sendRequest('search', { query: requested }, 15000)
+        this.assertEnabled()
+        return validateExternalSearchResults(this.manifest.id, response)
     }
 
     async episodes(comicId: string): Promise<ExternalReaderEpisode[]> {

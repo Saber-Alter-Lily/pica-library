@@ -36,7 +36,15 @@ export interface ExternalReaderMedia {
     contentType: string
 }
 
+/** Read-only source-owned search result; never a URL or executable descriptor. */
+export interface ExternalReaderSearchResult {
+    comicId: string
+    title: string
+}
+
 export interface ExternalReaderTransport {
+    /** Optional explicit search. Existing signed Reader-only sources remain valid. */
+    search?(query: string): Promise<ExternalReaderSearchResult[]>
     episodes(comicId: string): Promise<ExternalReaderEpisode[]>
     pages(comicId: string, episodeId: string): Promise<ExternalReaderPage[]>
     media(comicId: string, pageKey: string): Promise<ExternalReaderMedia>
@@ -101,6 +109,34 @@ export function externalRuntimeRevision(value: string) {
     if (typeof value !== 'string' || !REVISION.test(value))
         throw new Error('Invalid external reader runtime revision')
     return value
+}
+
+/** One user-initiated bounded search, not a URL fetch or ambient discovery. */
+export function externalSearchQuery(value: unknown): string {
+    if (typeof value !== 'string' || value.length < 2 || value.length > 120 ||
+        value.trim() !== value || /[\u0000-\u001f\u007f]/.test(value))
+        throw new Error('Invalid signed source search query')
+    return value
+}
+
+export function validateExternalSearchResults(
+    sourceId: string, value: unknown
+): ExternalReaderSearchResult[] {
+    if (!Array.isArray(value) || value.length > 25)
+        throw new Error('Invalid signed source search results')
+    const known = new Set<string>()
+    return value.map(item => {
+        if (!object(item) || !exactKeys(item, ['comicId', 'title']) ||
+            typeof item.comicId !== 'string' ||
+            typeof item.title !== 'string' || !item.title.trim() ||
+            item.title.length > 256 || /[\u0000-\u001f\u007f]/.test(item.title))
+            throw new Error('Invalid signed source search result')
+        const comicId = externalComicIdentity(sourceId, item.comicId)
+        if (known.has(comicId))
+            throw new Error('Duplicate signed source search result')
+        known.add(comicId)
+        return { comicId, title: item.title }
+    })
 }
 
 export function externalPageLocator(sourceId: string, comicId: string, key: string) {

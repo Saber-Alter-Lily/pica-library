@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { SignedReaderInputError } from '../source-extensions/signed-reader-errors'
 import type { ReadingLibraryRow } from '../library/reading-library'
-import type { ExternalReaderAccess, ExternalReaderTransport } from '../source-extensions/reader-contract'
+import {
+    externalSearchQuery,
+    type ExternalReaderAccess, type ExternalReaderTransport
+} from '../source-extensions/reader-contract'
 import type {
     OnlineReaderCache, OnlineReaderState, OnlineReaderContract, OnlineReaderSource
 } from '../services/online-reader-service'
@@ -22,6 +25,8 @@ export interface SignedReaderIdentityBridge {
         access: ExternalReaderAccess
     ): { source: OnlineReaderSource; contract: OnlineReaderContract }
     ownsComicId(comicId: string): boolean
+    /** App-owned codec from a worker-scoped search ID to an existing catalogue ID. */
+    projectSearchComicId?(workerComicId: string): string
     /** Optional app-owned catalogue projection identity for legacy migration. */
     readingSource?: Readonly<{ key: string; label: string }>
 }
@@ -155,6 +160,28 @@ export class SignedSourceDesktopReader {
             // Only the application's injected native picker can choose an
             // archive. No path, URL, payload or public key crosses HTTP.
             return this.packageInstaller.installChosen()
+        }
+        if (op === 'search') {
+            if (!exact(raw, ['operation', 'sessionId', 'query']))
+                throw new SignedReaderInputError()
+            let query: string
+            try { query = externalSearchQuery(raw.query) }
+            catch { throw new SignedReaderInputError() }
+            const sessionId = field(raw.sessionId)
+            const session = this.forSession(sessionId)
+            const matches = await session.worker.search(query)
+            // Search is a network operation. Revocation during it must
+            // never leak stale results to the browser after the source stops.
+            this.forSession(sessionId)
+            const bridge = this.identityBridges.get(session.sourceId)
+            const items = matches.map(hit => {
+                const comicId = bridge?.projectSearchComicId?.(hit.comicId) ??
+                    hit.comicId
+                if (!this.ownsSourceComic(session.sourceId, comicId))
+                    throw new SignedReaderInputError()
+                return { comicId, title: hit.title }
+            })
+            return { sessionId, sourceId: session.sourceId, query, items }
         }
         if (op === 'status') {
             if (!exact(raw, ['operation', 'sourceId']))

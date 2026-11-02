@@ -173,7 +173,7 @@ describe('S3 signed source generations: real worker lifecycle', () => {
             { comicId: 'demo:book1', title: 'Offline QA searchable book' }
         ])
         await expect(worker.search('bad-owner')).rejects.toThrow(
-            'Invalid'
+            'Comic does not belong to this source'
         )
         await expect(worker.search('a')).rejects.toThrow(
             'Invalid signed source search query'

@@ -101,9 +101,13 @@ export function verifiedFullWebQaAssets(
         if (!entries.has(required) ||
             !html.includes('src="./' + required + '"'))
             throw new Error('Optional Host Web UI is incomplete')
-    if (!userHost && [...HOST_WEB_UI].some(name =>
-        entries.has(name) || html.includes('src="./' + name + '"')))
-        throw new Error('Normal source-free Web stage includes Host UI')
+    // Original app.js already imports host-library.js as a passive helper.
+    // Only the two Host management initializers, or a new top-level Host
+    // script, would expand the ordinary zero-Host composition.
+    if (!userHost && (
+        ['source-hosts.js', 'saved-source-hosts.js'].some(name => entries.has(name)) ||
+        [...HOST_WEB_UI].some(name => html.includes('src="./' + name + '"'))
+    )) throw new Error('Normal source-free Web stage includes Host UI')
     for (const id of ['home', 'library', 'shelves', 'reader', 'settings'])
         if (!html.includes('id="' + id + '"'))
             throw new Error('Original full Web view is absent: ' + id)

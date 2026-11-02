@@ -102,15 +102,17 @@ export async function buildOfflineCoreCandidate(
     for (const required of [
         ...REQUIRE_SOURCE.filter(item => item !== ENTRY),
         ...(kind === 'qa-cli' ? [ENTRY] :
-            [PREVIEW_ENTRY, 'src/desktop/instance.ts',
-                ...(kind === 'desktop-core-host-preview' ? [USER_HOST_ENTRY] : [])])
+            [kind === 'desktop-core-host-preview' ? USER_HOST_ENTRY : PREVIEW_ENTRY,
+                'src/desktop/core-preview-runtime.ts',
+                'src/desktop/instance.ts'])
     ]) if (!sourceInputs.includes(required))
         throw new Error('Offline core lost an actual local Reader dependency: ' + required)
     for (const item of sourceInputs) {
         // Audit the original native picker/OS launcher utility as well as
         // the preview entry and instance lock. No source SDK or Host code.
         const allowedPreviewDesktop = kind !== 'qa-cli' &&
-            [PREVIEW_ENTRY, 'src/desktop/instance.ts',
+            [PREVIEW_ENTRY, 'src/desktop/core-preview-runtime.ts',
+                'src/desktop/instance.ts',
                 'src/desktop/core-local-profile.ts',
                 'src/desktop/pickers.ts', 'src/desktop/child-process.ts',
                 'src/desktop/platform.ts',

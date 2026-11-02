@@ -9,14 +9,14 @@
  */
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { runCoreDesktopPreview } from './core-preview-main'
+import { runCoreDesktopPreview } from './core-preview-runtime'
 import { SourceHostInspector } from '../source-hosts/inspector'
 import { SourceHostConnections } from '../source-hosts/connections'
 import { sourceHostHttp } from '../source-hosts/http-transport'
 import { HostedLibraryReader } from '../source-hosts/library-reader'
 import { sourceHostStore } from './source-host-store'
 import { PreviewCacheManager } from '../services/preview-cache-manager'
-import type { CoreUserHostFactory } from './core-preview-main'
+import type { CoreUserHostFactory } from './core-preview-runtime'
 
 const makeUserHost: CoreUserHostFactory = (root, database) => {
     const inspector = new SourceHostInspector(sourceHostHttp)

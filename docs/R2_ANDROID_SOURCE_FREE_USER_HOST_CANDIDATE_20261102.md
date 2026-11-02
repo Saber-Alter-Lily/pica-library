@@ -30,3 +30,15 @@
 - 当前 R1 原双端自动化已通过，但 G1 真实设备体验、R2 真实外部源/撤销和来源信任、G3 旧版无痛升级、G4 发布批准均保持 OPEN；记录实际 CI 状态后才能表述为工程 PASS。
 
 最终发布仍需把上述模块整合为**原产品的统一 Android 安装/升级路径**，不能把独立 QA companion 误当成对现有 v0.5.0 用户的无痛升级。
+
+## 实体 Host → Reader → 断开后离线阅读的端到端验收（新增）
+
+既有 Android 35 模拟器流程现在还包含**原生 HTTP 传输级**样本，使用 Python 标准库在 GitHub Runner 本机启动只监听 127.0.0.1 的合成 Suwayomi 2.4 GraphQL 端点，并通过 adb reverse 与独立 Host APK 通信。这不是页面 mock、Robolectric，也不下载外部漫画源。测试按用户操作执行：
+
+1. 原独立 Host APK 启动时保持未连接；用户在实际 Native UI 填 Host URL、保存、授权启用；验证没有隐式请求；
+2. 明确连接后通过原 HostHttp/HostProtocol 获取服务器状态和源列表，用户选择测试源，真实 HTTP 搜索漫画；
+3. 实际 HostSourceManager 准备章节/页并取得 PNG，交给同一 ReaderScreenActivity 翻至第二页；
+4. 用户明确选择保存单章，原 HostOfflineSaver → LocalComicStore 复制两页到本 APP 的私有书库，读取真实文件校验 PNG 字节；
+5. 断开 Host 会话、返回原本地书库，在仍不连接 Host 的情况下用原 Reader 打开该章节。
+
+完整 ADB、截图、UI 树、Host 请求操作列表和文件一致性证据随原 s3-local-emulator Action 上传（测试失败则记录 FAIL，不跳过）。**合成 Host PASS 不代表真实公共来源可用、授权或法律合规；实机 G1、真实多来源及签名 G2、旧版升级 G3、Release G4 仍 OPEN。**

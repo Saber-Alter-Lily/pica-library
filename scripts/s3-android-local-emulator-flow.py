@@ -715,11 +715,15 @@ def source_free_user_host_flow():
                        f"http://127.0.0.1:{port}/")
         tap_scrolling(("Save configuration","保存配置","設定を保存"),
                       only_class="Button")
+        until_data("user-host-config-v1.json",lambda data:
+            data.get("endpoint")==f"http://127.0.0.1:{port}/" and
+            data.get("enabled") is False)
         # Consent is an explicit checkbox; neither save nor enable connects.
         tap_scrolling(("Authorize this Host session","我授权本次连接自己的 Host",
                        "この接続を許可します"),only_class="CheckBox")
         tap_scrolling(("Enable / disable Host","启用 / 停用 Host","Host 有効／無効"),
                       only_class="Button")
+        until_data("user-host-config-v1.json",lambda data: data.get("enabled") is True)
         assert not operations, f"Host connected implicitly: {operations}"
         page("24-host-saved-without-network")
         record("user-selected loopback Host configured/enabled with no automatic request")
@@ -757,6 +761,10 @@ def source_free_user_host_flow():
             if imported:break
             time.sleep(.75)
         assert imported, "Host chapter was not committed to the original local inventory"
+        local_page=("files/local-comics-v1/"+imported["id"].removeprefix("local:")+
+                    "/"+imported["generation"]+"/"+imported["pages"][0]["file"])
+        assert adb("exec-out","run-as",PACKAGE,"cat",local_page,
+                   binary=True)==pngs[0], "Host saved local raster differs from source"
         page("27-host-chapter-explicitly-saved")
         record("authorized Host chapter copied via original owned LocalComicStore")
 
@@ -800,7 +808,10 @@ def main():
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",
-            "package": QA_PACKAGE, "also_tested": ORIGINAL_PACKAGE}, ensure_ascii=False, indent=2), encoding="utf-8")
+            "package": QA_PACKAGE,
+            "also_tested": [ORIGINAL_PACKAGE, USER_HOST_PACKAGE],
+            "network_source": "synthetic loopback Suwayomi only"},
+            ensure_ascii=False, indent=2), encoding="utf-8")
         print("S3 LOCAL END-TO-END PASS", flush=True)
     except Exception as error:
         print(f"S3 LOCAL END-TO-END FAIL at {STEP}: {error}", file=sys.stderr, flush=True)

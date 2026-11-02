@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+### 2026-11-01 | S3 CORE-ANDROID-21: local catalogue browse, resume and shelf workflow (stacked Draft)
+
+- Implemented together in the **existing** source-free Android `:local-app`: local-title live search; recently imported/title/page-count sort; all/read/unread filter; most recently read quick resume and per-row resume; direct long-press add to a named shelf alongside original CBZ export/removal. Uses original `LocalComicReaderPort` immutable manifests, `ReaderHistoryLedger` session order, `ReaderProgressLedger` page restore and `ShelfLedger.setMembership` tombstone semantics, not duplicate storage or Reader.
+- Native Android `EditText`/dialog/buttons only. OSS design references: Mihon categories/read/unread filters; Kavita library sorting. No upstream source code copied, no additional packages/test frameworks/network/source SDK.
+- Expanded **one existing** Android 35 SAF/Reader/restart emulator flow to exercise revived shelf membership, saved-page quick resume and read-state filter; retains the existing real image byte and import/export proof rather than adding test scaffolds.
+- Code checkpoint `b563683411deb788232e31feea4e7c86d188d6d6`. **PENDING** exact-head full CI, independent QA APK six-DEX/Manifest source absence, Android 35 E2E. Do not infer PASS from previous #277 green. G1 physical UX, G2 external providers, G3 actual v0.5.0 old data migration and G4 signed release remain OPEN. No main merge, publication, OTA or production user-data mutation.
+- Technical delivery and boundary: `docs/S3_ANDROID_LOCAL_LIBRARY_BROWSE_20261101.md`.
+
 ### 2026-11-01｜S3 SIGNED-SRC-09：本地可信 ZIP 安装复用原签名模块和原生选择器（隔离 Draft）
 
 - **复用优先**：原 `SignedWorkerStore.install`（应用预置 Ed25519 公钥与 SHA256、按代安装）、原 `TrustedSourceProcess`、`DesktopNativePicker` Windows WinForms / macOS AppleScript / Linux 原生 OpenFileDialog，以及已有 `adm-zip`；不创造新的插件 ABI、压缩器或来源市场。

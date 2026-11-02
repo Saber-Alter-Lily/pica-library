@@ -355,6 +355,42 @@ def remove_member_without_deleting(comic):
     record("shelf removal writes original tombstone without deleting the imported comic")
 
 
+
+def browse_and_resume_flow(comic):
+    global STEP
+    STEP = "local-browse-resume"
+    # Reuse the actual imported row, long-press menu, shelf ledger and Reader.
+    # A shelf tombstone exists from the preceding flow; adding revives membership.
+    x, y, _ = wait(("4 pages", "4 页", "4 ページ"), seconds=25)
+    adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "1400")
+    tap(("Add to shelf", "加入书架", "本棚に追加"), exact=True)
+    tap("QA_Shelf", exact=True)
+    shelf = until_data("portable-shelves-v1.json",
+        lambda root: any(
+            any(item["comicId"] == comic["id"] and not item["deletedAt"]
+                for item in row["items"])
+            for row in root["shelves"]))
+    assert any(item["comicId"] == comic["id"] and not item["deletedAt"]
+               for row in shelf["shelves"] for item in row["items"]), shelf
+    record("library long press -> original shelf ledger revives tombstoned membership")
+
+    tap(("Continue reading", "继续阅读", "続きを読む"), seconds=25)
+    wait_page_counter("2 / 3", seconds=30)
+    return_to_library()
+    record("library quick continue -> original chapter and saved page after force stop")
+
+    # One actual screen-level read-status case. This is not a substitute for
+    # full G1 visual matrix or physical-device testing.
+    tap(("All ▾", "全部 ▾", "すべて ▾"), exact=True, only_class="Button")
+    tap(("Unread", "未读", "未読"), exact=True)
+    wait(("No matching comics", "没有匹配的作品", "一致する作品なし"), seconds=15)
+    tap(("Unread ▾", "未读 ▾", "未読 ▾"), exact=True, only_class="Button")
+    tap(("All", "全部", "すべて"), exact=True)
+    wait(("4 pages", "4 页", "4 ページ"), seconds=20)
+    page("09a-library-browse-restored")
+    record("actual read-status filter uses original persisted local history")
+
+
 def import_folder():
     tap(("Import folder", "导入文件夹", "フォルダー取込"))
     page("10-folder-picker")
@@ -373,7 +409,10 @@ def import_folder():
 def export_cbz():
     global STEP
     STEP = "export-cbz"
-    x, y, _ = wait("S3-QA-Comic", seconds=30)
+    # Target the original four-page list row, not the Continue Reading button
+    # which also includes S3-QA-Comic in its accessible label. The previous
+    # exact run opened the Reader by long-pressing that button.
+    x, y, _ = wait(("4 pages", "4 页", "4 ページ"), seconds=30)
     adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "1300")
     tap(("Export CBZ", "导出 CBZ", "CBZ に書き出す"), seconds=18, exact=True)
     wait(("Save", "保存", "保存する"), seconds=35, exact=True, only_class="Button")
@@ -426,6 +465,7 @@ def main():
         reader_flow()
         restart_history(comic)
         remove_member_without_deleting(comic)
+        browse_and_resume_flow(comic)
         import_folder()
         export_cbz()
         (ROOT / "results.json").write_text(json.dumps({

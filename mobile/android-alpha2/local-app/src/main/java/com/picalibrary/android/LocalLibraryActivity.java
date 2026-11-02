@@ -8,10 +8,14 @@ import com.picalibrary.android.local.LocalComicExporter;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
@@ -19,7 +23,13 @@ import android.widget.TextView;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -31,7 +41,15 @@ public final class LocalLibraryActivity extends Activity {
     private static final int PICK_FOLDER=7101, PICK_CBZ=7102, CREATE_CBZ=7103;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ArrayList<LocalComicReaderPort.Book> books=new ArrayList<>();
+    private final ArrayList<LocalComicReaderPort.Book> inventory=new ArrayList<>();
+    private final Map<String,ReaderHistoryLedger.Session> recent=new HashMap<>();
     private volatile boolean destroyed, cancelImport;
+    private String query="";
+    private int sortMode,readMode,refreshSerial;
+    private EditText queryField;
+    private Button sortButton,readButton,continueButton;
+    private LocalComicReaderPort.Book continueBook;
+    private ReaderHistoryLedger.Session continueSession;
     private LocalComicStore.Preview pending;
     private Button folderButton,cbzButton,cancelButton;
     private TextView status;
@@ -58,7 +76,12 @@ public final class LocalLibraryActivity extends Activity {
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
-        if(saved!=null)exportComicId=saved.getString("pendingExportComicId","");
+        if(saved!=null){
+            exportComicId=saved.getString("pendingExportComicId","");
+            query=saved.getString("libraryQuery","");
+            sortMode=saved.getInt("librarySort",0);
+            readMode=saved.getInt("libraryRead",0);
+        }
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(16),dp(20),dp(16),dp(12));
@@ -95,6 +118,69 @@ public final class LocalLibraryActivity extends Activity {
         folderButton.setOnClickListener(v->choose(PICK_FOLDER));
         cbzButton.setOnClickListener(v->choose(PICK_CBZ));
 
+        // Native Android controls, following Mihon's library browse pattern.
+        // The immutable local manifest, shelves and history are the only data sources.
+        LinearLayout browse=new LinearLayout(this);
+        browse.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        queryField=new EditText(this);
+        queryField.setSingleLine(true);
+        queryField.setTextColor(Color.WHITE);
+        queryField.setHintTextColor(Color.LTGRAY);
+        queryField.setTextSize(14);
+        queryField.setHint(copy("搜索已导入作品","Search imported comics","取込済み作品を検索"));
+        queryField.setText(query);
+        browse.addView(queryField,new LinearLayout.LayoutParams(0,dp(48),1));
+        sortButton=compactAction();
+        readButton=compactAction();
+        browse.addView(sortButton,new LinearLayout.LayoutParams(dp(76),dp(48)));
+        browse.addView(readButton,new LinearLayout.LayoutParams(dp(76),dp(48)));
+        root.addView(browse);
+        updateBrowseLabels();
+        queryField.addTextChangedListener(new TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+            public void onTextChanged(CharSequence s,int start,int before,int count){
+                query=s.toString();
+                renderBooks();
+            }
+            public void afterTextChanged(Editable value){}
+        });
+        sortButton.setOnClickListener(v->new AlertDialog.Builder(this)
+            .setTitle(copy("书库排序","Sort library","書庫の並び替え"))
+            .setSingleChoiceItems(new String[]{
+                copy("最近导入","Recently imported","最近取り込んだ順"),
+                copy("标题 A-Z","Title A-Z","タイトル順"),
+                copy("页数从多到少","Most pages","ページ数の多い順")
+            },sortMode,(dialog,which)->{
+                sortMode=which;
+                updateBrowseLabels();
+                renderBooks();
+                dialog.dismiss();
+            }).setNegativeButton(android.R.string.cancel,null).show());
+        readButton.setOnClickListener(v->new AlertDialog.Builder(this)
+            .setTitle(copy("阅读状态","Reading status","閲覧状態"))
+            .setSingleChoiceItems(new String[]{
+                copy("全部","All","すべて"),
+                copy("未读","Unread","未読"),
+                copy("已读","Read","既読")
+            },readMode,(dialog,which)->{
+                readMode=which;
+                updateBrowseLabels();
+                renderBooks();
+                dialog.dismiss();
+            }).setNegativeButton(android.R.string.cancel,null).show());
+        continueButton=action("");
+        continueButton.setSingleLine(true);
+        continueButton.setEllipsize(TextUtils.TruncateAt.END);
+        continueButton.setVisibility(View.GONE);
+        continueButton.setOnClickListener(v->{
+            if(!busy&&continueBook!=null&&continueSession!=null)
+                openBook(continueBook,continueSession);
+        });
+        root.addView(continueButton,new LinearLayout.LayoutParams(-1,dp(48)));
+        // Avoid opening the keyboard every time this QA-only library starts.
+        root.setFocusableInTouchMode(true);
+        root.requestFocus();
+
         LinearLayout taskBar=new LinearLayout(this);
         taskBar.setGravity(android.view.Gravity.CENTER_VERTICAL);
         indicator=new ProgressBar(this);
@@ -126,9 +212,14 @@ public final class LocalLibraryActivity extends Activity {
             @Override public View getView(int position,View convertView,ViewGroup parent){
                 TextView item=convertView instanceof TextView?(TextView)convertView:label("",16);
                 LocalComicReaderPort.Book book=getItem(position);
-                if(book!=null)item.setText(book.title+"\n"+book.pageCount+
-                    copy(" 页 · 点击阅读，长按操作"," pages · Tap to read; hold for actions",
-                         " ページ · タップで読む、長押しで操作"));
+                if(book!=null){
+                    ReaderHistoryLedger.Session last=recent.get(book.id);
+                    item.setText(book.title+"\n"+book.pageCount+
+                        copy(" 页 · 点击阅读，长按操作"," pages · Tap to read; hold for actions",
+                             " ページ · タップで読む、長押しで操作")+
+                        (last==null?"":copy(" · 续读第 "," · Resume page "," · 続きは")+
+                            (last.lastPage+1)+copy("页","","ページ")));
+                }
                 item.setPadding(dp(10),dp(13),dp(10),dp(13));
                 item.setMinHeight(dp(64));
                 return item;
@@ -138,22 +229,31 @@ public final class LocalLibraryActivity extends Activity {
         list.setOnItemClickListener((parent,view,position,id)->{
             if(busy||position<0||position>=books.size())return;
             LocalComicReaderPort.Book book=books.get(position);
-            Intent open=new Intent(this,LocalReaderActivity.class);
-            open.putExtra("source","local");
-            open.putExtra("comicId",book.id);
-            open.putExtra("title",book.title);
-            startActivity(open);
+            openBook(book,recent.get(book.id));
         });
         list.setOnItemLongClickListener((parent,view,position,id)->{
             if(busy||position<0||position>=books.size())return true;
             LocalComicReaderPort.Book book=books.get(position);
-            new AlertDialog.Builder(this)
-                .setTitle(book.title)
-                .setItems(new String[]{
-                    copy("导出 CBZ","Export CBZ","CBZ に書き出す"),
-                    copy("删除本地副本","Remove local copy","ローカルコピーを削除")
-                },(dialog,choice)->{
-                    if(choice==0){chooseExport(book);return;}
+            boolean canResume=recent.containsKey(book.id);
+            String[] options=canResume?new String[]{
+                copy("继续阅读","Continue reading","続きを読む"),
+                copy("加入书架","Add to shelf","本棚に追加"),
+                copy("导出 CBZ","Export CBZ","CBZ に書き出す"),
+                copy("删除本地副本","Remove local copy","ローカルコピーを削除")
+            }:new String[]{
+                copy("加入书架","Add to shelf","本棚に追加"),
+                copy("导出 CBZ","Export CBZ","CBZ に書き出す"),
+                copy("删除本地副本","Remove local copy","ローカルコピーを削除")
+            };
+            new AlertDialog.Builder(this).setTitle(book.title)
+                .setItems(options,(dialog,choice)->{
+                    int index=choice;
+                    if(canResume){
+                        if(index==0){openBook(book,recent.get(book.id));return;}
+                        index--;
+                    }
+                    if(index==0){addToShelf(book);return;}
+                    if(index==1){chooseExport(book);return;}
                     new AlertDialog.Builder(this)
                         .setTitle(copy("删除此本地副本？","Remove local copy?","ローカルコピーを削除しますか？"))
                         .setMessage(book.title)
@@ -170,6 +270,9 @@ public final class LocalLibraryActivity extends Activity {
 
     @Override protected void onSaveInstanceState(Bundle state){
         state.putString("pendingExportComicId",exportComicId);
+        state.putString("libraryQuery",query);
+        state.putInt("librarySort",sortMode);
+        state.putInt("libraryRead",readMode);
         super.onSaveInstanceState(state);
     }
 
@@ -187,6 +290,145 @@ public final class LocalLibraryActivity extends Activity {
         if(!working)pageProgress.setVisibility(View.GONE);
         cancelButton.setVisibility(working&&canCancel?View.VISIBLE:View.GONE);
         cancelButton.setEnabled(canCancel);
+        if(sortButton!=null)sortButton.setEnabled(!working);
+        if(readButton!=null)readButton.setEnabled(!working);
+        if(continueButton!=null)continueButton.setEnabled(!working&&pending==null);
+    }
+
+    private Button compactAction(){
+        Button button=action("");
+        button.setTextSize(12);
+        button.setMinWidth(0);
+        button.setPadding(0,0,0,0);
+        return button;
+    }
+
+    private void updateBrowseLabels(){
+        if(sortButton!=null)sortButton.setText((sortMode==1?
+            copy("标题","Title","名前"):sortMode==2?
+            copy("页数","Pages","ページ"):
+            copy("最近","Recent","最近"))+" ▾");
+        if(readButton!=null)readButton.setText((readMode==1?
+            copy("未读","Unread","未読"):readMode==2?
+            copy("已读","Read","既読"):
+            copy("全部","All","すべて"))+" ▾");
+    }
+
+    private void openBook(LocalComicReaderPort.Book book,ReaderHistoryLedger.Session last){
+        if(busy)return;
+        Intent open=new Intent(this,LocalReaderActivity.class);
+        open.putExtra("source","local");
+        open.putExtra("comicId",book.id);
+        open.putExtra("title",book.title);
+        if(last!=null&&!last.chapterId.isEmpty()){
+            ReaderProgressLedger.seedOneShotPosition(this,book.id,last.chapterId,last.lastPage);
+            open.putExtra("episodeId",last.chapterId);
+        }
+        startActivity(open);
+    }
+
+    private void addToShelf(LocalComicReaderPort.Book book){
+        if(busy||pending!=null)return;
+        worker.execute(()->{
+            List<ShelfLedger.Shelf> choices=new ArrayList<>();
+            for(ShelfLedger.Shelf shelf:ShelfLedger.load(
+                    ShelfLedger.localFile(getApplicationContext())).activeShelves()){
+                boolean member=false;
+                for(ShelfLedger.Item item:shelf.activeItems())
+                    if(book.id.equals(item.comicId)){member=true;break;}
+                if(!member)choices.add(shelf);
+            }
+            runOnUiThread(()->{
+                if(destroyed||busy||pending!=null)return;
+                if(choices.isEmpty()){
+                    new AlertDialog.Builder(this)
+                        .setMessage(copy("没有可加入的书架。可以到书架页面新建，或作品已加入所有书架。",
+                            "No available shelf. Create one in Shelves, or this comic is already on every shelf.",
+                            "追加できる本棚がありません。本棚を作成するか、すでにすべてに追加されています。"))
+                        .setPositiveButton(copy("查看书架","Open shelves","本棚を見る"),
+                            (d,w)->startActivity(new Intent(this,LocalShelvesActivity.class)))
+                        .setNegativeButton(android.R.string.cancel,null).show();
+                    return;
+                }
+                String[] names=new String[choices.size()];
+                for(int i=0;i<choices.size();i++)names[i]=choices.get(i).name;
+                new AlertDialog.Builder(this)
+                    .setTitle(copy("加入书架","Add to shelf","本棚に追加"))
+                    .setItems(names,(dialog,which)->{
+                        ShelfLedger.Shelf selected=choices.get(which);
+                        setWorking(true,false);
+                        status.setText(copy("正在加入书架…","Adding to shelf…","本棚に追加中…"));
+                        worker.execute(()->{
+                            String failure=null;
+                            try{
+                                ShelfLedger.Item item=new ShelfLedger.Item(
+                                    book.id,book.title,"","",
+                                    java.util.Collections.emptyList(),
+                                    java.util.Collections.emptyList(),
+                                    false,0,book.pageCount,ShelfLedger.now());
+                                ShelfLedger.setMembership(
+                                    ShelfLedger.localFile(getApplicationContext()),
+                                    selected.id,item,true);
+                            }catch(Exception e){failure=e.getMessage();}
+                            String error=failure;
+                            runOnUiThread(()->{
+                                if(destroyed)return;
+                                setWorking(false,false);
+                                if(error!=null)status.setText(copy("加入书架失败：",
+                                    "Add to shelf failed: ","本棚への追加に失敗：")+error);
+                                else refresh();
+                            });
+                        });
+                    }).setNegativeButton(android.R.string.cancel,null).show();
+            });
+        });
+    }
+
+    private void renderBooks(){
+        if(adapter==null)return;
+        String search=query.trim().toLowerCase(Locale.ROOT);
+        List<LocalComicReaderPort.Book> visible=new ArrayList<>();
+        for(LocalComicReaderPort.Book book:inventory){
+            if(!search.isEmpty()&&!book.title.toLowerCase(Locale.ROOT).contains(search))continue;
+            boolean hasRead=recent.containsKey(book.id);
+            if((readMode==1&&hasRead)||(readMode==2&&!hasRead))continue;
+            visible.add(book);
+        }
+        if(sortMode==1)visible.sort(Comparator
+            .comparing((LocalComicReaderPort.Book b)->b.title.toLowerCase(Locale.ROOT))
+            .thenComparing(b->b.id));
+        else if(sortMode==2)visible.sort(Comparator
+            .comparingInt((LocalComicReaderPort.Book b)->b.pageCount).reversed()
+            .thenComparing(b->b.title.toLowerCase(Locale.ROOT)));
+        else visible.sort(Comparator
+            .comparing((LocalComicReaderPort.Book b)->b.updatedAt).reversed()
+            .thenComparing(b->b.id));
+        books.clear();
+        books.addAll(visible);
+        adapter.notifyDataSetChanged();
+
+        continueBook=null;
+        continueSession=null;
+        for(ReaderHistoryLedger.Session session:recent.values()){
+            if(continueSession==null||session.lastReadAt.compareTo(continueSession.lastReadAt)>0){
+                for(LocalComicReaderPort.Book book:inventory)if(book.id.equals(session.comicId)){
+                    continueBook=book;
+                    continueSession=session;
+                    break;
+                }
+            }
+        }
+        if(continueButton!=null){
+            continueButton.setVisibility(continueBook==null?View.GONE:View.VISIBLE);
+            if(continueBook!=null)continueButton.setText(copy("继续阅读 · ",
+                "Continue reading · ","続きを読む · ")+continueBook.title);
+        }
+        if(!busy&&pending==null)status.setText(inventory.isEmpty()?
+            copy("书库为空，选择文件夹或 CBZ 导入。","Empty library. Import a folder or CBZ.",
+                 "書庫は空です。フォルダーか CBZ を取り込んでください。"):
+            (visible.isEmpty()?copy("没有匹配的作品：","No matching comics: ","一致する作品なし："):
+                copy("本地作品：","Imported comics: ","取込済み作品："))+
+            visible.size()+"/"+inventory.size());
     }
 
     private void choose(int request){
@@ -219,18 +461,25 @@ public final class LocalLibraryActivity extends Activity {
     }
 
     private void refresh(){
+        int serial=++refreshSerial;
         worker.execute(()->{
             List<LocalComicReaderPort.Book> found=new LocalComicReaderPort(getApplicationContext()).books();
-            found.sort(Comparator.comparing((LocalComicReaderPort.Book b)->b.updatedAt).reversed());
+            Set<String> available=new HashSet<>();
+            for(LocalComicReaderPort.Book book:found)available.add(book.id);
+            Map<String,ReaderHistoryLedger.Session> read=new LinkedHashMap<>();
+            for(ReaderHistoryLedger.Session session:ReaderHistoryLedger
+                    .load(ReaderHistoryLedger.localFile(getApplicationContext())).sorted()){
+                if("local".equals(session.sourceKind)&&available.contains(session.comicId)
+                        &&!session.chapterId.isEmpty())
+                    read.putIfAbsent(session.comicId,session);
+            }
             runOnUiThread(()->{
-                if(destroyed)return;
-                books.clear();
-                books.addAll(found);
-                adapter.notifyDataSetChanged();
-                if(!busy&&pending==null)status.setText(found.isEmpty()?
-                    copy("书库为空，选择文件夹或 CBZ 导入。","Empty library. Import a folder or CBZ.",
-                         "書庫は空です。フォルダーか CBZ を取り込んでください。"):
-                    copy("本地作品：","Imported comics:","取込済み作品：")+found.size());
+                if(destroyed||serial!=refreshSerial)return;
+                inventory.clear();
+                inventory.addAll(found);
+                recent.clear();
+                recent.putAll(read);
+                renderBooks();
             });
         });
     }

@@ -249,13 +249,33 @@ public final class HostBrowserActivity extends Activity {
             Button read=action(results,t("阅读","Read","読む")+" · "+book.title);
             read.setOnClickListener(v->task(t("准备章节…","Preparing reader…","閲覧準備中…"),()->{
                 manager.select(book.id);
-                return ()->startActivity(new Intent(this,HostReaderActivity.class)
-                    .putExtra("source","host").putExtra("comicId",book.id)
-                    .putExtra("title",book.title));
+                String scope=manager.requireSession().scope;
+                return ()->openOwnedReader(book,scope);
             }));
             Button saveChapter=action(results,t("保存本地副本","Save chapter offline",
                 "章をローカル保存"));
             saveChapter.setOnClickListener(v->chooseChapter(book));
+        }
+    }
+
+    private void openOwnedReader(HostSourceManager.Book book,String scope){
+        // Prefer the EXACT original source-free Reader in its separate app
+        // identity, via the first-party signature-protected Binder bridge.
+        // If it is not installed, keep the existing Host APK Reader usable.
+        Intent original=new Intent().setClassName(
+                "com.picalibrary.android.localcore.qa",
+                "com.picalibrary.android.ExternalReaderActivity")
+            .putExtra("source","host").putExtra("comicId",book.id)
+            .putExtra("title",book.title).putExtra("scope",scope);
+        try {
+            startActivity(original);
+            status.setText(t("已在独立阅读器中打开",
+                "Opened in the separate Reader",
+                "別アプリの Reader で開きました"));
+        }catch(android.content.ActivityNotFoundException|SecurityException missing){
+            startActivity(new Intent(this,HostReaderActivity.class)
+                .putExtra("source","host").putExtra("comicId",book.id)
+                .putExtra("title",book.title));
         }
     }
 

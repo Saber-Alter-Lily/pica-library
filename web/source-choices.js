@@ -164,7 +164,7 @@ document.addEventListener('pica-language-change', localize)
  * install scripts or accept a worker path / publisher key from the browser.
  */
 const signedPanel = $('signed-source-manager')
-let signedCsrf = '', signedBusy = false, signedRows = []
+let signedCsrf = '', signedBusy = false, signedRows = [], signedCanInstall = false
 const signedSessions = new Map()
 const signedText = (tag, value) => {
     const element = document.createElement(tag)
@@ -174,8 +174,9 @@ const signedText = (tag, value) => {
 function signedLabels() {
     for (const [id, zh, en, ja] of [
         ['summary', '已验证的独立来源组件（实验）', 'Verified source components (experimental)', '検証済み配信元コンポーネント（実験）'],
-        ['help', '这里只管理应用已预置并验证签名的组件，不提供来源商店或脚本安装。操作均需主动确认，移除组件不会删除漫画和阅读记录。', 'Manage only app-provisioned, signature-verified components. No source marketplace or script installer. Actions require explicit selection; removing a component does not delete books or reading history.', 'アプリにより事前配置され署名検証されたコンポーネントのみ管理します。配信元ストアやスクリプト導入はありません。操作は明示的に選択し、削除しても漫画と読書履歴は保持されます。'],
-        ['refresh', '查看已安装的签名来源', 'Show installed signed sources', 'インストール済み署名ソースを表示']
+        ['help', '只允许应用预置公钥验证过的来源。支持主动选择本地签名 ZIP；不提供来源商店、脚本 URL 或自动安装。安装后仍需手动启用。', 'Only sources verified against the app-pinned publisher key are accepted. You may select a local signed ZIP; there is no marketplace, script URL or auto-install. Enabling is separate.', 'アプリが固定した公開鍵で検証できるソースのみ受け入れます。ローカル署名ZIPを選択できますが、配信元ストア・スクリプトURL・自動インストールはありません。有効化は別操作です。'],
+        ['refresh', '查看已安装的签名来源', 'Show installed signed sources', 'インストール済み署名ソースを表示'],
+        ['install', '选择本地已签名来源 ZIP', 'Install local signed source ZIP', 'ローカル署名ソースZIPを選択']
     ]) $('signed-source-' + id).textContent = t(zh, en, ja)
 }
 async function signedCommand(input) {
@@ -191,7 +192,8 @@ async function signedCommand(input) {
     return value
 }
 function signedInventory(value) {
-    if (value?.schemaVersion !== 1 || value.installAvailable !== false ||
+    if (value?.schemaVersion !== 1 ||
+        typeof value.installAvailable !== 'boolean' ||
         !Array.isArray(value.sources) || value.sources.length > 64 ||
         value.sources.some(source =>
             !/^[a-z][a-z0-9-]{2,31}$/.test(source.sourceId) ||
@@ -202,6 +204,7 @@ function signedInventory(value) {
             typeof source.connected !== 'boolean'))
         throw new Error('Invalid signed source inventory')
     signedRows = value.sources
+    signedCanInstall = value.installAvailable
     for (const [id] of signedSessions)
         if (!signedRows.some(row => row.sourceId === id && row.connected))
             signedSessions.delete(id)
@@ -293,6 +296,8 @@ function signedRender() {
         root.append(item)
     }
     $('signed-source-refresh').disabled = signedBusy
+    $('signed-source-install').hidden = !signedCanInstall
+    $('signed-source-install').disabled = signedBusy
 }
 async function signedOperate(input) {
     if (signedBusy || !signedCsrf || signedPanel.hidden) return
@@ -310,11 +315,16 @@ async function signedOperate(input) {
             }
         }
         signedInventory(await signedCommand({ operation: 'inventory' }))
-        $('signed-source-status').textContent = t(
-            '操作已完成；没有修改本地漫画与阅读记录。',
-            'Action completed. Local books and reading history were unchanged.',
-            '操作完了。ローカル漫画と読書履歴は変更されていません。'
-        )
+        $('signed-source-status').textContent = result?.cancelled === true
+            ? t(
+                '已取消本地签名来源选择；没有安装或启用任何组件。',
+                'Local signed source selection cancelled. Nothing installed or enabled.',
+                'ローカル署名ソースの選択をキャンセルしました。導入・有効化は行われていません。'
+            ) : t(
+                '操作已完成；没有修改本地漫画与阅读记录。',
+                'Action completed. Local books and reading history were unchanged.',
+                '操作完了。ローカル漫画と読書履歴は変更されていません。'
+            )
         document.dispatchEvent(new Event('pica-signed-reading-scope-changed'))
     } catch (error) {
         $('signed-source-status').textContent = t(
@@ -347,6 +357,7 @@ async function signedRefresh() {
         )
     } catch (error) {
         signedRows = []
+        signedCanInstall = false
         signedCsrf = ''
         $('signed-source-status').textContent = t(
             '无法读取可信来源组件。', 'Unable to load trusted source components.', '信頼済みソースを読み込めません。'
@@ -358,6 +369,15 @@ async function signedRefresh() {
 }
 if (signedPanel) {
     $('signed-source-refresh').onclick = () => void signedRefresh()
+    $('signed-source-install').onclick = () => {
+        if (signedBusy || !signedCanInstall) return
+        if (!window.confirm(t(
+            '仅接受由本应用可信发布者签名的本地 ZIP。确认打开系统文件选择器？安装后不会自动运行。',
+            'Only local ZIPs signed by the app-trusted publisher are accepted. Open the native file picker? Installation will not run the source.',
+            'アプリが信頼する発行元の署名付きローカルZIPのみ受け入れます。ファイル選択を開きますか？導入後も自動実行しません。'
+        ))) return
+        void signedOperate({ operation: 'install', consent: true })
+    }
     signedPanel.addEventListener('toggle', () => {
         if (signedPanel.open && !signedPanel.hidden) void signedRefresh()
     })

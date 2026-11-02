@@ -1,5 +1,14 @@
 # Pica Library Development Task Log
 
+### 2026-11-01｜S3 SIGNED-SRC-09：本地可信 ZIP 安装复用原签名模块和原生选择器（隔离 Draft）
+
+- **复用优先**：原 `SignedWorkerStore.install`（应用预置 Ed25519 公钥与 SHA256、按代安装）、原 `TrustedSourceProcess`、`DesktopNativePicker` Windows WinForms / macOS AppleScript / Linux 原生 OpenFileDialog，以及已有 `adm-zip`；不创造新的插件 ABI、压缩器或来源市场。
+- 新 `LocalSignedSourceInstaller` 只读取用户经原生文件选择器明确选出的本机 ZIP，要求恰好两个成员 `release.json` 与 `worker.cjs`，限制压缩与解压大小，由原 Store 验证签名/完整性后安装，不自动启动、启用或联网。公钥来自应用可信注入的 Store，不能随 ZIP 或 HTTP 传入；取消返回 cancelled。
+- 原受控 `SignedSourceDesktopReader` 增可信可选 installer 能力；`{operation:'install',consent:true}` 不带 path/bytes/key 才可执行；原库存 `installAvailable` 只在本机能力实际注入时 true。原 Web 设置新增三语言“选择本地已签名来源 ZIP”按钮，明确确认后经操作系统文件选择；普通正式 Desktop 未注入该控制器，按钮不出现；核心无来源客户端静态资产不加载源 UI。
+- 现有 `signed-worker-lifecycle`、`signed-source-desktop-http`、`desktop-native-pickers` 的单测覆盖真实 ZIP、伪签名/额外 ZIP 成员拒绝、取消、受控 HTTP 安装后原 Reader 与停用；原 `source-choices` Playwright 真实页面点击安装、确认浏览器只传 `consent`。验收必须按精确新提交 CI。
+- 仍缺正式发行者公钥、受保护 OS 安装根、跨平台发布、真实 E-H/Pica/JM 来源和 Android Service/Binder；不可把该工程候选说成公众可安全安装任意代码。G1–G4 仍 OPEN，main/Release/OTA/用户资料不动。
+
+
 ### 2026-11-01｜S3 SIGNED-SRC-08：可信签名来源接入原 Desktop 来源管理界面（隔离 Draft）
 
 - **第二轮独立源无关回归失败**：`446ef216` [CI #41323223846](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41323223846) 与新增浏览器用例提交 `f190f2a5` [CI #41323475391](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41323475391) Web/Desktop 实测都在旧 `reading-library-shell.test.ts` 的受控 VM 环境中失败：传入简化的 `document` 对象，但没有 `getElementById`（TypeError）；366/367 测试文件 PASS，故此处不是签名来源/服务错误。精确只补 `typeof document.getElementById === 'function'` 后再处理可选管理面板，其他启动/书库 API 不改，不替换或跳过现有测试。

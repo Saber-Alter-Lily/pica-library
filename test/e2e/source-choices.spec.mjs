@@ -181,9 +181,14 @@ test('trusted signed worker manager uses original Settings and never starts a so
             const input = request.postDataJSON()
             operations.push(input.operation)
             if (input.operation === 'inventory') {
-                result = { schemaVersion: 1, installAvailable: false,
+                result = { schemaVersion: 1, installAvailable: true,
                     sources: [{ sourceId: 'demo', schemaVersion: 1, revision,
                         activeVersion, connected, versions }] }
+            } else if (input.operation === 'install') {
+                expect(input).toEqual({ operation: 'install', consent: true })
+                // UI fixture: the actual native picker and Ed25519 ZIP
+                // verification run in the original Node integration tests.
+                result = { sourceId: 'demo', version: '1.0.0', installed: false }
             } else if (input.operation === 'activate') {
                 expect(input).toMatchObject({
                     sourceId: 'demo', version: '1.0.0', expectedRevision: 0
@@ -236,6 +241,10 @@ test('trusted signed worker manager uses original Settings and never starts a so
     await page.locator('#signed-source-manager summary').click()
     await expect(page.locator('#signed-source-list h4')).toHaveText('demo')
     expect(operations).toEqual(['inventory'])
+    page.once('dialog', dialog => dialog.accept())
+    await page.getByRole('button', { name: 'Install local signed source ZIP' }).click()
+    await expect.poll(() => operations.filter(op => op === 'install').length).toBe(1)
+    await expect(page.locator('#signed-source-list')).toContainText('Disabled')
     await page.getByRole('button', { name: 'Enable / switch version' }).click()
     await expect(page.locator('#signed-source-list')).toContainText('Enabled: 1.0.0')
     await page.getByRole('button', { name: 'Connect enabled source' }).click()
@@ -246,8 +255,8 @@ test('trusted signed worker manager uses original Settings and never starts a so
     await page.getByRole('button', { name: 'Uninstall selected inactive version' }).click()
     await expect(page.locator('#signed-source-list')).toContainText('No installed versions')
     expect(operations.filter(op => op !== 'inventory'))
-        .toEqual(['activate', 'connect', 'disable', 'uninstall'])
-    expect(operations).not.toContain('install')
+        .toEqual(['install', 'activate', 'connect', 'disable', 'uninstall'])
+    expect(operations.filter(op => op === 'install')).toHaveLength(1)
     expect(errors).toEqual([])
     expect(await page.evaluate(() =>
         document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)

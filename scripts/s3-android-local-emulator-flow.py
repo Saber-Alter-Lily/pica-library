@@ -740,11 +740,26 @@ def source_free_user_host_flow():
         wait_host_operation(operations,"PicaHostSourceSearch")
         tap_scrolling("S3-QA-Hosted-Comic",direction="down",only_class="Button")
         wait_page_counter("1 / 2",seconds=45)
+        # The Host app must open the separately installed no-INTERNET Reader,
+        # not silently fall back to the Host companion Reader.
+        active=adb("shell","dumpsys","activity","activities",timeout=35)
+        if ("com.picalibrary.android.ExternalReaderActivity" not in active or
+                "com.picalibrary.android.localcore.qa" not in active):
+            raise AssertionError("Signed Binder Reader did not become visible")
         page("25-original-reader-from-synthetic-host")
         advance_reader_next()
         wait_page_counter("2 / 2",seconds=35)
         page("26-original-reader-host-second-image")
-        record("real local HTTP Suwayomi: explicit source search -> original Reader -> second PNG")
+        record("real local HTTP Suwayomi: same-signer Binder source -> separate original no-network Reader -> second PNG")
+        current_package=PACKAGE
+        try:
+            PACKAGE=QA_PACKAGE
+            until_data("reading-history-v1.json",lambda data: any(
+                row.get("sourceKind")=="host" and row.get("lastPage",0)>=1
+                for row in data.get("sessions",[])),seconds=25)
+        finally:
+            PACKAGE=current_package
+        record("external source progress persists in original source-free Reader profile")
 
         STEP = "user-host-offline-save-and-revoke"
         adb("shell","input","keyevent","KEYCODE_BACK")

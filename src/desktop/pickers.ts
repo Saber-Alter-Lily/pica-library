@@ -286,4 +286,13 @@ export class DesktopNativePicker {
         return runPicker(pickerCommand({ backend: this.status.backend, kind: 'open',
             title: '选择本地 CBZ 漫画 / Choose a local CBZ comic', extension: 'cbz' }), this.spawnProcess)
     }
+
+    /** Trusted application-side selection, not a browser-provided path. */
+    chooseSignedSourceArchive() {
+        return runPicker(pickerCommand({
+            backend: this.status.backend, kind: 'open',
+            title: '选择已签名的来源 ZIP / Select a signed source ZIP',
+            extension: 'zip'
+        }), this.spawnProcess)
+    }
 }

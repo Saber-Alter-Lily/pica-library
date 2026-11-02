@@ -89,6 +89,13 @@ public final class HostBrowserActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(20,20,26));
         root.setPadding(dp(16),dp(18),dp(16),dp(26));
+        // Android 35 edge-to-edge: keep the long Host page clear of status
+        // and navigation gesture areas, including after collapsing setup.
+        root.setOnApplyWindowInsetsListener((v,insets)->{
+            v.setPadding(dp(16),insets.getSystemWindowInsetTop()+dp(12),
+                dp(16),insets.getSystemWindowInsetBottom()+dp(16));
+            return insets;
+        });
         root.addView(text(t("我的外部来源","My external sources","外部ソース"),23));
         root.addView(text(t(
             "仅连接你自行运行的 Suwayomi 2.4 Host。配置不会自动联网或安装任何漫画源；本地书库不受影响。",
@@ -153,7 +160,7 @@ public final class HostBrowserActivity extends Activity {
         results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);
         root.addView(results);
         scroller=new ScrollView(this);scroller.setFillViewport(true);scroller.addView(root);
-        setContentView(scroller);
+        setContentView(scroller);root.requestApplyInsets();
 
         save.setOnClickListener(v->{
             String name=label.getText().toString().trim();

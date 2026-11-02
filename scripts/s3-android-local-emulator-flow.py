@@ -113,7 +113,7 @@ def tap_scrolling(terms, direction="down", only_class=None, attempts=13):
     """Find a visible native control on the existing scrollable Host screen."""
     for _ in range(attempts):
         selected = find(terms, only_class=only_class)
-        if selected and 60 <= selected[0] <= 660 and 100 <= selected[1] <= 1130:
+        if selected and 60 <= selected[0] <= 660 and 100 <= selected[1] <= 1200:
             x, y, title = selected
             adb("shell", "input", "tap", str(x), str(y))
             print(f"Host native UI tap: {title!r} ({x},{y})", flush=True)

@@ -60,6 +60,11 @@ public final class ExternalImportActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(20,20,26));
         root.setPadding(dp(16),dp(26),dp(16),dp(16));
+        root.setOnApplyWindowInsetsListener((v,insets)->{
+            v.setPadding(dp(16),insets.getSystemWindowInsetTop()+dp(16),
+                dp(16),insets.getSystemWindowInsetBottom()+dp(16));
+            return insets;
+        });
         root.addView(text(t("保存到原阅读器书库","Save to original Reader",
             "元の Reader に保存"),23));
         root.addView(text(title,17));
@@ -74,7 +79,7 @@ public final class ExternalImportActivity extends Activity {
         root.addView(status);
         Button back=button(root,t("返回","Back","戻る"));
         back.setOnClickListener(v->finish());
-        setContentView(root);
+        setContentView(root);root.requestApplyInsets();
         select.setOnClickListener(v->selectChapter());
         read.setOnClickListener(v->{
             LocalComicStore.Comic local=saved;

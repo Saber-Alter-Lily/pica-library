@@ -1,6 +1,7 @@
 package com.picalibrary.android;
 
 import android.content.Context;
+import com.picalibrary.android.userhost.R;
 import com.picalibrary.android.sources.SourceAccessPolicy;
 import java.io.*;
 import java.net.*;

@@ -16,7 +16,7 @@ final class HostTestFixture {
     final HostSourceManager manager;
     String source=SOURCE,imageType="image/png",errorOperation="";int status=200;boolean wrongPage,failWithOom,unknownPageCount;byte[] image=PNG;Runnable imageRead;
     HostTestFixture(Context context)throws Exception {
-        JSONObject operations;try(InputStream in=context.getResources().openRawResource(R.raw.host_source_operations)){operations=HostJson.object(HostHttp.read(in,32768));}
+        JSONObject operations;try(InputStream in=context.getResources().openRawResource(com.picalibrary.android.userhost.R.raw.host_source_operations)){operations=HostJson.object(HostHttp.read(in,32768));}
         manager=new HostSourceManager(context,new HostHttp(url->{Connection c=new Connection(url);opened.add(c);return c;},operations),clock::get);
     }
     void configured()throws Exception {manager.configure(0,"Synthetic Host","https://fixture.invalid/base/","none",false);manager.enabled(1,true,true);}

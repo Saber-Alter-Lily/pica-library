@@ -17,8 +17,8 @@ final class HostReaderSource implements ReaderSource {
     public String displayTitle(String comic){try{return manager.title(session,comic);}catch(RuntimeException unavailable){return "";}}
     public boolean emitsRecommendationEvidence(){return false;} // Host-only IDs are not part of portable recommendation sync.
     public SourceAccessPolicy.Access sourceAccess(){return session;}
-    public List<BridgeClient.ChapterItem> chapters(String comic)throws Exception{try{return manager.chapters(session,comic);}catch(Exception failure){throw sanitized(failure);}}
-    public BridgeClient.ChapterData chapter(String comic,String episode)throws Exception{try{return manager.chapter(session,comic,episode);}catch(Exception failure){throw sanitized(failure);}}
+    public List<BridgeClient.ChapterItem> chapters(String comic)throws Exception{try{List<BridgeClient.ChapterItem> out=new java.util.ArrayList<>();for(ReaderContent.Chapter item:manager.chapters(session,comic))out.add(new BridgeClient.ChapterItem(item.id,item.title,item.order,item.downloadedPictures));return out;}catch(Exception failure){throw sanitized(failure);}}
+    public BridgeClient.ChapterData chapter(String comic,String episode)throws Exception{try{ReaderContent.ChapterData data=manager.chapter(session,comic,episode);BridgeClient.ChapterItem chapter=new BridgeClient.ChapterItem(data.episode.id,data.episode.title,data.episode.order,data.episode.downloadedPictures);List<BridgeClient.PageItem> pages=new java.util.ArrayList<>();for(ReaderContent.Page page:data.pages)pages.add(new BridgeClient.PageItem(page.id,page.url,page.position));return new BridgeClient.ChapterData(chapter,pages,data.progressIndex);}catch(Exception failure){throw sanitized(failure);}}
     public HttpURLConnection image(String locator)throws Exception{try{return manager.image(session,locator);}catch(Exception failure){throw sanitized(failure);}}
     public String recentChapter(String comic){return "";}
     public void saveProgress(String comic,String episode,int page){} // Existing scoped local ledger only; no host sync mutation.

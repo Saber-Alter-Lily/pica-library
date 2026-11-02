@@ -12,12 +12,12 @@ final class HostOfflineSaver {
     static LocalComicStore.Comic save(Context context,HostSourceManager manager,HostSourceManager.Session session,String comic,String episode,boolean consent,LocalComicImporter.Progress progress)throws Exception {
         if(!consent)throw new IOException("SOURCE_HOST_SAVE_CONSENT_REQUIRED");
         if(manager.requireSession()!=session)throw new IOException("SOURCE_HOST_CANCELLED");session.check();
-        BridgeClient.ChapterData chapter=manager.chapter(session,comic,episode);
+        ReaderContent.ChapterData chapter=manager.chapter(session,comic,episode);
         if(chapter.pages.isEmpty()||chapter.pages.size()>LocalComicImporter.MAX_PAGES)throw new IOException("SOURCE_HOST_TOO_LARGE");
         String id=LocalComicImporter.identity(DeviceIdentity.id(context),"folder","user-host-chapter-v1\n"+comic+"\n"+episode);
         String title=shortTitle(manager.title(session,comic),120)+" · "+shortTitle(chapter.episode.title,70);
         List<LocalComicImporter.Open> streams=new ArrayList<>();
-        for(BridgeClient.PageItem page:chapter.pages)streams.add(()->{
+        for(ReaderContent.Page page:chapter.pages)streams.add(()->{
             HttpURLConnection connection=null;
             try{
                 session.check();connection=manager.image(session,page.url);

@@ -75,17 +75,17 @@ public class HostSourceActivity extends LocaleAwareActivity {
         savedStatus.setText(savedSnapshot.isEmpty()?getString(R.string.host_books_empty):getString(R.string.host_books_count,savedOffset+1,until,savedSnapshot.size()));controls();
     }
     private void chooseChapter(HostSourceManager.Book book){task(()->{
-        HostSourceManager.Session grant=manager.requireSession();manager.select(book.id);List<BridgeClient.ChapterItem> chapters=manager.chapters(grant,book.id);
+        HostSourceManager.Session grant=manager.requireSession();manager.select(book.id);List<ReaderContent.Chapter> chapters=manager.chapters(grant,book.id);
         return ()->{if(chapters.isEmpty()){status.setText(R.string.host_no_chapters);return;}String[] labels=new String[chapters.size()];for(int i=0;i<labels.length;i++)labels[i]=chapters.get(i).title;
             showDialog(new AlertDialog.Builder(this).setTitle(R.string.host_choose_chapter).setItems(labels,(dialog,index)->confirmSave(grant,book,chapters.get(index))).setNegativeButton(R.string.common_back,null).create());};
     });}
     private boolean current(HostSourceManager.Session grant){try{if(manager.requireSession()==grant)return true;}catch(RuntimeException ignored){}status.setText(R.string.host_request_failed);controls();return false;}
-    private void confirmSave(HostSourceManager.Session grant,HostSourceManager.Book book,BridgeClient.ChapterItem chapter){
+    private void confirmSave(HostSourceManager.Session grant,HostSourceManager.Book book,ReaderContent.Chapter chapter){
         if(!current(grant))return;LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,16),Ui.dp(this,8),Ui.dp(this,16),Ui.dp(this,8));content.addView(Ui.rawText(this,book.title+" · "+chapter.title,16,Ui.TEXT,true));content.addView(Ui.rawText(this,getString(R.string.host_save_scope),13,Ui.MUTED,false));CheckBox permission=new CheckBox(this);permission.setText(R.string.host_save_consent);permission.setTextColor(Ui.TEXT);permission.setTag("host.save.consent");content.addView(permission);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle(R.string.host_save_chapter).setView(content).setNegativeButton(R.string.common_back,null).setPositiveButton(R.string.host_save_confirm,(view,which)->{if(permission.isChecked()&&current(grant))saveChapter(grant,book,chapter);}).create();dialog.setOnShowListener(view->{Button confirm=dialog.getButton(AlertDialog.BUTTON_POSITIVE);confirm.setEnabled(false);permission.setOnCheckedChangeListener((button,checked)->confirm.setEnabled(checked));});showDialog(dialog);
     }
     private void showDialog(AlertDialog dialog){if(destroyed)return;if(chooser!=null)chooser.dismiss();chooser=dialog;dialog.setOnDismissListener(view->{if(chooser==dialog)chooser=null;});dialog.show();}
-    private void saveChapter(HostSourceManager.Session grant,HostSourceManager.Book book,BridgeClient.ChapterItem chapter){int ticket=request+1;task(()->{
+    private void saveChapter(HostSourceManager.Session grant,HostSourceManager.Book book,ReaderContent.Chapter chapter){int ticket=request+1;task(()->{
         LocalComicStore.Comic saved=HostOfflineSaver.save(this,manager,grant,book.id,chapter.id,true,(complete,total)->runOnUiThread(()->{if(!destroyed&&request==ticket)status.setText(getString(R.string.host_save_progress,complete,total));}));
         return ()->{status.setText(R.string.host_save_complete);results.addView(Ui.rawText(this,saved.title,16,Ui.TEXT,true));Button local=Ui.button(this,getString(R.string.host_read_local),view->startActivity(new Intent(this,ReaderActivity.class).putExtra("source","local").putExtra("comicId",saved.id).putExtra("title",saved.title)),true);local.setTag("host.saved."+saved.id);results.addView(local);};
     });}

@@ -128,6 +128,9 @@ dependencies {
     implementation project(':local-core')
     implementation project(':local-storage')
     implementation project(':reader-view')
+    // Verified Suwayomi Host protocol/IO/state lives in a reusable library.
+    // No Pica/E-H/JM or provider SDK is a dependency of this module.
+    implementation project(':user-host-core')
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation('io.github.jukomu:jmcomic-core:v1.1.12') {
         exclude group: 'io.github.darkxanter', module: 'webp-imageio'

@@ -1,5 +1,7 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+> **2026-11-02 delivery-priority update:** [R0–R4 unified product integration roadmap](./PRODUCT_INTEGRATION_DELIVERY_20261102.md) controls batch size, integration order, and product delivery. Historical S0–S6 scope and all acceptance gates below remain binding; this is not a pass or a release authorization.
+
 ### 2026-11-02｜S3 CORE-HOST-24：完整 Web 原书库统一续读（本地 + 本次授权 Host）
 
 - 接续 #281 纯核心/用户自管 Suwayomi Host 的 **24/24 精确 HEAD CI 通过**，发现原完整 Web 仍存在真实产品缺口：已有 `installReadingLibrary` 续读面板，但纯核心端 `/api/v1/desktop/reading-library/query` 返回 405。此批一次打通**原核心 SQLite 历史 → 同一原书库视图 → 本地续读，以及用户明确选择的 Host 作品/进度 → 同一书库视图 → 原 Host Reader 续读**，不再另建一个 QA 书库页面。

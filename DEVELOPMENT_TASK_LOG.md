@@ -1,5 +1,7 @@
 # Pica Library Development Task Log
 
+> **2026-11-02 product integration route:** [R0–R4 delivery roadmap](docs/PRODUCT_INTEGRATION_DELIVERY_20261102.md). Stop isolated micro-PR churn. Use a single Draft product-integration branch rooted at #282 (`27ce6f8b`) and deliver complete Windows/Android user journeys. S0–S6, 42+new cases, all historic failures and G1–G4 OPEN remain authoritative. Production main/Release/OTA/user profiles unchanged.
+
 ### 2026-11-02 | S3 CORE-HOST-24: one original Web reading-library for local + authorized Host (stacked Draft #282)
 
 - Parent #281 exact head `98980f4b41e2ceaa3dc605790f81bb5e8d5c158c` is **24/24 Actions SUCCESS** (full Android/Web/Desktop, original browser and runtime gates). It is still Draft, unmerged and unpublished.

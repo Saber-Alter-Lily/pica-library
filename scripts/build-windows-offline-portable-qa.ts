@@ -260,7 +260,7 @@ export async function buildWindowsOfflinePortableQa(
             options.userHostQa
                 ? 'No provider SDK, source installer or updater. User-owned Host is optional.'
                 : 'No Pica, EH, ExH, JM, online sources, downloader, account, Host or updater.'
-        ))
+        )))
     if (options.fullWebQa) {
         // Actual original full HTML and its verified, source-neutral ES module
         // closure. This does not reimplement the Reader or package an SDK.

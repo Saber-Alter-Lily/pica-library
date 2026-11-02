@@ -12,6 +12,8 @@ import { coreCatalogueGet, coreCatalogueQuery } from '../library/core-catalog-re
 import { coreBootstrapStatus, coreBootstrapAuthors, coreBootstrapCapabilities } from '../library/core-bootstrap-read'
 import { coreShelfMatch, coreShelfExecute } from '../library/core-shelf-routes'
 import { coreLocalImportMatch, type CoreLocalPicker } from '../library/core-local-import'
+import { ReadingLibrary, type ReadingLibraryPort } from '../library/reading-library'
+import { catalogueReadingPort } from '../services/reading-library-adapters'
 import type { LibraryFacetQuery } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
 import type { ReaderService } from '../services/reader-service'
@@ -577,7 +579,8 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         }
         if (!shelfRoute && !localImportRoute && !localExportFormat &&
             (request.method !== 'POST' ||
-            !['/api/v1/reader/progress', '/api/v1/library/query']
+            !['/api/v1/reader/progress', '/api/v1/library/query',
+                '/api/v1/desktop/reading-library/query']
                 .includes(url.pathname)))
             return json(response, 405, { error: 'Unsupported QA operation' })
         // The original full app uses x-pica-csrf for Desktop actions, while
@@ -658,6 +661,36 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                     libraryQueries,
                     { localOnly: true, fullWebQa: Boolean(fullWeb) }
                 ))
+            }
+            if (url.pathname === '/api/v1/desktop/reading-library/query') {
+                if (!fullWeb) throw new Error('Original Web UI is required')
+                const input = await readJsonObject(request)
+                if (Object.keys(input).some(key =>
+                    !['query', 'hostSessionId'].includes(key)) ||
+                    !Object.hasOwn(input, 'query'))
+                    throw new Error('Invalid reading-library query')
+                const hostId = input.hostSessionId
+                if (hostId !== undefined && (
+                    !options.userHost || typeof hostId !== 'string' ||
+                    !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(hostId)
+                )) throw new Error('Unowned Host session')
+                // The existing projection takes only already persisted local
+                // progress and explicitly selected rows of one live Host
+                // session. No source activation, network call or catalogue
+                // import occurs on this query.
+                const ports: ReadingLibraryPort[] = [
+                    catalogueReadingPort('local',
+                        () => options.database.recentReadingProgress(100),
+                        options.database, () => false)
+                ]
+                if (typeof hostId === 'string') ports.push({
+                    id: 'selected-host',
+                    snapshot: () => options.userHost!.reader.readingLibraryRows(
+                        hostId
+                    )
+                })
+                return json(response, 200,
+                    new ReadingLibrary(ports).query(input.query))
             }
             const input = await readSmallJson(request)
             return json(response, 200, options.reader.saveProgress(

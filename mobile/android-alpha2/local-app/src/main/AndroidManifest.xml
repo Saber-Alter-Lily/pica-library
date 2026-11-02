@@ -20,6 +20,9 @@
         <activity android:name="com.picalibrary.android.ExternalReaderActivity"
             android:exported="true"
             android:permission="com.picalibrary.android.remote.BIND_SOURCE"/>
+        <activity android:name="com.picalibrary.android.ExternalImportActivity"
+            android:exported="true"
+            android:permission="com.picalibrary.android.remote.BIND_SOURCE"/>
         <activity
             android:name="com.picalibrary.android.LocalReaderActivity"
             android:screenOrientation="unspecified"

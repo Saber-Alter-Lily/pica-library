@@ -262,7 +262,26 @@ public final class HostBrowserActivity extends Activity {
             }));
             Button saveChapter=action(results,t("保存本地副本","Save chapter offline",
                 "章をローカル保存"));
-            saveChapter.setOnClickListener(v->chooseChapter(book));
+            saveChapter.setOnClickListener(v->chooseChapter(book));            Button intoReader=action(results,t("保存到独立阅读器的书库",
+                "Save to separate Reader library","別の Reader 書庫に保存"));
+            intoReader.setOnClickListener(v->task(
+                t("准备复制章节…","Preparing import…","取込準備中…"),()->{
+                manager.select(book.id);
+                String scope=manager.requireSession().scope;
+                return ()->{
+                    Intent importOne=new Intent().setClassName(
+                        "com.picalibrary.android.localcore.qa",
+                        "com.picalibrary.android.ExternalImportActivity")
+                        .putExtra("scope",scope).putExtra("comicId",book.id)
+                        .putExtra("title",book.title);
+                    try{startActivity(importOne);}
+                    catch(android.content.ActivityNotFoundException|SecurityException error){
+                        status.setText(t("请安装同一签名的独立阅读器",
+                            "Install the matching signed standalone Reader",
+                            "同じ署名の別 Reader をインストールしてください"));
+                    }
+                };
+            }));
         }
     }
 

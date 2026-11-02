@@ -16,7 +16,7 @@
 | 批次 | 唯一主要交付 | 必须证明的实际用户路径 | 不可借用的验收 | 状态 |
 | --- | --- | --- | --- | --- |
 | R0 统一集成 | 一个对 main 的未发布 Draft 集成候选、一个事实/缺口列表、旧任务完整映射 | 可以追踪 v0.5.0 → 各 Draft → 唯一候选的代码和功能归属 | 精确 SHA 对账，CI 仅记工程成功；不合并 main | IN_PROGRESS |
-| R1 双端完整核心 | 使用原 Windows Web 和原 Android Reader/存储的统一核心，独立可测试，不重造第二套 App | 两端分别首次启动 → 本地文件夹/CBZ 导入 → 浏览/搜索 → 书架 → 章节/图片阅读 → 记录进度 → 关闭重启后续读；用户数据相互隔离 | Windows 实体可启动候选、Android 实体 APK 的依赖/DEX 检查、真实设备操作；G1 仍需人工验收 | NEXT |
+| R1 双端完整核心 | 使用原 Windows Web 和原 Android Reader/存储的统一核心，独立可测试，不重造第二套 App | 两端分别首次启动 → 本地文件夹/CBZ 导入 → 浏览/搜索 → 书架 → 章节/图片阅读 → 记录进度 → 关闭重启后续读；用户数据相互隔离 | Windows 实体可启动候选、Android 实体 APK 的依赖/DEX 检查、真实设备操作；G1 仍需人工验收 | IN_PROGRESS |
 | R2 来源真正可选 | 原 Reader 接入可单独启停/升级/撤销的来源，Host 只是可选路径 | 无源核心仍可用 → 用户主动装/选一个可信来源 → 搜索/详情 → 章节/图片 → 继续阅读 → 停用来源不破坏本地作品；双端至少各有真实链路，第二真实来源单独核验 | Windows 受保护来源安装与签名信任、Android Service/Binder、可验证真实外部来源、许可审查；禁用 UI 不算物理剔除 | PLANNED |
 | R3 产品体验与功能收口 | 两端完整日常体验，集中消化 Issue 而非不断增加独立样例 | 原功能矩阵逐项：布局/三语/明暗/交互式八章引导，推荐与 Visual 可控、标签过滤 #199/#200、#204 的授权范围、下载进度、LAN/WebDAV 同步、无黑屏和长任务可取消 | 360/393/480dp 与字体缩放代表性截图，真实手机 + Windows；约 1500 部库实测；重大 P0/P1=0；G1 经用户确认 | PLANNED |
 | R4 无痛升级与发布 | 旧 v0.5.0 安全过渡 + 同源码双端签名候选 + 统一发布决策 | 旧版真实数据只读预检 → 校验备份 → 用户同意迁移/升级 → 旧书库/进度/下载/偏好比对 → 故障注入回滚 → 新候选再次启动和应用内更新 | G3 真实一致性/回滚，G4 原42+新增验收逐条回执、SHA/签名/版本/来源信任、用户明确批准；禁止以合成迁移冒充生产验收 | PLANNED |
@@ -30,6 +30,11 @@
 
 R1 完成定义：同一固定 HEAD 的 Windows/Android 构建与核心流程测试通过，有可核查候选清单、原应用功能对照和实机未验收事项；至少一次真正贯通上述双端流程。任何仅修改接口/测试/文档、用户操作没有变得完整可用的提交，不单独称为一个交付批次。
 
+### R1 第一批：同源双端候选与实际操作（2026-11-02）
+
+- Windows 复用已存在的原完整 Web + Reader + SQLite + NativePicker + Windows Launcher 打包测试。新的集成分支只在全 Web ZIP 的解压、真实本机启动/阅读/书架/重启核验成功后，保留 3 天未签名 QA 产物供人工操作；Reader-only 小壳继续不上传。
+- Android 复用现有独立无源 APK 的正式 CI 构建/DEX 验证与 Android 35 系统 SAF 模拟器；集成分支 push 直接执行真实模拟器流程。APK 与 v0.5.0 的安装包 ID 和资料隔离，不是正式版替代。
+- 双端手工操作和证据见 [R1 同源双端测试候选](R1_LOCAL_CORE_DUAL_PLATFORM_CANDIDATE_20261102.md)。不新增第二套架构、阅读器、测试系统；当前仍需实机 Windows/Android 和用户体验核验。G1–G4 一律 OPEN。
 ## 4. 工程和开源复用纪律
 
 - 首先检查本仓库 v0.5.0 已实现的 Reader、SQLite、LocalLibraryIngestion、ReaderProgress/History、Shelf、Web UI、Upgrade Assistant、NativePicker、SignedWorkerStore 和 SourceHostConnections；其次参考 Mihon（Apache-2.0）来源与核心分离、Suwayomi 用户自管 Host 标准 API、Kavita 的书库检索/状态 UX；未核许可与适配成本，不复制第三方源代码。Kotatsu GPL 工程只能作设计比较，不直接复制。

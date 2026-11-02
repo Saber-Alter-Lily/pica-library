@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest'
 
 // Source/resource boundaries and shared identity only; never claim Android runtime coverage.
 const root = 'mobile/android-alpha2/app/src/'
-const java = (name: string, test = false) => fs.readFileSync(root + (test ? 'test' : 'main') + '/java/com/picalibrary/android/' + name + '.java', 'utf8')
+const host = 'mobile/android-alpha2/user-host-core/src/main/'
+const hostNames = new Set(['HostSavedBooks','HostSourceManager'])
+const java = (name: string, test = false) => fs.readFileSync(
+    (test ? root + 'test' : hostNames.has(name) ? host.slice(0,-1) : root + 'main') +
+        '/java/com/picalibrary/android/' + name + '.java', 'utf8')
 const storage = java('HostSavedBooks'), manager = java('HostSourceManager'), screen = java('HostSourceActivity')
 const hash = (text: string) => createHash('sha256').update(text).digest('hex')
 

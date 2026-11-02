@@ -5,15 +5,20 @@ import { HOST_READER_OPERATIONS, HOST_DISCOVERY_OPERATIONS } from '../../src/sou
 
 // These are Node source/resource drift gates, NOT Android compilation or runtime tests.
 const base = 'mobile/android-alpha2/app/src/'
+const host = 'mobile/android-alpha2/user-host-core/src/main/'
+const hostNames = new Set(['HostProtocol','HostEndpoint','HostJson','HostConfigStore','HostSavedBooks','HostHttp','HostSourceManager','HostOfflineSaver','SourceHttpConnection','sources/SourceAccessPolicy'])
+// Host code was MOVED into its own Gradle library; the original app UI
+// still owns only its reader adapter, not duplicate Host implementation.
 const read = (file: string) => fs.readFileSync(base + file, 'utf8')
 const java = (name: string) => name === 'LocalComicStore'
     ? fs.readFileSync('mobile/android-alpha2/local-storage/src/main/java/com/picalibrary/android/LocalComicStore.java', 'utf8')
-    : read('main/java/com/picalibrary/android/' + name + '.java')
+    : fs.readFileSync((hostNames.has(name) ? host : base + 'main/') +
+        'java/com/picalibrary/android/' + name + '.java', 'utf8')
 const strings = (locale: string) => Object.fromEntries([...read(`main/res/${locale}/strings_host.xml`).matchAll(/<string name="([^"]+)">([\s\S]*?)<\/string>/g)].map(row => [row[1], row[2]]))
 
 describe('native user-Host source/resource contracts only', () => {
     it('reuses the same eight pinned operations rather than exposing an arbitrary GraphQL caller', () => {
-        const raw = JSON.parse(read('main/res/raw/host_source_operations.json'))
+        const raw = JSON.parse(fs.readFileSync(host + 'res/raw/host_source_operations.json', 'utf8'))
         const { schemaVersion, upstreamCommit, ...operations } = raw
         expect(schemaVersion).toBe(1)
         expect(upstreamCommit).toBe('40bc5da57820324ed0ae724cbbc020cc4673b594')
@@ -77,6 +82,7 @@ describe('native user-Host source/resource contracts only', () => {
         const files: string[] = []
         const walk = (dir: string) => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const file = dir + '/' + entry.name; if (entry.isDirectory()) walk(file); else if (entry.name.endsWith('.java')) files.push(file) } }
         walk(base + 'main/java')
+        walk(host + 'java')
         for (const file of files) expect(fs.readFileSync(file, 'utf8'), file).not.toMatch(/\bAuthenticator\s*\.\s*setDefault\s*\(/)
         expect(java('HostHttp').replace(/\/\/[^\n]*/g, '')).not.toContain('Authenticator.getDefault()')
         // No hidden/reflected getter workaround and no global auth/cookie mutation.

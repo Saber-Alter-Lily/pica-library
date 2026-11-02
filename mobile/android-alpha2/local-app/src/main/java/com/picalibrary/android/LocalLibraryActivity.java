@@ -386,38 +386,14 @@ public final class LocalLibraryActivity extends Activity {
 
     private void renderBooks(){
         if(adapter==null)return;
-        String search=query.trim().toLowerCase(Locale.ROOT);
-        List<LocalComicReaderPort.Book> visible=new ArrayList<>();
-        for(LocalComicReaderPort.Book book:inventory){
-            if(!search.isEmpty()&&!book.title.toLowerCase(Locale.ROOT).contains(search))continue;
-            boolean hasRead=recent.containsKey(book.id);
-            if((readMode==1&&hasRead)||(readMode==2&&!hasRead))continue;
-            visible.add(book);
-        }
-        if(sortMode==1)visible.sort(Comparator
-            .comparing((LocalComicReaderPort.Book b)->b.title.toLowerCase(Locale.ROOT))
-            .thenComparing(b->b.id));
-        else if(sortMode==2)visible.sort(Comparator
-            .comparingInt((LocalComicReaderPort.Book b)->b.pageCount).reversed()
-            .thenComparing(b->b.title.toLowerCase(Locale.ROOT)));
-        else visible.sort(Comparator
-            .comparing((LocalComicReaderPort.Book b)->b.updatedAt).reversed()
-            .thenComparing(b->b.id));
+        List<LocalComicReaderPort.Book> visible=
+                LocalLibraryBrowse.visible(inventory,recent,query,sortMode,readMode);
         books.clear();
         books.addAll(visible);
         adapter.notifyDataSetChanged();
 
-        continueBook=null;
-        continueSession=null;
-        for(ReaderHistoryLedger.Session session:recent.values()){
-            if(continueSession==null||session.lastReadAt.compareTo(continueSession.lastReadAt)>0){
-                for(LocalComicReaderPort.Book book:inventory)if(book.id.equals(session.comicId)){
-                    continueBook=book;
-                    continueSession=session;
-                    break;
-                }
-            }
-        }
+        continueSession=LocalLibraryBrowse.newest(recent);
+        continueBook=LocalLibraryBrowse.bookFor(inventory,continueSession);
         if(continueButton!=null){
             continueButton.setVisibility(continueBook==null?View.GONE:View.VISIBLE);
             if(continueBook!=null)continueButton.setText(copy("继续阅读 · ",
@@ -463,16 +439,11 @@ public final class LocalLibraryActivity extends Activity {
     private void refresh(){
         int serial=++refreshSerial;
         worker.execute(()->{
-            List<LocalComicReaderPort.Book> found=new LocalComicReaderPort(getApplicationContext()).books();
-            Set<String> available=new HashSet<>();
-            for(LocalComicReaderPort.Book book:found)available.add(book.id);
-            Map<String,ReaderHistoryLedger.Session> read=new LinkedHashMap<>();
-            for(ReaderHistoryLedger.Session session:ReaderHistoryLedger
-                    .load(ReaderHistoryLedger.localFile(getApplicationContext())).sorted()){
-                if("local".equals(session.sourceKind)&&available.contains(session.comicId)
-                        &&!session.chapterId.isEmpty())
-                    read.putIfAbsent(session.comicId,session);
-            }
+            List<LocalComicReaderPort.Book> found=
+                    new LocalComicReaderPort(getApplicationContext()).books();
+            Map<String,ReaderHistoryLedger.Session> read=LocalLibraryBrowse.latestFor(
+                    found,ReaderHistoryLedger.load(
+                            ReaderHistoryLedger.localFile(getApplicationContext())));
             runOnUiThread(()->{
                 if(destroyed||serial!=refreshSerial)return;
                 inventory.clear();

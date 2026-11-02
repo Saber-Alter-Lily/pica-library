@@ -301,6 +301,18 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         boolean pica=PicaClient.available(this);
         boolean eh=EhClient.accountAvailable(this);
         EhCapabilityStore.Snapshot exh=EhCapabilityStore.load(this);
+        // The existing user-managed Suwayomi client is independent of the
+        // built-in providers. Opening its page never starts a network session:
+        // endpoint, source selection and consent remain explicit there.
+        LinearLayout userHost=SettingsRow.row(this,
+            LocalizedText.ui(this,"我的外接来源","My external sources","外部ソース"),
+            LocalizedText.ui(this,
+                "手动连接自己的 Suwayomi Host · 不自动安装哔咔/JM 插件",
+                "Connect your own Suwayomi Host · no automatic source installs",
+                "自分の Suwayomi Host を接続 · ソースの自動インストールなし"),
+            v->startActivity(new Intent(this,HostSourceActivity.class)));
+        userHost.setTag("online-user-host");
+        p.addView(userHost);
         p.addView(SettingsRow.row(this,"全部来源","Pica + E-H"+(exh.available()?" + ExH":""),v->openOnlineSource("all")));
         p.addView(SettingsRow.row(this,"Pica",pica?"可用":"未登录",v->openOnlineSource("pica")));
         p.addView(SettingsRow.row(this,"E-Hentai",eh?"账号已连接":"游客可浏览",v->openOnlineSource("eh")));

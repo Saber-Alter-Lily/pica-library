@@ -311,6 +311,24 @@ public class LocalComicImportTest {
         }
     }
 
+    @Test public void originalOnlinePageOpensOptInHostWithoutStartingBuiltInSources() throws Exception {
+        OnboardingStore.setAutoShow(context,false);
+        context.getSharedPreferences("alpha81-ui",0).edit()
+                .putBoolean("libraryRefreshed",true).commit();
+        try(ActivityController<HomeActivity> controller=
+                Robolectric.buildActivity(HomeActivity.class).setup()){
+            HomeActivity activity=controller.get();
+            activity.onboardingShowTab(2,()->{});
+            View entry=activity.getWindow().getDecorView()
+                    .findViewWithTag("online-user-host");
+            assertNotNull("External Host must be discoverable on the original Online tab",entry);
+            assertTrue(entry.performClick());
+            Intent intent=shadowOf(activity).getNextStartedActivity();
+            assertNotNull(intent);
+            assertEquals(HostSourceActivity.class.getName(),
+                    intent.getComponent().getClassName());
+        }
+    }
     private androidx.recyclerview.widget.RecyclerView findCollection(View view){if(view instanceof androidx.recyclerview.widget.RecyclerView)return (androidx.recyclerview.widget.RecyclerView)view;if(view instanceof android.view.ViewGroup)for(int i=0;i<((android.view.ViewGroup)view).getChildCount();i++){androidx.recyclerview.widget.RecyclerView found=findCollection(((android.view.ViewGroup)view).getChildAt(i));if(found!=null)return found;}return null;}
     @Test public void rotationRetainsUncommittedPreviewAndExplicitDiscardIsSafe() throws Exception {
         try(ActivityController<LocalComicImportActivity> controller=Robolectric.buildActivity(LocalComicImportActivity.class).setup()){

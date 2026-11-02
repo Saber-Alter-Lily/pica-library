@@ -98,6 +98,8 @@ describe('optional user-owned Host in original source-free full Web (Draft only)
         const importer = new LocalLibraryIngestion(db, local)
         const staged = await importer.preview(folder, 'folder')
         const imported = await importer.confirm(staged.token)
+        const localChapter = runtime.readerService.chapters(imported.comicId)[0]
+        runtime.readerService.saveProgress(imported.comicId, localChapter.id, 0)
         const manifest = stageOfflineFullWebQa(web, { userHost: true })
         expect(manifest.sourceSdkIncluded).toBe(false)
 
@@ -180,6 +182,28 @@ describe('optional user-owned Host in original source-free full Web (Draft only)
             })
         const hosts = '/api/v1/desktop/source-hosts/connections'
         const route = '/api/v1/desktop/host-reader'
+        const reading = '/api/v1/desktop/reading-library/query'
+        const initial = await command(reading, {
+            query: { limit: 12, offset: 0 }
+        })
+        expect(initial.status).toBe(200)
+        expect(await initial.json()).toMatchObject({
+            complete: true, total: 1,
+            items: [{ comicId: imported.comicId, routes: [{
+                channel: 'local', available: true,
+                progress: { pageIndex: 0 }
+            }] }]
+        })
+        expect((await command(reading, { query: {} }, {
+            origin: 'https://bad.example'
+        })).status).toBe(403)
+        expect((await command(reading, {
+            query: {}, hostSessionId: 'arbitrary-session'
+        })).status).toBe(400)
+        expect((await command(reading, {
+            query: {}, executable: 'unknown'
+        })).status).toBe(400)
+        expect(requests).toEqual([])
         expect((await command(hosts, { action: 'list' }, {
             origin: 'https://bad.example'
         })).status).toBe(403)
@@ -254,6 +278,23 @@ describe('optional user-owned Host in original source-free full Web (Draft only)
         expect(latest.status).toBe(200)
         expect((await latest.json())[0].pageIndex).toBe(1)
 
+        const previousNetworkCount = requests.length
+        const combined = await command(reading, {
+            query: { limit: 12, offset: 0 },
+            hostSessionId: session.sessionId
+        })
+        expect(combined.status).toBe(200)
+        const projection = await combined.json()
+        expect(projection).toMatchObject({ total: 2, complete: true })
+        expect(projection.items.map((item: { comicId: string }) => item.comicId))
+            .toEqual(expect.arrayContaining([comicId, imported.comicId]))
+        expect(projection.items.find((item: {comicId: string}) =>
+            item.comicId === comicId).routes[0]).toMatchObject({
+                channel: 'hosted', available: true,
+                progress: { pageIndex: 1 }
+            })
+        expect(requests).toHaveLength(previousNetworkCount)
+
         const revoked = await command(hosts, {
             action: 'set-enabled', id: HOST_ID, enabled: false,
             expectedRevision: 1, consent: true
@@ -261,6 +302,18 @@ describe('optional user-owned Host in original source-free full Web (Draft only)
         expect(revoked.status).toBe(200)
         const stale = await get(root, metadata)
         expect(stale.status).toBe(409)
+        const after = await command(reading, {
+            query: { limit: 12 }, hostSessionId: session.sessionId
+        })
+        expect(after.status).toBe(200)
+        const retained = await after.json()
+        expect(retained).toMatchObject({
+            complete: false, total: 1,
+            items: [{ comicId: imported.comicId }]
+        })
+        expect(retained.issues).toMatchObject([{
+            port: 'selected-host', code: 'READING_STATE_UNAVAILABLE'
+        }])
         expect(db.getComic(imported.comicId)?.providerId).toBe('local')
         expect(fs.readFileSync(path.join(folder, '01.png'))).toEqual(tiny)
         expect((await get('/api/v1/comics?limit=5000')).status).toBe(200)

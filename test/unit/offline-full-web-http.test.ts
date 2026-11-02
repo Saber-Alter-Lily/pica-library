@@ -113,6 +113,20 @@ describe('real original full Web HTML behind source-free, cookie-protected local
             { scope: 'library', limit: 5000 }, {
                 origin: 'https://evil.example', 'x-pica-qa-csrf': token!
             })).status).toBe(403)
+        // Original full-Web reading-library module now has a real
+        // source-free read projection, without Host or provider start.
+        const reading = await mutate('/api/v1/desktop/reading-library/query',
+            { query: { limit: 12 } }, {
+                origin: home, 'x-pica-csrf': token!
+            })
+        expect(reading.status).toBe(200)
+        expect(await reading.json()).toMatchObject({
+            total: 0, complete: true, items: [], sources: []
+        })
+        expect((await mutate('/api/v1/desktop/reading-library/query',
+            { query: {}, hostSessionId: 'user-supplied' }, {
+                origin: home, 'x-pica-csrf': token!
+            })).status).toBe(400)
         const query = await mutate('/api/v1/library/query',
             { scope: 'library', limit: 5000 }, {
                 origin: home, 'x-pica-qa-csrf': token!

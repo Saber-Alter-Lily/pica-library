@@ -117,6 +117,17 @@ test('real Chromium loads ORIGINAL home/library/shelves/Reader/settings in owned
     await expect(page.locator('#reader-title')).toContainText('original-pages')
     await expect(page.locator('#reader-pages img').first()).toBeVisible()
     await page.locator('#reader-exit').click()
+    await page.locator('nav button[data-view="library"]').click()
+    // This is the ORIGINAL full Web component, not an alternative QA screen.
+    // The source-free HTTP composition must now serve its real read-only
+    // local-history projection instead of a 405/unsupported route.
+    await expect(page.locator('#reading-library')).toBeVisible()
+    await expect(page.locator('#reading-library [role="status"]')).toContainText(
+        /Saved records only|仅查询已保存记录|保存済み記録のみ/, { timeout: 15_000 }
+    )
+    await expect(page.locator('#reading-library')).not.toContainText(
+        /temporarily unavailable|暂时无法读取记录|一時的に読めません/
+    )
     await page.locator('#settings-nav').click()
     await expect(page.locator('#settings')).toBeVisible()
     await expect(page.locator('#settings-remote-storage')).toBeAttached()

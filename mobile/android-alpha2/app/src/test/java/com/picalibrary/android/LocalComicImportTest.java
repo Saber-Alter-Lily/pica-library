@@ -118,6 +118,36 @@ public class LocalComicImportTest {
         assertArrayEquals(PNG,Files.readAllBytes(new File(original,"2.png").toPath()));
     }
 
+    @Test public void installedAndSourceFreeLibraryUseOneBrowsePolicy() throws Exception {
+        LocalComicStore.Comic comic=imported();
+        LocalComicReaderPort source=new LocalComicReaderPort(context);
+        List<LocalComicReaderPort.Book> books=source.books();
+        assertEquals(1,books.size());
+        Map<String,ReaderHistoryLedger.Session> unread=LocalLibraryBrowse.latestFor(
+                books,ReadingHistoryStore.load(context));
+        assertFalse(unread.containsKey(comic.id));
+        assertEquals(1,LocalLibraryBrowse.visible(books,unread,"",0,1).size());
+        assertTrue(LocalLibraryBrowse.visible(books,unread,"",0,2).isEmpty());
+        assertEquals(1,LocalLibraryBrowse.visible(books,unread,
+                books.get(0).title.toUpperCase(Locale.ROOT),1,0).size());
+        assertTrue(LocalLibraryBrowse.visible(books,unread,
+                "missing-local-work",2,0).isEmpty());
+
+        String chapter=source.chapters(comic.id).get(0).id;
+        ReadingHistoryStore.record(context,"test-local-browse",comic.id,chapter,
+                comic.title,"","Chapter 1",1,"local","local",1,
+                "2026-10-31T10:00:00Z","2026-10-31T10:02:00Z");
+        Map<String,ReaderHistoryLedger.Session> visited=LocalLibraryBrowse.latestFor(
+                source.books(),ReadingHistoryStore.load(context));
+        assertEquals(1,visited.get(comic.id).lastPage);
+        assertEquals(1,LocalLibraryBrowse.visible(books,visited,"",0,2).size());
+        assertTrue(LocalLibraryBrowse.visible(books,visited,"",0,1).isEmpty());
+        assertEquals(comic.id,LocalLibraryBrowse.bookFor(books,
+                LocalLibraryBrowse.newest(visited)).id);
+        assertTrue("Read/filter remains view-only",LocalComicStore.has(context,comic.id));
+        assertArrayEquals(PNG,Files.readAllBytes(new File(original,"2.png").toPath()));
+    }
+
     @Test public void ownedComicPathsAllowAndroidAppDataAliasButRejectOwnedLinks() throws Exception {
         // Real Android has /data/user/0 -> /data/data above the app-owned root.
         // A trusted ancestor alias is not a symlink *inside* our comic directory.

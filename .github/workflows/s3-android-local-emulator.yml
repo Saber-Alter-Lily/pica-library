@@ -1,6 +1,16 @@
 name: S3 Android local Reader real emulator flow (unpublished)
 
 on:
+  push:
+    branches: [codex/product-integration-r1-20261102]
+    paths:
+      - '.github/workflows/s3-android-local-emulator.yml'
+      - 'mobile/android-alpha2/local-app/**'
+      - 'mobile/android-alpha2/local-storage/**'
+      - 'mobile/android-alpha2/reader-view/**'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/LocalComicImportActivity.java'
+      - 'scripts/run-s3-android-local-emulator.sh'
+      - 'scripts/s3-android-local-emulator-flow.py'
   pull_request:
     paths:
       - '.github/workflows/s3-android-local-emulator.yml'
@@ -16,7 +26,7 @@ permissions:
 
 jobs:
   local-ui-flow:
-    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    if: github.repository == 'Saber-Alter-Lily/pica-library' && (github.event_name != 'pull_request' || github.head_ref != 'codex/product-integration-r1-20261102')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

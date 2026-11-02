@@ -17,6 +17,7 @@ from pathlib import Path
 
 QA_PACKAGE = "com.picalibrary.android.localcore.qa"
 ORIGINAL_PACKAGE = "com.picalibrary.android.dev"
+USER_HOST_PACKAGE = "com.picalibrary.android.userhost.qa"
 PACKAGE = QA_PACKAGE
 ROOT = Path("mobile/android-alpha2/s3-local-emulator-evidence")
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -562,6 +563,32 @@ def original_app_flow():
     page("21-original-user-host-entry")
     record("original Android Online tab opens user-owned Host config without provider login")
 
+def source_free_user_host_flow():
+    """Drive separate real Host-capable APK; no actual source or account installed."""
+    global PACKAGE, STEP
+    PACKAGE = USER_HOST_PACKAGE
+    STEP = "user-host-app-initial"
+    adb("shell", "am", "start", "-W", "-n",
+        PACKAGE + "/com.picalibrary.android.LocalLibraryActivity", timeout=50)
+    wait(("Import CBZ", "导入 CBZ", "CBZ 取込"), seconds=30)
+    tap(("My external Host", "连接我的外部 Host", "外部 Host"),
+        seconds=25, only_class="Button")
+    wait(("My external sources", "我的外部来源", "外部ソース"), seconds=25)
+    wait(("No Host connected", "尚未连接 Host", "未接続"), seconds=25)
+    page("22-standalone-source-free-user-host")
+    record("separate source-free user-Host APK exposes manual opt-in, no auto-connect")
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    wait(("Import CBZ", "导入 CBZ", "CBZ 取込"), seconds=25)
+    tap(("Import CBZ", "导入 CBZ", "CBZ 取込"), seconds=20, only_class="Button")
+    locate_document("S3-QA-Comic.cbz")
+    tap(("Save to library", "保存到书库", "書庫に保存"), seconds=40)
+    wait(("4 pages", "4 页", "4 ページ"), seconds=50)
+    tap("S3-QA-Comic")
+    dismiss_immersive_help()
+    wait_page_counter("1 / 3", seconds=40)
+    page("23-standalone-host-app-offline-reader")
+    record("optional Host APK reuses original local CBZ import and Reader without any Host connection")
+
 def main():
     global STEP
     try:
@@ -582,6 +609,7 @@ def main():
         import_folder()
         export_cbz()
         original_app_flow()
+        source_free_user_host_flow()
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",

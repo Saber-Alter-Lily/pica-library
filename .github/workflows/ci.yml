@@ -77,6 +77,48 @@ jobs:
             echo "Local-only APK still requests a forbidden runtime capability"
             exit 1
           fi
+      - name: Build user-owned Host Android APK without bundled site SDKs
+        working-directory: mobile/android-alpha2
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          gradle :user-host-app:assembleDebug --no-daemon --max-workers=2
+          apk=user-host-app/build/outputs/apk/debug/user-host-app-debug.apk
+          test -s "$apk"
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$aapt" dump badging "$apk" | grep -F "package: name='com.picalibrary.android.userhost.qa'"
+          "$aapt" dump badging "$apk" | grep -F "launchable-activity: name='com.picalibrary.android.LocalLibraryActivity'"
+          "$aapt" dump permissions "$apk" | grep -F 'android.permission.INTERNET'
+          if "$aapt" dump permissions "$apk" | grep -E 'android.permission.(CAMERA|REQUEST_INSTALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE)'; then
+            echo 'Unexpected permission in optional Host APK'; exit 1
+          fi
+          APK_PATH="$apk" python3 - <<'PY'
+          import os, re, zipfile
+          with zipfile.ZipFile(os.environ['APK_PATH']) as archive:
+              dexes = [archive.read(name) for name in archive.namelist()
+                       if re.fullmatch(r'classes[0-9]*\.dex', name)]
+          if not dexes: raise SystemExit('No compiled DEX files')
+          data = b''.join(dexes)
+          for forbidden in (b'Lio/github/jukomu/', b'PicaAccountActivity',
+                            b'EhAccountActivity', b'JmSourceActivity',
+                            b'PicaBrowseActivity', b'Lcom/picalibrary/android/PicaClient;',
+                            b'Lcom/picalibrary/android/EhClient;'):
+              if forbidden in data:
+                  raise SystemExit('Provider SDK or account leaked into Host APK')
+          for needed in (b'HostSourceManager', b'HostBrowserActivity',
+                         b'HostReaderActivity', b'LocalComicStore'):
+              if needed not in data:
+                  raise SystemExit('Missing owned Host or original Reader: ' + str(needed))
+          print('PASS: separate Host APK includes original Reader and owned Suwayomi, no site SDK')
+          PY
+      - name: Upload unsigned source-free user-Host QA APK (not Release)
+        if: success() && github.event.repository.private == false && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: r2-source-free-user-host-android-qa-${{ github.sha }}
+          path: mobile/android-alpha2/user-host-app/build/outputs/apk/debug/user-host-app-debug.apk
+          retention-days: 3
+          if-no-files-found: error
       - name: Build and inspect physically source-free Android local QA APK
         working-directory: mobile/android-alpha2
         timeout-minutes: 10

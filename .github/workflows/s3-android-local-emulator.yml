@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/s3-android-local-emulator.yml'
       - 'mobile/android-alpha2/local-app/**'
+      - 'mobile/android-alpha2/user-host-core/**'
+      - 'mobile/android-alpha2/user-host-app/**'
       - 'mobile/android-alpha2/local-storage/**'
       - 'mobile/android-alpha2/reader-view/**'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/LocalComicImportActivity.java'
@@ -20,6 +22,8 @@ on:
       - 'scripts/run-s3-android-local-emulator.sh'
       - 'scripts/s3-android-local-emulator-flow.py'
       - 'mobile/android-alpha2/local-app/**'
+      - 'mobile/android-alpha2/user-host-core/**'
+      - 'mobile/android-alpha2/user-host-app/**'
       - 'mobile/android-alpha2/local-storage/**'
       - 'mobile/android-alpha2/reader-view/**'
   workflow_dispatch:

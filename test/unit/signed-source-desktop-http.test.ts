@@ -5,6 +5,8 @@ import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { request as httpRequest, type Server } from 'node:http'
+import AdmZip from 'adm-zip'
+import { LocalSignedSourceInstaller } from '../../src/source-extensions/local-signed-package'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
@@ -24,6 +26,7 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
     let desktopReader: SignedSourceDesktopReader
     let server: Server
     let baseUrl: string
+    let chosenArchive: string | null = null
     const token = 'signed-source-fixture-csrf'
     const keys = generateKeyPairSync('ed25519')
     const publicPem = keys.publicKey.export({ format: 'pem', type: 'spki' }).toString()
@@ -57,7 +60,9 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
             store, db, () => new PreviewCacheManager(
                 path.join(dir, 'signed-cache'),
                 { maxBytes: 4 * 1024 * 1024, ttlMs: 30_000 }
-            )
+            ),
+            new Map(),
+            new LocalSignedSourceInstaller(store, async () => chosenArchive)
         )
         const result = await startLibraryServer({
             database: db,
@@ -157,7 +162,7 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
         const inventory = await post(endpoint, { operation: 'inventory' })
         expect(inventory.status).toBe(200)
         expect(await inventory.json()).toEqual({
-            schemaVersion: 1, installAvailable: false,
+            schemaVersion: 1, installAvailable: true,
             sources: [{
                 sourceId: 'demo', schemaVersion: 1, revision: 0,
                 activeVersion: null, versions: ['1.0.0', '1.1.0'],
@@ -527,6 +532,68 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
             versions: [], activeVersion: null, connected: false
         })
         expect(db.getAppState('signed-source-progress-v1:demo')).toBeDefined()
+    })
+
+
+    it('installs only the native-selected signed ZIP; explicit enable and original Reader remain separate', async () => {
+        const endpoint = '/api/v1/desktop/signed-reader'
+        const start = await post(endpoint, { operation: 'inventory' })
+        expect(start.status).toBe(200)
+        const inventory = await start.json() as {
+            installAvailable: boolean
+            sources: Array<{ sourceId: string; revision: number;
+                activeVersion: string | null; versions: string[] }>
+        }
+        expect(inventory.installAvailable).toBe(true)
+        expect(inventory.sources[0]).toMatchObject({
+            sourceId: 'demo', activeVersion: null, versions: []
+        })
+        const rejected = await post(endpoint, {
+            operation: 'install', consent: true, path: workerFile
+        })
+        expect(rejected.status).toBe(400)
+        expect((await post(endpoint, { operation: 'install' })).status).toBe(400)
+        const cancelled = await post(endpoint, {
+            operation: 'install', consent: true
+        })
+        expect(cancelled.status).toBe(200)
+        expect(await cancelled.json()).toEqual({ cancelled: true })
+        const zipped = new AdmZip()
+        zipped.addFile('release.json', Buffer.from(JSON.stringify(signed('1.2.0'))))
+        zipped.addFile('worker.cjs', workerBytes)
+        chosenArchive = path.join(dir, 'native-selected-signed-source.zip')
+        fs.writeFileSync(chosenArchive, zipped.toBuffer())
+        const installed = await post(endpoint, {
+            operation: 'install', consent: true
+        })
+        expect(installed.status).toBe(200)
+        expect(await installed.json()).toEqual({
+            sourceId: 'demo', version: '1.2.0', installed: true
+        })
+        const passive = await post(endpoint, { operation: 'inventory' })
+        expect((await passive.json()).sources[0]).toMatchObject({
+            revision: inventory.sources[0].revision,
+            activeVersion: null, connected: false, versions: ['1.2.0']
+        })
+        const activation = await post(endpoint, {
+            operation: 'activate', sourceId: 'demo',
+            version: '1.2.0', expectedRevision: inventory.sources[0].revision
+        })
+        expect(activation.status).toBe(200)
+        const state = await activation.json() as { revision: number }
+        const connected = await post(endpoint, { operation: 'connect', sourceId: 'demo' })
+        expect(connected.status).toBe(200)
+        const session = await connected.json() as { sessionId: string }
+        const chapters = await get(endpoint + '/' + session.sessionId +
+            '/comics/demo%3Abook1/chapters')
+        expect(chapters.status).toBe(200)
+        expect((await chapters.json())[0].id).toBe('chapter-1')
+        expect((await post(endpoint, {
+            operation: 'disable', sourceId: 'demo',
+            expectedRevision: state.revision
+        })).status).toBe(200)
+        expect((await get(endpoint + '/' + session.sessionId + '/progress')).status)
+            .toBe(409)
     })
 
 })

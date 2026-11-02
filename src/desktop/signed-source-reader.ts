@@ -9,6 +9,7 @@ import { OnlineReaderService } from '../services/online-reader-service'
 import { bindExternalReader } from '../source-extensions/desktop-reader-adapter'
 import type { TrustedSourceProcess } from '../source-extensions/trusted-process'
 import { SignedWorkerStore } from '../source-extensions/signed-worker-store'
+import type { LocalSignedSourceInstaller } from '../source-extensions/local-signed-package'
 
 /**
  * Only the trusted application composition root may opt a worker into a
@@ -71,7 +72,8 @@ export class SignedSourceDesktopReader {
         private readonly store: SignedWorkerStore,
         private readonly state: OnlineReaderState,
         private readonly makeCache: () => OnlineReaderCache,
-        private readonly identityBridges: ReadonlyMap<string, SignedReaderIdentityBridge> = new Map()
+        private readonly identityBridges: ReadonlyMap<string, SignedReaderIdentityBridge> = new Map(),
+        private readonly packageInstaller?: Pick<LocalSignedSourceInstaller, 'installChosen'>
     ) {}
 
     private ownsSourceComic(sourceId: string, comicId: string) {
@@ -137,7 +139,7 @@ export class SignedSourceDesktopReader {
                 throw new SignedReaderInputError()
             return {
                 schemaVersion: 1,
-                installAvailable: false,
+                installAvailable: Boolean(this.packageInstaller),
                 sources: this.store.installedSources().map(source => ({
                     ...source,
                     connected: this.connectedSource(
@@ -145,6 +147,14 @@ export class SignedSourceDesktopReader {
                     )
                 }))
             }
+        }
+        if (op === 'install') {
+            if (!exact(raw, ['operation', 'consent']) || raw.consent !== true ||
+                !this.packageInstaller)
+                throw new SignedReaderInputError()
+            // Only the application's injected native picker can choose an
+            // archive. No path, URL, payload or public key crosses HTTP.
+            return this.packageInstaller.installChosen()
         }
         if (op === 'status') {
             if (!exact(raw, ['operation', 'sourceId']))

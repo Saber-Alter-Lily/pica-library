@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-11-01 S3 CORE-ANDROID-21｜本地真实书库一批次补齐常用浏览与续读（仍为 Draft）
+
+- 不再拆成五个无关小 PR。本轮在原 `:local-app/LocalLibraryActivity` 一次实现**搜索标题、最近/名称/页数排序、全部/已读/未读筛选、最近继续阅读和作品长按直接加入书架**。全部调用已经抽离的 `LocalComicReaderPort.books()`、`ReaderHistoryLedger`、`ReaderProgressLedger.seedOneShotPosition`、`ShelfLedger.setMembership` 和旧 `ReaderScreenActivity`，不新增数据库、阅读器、来源、专用网络或依赖。
+- 交互参考 [Mihon 的本地书库/分类与阅读状态筛选](https://mihon.app/docs/faq/library) 和 [Kavita 的库过滤/排序](https://wiki.kavitareader.com/guides/features/filtering/)；仅借鉴成熟产品的用户流程，具体实现均复用 Pica Library 旧代码与 Android 系统控件，没有复制第三方源码。Android 唯一原应用原有数据持有者保持不变；独立 QA 的文件仍被 `com.picalibrary.android.localcore.qa` 隔离。
+- 已提交代码 `b563683`：状态过滤只基于本地已存真实 session；列表只渲染不修改目录、书架/历史；列表操作按稳定 local ID；加入书架复活已删除成员应走原 tombstone 逻辑。另扩展**既有** Android35 真实模拟器流程，检查从本地书库直接加书架、强制停止后回到原页，以及读/未读筛选；没有新 runner、测试框架或 UI 截图矩阵。
+- **验收等级**：首次提交属于 IMPLEMENTED_IN_DRAFT/CI_PENDING。原 Android Web/Desktop 全量、独立无源 APK DEX/权限闭包、Android35 QA E2E 均需按最终精确 HEAD 核实；即便通过，只是工程及模拟器验证。全部多语言屏宽、物理 Android 手机、原正式 App 功能对照、第二真实来源/Android Binder、v0.5.0 老资料升级及 G1–G4 均 OPEN。不合并 main、Release、OTA，不读取/修改私人用户资料。
+- 本轮代码与证据索引：`docs/S3_ANDROID_LOCAL_LIBRARY_BROWSE_20261101.md`。下一大批优先完善双端原产品中的一体化本地书库/来源端到端，不反复叠加 QA 空壳界面。
+
 ### 2026-11-01 S3 SIGNED-SRC-09｜本机显式安装可信签名来源包
 
 - 在现有签名 Worker、原 Reader/UI/NativePicker 之上，仅补本机原生选择签名 ZIP 的最小安装操作：两个固定成员、签名与哈希验证、独立版本写入。使用已装 `adm-zip`，不引入新插件执行体系或自动来源商店。

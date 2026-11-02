@@ -783,6 +783,43 @@ def source_free_user_host_flow():
         page("27-host-chapter-explicitly-saved")
         record("authorized Host chapter copied via original owned LocalComicStore")
 
+        STEP = "user-host-binder-import-to-original-library"
+        tap_scrolling(("Save to separate Reader library",
+                       "保存到独立阅读器的书库","別の Reader 書庫に保存"),
+                      direction="down",only_class="Button")
+        wait(("Save to original Reader","保存到原阅读器书库","元の Reader に保存"),
+             seconds=35)
+        tap(("Choose chapter to save","选择要保存的章节","保存する章を選択"),
+            only_class="Button",seconds=25)
+        tap(("Synthetic chapter",),seconds=30)
+        tap(("Save this chapter","保存这一章","この章を保存"),
+            exact=True,only_class="Button",seconds=20)
+        originalPackage=PACKAGE
+        try:
+            PACKAGE=QA_PACKAGE
+            importedToReader=None
+            end=time.monotonic()+65
+            while time.monotonic()<end:
+                importedToReader=next((row for row in book_rows() if
+                    row["title"].startswith("S3-QA-Hosted-Comic") and
+                    len(row["pages"])==2),None)
+                if importedToReader:break
+                time.sleep(.6)
+            assert importedToReader,("Signed Binder import never entered the "
+                "original source-free library")
+            idFromReader=importedToReader["id"]
+            localRaster=("files/local-comics-v1/"+idFromReader.removeprefix("local:")
+                         +"/"+importedToReader["generation"]+"/"
+                         +importedToReader["pages"][0]["file"])
+            assert adb("exec-out","run-as",PACKAGE,"cat",localRaster,
+                       binary=True)==pngs[0], "Binder page copied wrong image bytes"
+        finally:
+            PACKAGE=originalPackage
+        page("27a-cross-app-binder-import-in-original-library")
+        record("signed remote Host chapter imported into original source-free library with matching PNG bytes")
+        adb("shell","input","keyevent","KEYCODE_BACK")
+        wait(("My external sources","我的外部来源","外部ソース"),seconds=25)
+
         tap_scrolling(("Disconnect","断开会话","セッション終了"),
                       direction="up",only_class="Button")
         tap_scrolling(("Back to library","返回书库","書庫に戻る"),
@@ -792,6 +829,20 @@ def source_free_user_host_flow():
         wait_page_counter("1 / 2",seconds=40)
         page("28-host-copy-offline-after-disconnect")
         record("original Reader opens Host-copied chapter offline after revoking Host session")
+
+        # The original no-network Reader must ALSO retain the image copied via
+        # the signed Binder service, inside its own independent library.
+        STEP = "source-free-original-library-offline-after-revoke"
+        PACKAGE=QA_PACKAGE
+        adb("shell","am","start","-W","-n",
+            PACKAGE+"/com.picalibrary.android.LocalLibraryActivity",timeout=45)
+        wait(("Import CBZ","导入 CBZ","CBZ 取込"),seconds=25)
+        tap_scrolling("S3-QA-Hosted-Comic",direction="down")
+        dismiss_immersive_help()
+        wait_page_counter("1 / 2",seconds=40)
+        page("29-original-source-free-library-after-host-revoke")
+        record("source-free Reader opens its own Binder-imported chapter with Host disconnected")
+        PACKAGE=USER_HOST_PACKAGE
         assert all(item in operations for item in ("PicaSourceHostInfo",
             "PicaSourceHostSources","PicaHostSourceSearch","PicaHostManga",
             "PicaHostChapter","PicaHostChapterPages","PicaHostPrepareManga")),operations

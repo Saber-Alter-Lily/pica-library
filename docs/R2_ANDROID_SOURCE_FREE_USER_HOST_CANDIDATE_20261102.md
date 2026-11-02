@@ -1,0 +1,32 @@
+# R2｜Android 物理无源核心与用户自管 Host APK 候选
+
+日期：2026-11-02。唯一主干 Draft PR #284。**这是研发 QA 组合，不是替换 v0.5.0 的正式更新。**
+
+## 真实代码复用
+
+- `:local-core`：原 `ReaderContent`、原图像/导入策略和身份算法，不复制第三方阅读器。
+- `:local-storage`：原本地作品清单、CBZ/文件夹导入、书架、阅读历史、用户独立存储。
+- `:reader-view`：原 `ReaderScreenActivity`、图片加载、页面手势和进度；**没有第二个 Reader**。
+- `:local-app`：原本已隔离的 Reader/本地书库 Android UI，原 Gradle 模块不改变包身份、无 `INTERNET`，无内置来源或 Host。
+- `:user-host-core`：从原 `:app` **移动** HostProtocol/HostEndpoint/HostJson/HostHttp/HostSourceManager/HostConfigStore/HostSavedBooks/HostOfflineSaver/SourceHttpConnection 和公共 SourceAccessPolicy；资源 `host_source_operations.json` 也从原 app 移到库中。它不依赖 `:app`、哔咔/JM 等 Provider SDK 或 WebView；Host 的作品、章节、图片使用已有 `ReaderContent`。
+- `:user-host-app`：独立 applicationId `com.picalibrary.android.userhost.qa`，Gradle 直接把 `:local-app/src/main/java` 当作**共享源码**，复用原导入、书库、书架、历史和 Reader；新增可选的用户 Host 页面与 HostReaderActivity 薄适配。仅此 APK 请求 `INTERNET`，使用现有 HostEndpoint 允许明确授权的 HTTP 私有 LAN/loopback，其他 Host 路径遵循 HTTPS/权限限制。
+- 原 `:app` 仍保留 Android v0.5.0 之后完整产品行为及来源，原 HostReaderSource 只在 app 边界把 `ReaderContent` 兼容转换为 `BridgeClient`，旧用户数据库、账号、下载、签名、升级均未修改。**原 app 尚不是完全无源正式版本。**
+
+## 用户路径与验收要求
+
+| 用户路径 | 实现 | 验收门槛 |
+| --- | --- | --- |
+| 完全无源 Android APK | `:local-app` | 原离线书库与 Reader 流程，DEX 禁止 Host/站点代码、Manifest 无 INTERNET |
+| 可选 Host Android APK | `:user-host-app` | 安装包独立、不包含 Pica/EH/JM SDK/账号；默认无会话；同一 Reader 仍能导入 CBZ 并离线阅读 |
+| 用户主动联网 | HostBrowserActivity → `:user-host-core` | 保存名称/URL/认证方式（不存密码）→ 显式启用+授权 → 列出 Host 来源 → 选定来源 → 搜索 → 原 Reader 阅读 |
+| 明确保存章节 | `HostOfflineSaver` → 原 LocalComicStore | 仅复制选定章节到 app 私有书库；完成后可脱离 Host 阅读；无自动保存全部 Host 收藏 |
+| 后续隔离与升级 | G1–G4 | 真实手机 UI、真实 Suwayomi Host/插件在线实验、Android 来源独立安装/撤销边界、旧 v0.5.0 升级/回滚、官方签名尚未验收 |
+
+## 证据与限制
+
+- 自动化：保留现有 Android 35 模拟器，并扩展为**三安装包**：纯本地 QA、原完整应用 Dev、物理无站点 SDK 的可选 Host QA。测试只调用系统 SAF、原 Reader、本地读页及显式 Host 配置入口；模拟器没有用户真实漫画服务账号。
+- 构建：原 CI 同时验证单独 Host APK 的应用 ID、权限与 DEX，若混入 Pica/EH/JM 账户或站点 SDK 则失败。包未签名、独立隔离 QA，仅随限时 CI Artifact 提供，不进入 Release/OTA。
+- 尤其注意：GitHub Actions 的构建成功 **不等于**真实公共来源登录、网络可用或真实插件许可证合规。Breeze/VeneraNext/Delta 的架构比较见 `R2_OPEN_SOURCE_COMPATIBILITY_DECISION_20261102.md`；未复制其非兼容或许可不明的源码。
+- 当前 R1 原双端自动化已通过，但 G1 真实设备体验、R2 真实外部源/撤销和来源信任、G3 旧版无痛升级、G4 发布批准均保持 OPEN；记录实际 CI 状态后才能表述为工程 PASS。
+
+最终发布仍需把上述模块整合为**原产品的统一 Android 安装/升级路径**，不能把独立 QA companion 误当成对现有 v0.5.0 用户的无痛升级。

@@ -17,7 +17,7 @@
 | --- | --- | --- | --- | --- |
 | R0 统一集成 | 一个对 main 的未发布 Draft 集成候选、一个事实/缺口列表、旧任务完整映射 | 可以追踪 v0.5.0 → 各 Draft → 唯一候选的代码和功能归属 | 精确 SHA 对账，CI 仅记工程成功；不合并 main | IN_PROGRESS |
 | R1 双端完整核心 | 使用原 Windows Web 和原 Android Reader/存储的统一核心，独立可测试，不重造第二套 App | 两端分别首次启动 → 本地文件夹/CBZ 导入 → 浏览/搜索 → 书架 → 章节/图片阅读 → 记录进度 → 关闭重启后续读；用户数据相互隔离 | Windows 实体可启动候选、Android 实体 APK 的依赖/DEX 检查、真实设备操作；G1 仍需人工验收 | IN_PROGRESS |
-| R2 来源真正可选 | 原 Reader 接入可单独启停/升级/撤销的来源，Host 只是可选路径 | 无源核心仍可用 → 用户主动装/选一个可信来源 → 搜索/详情 → 章节/图片 → 继续阅读 → 停用来源不破坏本地作品；双端至少各有真实链路，第二真实来源单独核验 | Windows 受保护来源安装与签名信任、Android Service/Binder、可验证真实外部来源、许可审查；禁用 UI 不算物理剔除 | PLANNED |
+| R2 来源真正可选 | 原 Reader 接入可单独启停/升级/撤销的来源，Host 只是可选路径 | 无源核心仍可用 → 用户主动装/选一个可信来源 → 搜索/详情 → 章节/图片 → 继续阅读 → 停用来源不破坏本地作品；双端至少各有真实链路，第二真实来源单独核验 | Windows 受保护来源安装与签名信任、Android Service/Binder、可验证真实外部来源、许可审查；禁用 UI 不算物理剔除 | IN_PROGRESS |
 | R3 产品体验与功能收口 | 两端完整日常体验，集中消化 Issue 而非不断增加独立样例 | 原功能矩阵逐项：布局/三语/明暗/交互式八章引导，推荐与 Visual 可控、标签过滤 #199/#200、#204 的授权范围、下载进度、LAN/WebDAV 同步、无黑屏和长任务可取消 | 360/393/480dp 与字体缩放代表性截图，真实手机 + Windows；约 1500 部库实测；重大 P0/P1=0；G1 经用户确认 | PLANNED |
 | R4 无痛升级与发布 | 旧 v0.5.0 安全过渡 + 同源码双端签名候选 + 统一发布决策 | 旧版真实数据只读预检 → 校验备份 → 用户同意迁移/升级 → 旧书库/进度/下载/偏好比对 → 故障注入回滚 → 新候选再次启动和应用内更新 | G3 真实一致性/回滚，G4 原42+新增验收逐条回执、SHA/签名/版本/来源信任、用户明确批准；禁止以合成迁移冒充生产验收 | PLANNED |
 
@@ -40,6 +40,11 @@ R1 完成定义：同一固定 HEAD 的 Windows/Android 构建与核心流程测
 - 已逐文件核对 Breeze QuickJS/Rust + Bika/JM 插件 API、VeneraNext JS/QuickJS API、Delta Comic 插件安装/协议、现有 Suwayomi Host 与本项目签名 CJS Worker；结论与许可证界限见 [R2 开源兼容审计](R2_OPEN_SOURCE_COMPATIBILITY_DECISION_20261102.md)。Breeze 插件无明确许可，Venera GPL、Delta AGPL 不复制到本 MIT 项目。
 - 按“先复用可工作的服务/插件架构”原则，R2 首批选现有 Suwayomi Host，**作为额外可选组合**接入原 Windows Launcher + Web + Reader，不推翻 R1。严格区分 `app/web` 原无源页面、`app/web-host` 显式 Host 页面；默认从不启用 Host，绝不打包具体站点 SDK。
 - 本轮可运行工程候选仍须通过 exact HEAD Windows 实体 ZIP/两个原生入口与真实用户源端验证；R1、G1–G4 仍 OPEN。
+### R2 Android 物理来源分离候选（2026-11-02）
+
+- 基于原 Android `:local-core/:local-storage/:reader-view` 与 `:local-app` 的现有组件，已将 Suwayomi Host 协议/HTTP/会话及离线保存代码**移动到独立 `:user-host-core`**，主 App 仅保留旧 BridgeClient 兼容适配。
+- 新增 `:user-host-app`，独立 APK 复用原本地 UI 源代码和 Reader，默认纯本地可用，另有用户授权后才运行的 Host 管理、搜索、阅读与按章保存。两个来源模块不包括 Pica/EH/JM SDK。完整代码/验收边界见 [R2 Android 无源 Host 候选](R2_ANDROID_SOURCE_FREE_USER_HOST_CANDIDATE_20261102.md)。
+- 新增的同一 Android CI / Android 35 模拟器路径要求 APK 权限/DEX 实证和真实 UI；在 exact-head 得到结果前，R2 阶段与 G1–G4 仍 OPEN。原正式 Android App 的来源代码尚未全部物理剔除，因此独立 APK 属于工程候选，而不是旧用户自动升级方案。
 ## 4. 工程和开源复用纪律
 
 - 首先检查本仓库 v0.5.0 已实现的 Reader、SQLite、LocalLibraryIngestion、ReaderProgress/History、Shelf、Web UI、Upgrade Assistant、NativePicker、SignedWorkerStore 和 SourceHostConnections；其次参考 Mihon（Apache-2.0）来源与核心分离、Suwayomi 用户自管 Host 标准 API、Kavita 的书库检索/状态 UX；未核许可与适配成本，不复制第三方源代码。Kotatsu GPL 工程只能作设计比较，不直接复制。

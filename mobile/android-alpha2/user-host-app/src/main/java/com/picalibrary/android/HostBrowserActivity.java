@@ -23,7 +23,7 @@ public final class HostBrowserActivity extends Activity {
     private final List<HostProtocol.Source> sources=new ArrayList<>();
     private HostSourceManager manager;
     private EditText label,endpoint,username,password,query;
-    private CheckBox allowLan,permission;
+    private CheckBox allowLan,permission,basicAuth;
     private Spinner sourceChoices;
     private LinearLayout results;
     private TextView status;
@@ -101,6 +101,10 @@ public final class HostBrowserActivity extends Activity {
         allowLan.setTextColor(Color.WHITE);root.addView(allowLan);
         save=action(root,t("保存配置","Save configuration","設定を保存"));
         enable=action(root,t("启用 / 停用 Host","Enable / disable Host","Host 有効／無効"));
+        basicAuth=new CheckBox(this);
+        basicAuth.setText(t("此 Host 使用 Basic 认证",
+            "This Host uses Basic authentication","Basic 認証を使用"));
+        basicAuth.setTextColor(Color.WHITE);root.addView(basicAuth);
         username=field(root,t("Basic 用户名（如有）","Basic username (if needed)","ユーザー名"),false);
         password=field(root,t("Basic 密码（如有）","Basic password (if needed)","パスワード"),true);
         username.setSaveEnabled(false);password.setSaveEnabled(false);
@@ -130,7 +134,7 @@ public final class HostBrowserActivity extends Activity {
             String url=endpoint.getText().toString().trim();
             boolean allow=allowLan.isChecked();
             // Auth mode is a saved descriptor, never persistent credentials.
-            String mode=username.getText().length()>0?"basic":"none";
+            String mode=basicAuth.isChecked()?"basic":"none";
             long revision=manager.config().revision;
             task(t("保存中…","Saving…","保存中…"),()->{
                 manager.configure(revision,name,url,mode,allow);
@@ -196,6 +200,7 @@ public final class HostBrowserActivity extends Activity {
         HostConfigStore.Config config=manager.config();
         label.setText(config.label);endpoint.setText(config.endpoint);
         allowLan.setChecked(config.allowLan);
+        basicAuth.setChecked("basic".equals(config.authMode));
         status.setText(manager.hasSession()?t("会话已连接","Host session connected","接続済み"):
             t("尚未连接 Host","No Host connected","未接続"));
         controls();

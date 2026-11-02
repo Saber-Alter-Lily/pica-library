@@ -1,5 +1,13 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-11-01｜S3 SIGNED-SRC-10：可信来源主动搜索到原阅读器整批接线（未发布 Draft）
+
+- 接续 #279 真实原 Android 书库整合工程验收，选择**来源连接之后用户仍无法搜索/选书**这一真实产品阻断，一批完成：Worker 侧明确搜索能力、受控 IPC、原 Desktop 签名来源指令、原 Web 设置页搜索/作品选择，以及现有 Web Reader 点击跳转和原阅读进度。仅在用户明确连接已签名来源并主动提交关键词时发生搜索；不会因启动、打开设置或被动刷新执行来源扫描/安装/网络流量。
+- **开源复用决策**：Mihon 的扩展/来源与阅读器解耦、Suwayomi 的手动选择来源后搜索的交互流程作为架构参考；实际复用 Pica Library 的 `EhProvider.search`、`TrustedSourceProcess`、`SignedWorkerStore`、`SignedSourceDesktopReader`、`OnlineReaderService` 与 `web/app.js`。不自造爬虫、第二 Reader、第二插件执行器、任意扩展市场、网络抓包/安装服务或新 SDK；不复制开源第三方代码。
+- 首批真实适配范围仅为**匿名 E-H 旧 Provider 解析器**。签名 worker `eh-public-reader` 将用户键入的 2–120 字符查询映射到已有 E-H 公共列表，最多 25 个有归属 work ID 的结果；仅由可信程序身份适配器映射为原有 `eh:<gid>:<token>`，不产生新的书库和推荐 ID。连接/停用/撤销后旧 session 无法继续请求；Web UI 不接受 worker 路径、签名私钥、来源 URL 或可执行扩展数据。
+- **验收**：使用原 `signed-worker-lifecycle`、`signed-source-desktop-http`、`eh-public-worker-ipc`、`eh-public-reader-migration`、`signed-reader-web-routing` 定向回归加仓库原全量 CI 与 Windows/Linux 真实 Node 子进程；外网内容只通过合成 E-H HTTP fixture，不能等同用户真实来源可用。原正式 main、v0.5.0/OTA、个人数据/账号不动。G1 设备 UX、G2 官方可信签名/OS 根与 Android Binder/第二真实源、G3 历史用户迁移及回滚、G4 集中发布仍为 OPEN。
+- 详细本轮范围、测试真实性和后续优先级见 `docs/S3_SIGNED_SOURCE_SEARCH_READER_20261101.md`。当前状态 IMPLEMENTED_IN_DRAFT / CI_PENDING / UNPUBLISHED。
+
 ### 2026-11-01｜S3 CORE-ANDROID-22：正式 Android 的本地书库一体化功能批次
 
 - **推进阶段**：继 #278 独立 QA 的本地书库搜索/排序/已读状态/续读/书架操作已完成且修复模拟器操作定位后，将真实用户需要的这些功能全部接回**原 Android `app/LocalComicImportActivity`**，不继续另造 QA 书库产品。原 Android 的读取和 UI 使用原 `Ui`、`LocalizedText`、`ReaderActivity`、`ReadingHistoryStore`、`ShelfStore`、`UnifiedCatalogStore` 与正式数据路径；隔离 QA 仍使用自己的 `ReaderHistoryLedger.localFile` 和 `ShelfLedger.localFile`，**两者不共享或迁移用户数据文件**。

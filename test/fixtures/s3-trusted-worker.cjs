@@ -18,6 +18,15 @@ process.on('message', (packet) => {
         reply({ apiVersion: 1, sourceId: 'demo' })
         return
     }
+    if (packet.operation === 'search') {
+        if (packet.query === 'bad-owner') {
+            reply([{ comicId: 'another:book1', title: 'Foreign result' }])
+            return
+        }
+        if (packet.query === 'no-results') { reply([]); return }
+        reply([{ comicId: 'demo:book1', title: 'Offline QA searchable book' }])
+        return
+    }
     if (packet.operation === 'episodes') {
         if (packet.comicId === 'demo:bad-chapters') {
             reply([{ id: 'dup', title: 'A', order: 1 }, { id: 'dup', title: 'B', order: 2 }])

@@ -2,15 +2,18 @@ import { createHmac, randomBytes } from 'node:crypto'
 import { EhProvider } from '../providers/eh-provider'
 import {
     externalEpisodeIdentity,
+    externalSearchQuery,
     validateExternalEpisodes,
+    validateExternalSearchResults,
     validateExternalMedia,
     validateExternalPages,
     MAX_EXTERNAL_MEDIA_BYTES,
     type ExternalReaderTransport
 } from './reader-contract'
-import { fromEhPublicWorkerId } from './eh-public-identity'
+import { fromEhPublicWorkerId, toEhPublicWorkerId, EH_PUBLIC_WORKER_ID } from './eh-public-identity'
 
-type PublicEhPages = Pick<EhProvider, 'episodes' | 'pages' | 'fetchPage'>
+type PublicEhPages = Pick<EhProvider, 'episodes' | 'pages' | 'fetchPage'> &
+    Partial<Pick<EhProvider, 'search'>>
 const MAX_CACHED_CHAPTERS = 4
 const MAX_PAGE_LOCATOR_LENGTH = 512 // 4 * 10k pages => bounded per-worker locator memory
 
@@ -20,7 +23,8 @@ const MAX_PAGE_LOCATOR_LENGTH = 512 // 4 * 10k pages => bounded per-worker locat
  * This module deliberately imports the existing E-H Provider instead of
  * copying its HTML parser, gallery metadata logic or image handling. It is
  * an OPTIONAL source-worker entry and must never be included in core bundles.
- * Account login, cookies, favorites, source search and downloading are absent.
+ * Account login, cookies, favorites and downloading are absent.
+ * Explicit search delegates to the EXISTING anonymous E-H Provider parser.
  */
 export function createEhPublicReaderTransport(
     provider: PublicEhPages = new EhProvider()
@@ -58,6 +62,18 @@ export function createEhPublicReaderTransport(
     }
 
     return {
+        async search(query) {
+            const keyword = externalSearchQuery(query)
+            if (!provider.search) throw new Error('Signed source search is unavailable')
+            const results = await provider.search({
+                keyword, ehMode: 'latest', surface: 'eh', limit: 25
+            })
+            return validateExternalSearchResults(EH_PUBLIC_WORKER_ID,
+                results.map(row => ({
+                    comicId: toEhPublicWorkerId(row.comicId),
+                    title: row.title
+                })))
+        },
         async episodes(comicId) {
             const legacy = fromEhPublicWorkerId(comicId)
             const rows = await provider.episodes(legacy)

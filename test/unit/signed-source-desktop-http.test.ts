@@ -236,6 +236,33 @@ describe('S3 Desktop HTTP signed-worker integration: opt-in, localhost only', ()
         }
         expect(connected).toMatchObject({ revision: 1, sourceId: 'demo' })
         const root = endpoint + '/' + connected.sessionId
+        const search = await post(endpoint, {
+            operation: 'search', sessionId: connected.sessionId, query: 'offline'
+        })
+        expect(search.status).toBe(200)
+        expect(await search.json()).toMatchObject({
+            sessionId: connected.sessionId, sourceId: 'demo', query: 'offline',
+            items: [{ comicId: 'demo:book1', title: 'Offline QA searchable book' }]
+        })
+        const empty = await post(endpoint, {
+            operation: 'search', sessionId: connected.sessionId, query: 'no-results'
+        })
+        expect(empty.status).toBe(200)
+        expect((await empty.json()).items).toEqual([])
+        for (const invalid of [
+            { operation: 'search', sessionId: connected.sessionId, query: '' },
+            { operation: 'search', sessionId: connected.sessionId, query: 'a' },
+            { operation: 'search', sessionId: connected.sessionId,
+                query: 'x'.repeat(121) },
+            { operation: 'search', sessionId: connected.sessionId, query: 'ok',
+                url: 'https://example.invalid' },
+            { operation: 'search', sessionId: connected.sessionId, query: 'ok',
+                script: 'worker.cjs' }
+        ]) expect((await post(endpoint, invalid)).status).toBe(400)
+        const wrongOwner = await post(endpoint, {
+            operation: 'search', sessionId: connected.sessionId, query: 'bad-owner'
+        })
+        expect(wrongOwner.status).toBe(409)
         const chaptersResponse = await get(root + '/comics/demo%3Abook1/chapters')
         expect(chaptersResponse.status).toBe(200)
         const chapters = await chaptersResponse.json()

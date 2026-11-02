@@ -4,7 +4,8 @@ import type { SignedReaderIdentityBridge } from '../desktop/signed-source-reader
 import {
     EH_PUBLIC_WORKER_ID,
     ownsLegacyEhId,
-    toEhPublicWorkerId
+    toEhPublicWorkerId,
+    fromEhPublicWorkerId
 } from './eh-public-identity'
 
 /**
@@ -18,6 +19,7 @@ export const ehPublicIdentityBridge: SignedReaderIdentityBridge = {
     ownsComicId: ownsLegacyEhId,
     // Join the same already-owned E-H catalogue identity, not a duplicate book.
     readingSource: { key: 'catalogue:eh', label: 'E-H / ExH' },
+    projectSearchComicId: fromEhPublicWorkerId,
     bind(rawManifest, transport, access) {
         const manifest = normalizeExternalReaderManifest(rawManifest)
         if (manifest.id !== EH_PUBLIC_WORKER_ID)

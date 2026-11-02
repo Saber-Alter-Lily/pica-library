@@ -1,4 +1,5 @@
 import { copy as t } from './locale-runtime.js'
+import { isSignedReaderComicId } from './signed-reader-route.js'
 
 const $ = (id) => document.getElementById(id)
 let revision = null,
@@ -166,6 +167,8 @@ document.addEventListener('pica-language-change', localize)
 const signedPanel = $('signed-source-manager')
 let signedCsrf = '', signedBusy = false, signedRows = [], signedCanInstall = false
 const signedSessions = new Map()
+const signedQueries = new Map()
+const signedResults = new Map()
 const signedText = (tag, value) => {
     const element = document.createElement(tag)
     if (value !== undefined) element.textContent = value
@@ -206,8 +209,10 @@ function signedInventory(value) {
     signedRows = value.sources
     signedCanInstall = value.installAvailable
     for (const [id] of signedSessions)
-        if (!signedRows.some(row => row.sourceId === id && row.connected))
+        if (!signedRows.some(row => row.sourceId === id && row.connected)) {
             signedSessions.delete(id)
+            signedResults.delete(id)
+        }
 }
 function signedRender() {
     const root = $('signed-source-list')
@@ -293,11 +298,105 @@ function signedRender() {
         select.addEventListener('change', update)
         update()
         item.append(actions)
+        // Search is explicitly submitted by the user after activating and
+        // connecting a verified component. This UI never lists a catalogue
+        // on load, connects in the background or stores source credentials.
+        const sessionId = signedSessions.get(row.sourceId)
+        if (row.connected && sessionId) {
+            const form = signedText('form')
+            form.className = 'actions'
+            const input = signedText('input')
+            input.type = 'search'
+            input.maxLength = 120
+            input.required = true
+            input.value = signedQueries.get(row.sourceId) || ''
+            input.placeholder = t('搜索此来源的作品', 'Search this source', 'このソースで検索')
+            input.setAttribute('aria-label', input.placeholder + ' · ' + row.sourceId)
+            input.oninput = () => signedQueries.set(row.sourceId, input.value)
+            const submit = signedText('button', t('搜索作品', 'Search books', '作品を検索'))
+            submit.type = 'submit'
+            submit.disabled = signedBusy
+            form.append(input, submit)
+            form.onsubmit = event => {
+                event.preventDefault()
+                if (!signedBusy) void signedSearch(row.sourceId, sessionId, input.value)
+            }
+            item.append(form)
+            if (signedResults.has(row.sourceId)) {
+                const results = signedText('div')
+                results.className = 'list'
+                const items = signedResults.get(row.sourceId)
+                if (!items.length) results.append(signedText('p', t(
+                    '没有匹配作品。可调整关键词重试。',
+                    'No matching books. Try a different query.',
+                    '一致する作品はありません。検索語を変えてください。'
+                )))
+                for (const hit of items) {
+                    const open = signedText('button', hit.title)
+                    open.type = 'button'
+                    open.setAttribute('aria-label', t('阅读：', 'Read: ', '読む：') + hit.title)
+                    open.disabled = signedBusy
+                    open.onclick = () => {
+                        if (signedBusy || signedPanel.hidden ||
+                            signedSessions.get(row.sourceId) !== sessionId) return
+                        document.dispatchEvent(new CustomEvent('pica-open-signed-reader', {
+                            detail: { comicId: hit.comicId, title: hit.title,
+                                sessionId, csrfToken: signedCsrf }
+                        }))
+                    }
+                    results.append(open)
+                }
+                item.append(results)
+            }
+        }
         root.append(item)
     }
     $('signed-source-refresh').disabled = signedBusy
     $('signed-source-install').hidden = !signedCanInstall
     $('signed-source-install').disabled = signedBusy
+}
+async function signedSearch(sourceId, sessionId, rawQuery) {
+    if (signedBusy || signedPanel.hidden ||
+        signedSessions.get(sourceId) !== sessionId) return
+    const query = String(rawQuery || '').trim()
+    if (query.length < 2 || query.length > 120) {
+        $('signed-source-status').textContent = t(
+            '搜索词必须是 2–120 个字符。',
+            'Enter a search term of 2–120 characters.',
+            '検索語は2～120文字にしてください。'
+        )
+        return
+    }
+    signedQueries.set(sourceId, query)
+    signedResults.delete(sourceId)
+    signedBusy = true
+    signedRender()
+    try {
+        const result = await signedCommand({ operation: 'search', sessionId, query })
+        if (signedSessions.get(sourceId) !== sessionId ||
+            result.sourceId !== sourceId || result.sessionId !== sessionId ||
+            result.query !== query || !Array.isArray(result.items) ||
+            result.items.length > 25 || result.items.some(hit =>
+                typeof hit.title !== 'string' || !hit.title.trim() ||
+                hit.title.length > 256 || !isSignedReaderComicId(hit.comicId)))
+            throw new Error('Invalid trusted source search results')
+        signedResults.set(sourceId, result.items)
+        $('signed-source-status').textContent = t(
+            '搜索完成。仅点击作品才会交给原阅读器。',
+            'Search complete. Select a book to open the existing Reader.',
+            '検索完了。作品の選択後に既存のリーダーを開きます。'
+        )
+    } catch {
+        signedResults.delete(sourceId)
+        $('signed-source-status').textContent = t(
+            '搜索失败或来源已经断开；没有修改个人书库。',
+            'Search failed or the source was disconnected. Local library unchanged.',
+            '検索できないか接続が切れました。ローカル書庫は変更されていません。'
+        )
+    } finally {
+        signedBusy = false
+        signedRender()
+    }
 }
 async function signedOperate(input) {
     if (signedBusy || !signedCsrf || signedPanel.hidden) return
@@ -305,13 +404,21 @@ async function signedOperate(input) {
     signedRender()
     try {
         const result = await signedCommand(input)
-        if (input.operation === 'connect' && typeof result.sessionId === 'string')
+        if (input.operation === 'connect' && typeof result.sessionId === 'string') {
             signedSessions.set(input.sourceId, result.sessionId)
+            signedResults.delete(input.sourceId)
+        }
         if (['disable', 'activate', 'rollback', 'uninstall', 'disconnect'].includes(input.operation)) {
-            if (input.sourceId) signedSessions.delete(input.sourceId)
+            if (input.sourceId) {
+                signedSessions.delete(input.sourceId)
+                signedResults.delete(input.sourceId)
+            }
             if (input.operation === 'disconnect') {
                 for (const [id, sessionId] of signedSessions)
-                    if (sessionId === input.sessionId) signedSessions.delete(id)
+                    if (sessionId === input.sessionId) {
+                        signedSessions.delete(id)
+                        signedResults.delete(id)
+                    }
             }
         }
         signedInventory(await signedCommand({ operation: 'inventory' }))

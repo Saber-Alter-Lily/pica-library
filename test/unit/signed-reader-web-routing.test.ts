@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { isSignedReaderComicId } from '../../web/signed-reader-route.js'
 
 const app = fs.readFileSync('web/app.js', 'utf8')
+const sourceChoices = fs.readFileSync('web/source-choices.js', 'utf8')
 const parsed = ts.createSourceFile(
     'app.js', app, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS
 )
@@ -76,6 +77,15 @@ function actualWebReader() {
 }
 
 describe('real common Web Reader accepts signed source-neutral legacy IDs', () => {
+    it('wires explicit search results into the unchanged common Web Reader', () => {
+        expect(sourceChoices).toContain("operation: 'search', sessionId, query")
+        expect(sourceChoices).toContain("new CustomEvent('pica-open-signed-reader'")
+        expect(sourceChoices).toContain("isSignedReaderComicId(hit.comicId)")
+        expect(app).toContain("document.addEventListener('pica-open-signed-reader'")
+        expect(app).toContain("detail.csrfToken !== desktop.csrfToken")
+        expect(app).toContain("openReaderComic(String(detail.comicId || ''), true, null")
+    })
+
     it.each([
         'demo:book1',
         'eh:123:abcdef1234',

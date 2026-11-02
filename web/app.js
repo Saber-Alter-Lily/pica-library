@@ -3292,6 +3292,16 @@ document.addEventListener('pica-open-hosted-reader', event => {
     const detail = event instanceof CustomEvent ? event.detail : null
     if (detail) void openReaderComic(String(detail.comicId || ''), true, { sessionId: String(detail.sessionId || ''), title: String(detail.title || ''), csrfToken: String(detail.csrfToken || '') })
 })
+document.addEventListener('pica-open-signed-reader', event => {
+    const detail = event instanceof CustomEvent ? event.detail : null
+    if (!detail || desktop?.signedSourceManagement?.available !== true ||
+        !desktop?.csrfToken || detail.csrfToken !== desktop.csrfToken) return
+    void openReaderComic(String(detail.comicId || ''), true, null, {
+        sessionId: String(detail.sessionId || ''),
+        title: String(detail.title || ''),
+        csrfToken: desktop.csrfToken
+    })
+})
 
 function moveReader(delta) {
     const next = readerPageIndex({

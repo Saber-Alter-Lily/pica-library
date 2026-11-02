@@ -169,6 +169,15 @@ describe('S3 signed source generations: real worker lifecycle', () => {
             schemaVersion: 1, revision: 1, activeVersion: '1.0.0'
         })
         const worker = await f.store.openActive('demo')
+        expect(await worker.search('Offline QA')).toEqual([
+            { comicId: 'demo:book1', title: 'Offline QA searchable book' }
+        ])
+        await expect(worker.search('bad-owner')).rejects.toThrow(
+            'Comic does not belong to this source'
+        )
+        await expect(worker.search('a')).rejects.toThrow(
+            'Invalid signed source search query'
+        )
         const memory = new Map<string, unknown>()
         const { source, contract } = bindExternalReader(manifest, worker, worker)
         const reader = new OnlineReaderService({

@@ -43,6 +43,7 @@ public final class HostBrowserActivity extends Activity {
     }
     private EditText field(LinearLayout root,String hint,boolean secret){
         EditText e=new EditText(this);e.setSingleLine(true);e.setHint(hint);
+        e.setContentDescription(hint);
         if(secret)e.setInputType(InputType.TYPE_CLASS_TEXT|
                 InputType.TYPE_TEXT_VARIATION_PASSWORD);
         root.addView(e,new LinearLayout.LayoutParams(-1,dp(48)));return e;
@@ -90,6 +91,11 @@ public final class HostBrowserActivity extends Activity {
             "仅连接你自行运行的 Suwayomi 2.4 Host。配置不会自动联网或安装任何漫画源；本地书库不受影响。",
             "Connect only a Suwayomi 2.4 Host you manage. No automatic connection or source installation. Local reading works offline.",
             "自分で管理する Suwayomi 2.4 Host のみ。自動接続や拡張導入なし。ローカル書庫はオフライン。"),12));
+        // Keep the status at the top of a long scrollable form. Previously it
+        // appeared below the results and could not be seen after an action.
+        status=text("",13);status.setTag("host.qa.status");
+        status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        root.addView(status);
         Button back=action(root,t("返回书库","Back to library","書庫に戻る"));
         back.setOnClickListener(v->finish());
         label=field(root,t("连接名称","Host name","接続名"),false);
@@ -121,9 +127,6 @@ public final class HostBrowserActivity extends Activity {
         select=action(root,t("选择此来源","Use selected source","ソースを選択"));
         query=field(root,t("搜索作品","Search works","作品を検索"),false);
         search=action(root,t("搜索选中来源","Search selected source","選択ソースで検索"));
-        status=text("",13);status.setTag("host.qa.status");
-        status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-        root.addView(status);
         results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);
         root.addView(results);
         ScrollView scroller=new ScrollView(this);scroller.addView(root);

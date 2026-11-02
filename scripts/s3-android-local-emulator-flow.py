@@ -6,6 +6,9 @@ application files. No extra test framework, simulated Reader or source login.
 """
 import json
 import re
+import threading
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import struct
 import subprocess
 import sys
@@ -103,6 +106,117 @@ def tap(terms, seconds=35, exact=False, only_class=None):
     x, y, label = wait(terms, seconds=seconds, exact=exact, only_class=only_class)
     adb("shell", "input", "tap", str(x), str(y))
     print(f"UI tap: {label!r} ({x},{y})", flush=True)
+
+
+
+def tap_scrolling(terms, direction="down", only_class=None, attempts=13):
+    """Find a visible native control on the existing scrollable Host screen."""
+    for _ in range(attempts):
+        selected = find(terms, only_class=only_class)
+        if selected and 60 <= selected[0] <= 660 and 100 <= selected[1] <= 1130:
+            x, y, title = selected
+            adb("shell", "input", "tap", str(x), str(y))
+            print(f"Host native UI tap: {title!r} ({x},{y})", flush=True)
+            return
+        if direction == "up":
+            adb("shell", "input", "swipe", "360", "360", "360", "1010", "360")
+        else:
+            adb("shell", "input", "swipe", "360", "1010", "360", "360", "360")
+    labels = [(text or desc)[:70] for text,desc,_,_ in nodes() if text or desc]
+    raise AssertionError(f"{STEP}: Host UI item {terms!r} not visible; {labels[:30]}")
+
+
+def type_into_host(hint, value):
+    tap_scrolling(hint, only_class="EditText")
+    adb("shell", "input", "text", value)
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+
+
+@contextmanager
+def synthetic_user_host():
+    """A real loopback-only Suwayomi 2.4 API with the original eight operations.
+
+    The Android app connects through ADB reverse and its own HttpURLConnection.
+    This exposes no real site, credentials or extension and never changes
+    user data; it exercises the original Host parser and Reader end-to-end.
+    """
+    source = "-9223372036854775808"
+    book = dict(id=7,sourceId=source,url="/synthetic/manga",
+                title="S3-QA-Hosted-Comic",inLibrary=False)
+    chapter = dict(id=11,mangaId=7,url="/synthetic/chapter",name="Synthetic chapter",
+                   sourceOrder=0,pageCount=2,chapterNumber=1)
+    first=original_png(135,185,215)
+    second=original_png(215,185,120)
+    operations=[]
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self,*args):
+            return
+        def respond(self,data,content_type,code=200):
+            self.send_response(code)
+            self.send_header("Content-Type",content_type)
+            self.send_header("Content-Length",str(len(data)))
+            self.send_header("Cache-Control","no-store")
+            self.send_header("Connection","close")
+            self.end_headers()
+            self.wfile.write(data)
+        def do_GET(self):
+            if self.path=="/api/v1/manga/7/chapter/0/page/0":
+                return self.respond(first,"image/png")
+            if self.path=="/api/v1/manga/7/chapter/0/page/1":
+                return self.respond(second,"image/png")
+            self.respond(b"not found","text/plain",404)
+        def do_POST(self):
+            if self.path!="/api/graphql":
+                return self.respond(b"not found","text/plain",404)
+            size=int(self.headers.get("Content-Length","0"))
+            if size<1 or size>10000:
+                return self.respond(b"invalid","text/plain",400)
+            request=json.loads(self.rfile.read(size))
+            name=request.get("operationName","")
+            operations.append(name)
+            if name=="PicaSourceHostInfo":
+                data={"aboutServer":{"name":"Suwayomi-Server","version":"v2.4.2366"}}
+            elif name=="PicaSourceHostSources":
+                data={"sources":{"nodes":[{"id":source,"name":"User installed fixture",
+                      "lang":"en","supportsLatest":True}],
+                      "pageInfo":{"hasNextPage":False,"hasPreviousPage":False},"totalCount":1}}
+            elif name=="PicaHostSourceSearch":
+                data={"fetchSourceManga":{"mangas":[book],"hasNextPage":False}}
+            elif name=="PicaHostManga":
+                data={"manga":dict(book,chapters={"nodes":[chapter]})}
+            elif name=="PicaHostPrepareManga":
+                data={"fetchMangaAndChapters":{"manga":book,"chapters":[chapter]}}
+            elif name=="PicaHostChapter":
+                data={"chapter":chapter}
+            elif name=="PicaHostChapterPages":
+                data={"fetchChapterPages":{"chapter":chapter,"pages":[
+                     "/api/v1/manga/7/chapter/0/page/0",
+                     "/api/v1/manga/7/chapter/0/page/1"]}}
+            else:
+                return self.respond(b"unsupported","text/plain",422)
+            body=json.dumps({"data":data},separators=(",",":")).encode()
+            self.respond(body,"application/json; charset=utf-8")
+    server=ThreadingHTTPServer(("127.0.0.1",0),Handler)
+    server.daemon_threads=True
+    port=server.server_address[1]
+    thread=threading.Thread(target=server.serve_forever,daemon=True)
+    thread.start()
+    try:
+        adb("reverse",f"tcp:{port}",f"tcp:{port}")
+        yield port,operations,(first,second)
+    finally:
+        adb("reverse","--remove",f"tcp:{port}",check=False)
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def wait_host_operation(operations, operation, seconds=30):
+    end=time.monotonic()+seconds
+    while time.monotonic()<end:
+        if operation in operations:return
+        time.sleep(.35)
+    raise AssertionError(f"{STEP}: expected real Host operation {operation}, got {operations!r}")
 
 
 def record(label):
@@ -588,6 +702,79 @@ def source_free_user_host_flow():
     wait_page_counter("1 / 3", seconds=40)
     page("23-standalone-host-app-offline-reader")
     record("optional Host APK reuses original local CBZ import and Reader without any Host connection")
+
+    adb("shell","input","keyevent","KEYCODE_BACK")
+    wait(("Import CBZ","导入 CBZ","CBZ 取込"), seconds=25)
+    with synthetic_user_host() as (port, operations, pngs):
+        STEP = "user-host-real-http-config"
+        tap(("My external Host","连接我的外部 Host","外部 Host"),
+            only_class="Button")
+        wait(("No Host connected","尚未连接 Host","未接続"),seconds=25)
+        type_into_host(("Host name","连接名称","接続名"),"QA_Host")
+        type_into_host(("Host URL","Host URL (http:// 或 https://)"),
+                       f"http://127.0.0.1:{port}/")
+        tap_scrolling(("Save configuration","保存配置","設定を保存"),
+                      only_class="Button")
+        # Consent is an explicit checkbox; neither save nor enable connects.
+        tap_scrolling(("Authorize this Host session","我授权本次连接自己的 Host",
+                       "この接続を許可します"),only_class="CheckBox")
+        tap_scrolling(("Enable / disable Host","启用 / 停用 Host","Host 有効／無効"),
+                      only_class="Button")
+        assert not operations, f"Host connected implicitly: {operations}"
+        page("24-host-saved-without-network")
+        record("user-selected loopback Host configured/enabled with no automatic request")
+
+        STEP = "user-host-real-http-source-search"
+        tap_scrolling(("Connect and list sources","连接并读取来源","接続してソースを表示"),
+                      only_class="Button")
+        wait_host_operation(operations,"PicaSourceHostSources")
+        tap_scrolling(("Use selected source","选择此来源","ソースを選択"),
+                      only_class="Button")
+        type_into_host(("Search works","搜索作品","作品を検索"),"synthetic")
+        tap_scrolling(("Search selected source","搜索选中来源","選択ソースで検索"),
+                      only_class="Button")
+        wait_host_operation(operations,"PicaHostSourceSearch")
+        tap_scrolling("S3-QA-Hosted-Comic",direction="down",only_class="Button")
+        wait_page_counter("1 / 2",seconds=45)
+        page("25-original-reader-from-synthetic-host")
+        advance_reader_next()
+        wait_page_counter("2 / 2",seconds=35)
+        page("26-original-reader-host-second-image")
+        record("real local HTTP Suwayomi: explicit source search -> original Reader -> second PNG")
+
+        STEP = "user-host-offline-save-and-revoke"
+        adb("shell","input","keyevent","KEYCODE_BACK")
+        tap_scrolling(("Save chapter offline","保存本地副本","章をローカル保存"),
+                      only_class="Button")
+        tap(("Synthetic chapter",),seconds=35)
+        tap(("Save","确认保存","保存"),exact=True,only_class="Button")
+        end=time.monotonic()+65
+        imported=None
+        while time.monotonic()<end:
+            imported=next((row for row in book_rows() if
+                row["title"].startswith("S3-QA-Hosted-Comic") and
+                len(row["pages"])==2),None)
+            if imported:break
+            time.sleep(.75)
+        assert imported, "Host chapter was not committed to the original local inventory"
+        page("27-host-chapter-explicitly-saved")
+        record("authorized Host chapter copied via original owned LocalComicStore")
+
+        tap_scrolling(("Disconnect","断开会话","セッション終了"),
+                      direction="up",only_class="Button")
+        tap_scrolling(("Back to library","返回书库","書庫に戻る"),
+                      direction="up",only_class="Button")
+        tap_scrolling("S3-QA-Hosted-Comic",direction="down")
+        dismiss_immersive_help()
+        wait_page_counter("1 / 2",seconds=40)
+        page("28-host-copy-offline-after-disconnect")
+        record("original Reader opens Host-copied chapter offline after revoking Host session")
+        assert all(item in operations for item in ("PicaSourceHostInfo",
+            "PicaSourceHostSources","PicaHostSourceSearch","PicaHostManga",
+            "PicaHostChapter","PicaHostChapterPages","PicaHostPrepareManga")),operations
+        (ROOT/"synthetic-host-operations.json").write_text(json.dumps(
+            {"operations":operations,"syntheticOnly":True},indent=2),
+            encoding="utf-8")
 
 def main():
     global STEP

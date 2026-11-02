@@ -81,6 +81,7 @@ describe('actual independent source-free Desktop entrypoint, never legacy profil
     it('physically excludes every provider SDK and Host, while retaining original business modules', async () => {
         const candidate = await buildOfflineCoreCandidate('desktop-core-preview')
         expect(candidate.sourceInputs).toContain('src/desktop/core-preview-main.ts')
+        expect(candidate.sourceInputs).toContain('src/desktop/core-preview-runtime.ts')
         expect(candidate.sourceInputs).toContain('src/desktop/instance.ts')
         expect(candidate.sourceInputs).toContain('src/library/core-runtime-composition.ts')
         expect(candidate.sourceInputs).not.toContain('src/offline-core/qa-cli.ts')
@@ -92,6 +93,7 @@ describe('actual independent source-free Desktop entrypoint, never legacy profil
                 'src/desktop/child-process.ts',
                 'src/desktop/core-local-profile.ts',
                 'src/desktop/core-preview-main.ts',
+                'src/desktop/core-preview-runtime.ts',
                 'src/desktop/instance.ts',
                 'src/desktop/pickers.ts',
                 'src/desktop/platform.ts'

@@ -1,5 +1,14 @@
 # Pica Library 产品恢复与架构主线｜执行计划 V1.0
 
+### 2026-11-01｜S3 CORE-HOST-23：纯核心 Windows + 用户自管 Suwayomi 宿主（独立可选，工程 Draft）
+
+- 在 #280 已完成的受签名 Worker 搜索/原 Reader 接口之外，解决另一条**实际用户所需的可扩展来源路径**：用户已有自行运行的 Suwayomi，可在**独立、无站点 SDK 的完整 Windows Web 核心**中手动输入/保存/启用 Host，单独授权本次连接，选择来源搜索/读章节与图片、保存进度。核心仍负责书库/阅读器，本批不引入官方内容目录、内嵌源 SDK、自动下载扩展或强制 Host。
+- **开源复用**：复用项目已接入的 Suwayomi v2.4 固定 GraphQL 操作、`SourceHostConnections` 权限版本与撤销、`HostedLibraryReader` 原 Reader 接线、`SourceHostInspector`、`PreviewCacheManager`、`sourceHostStore`，以及原 Desktop/Android 已复用的本地 Reader + SQLite。Mihon 的可选来源思想作为 UI 参考，不另造插件执行器、HTTP 解析器、宿主或阅读器；宿主由用户自管，不代表插件经过官方签名审计。
+- 新入口 `desktop-core-host-preview.mjs` 与普通 `desktop-core-preview.mjs` **严格分开**。单独入口仅在显式 `--explicit-user-host-preview` + 标记过的隔离根中启用 Host；默认离线核心不包含 Host 客户端。原完整 Web 模板按两种可审计、固定哈希资源闭包构建；仅用户 Host 入口允许加载已有 `source-hosts.js`、`saved-source-hosts.js`、`host-library.js`，不加载原 Pica/E-H/JM 站点脚本或凭据接口。
+- Host 连接/章节/图片/进度复用旧 `/api/v1/desktop/source-hosts/**`、`/api/v1/desktop/host-reader/**` 语义，由已注入的原 Host 模块实现；进程和 HTTP 默认零网络，所有请求有短期 Cookie、精确 loopback、来源同源/CSRF、用户明确授权。签名来源系统和 Host 是**两条互不相同的机制**，不能互相冒充官方可信安装包。
+- **验收**：隔离完整 Web 实际页面、可选 Host 资源/核心包依赖闭包、真实 localhost HTTP 调用、原 Reader 路由、旧 v0.5.0 空间完全不访问及 Host 禁用后本地已下载不消失；GitHub 原 Android/Web/Desktop CI 和原实机模拟门禁须对最终 HEAD 独立完成。第一个 CI 因原入口导出和被动依赖的校验器误判失败已保留，后续精确源码继续验收。当前不声称已在实体 Windows/UI 或真实远端 Suwayomi 重现。
+- 正式发布者密钥与受保护安装根、Android Service/Binder、第二真实远端 Provider、G1 真机视觉、G3 v0.5.0 数据迁移/回滚、G4 全集中 Release 仍 **OPEN**；main/正式 Release/OTA/真人账号保持不动。细节 `docs/S3_CORE_HOST_STANDALONE_20261101.md`。
+
 ### 2026-11-01｜S3 SIGNED-SRC-10：可信来源主动搜索到原阅读器整批接线（未发布 Draft）
 
 - 接续 #279 真实原 Android 书库整合工程验收，选择**来源连接之后用户仍无法搜索/选书**这一真实产品阻断，一批完成：Worker 侧明确搜索能力、受控 IPC、原 Desktop 签名来源指令、原 Web 设置页搜索/作品选择，以及现有 Web Reader 点击跳转和原阅读进度。仅在用户明确连接已签名来源并主动提交关键词时发生搜索；不会因启动、打开设置或被动刷新执行来源扫描/安装/网络流量。

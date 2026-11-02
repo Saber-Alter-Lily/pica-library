@@ -21,6 +21,12 @@ const kinds: Record<string, string> = {
     png: 'image/png',
     svg: 'image/svg+xml'
 }
+const HOST_WEB_UI = new Set([
+    'source-hosts.js', 'saved-source-hosts.js', 'host-library.js'
+])
+const DEFAULT_ENTRIES = 'info-tip-v1.js,app.js,alpha7-cloud.js,ui-polish-v5.js'
+const HOST_ENTRIES = 'info-tip-v1.js,app.js,alpha7-cloud.js,' +
+    'source-hosts.js,saved-source-hosts.js,host-library.js,ui-polish-v5.js'
 const denied = new Set([
     'eh-account.js', 'jm-account.js', 'source-choices.js',
     'source-hosts.js', 'saved-source-hosts.js', 'recommendation-v5.js',
@@ -31,7 +37,9 @@ const denied = new Set([
     'offline-core-reader-qa.js', 'reader-fragment.html'
 ])
 const hash = (data: Buffer) => createHash('sha256').update(data).digest('hex')
-export function verifiedFullWebQaAssets(webRoot: string): FullWebStatic | null {
+export function verifiedFullWebQaAssets(
+    webRoot: string, userHost = false
+): FullWebStatic | null {
     const manifestPath = path.join(webRoot, FULL_WEB_QA_MANIFEST)
     if (!fs.existsSync(manifestPath)) return null
     const stat = fs.lstatSync(manifestPath)
@@ -47,7 +55,8 @@ export function verifiedFullWebQaAssets(webRoot: string): FullWebStatic | null {
         input.distributable !== false ||
         !Array.isArray(input.appEntrypoints) ||
         input.appEntrypoints.join(',') !==
-            'info-tip-v1.js,app.js,alpha7-cloud.js,ui-polish-v5.js' ||
+            (userHost ? HOST_ENTRIES : DEFAULT_ENTRIES) ||
+        (input.userHostIncluded === true) !== userHost ||
         !Array.isArray(input.files) || input.files.length < 20 ||
         input.files.length > 75)
         throw new Error('Unsupported full Web QA manifest')
@@ -60,7 +69,9 @@ export function verifiedFullWebQaAssets(webRoot: string): FullWebStatic | null {
         const name = record.name
         if (typeof name !== 'string' ||
             !/^[a-z0-9][a-z0-9_.-]*\.(?:js|css|webp|png|svg|html)$/.test(name) ||
-            name.includes('..') || denied.has(name) || entries.has(name) ||
+            name.includes('..') ||
+            (denied.has(name) && !(userHost && HOST_WEB_UI.has(name))) ||
+            entries.has(name) ||
             !Number.isSafeInteger(record.size) ||
             (record.size as number) < 1 || (record.size as number) > 512 * 1024 ||
             typeof record.sha256 !== 'string' ||
@@ -86,6 +97,17 @@ export function verifiedFullWebQaAssets(webRoot: string): FullWebStatic | null {
     ]) if (!entries.has(required))
         throw new Error('Original full Web UI is incomplete: ' + required)
     const html = entries.get('index.html')!.data.toString('utf8')
+    if (userHost) for (const required of HOST_WEB_UI)
+        if (!entries.has(required) ||
+            !html.includes('src="./' + required + '"'))
+            throw new Error('Optional Host Web UI is incomplete')
+    // Original app.js already imports host-library.js as a passive helper.
+    // Only the two Host management initializers, or a new top-level Host
+    // script, would expand the ordinary zero-Host composition.
+    if (!userHost && (
+        ['source-hosts.js', 'saved-source-hosts.js'].some(name => entries.has(name)) ||
+        [...HOST_WEB_UI].some(name => html.includes('src="./' + name + '"'))
+    )) throw new Error('Normal source-free Web stage includes Host UI')
     for (const id of ['home', 'library', 'shelves', 'reader', 'settings'])
         if (!html.includes('id="' + id + '"'))
             throw new Error('Original full Web view is absent: ' + id)

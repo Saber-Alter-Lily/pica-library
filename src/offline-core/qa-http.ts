@@ -15,6 +15,18 @@ import { coreLocalImportMatch, type CoreLocalPicker } from '../library/core-loca
 import type { LibraryFacetQuery } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
 import type { ReaderService } from '../services/reader-service'
+import type { SourceHostInspector } from '../source-hosts/inspector'
+import type { SourceHostConnections } from '../source-hosts/connections'
+import type { HostedLibraryReader } from '../source-hosts/library-reader'
+
+/** Optional ports supplied only by a separate, explicitly launched user-Host
+ * composition. Type-only dependencies keep default core binaries source/Host-free.
+ */
+export interface CoreUserHostPorts {
+    inspector: SourceHostInspector
+    connections: SourceHostConnections
+    reader: HostedLibraryReader
+}
 
 /**
  * Disposable, browser-visible acceptance seam for the actual local Reader.
@@ -31,6 +43,8 @@ interface QaHttpOptions {
     /** Only the trusted Desktop composition root may supply this native UI. */
     localPicker?: CoreLocalPicker
     webRoot: string
+    /** Never supplied by the normal pure-local source-free composition. */
+    userHost?: CoreUserHostPorts
 }
 const SCRIPT_ASSETS = new Set([
     'offline-core-reader-qa.js',
@@ -69,7 +83,7 @@ function hasCookie(request: IncomingMessage, secret: string) {
     return values.length === 1 && secureEqual(
         values[0].slice(SESSION_NAME.length + 1), secret)
 }
-async function readJsonObject(request: IncomingMessage) {
+async function readJsonObject(request: IncomingMessage, maxBytes = 4096) {
     const type = String(request.headers['content-type'] ?? '')
     if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(type))
         throw new Error('Invalid QA content type')
@@ -78,7 +92,7 @@ async function readJsonObject(request: IncomingMessage) {
     for await (const item of request) {
         const buffer = Buffer.from(item)
         count += buffer.length
-        if (count > 4096) throw new Error('QA request too large')
+        if (count > maxBytes) throw new Error('QA request too large')
         chunks.push(buffer)
     }
     const value: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
@@ -179,12 +193,145 @@ ${markup}
 <script type="module" src="/offline-core-reader-qa.js"></script>
 </body></html>`
 }
+/**
+ * Exactly the existing Desktop Host control and Reader paths, invoked only
+ * after the source-free QA cookie + loopback Host checks. No new Host protocol,
+ * parser, source marketplace or network client; all requests use injected
+ * SourceHostConnections / HostedLibraryReader.
+ */
+async function optionalUserHostRoute(
+    request: IncomingMessage, response: ServerResponse, pathname: string,
+    options: CoreUserHostPorts | undefined, origin: string, csrf: string
+): Promise<boolean> {
+    const prefix = '/api/v1/desktop/host-reader'
+    const hosts = '/api/v1/desktop/source-hosts/'
+    const hostReader = pathname === prefix || pathname.startsWith(prefix + '/')
+    const hostSettings = [
+        hosts + 'inspect', hosts + 'connections', hosts + 'inspect-saved'
+    ].includes(pathname)
+    if (!options || !hostReader && !hostSettings) return false
+
+    const trustedPost = request.method === 'POST' &&
+        request.headers.origin === origin &&
+        request.headers['x-pica-csrf'] === csrf
+    let referrer = ''
+    try {
+        referrer = new URL(String(request.headers.referer ?? '')).origin
+    } catch { /* no referrer means no implicit image authority */ }
+    const sameOriginGet = request.method === 'GET' &&
+        request.headers['sec-fetch-site'] === 'same-origin' &&
+        referrer === origin
+    const image = /^\/api\/v1\/desktop\/host-reader\/[0-9a-f-]{36}\/comics\/[^/]+\/chapters\/[^/]+\/pages\/\d+$/.test(pathname)
+    const implicitImage = image && sameOriginGet &&
+        !request.headers.origin &&
+        request.headers['sec-fetch-dest'] === 'image'
+    const trustedGet = sameOriginGet &&
+        request.headers['x-pica-csrf'] === csrf
+    if (!trustedPost && !trustedGet && !implicitImage) {
+        json(response, 403, { error: 'User Host authority required' })
+        return true
+    }
+    const abort = new AbortController()
+    const closed = () => { if (!response.writableEnded) abort.abort() }
+    response.once('close', closed)
+    try {
+        if (hostSettings) {
+            if (!trustedPost) throw Error('INVALID_SOURCE_HOST')
+            const input = await readJsonObject(request, 16384)
+            const result = pathname === hosts + 'inspect'
+                ? await options.inspector.inspect(input, abort.signal)
+                : pathname === hosts + 'inspect-saved'
+                    ? await options.connections.inspect(input, abort.signal)
+                    : options.connections.command(input)
+            if (!response.destroyed) json(response, 200, result)
+            return true
+        }
+        if (pathname === prefix) {
+            if (!trustedPost) throw Error('INVALID_SOURCE_HOST')
+            const command = await readJsonObject(request, 16384)
+            const result = await options.reader.command(command, abort.signal)
+            if (!response.destroyed) json(response, 200, result)
+            return true
+        }
+        const route = pathname.match(
+            /^\/api\/v1\/desktop\/host-reader\/([0-9a-f-]{36})\/(?:progress|comics\/([^/]+)\/chapters(?:\/([^/]+)(?:\/pages\/(\d+))?)?)$/
+        )
+        if (!route) throw Error('INVALID_SOURCE_HOST')
+        const [, id, rawComic, rawChapter, page] = route
+        if (!rawComic) {
+            if (!trustedPost && !trustedGet)
+                throw Error('INVALID_SOURCE_HOST')
+            const input = request.method === 'POST'
+                ? await readJsonObject(request, 4096) : {}
+            if (request.method === 'POST' &&
+                Object.keys(input).some(k =>
+                    !['comicId', 'episodeId', 'pageIndex'].includes(k)))
+                throw Error('INVALID_SOURCE_HOST')
+            const value = await options.reader.read(
+                id, request.method === 'POST' ? 'save-progress' : 'progress',
+                input, abort.signal
+            )
+            if (!response.destroyed) json(response, 200, value)
+            return true
+        }
+        if (request.method !== 'GET' || !trustedGet && !implicitImage)
+            throw Error('INVALID_SOURCE_HOST')
+        const comicId = decodeURIComponent(rawComic)
+        const episodeId = rawChapter ? decodeURIComponent(rawChapter) : undefined
+        if (page !== undefined) {
+            const media = await options.reader.picture(
+                id, comicId, episodeId!, Number(page), abort.signal
+            )
+            if (!response.destroyed) {
+                response.writeHead(200, {
+                    'content-type': media.contentType,
+                    'cache-control': 'private, no-store',
+                    'x-content-type-options': 'nosniff',
+                    'cross-origin-resource-policy': 'same-origin'
+                })
+                response.end(media.data)
+            }
+            return true
+        }
+        const result = await options.reader.read(
+            id, episodeId ? 'chapter' : 'chapters',
+            { comicId, episodeId }, abort.signal
+        )
+        if (!response.destroyed) json(response, 200, result)
+    } catch (error) {
+        const candidate = error && typeof error === 'object' &&
+            'code' in error && typeof error.code === 'string'
+            ? error.code : error instanceof Error ? error.message : ''
+        const code = /^(?:SOURCE_HOST_[A-Z_]+|INVALID_SOURCE_HOST)$/.test(candidate)
+            ? candidate : 'SOURCE_HOST_UNAVAILABLE'
+        const status = code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401
+            : code === 'SOURCE_HOST_SCOPE_REQUIRED' ? 403
+            : ['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_STALE',
+                'SOURCE_HOST_DISABLED', 'SOURCE_HOST_BUSY',
+                'SOURCE_HOST_DUPLICATE'].includes(code) ? 409
+            : code === 'SOURCE_HOST_UNSUPPORTED' ? 422
+            : code === 'SOURCE_HOST_TIMEOUT' ? 504
+            : code === 'SOURCE_HOST_STORAGE' ? 503
+            : ['INVALID_SOURCE_HOST', 'SOURCE_HOST_CONSENT_REQUIRED',
+                'SOURCE_HOST_INSECURE', 'SOURCE_HOST_READER_CONSENT_REQUIRED',
+                'SOURCE_HOST_SOURCE_SELECTION_REQUIRED',
+                'SOURCE_HOST_DOWNLOAD_CONSENT_REQUIRED'].includes(code) ? 400
+            : 502
+        if (!response.destroyed) json(response, status, { code, error: code })
+    } finally {
+        response.removeListener('close', closed)
+    }
+    return true
+}
+
 export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
     url: string
     close(): Promise<void>
 }> {
     const webRoot = fs.realpathSync.native(options.webRoot)
-    const fullWeb = verifiedFullWebQaAssets(webRoot)
+    const fullWeb = verifiedFullWebQaAssets(webRoot, Boolean(options.userHost))
+    if (options.userHost && !fullWeb)
+        throw new Error('User Host requires explicitly reviewed full Web assets')
     const localPickerStatus = fullWeb && options.coreRuntime
         ? options.localPicker?.status() : undefined
     const capabilities = () => coreBootstrapCapabilities({
@@ -275,6 +422,9 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
         }
         if (!hasCookie(request, secret))
             return json(response, 403, { error: 'QA session missing' })
+        if (await optionalUserHostRoute(
+            request, response, url.pathname, options.userHost, origin, csrf
+        )) return
         let shelfRoute: ReturnType<typeof coreShelfMatch>
         try {
             shelfRoute = coreShelfMatch(request.method ?? '', url.pathname)
@@ -297,6 +447,10 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                 // explicit local requests, never persisted or sent cross-site.
                 const html = original.replace('</head>',
                     '<meta name="pica-core-qa-csrf" content="' + csrf + '"></head>')
+                // User-owned Host image tags require a genuine same-origin
+                // Referer; keep the normal zero-network QA's no-referrer.
+                if (options.userHost)
+                    response.setHeader('referrer-policy', 'same-origin')
                 response.writeHead(200, {
                     'content-type': 'text/html; charset=utf-8'
                 })
@@ -317,6 +471,28 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                     ehAccount: { configured: false, enabled: false },
                     externalSources: { schemaVersion: 1, revision: 0, enabled: [] },
                     remoteStorage: { configured: false, kind: 'webdav' },
+                    ...(options.userHost ? {
+                        sourceHostInspection: {
+                            available: true, reader: false, libraryImport: false,
+                            extensionInstall: false, persisted: false
+                        },
+                        sourceHostConnections: {
+                            available: true,
+                            storage: options.userHost.connections.snapshot().storage,
+                            scope: 'inspect-only', reader: false
+                        },
+                        hostedLibraryReader: {
+                            available: true, scope: 'explicit-session-library-read',
+                            providerSearch: false, libraryImport: false,
+                            extensionInstall: false, downloads: false, native: false
+                        },
+                        hostedSourceBrowser: {
+                            available: true,
+                            scope: 'explicit-session-selected-source-search-read',
+                            providerSearch: true, libraryImport: false,
+                            extensionInstall: false, downloads: false, native: false
+                        }
+                    } : {}),
                     nativePicker: localPickerStatus?.nativePicker ??
                         { folderPicker: false, savePicker: false },
                     runtime: localPickerStatus?.runtime ?? { mode: 'headless' }
@@ -491,7 +667,7 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
             return json(response, 400, { error: 'Invalid local QA mutation' })
         }
     })
-    server.requestTimeout = 10_000
+    server.requestTimeout = options.userHost ? 20_000 : 10_000
     server.headersTimeout = 10_000
     server.maxRequestsPerSocket = 500
     try {

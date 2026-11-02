@@ -51,6 +51,23 @@ const LOCAL_ONLY_DRAFT_LAUNCHER = [
     '"%~dp0Pica-Library-Core-Preview.exe" --source-free-local',
     'exit /b %ERRORLEVEL%'
 ].join('\r\n') + '\r\n'
+const USER_HOST_DRAFT_LAUNCHER = [
+    '@echo off',
+    'setlocal',
+    'rem Optional user-owned Suwayomi Host; independent of source-free default.',
+    '"%~dp0Pica-Library-Core-Preview.exe" --source-free-user-host',
+    'exit /b %ERRORLEVEL%'
+].join('\r\n') + '\r\n'
+const USER_HOST_DRAFT_README = [
+    'Pica Library OPTIONAL HOST QA - NOT A RELEASE',
+    'Start-User-Host-Draft.cmd opts into your own authorized Suwayomi 2.4 Host.',
+    'Start-Local-Only-Draft.cmd remains the original fully offline Reader.',
+    'The Host must already be running and is never installed or auto-connected.',
+    'No Pica, E-H, JM provider SDK or third-party extensions are shipped.',
+    'All data stays in %LOCALAPPDATA%\\Pica Library Local, not official v0.5.0.',
+    'Only one local/host draft can run at once; stop the other first.',
+    'UNSIGNED QA, no formal updates, signing, migration or release authorization.'
+].join('\r\n') + '\r\n'
 const LOCAL_ONLY_DRAFT_README = [
     'Pica Library - UNSIGNED LOCAL-ONLY DRAFT (NOT A RELEASE)',
     'Double-click Start-Local-Only-Draft.cmd to open the original full Web.',
@@ -122,6 +139,7 @@ export interface WindowsOfflinePortableInput {
     sourceSha: string
     /** Explicit opt-in to the original full Web QA composition, never Release. */
     fullWebQa?: boolean
+    userHostQa?: boolean
 }
 export interface WindowsOfflinePortableQa {
     directory: string
@@ -158,6 +176,8 @@ export async function buildWindowsOfflinePortableQa(
 ): Promise<WindowsOfflinePortableQa> {
     if (process.platform !== 'win32' || process.arch !== 'x64')
         throw new Error('Portable Windows QA must run on Windows x64')
+    if (options.userHostQa && !options.fullWebQa)
+        throw new Error('Optional Host requires the original full Web')
     if (!SOURCE_SHA.test(options.sourceSha) ||
         !SHA256.test(options.verifiedRuntimeArchiveSha256) ||
         options.verifiedRuntimeArchiveSha256 !== OFFLINE_PORTABLE_NODE_ARCHIVE_SHA256)
@@ -212,6 +232,12 @@ export async function buildWindowsOfflinePortableQa(
         add('Pica-Library-Core-Preview.exe',
             checkedFile(launcherOutput, 8 * 1024 * 1024))
         add('app/desktop-core-preview.mjs', preview.bytes)
+        if (options.userHostQa) {
+            const host = await buildOfflineCoreCandidate('desktop-core-host-preview')
+            add('app/desktop-core-host-preview.mjs', host.bytes)
+            add('Start-User-Host-Draft.cmd', Buffer.from(USER_HOST_DRAFT_LAUNCHER))
+            add('README-USER-HOST-DRAFT.txt', Buffer.from(USER_HOST_DRAFT_README))
+        }
         add('Start-Local-Only-Draft.cmd', Buffer.from(LOCAL_ONLY_DRAFT_LAUNCHER))
         add('README-LOCAL-ONLY-DRAFT.txt', Buffer.from(LOCAL_ONLY_DRAFT_README))
     }
@@ -229,12 +255,19 @@ export async function buildWindowsOfflinePortableQa(
             'This original full Web UI is a disposable, source-free QA fixture only.\r\n' +
             'It does not prove production Windows app UI, source isolation as an OS'
           )
-        : README))
+        : README).toString().replace(
+            'No Pica, EH, ExH, JM, online sources, downloader, account, Host or updater.',
+            options.userHostQa
+                ? 'No provider SDK, source installer or updater. User-owned Host is optional.'
+                : 'No Pica, EH, ExH, JM, online sources, downloader, account, Host or updater.'
+        ))
     if (options.fullWebQa) {
         // Actual original full HTML and its verified, source-neutral ES module
         // closure. This does not reimplement the Reader or package an SDK.
-        const staged = stageOfflineFullWebQa(path.join(root, 'app', 'web'))
+        const staged = stageOfflineFullWebQa(path.join(root, 'app', 'web'),
+            { userHost: options.userHostQa === true })
         if (staged.sourceSdkIncluded || staged.distributable ||
+            Boolean(staged.userHostIncluded) !== Boolean(options.userHostQa) ||
             !staged.files.some(row => row.name === 'app.js') ||
             !staged.files.some(row => row.name === 'index.html'))
             throw new Error('Original full Web QA stage is incomplete')
@@ -264,8 +297,15 @@ export async function buildWindowsOfflinePortableQa(
     const entries = [...bytes].map(([entry, value]) => ({
         path: entry, sha256: sha256(value), bytes: value.length
     })).sort((a, b) => a.path.localeCompare(b.path, 'en'))
-    const providerFiles = /(?:^|\/)(?:node_modules|\.git|library\.db|source-hosts\.js|eh-account\.js|jm-account\.js|source-choices\.js)(?:\/|$)/i
+    const providerFiles = /(?:^|\/)(?:node_modules|\.git|library\.db|eh-account\.js|jm-account\.js|source-choices\.js)(?:\/|$)/i
     if (entries.some(item => providerFiles.test(item.path)) ||
+        (!options.userHostQa && entries.some(item =>
+            item.path === 'app/web/source-hosts.js' ||
+            item.path === 'app/desktop-core-host-preview.mjs')) ||
+        (options.userHostQa && ![
+            'app/web/source-hosts.js', 'app/desktop-core-host-preview.mjs',
+            'Start-User-Host-Draft.cmd', 'README-USER-HOST-DRAFT.txt'
+        ].every(name => entries.some(row => row.path === name))) ||
         (options.fullWebQa
             ? (entries.length < 30 ||
                 !entries.some(row => row.path === 'app/web/app.js') ||
@@ -281,9 +321,11 @@ export async function buildWindowsOfflinePortableQa(
 
     const manifest: WindowsOfflinePortableQa['manifest'] = {
         schemaVersion: 1,
-        label: options.fullWebQa
-            ? 'UNSIGNED_S3_WINDOWS_X64_FULL_WEB_QA_ONLY'
-            : 'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY',
+        label: options.userHostQa
+            ? 'UNSIGNED_S3_WINDOWS_X64_USER_HOST_QA_ONLY'
+            : options.fullWebQa
+                ? 'UNSIGNED_S3_WINDOWS_X64_FULL_WEB_QA_ONLY'
+                : 'UNSIGNED_S3_WINDOWS_X64_PORTABLE_QA_ONLY',
         sourceSha: options.sourceSha,
         runtimeVersion: OFFLINE_PORTABLE_NODE_VERSION,
         verifiedNodeArchiveSha256: options.verifiedRuntimeArchiveSha256,
@@ -307,9 +349,11 @@ export async function buildWindowsOfflinePortableQa(
         if (!entry) throw new Error('Portable QA ZIP entry missing')
         entry.header.time = ZIP_TIMESTAMP
     }
-    const zipPath = path.join(directory, options.fullWebQa
-        ? 'offline-source-free-full-web-qa-windows-x64.zip'
-        : 'offline-source-free-reader-qa-windows-x64.zip')
+    const zipPath = path.join(directory, options.userHostQa
+        ? 'optional-user-host-full-web-qa-windows-x64.zip'
+        : options.fullWebQa
+            ? 'offline-source-free-full-web-qa-windows-x64.zip'
+            : 'offline-source-free-reader-qa-windows-x64.zip')
     zip.writeZip(zipPath)
     const check = new AdmZip(zipPath).getEntries()
     if (check.length !== bytes.size + 1 ||
@@ -323,7 +367,9 @@ export async function buildWindowsOfflinePortableQa(
 
 async function main() {
     const args = process.argv.slice(2)
-    const fullWebQa = args.length === 9 && args[8] === '--full-web'
+    const userHostQa = args.length === 10 && args[8] === '--full-web' &&
+        args[9] === '--user-host'
+    const fullWebQa = userHostQa || args.length === 9 && args[8] === '--full-web'
     if ((!fullWebQa && args.length !== 8) ||
         args[0] !== '--runtime' || args[2] !== '--runtime-license' ||
         args[4] !== '--archive-sha256' || args[6] !== '--source-sha')
@@ -333,7 +379,8 @@ async function main() {
         runtimeLicense: args[3],
         verifiedRuntimeArchiveSha256: args[5],
         sourceSha: args[7],
-        fullWebQa
+        fullWebQa,
+        userHostQa
     })
     process.stdout.write(JSON.stringify({
         status: built.manifest.label,

@@ -41,6 +41,14 @@ def adb(*args, timeout=45, check=True, binary=False):
     return run("adb", *args, timeout=timeout, check=check, binary=binary)
 
 
+def installed_version_code(package):
+    details = adb("shell", "dumpsys", "package", package)
+    match = re.search(r"\bversionCode=(\d+)\b", details)
+    if match is None:
+        raise AssertionError(f"{STEP}: Android package version not reported for {package}")
+    return int(match.group(1))
+
+
 def page(label):
     global STEP
     STEP = label
@@ -817,17 +825,21 @@ def source_free_user_host_flow():
         page("29-original-source-free-library-after-host-revoke")
         record("source-free Reader opens its own Binder-imported chapter with Host disconnected")
 
-        # Independently reinstall the SAME signed source APK, without touching
-        # the Reader package, and confirm the user's Host configuration remains.
-        # This is install-replacement/data-retention evidence, NOT proof of a
-        # future upgraded binary/protocol or a production signer.
-        STEP = "source-only-companion-replacement"
-        host_apk = "mobile/android-alpha2/user-host-app/build/outputs/apk/debug/user-host-app-debug.apk"
+        # Upgrade the optional source to a DIFFERENT debug APK, versionCode 1
+        # -> 2, without replacing the Reader, granting network to the Reader,
+        # or writing its private library. Both versions use the same QA signer.
+        STEP = "source-only-companion-versioned-upgrade"
+        host_apk = "mobile/android-alpha2/user-host-app/build/outputs/apk/debug/user-host-app-v2-debug.apk"
+        assert installed_version_code(USER_HOST_PACKAGE)==1
+        operations_before_upgrade=len(operations)
         adb("install", "-r", host_apk, timeout=65)
+        assert installed_version_code(USER_HOST_PACKAGE)==2
         PACKAGE=USER_HOST_PACKAGE
         until_data("user-host-config-v1.json", lambda data:
             data.get("label")=="QA_Host" and data.get("enabled") is True)
-        record("same-signer source APK reinstall retains its own saved Host configuration")
+        assert len(operations)==operations_before_upgrade, (
+            "Source update triggered a Host request without user action")
+        record("different versionCode QA source APK upgrades in place and retains consent/config without auto-connecting")
 
         # Remove ONLY the source APK. The local Reader must still expose the
         # actual already imported PNG and open it without source installation.
@@ -836,8 +848,14 @@ def source_free_user_host_flow():
         PACKAGE=QA_PACKAGE
         assert USER_HOST_PACKAGE not in adb("shell", "pm", "list", "packages",
                                             USER_HOST_PACKAGE)
+        # Package removal can invalidate an active Binder connection and
+        # transient Android windows. Prove a clean process-level Reader restart
+        # rather than accepting a stale activity or an empty UI hierarchy.
+        adb("shell", "am", "force-stop", QA_PACKAGE)
         adb("shell", "am", "start", "-W", "-n",
             PACKAGE+"/com.picalibrary.android.LocalLibraryActivity",timeout=45)
+        page("30-source-removed-fresh-reader-launch")
+        wait(("Import CBZ", "导入 CBZ", "CBZ 取込"),seconds=30)
         wait(("External sources · not installed", "外接来源 · 未安装",
               "外部ソース · 未インストール"),seconds=30)
         assert adb("exec-out", "run-as", PACKAGE, "cat", localRaster,
@@ -853,6 +871,8 @@ def source_free_user_host_flow():
         # Reader migration; Host settings are deliberately reset by uninstall.
         STEP = "source-only-reinstall-after-uninstall"
         adb("install", "-r", host_apk, timeout=65)
+        assert installed_version_code(USER_HOST_PACKAGE)==2
+        adb("shell", "am", "force-stop", QA_PACKAGE)
         adb("shell", "am", "start", "-W", "-n",
             QA_PACKAGE+"/com.picalibrary.android.LocalLibraryActivity",timeout=45)
         wait(("My external Host", "我的外接来源", "外部 Host"),seconds=30)
@@ -862,7 +882,9 @@ def source_free_user_host_flow():
         PACKAGE=USER_HOST_PACKAGE
         wait(("No Host connected", "尚未连接 Host", "未接続"),seconds=30)
         page("32-source-component-reinstalled-no-auto-connect")
-        record("optional source reinstall restores same-signer management without implicit network connection")
+        assert len(operations)==operations_before_upgrade, (
+            "Source reinstall triggered a Host request without user action")
+        record("optional v2 source reinstall restores same-signer management without implicit network connection")
         PACKAGE=USER_HOST_PACKAGE
         assert all(item in operations for item in ("PicaSourceHostInfo",
             "PicaSourceHostSources","PicaHostSourceSearch","PicaHostManga",

@@ -56,13 +56,28 @@ if (-not (Test-Path -LiteralPath $requiredBase)) {
     throw "The checksum-pinned released Windows baseline is required: $requiredBase"
 }
 
+# The accepted-launcher hash lock protects *reuse of the released launcher*.
+# Post-stable RC performs a full, isolated replacement and compiles a separate
+# RC launcher below. Reusing the old stable launcher here would wrongly fail
+# after a legitimate launcher source change. Keep the official checksum-pinned
+# baseline validation above, and restore both build environment pins afterwards.
+$originalLauncherPinVersion = $env:PICA_WINDOWS_LAUNCHER_BASE_VERSION
+$originalLauncherPinHash = $env:PICA_WINDOWS_LAUNCHER_BASE_SHA256
 Push-Location $root
 try {
+    if ($PostStable) {
+        Remove-Item Env:PICA_WINDOWS_LAUNCHER_BASE_VERSION -ErrorAction SilentlyContinue
+        Remove-Item Env:PICA_WINDOWS_LAUNCHER_BASE_SHA256 -ErrorAction SilentlyContinue
+    }
     & (Join-Path $root 'scripts\build-windows-package.ps1') -SourceRuntimes $picaRuntimeMode
     if ($LASTEXITCODE -ne 0) {
-        throw 'Stable package assembly failed before RC repackaging'
+        throw 'Full-install RC staging failed before isolated RC repackaging'
     }
 } finally {
+    if ($PostStable) {
+        $env:PICA_WINDOWS_LAUNCHER_BASE_VERSION = $originalLauncherPinVersion
+        $env:PICA_WINDOWS_LAUNCHER_BASE_SHA256 = $originalLauncherPinHash
+    }
     Pop-Location
 }
 

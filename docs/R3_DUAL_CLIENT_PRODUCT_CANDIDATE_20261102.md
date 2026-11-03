@@ -45,3 +45,9 @@
 ## 构建速度调整（与本轮双端交付相关）
 
 初版完整 Windows RC 在打包前重复运行全套 `pnpm test`，尽管已有常规 CI 完成。现在 Windows 打包阶段只保留包/回滚/Windows PowerShell 合同的定向 Vitest，继续运行 `pnpm type:check`、`pnpm web:check`，**绝不删除** Windows 原生 ZIP 解压启动、端口冲突、持久化和 v0.5.0 基线完整替换验收。Android 仍保留 JUnit、Lint、包身份和签名检查。工程包仍须等待此变更自身 exact-SHA CI 验收，不能继承之前旧 SHA 的成功状态。
+
+## Windows 完整替换打包阻断与修正（2026-11-02）
+
+- [构建 #41587857309](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41587857309) 的合同与 Android 完整 QA 均成功，Windows 在临时完整程序组装时被旧版 Launcher 复用保护中止：`Launcher source changed since accepted stable package; a full install is required`。这是**实际新架构与旧版增量复用约束不兼容**，不是 Windows 语法或用户资料故障。未生成该轮 Windows 候选。
+- 当前变更只在 `-PostStable` **独立、完整替换 RC** 路径中临时禁止尝试继承公开版的旧 Launcher；继续使用本仓库当前 Launcher 编译成全量暂存包，并在最终独立 RC 中照常重新编译 `RcLauncher.cs`。这两个旧版复用环境变量在 `finally` 中恢复。普通生产 `scripts/build-windows-package.ps1` 本身及其正式旧版 Launcher 哈希锁**一字未改**，标准增量升级仍必须遵守原规则。
+- 仍先校验公开 v0.5.0 ZIP 的固定 SHA-256；新 RC 只上传独立 ZIP，最终强制验证完整包原生启动、端口冲突、进度和本地数据持久化，并进行已有的合成 v0.5.0 完整替换/回滚。不能据此推断老用户真实数据迁移 PASS。

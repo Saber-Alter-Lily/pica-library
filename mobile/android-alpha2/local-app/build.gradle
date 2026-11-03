@@ -24,6 +24,7 @@ dependencies {
     implementation project(':local-core')
     implementation project(':local-storage')
     implementation project(':reader-view')
-    // First-party, signature-bound Binder contract only; no network or manga SDK.
-    implementation project(':source-bridge')
+    // Both the full original product and the source-free Reader consume the
+    // SAME implementation, no copy of the Binder/Reader/importer code.
+    implementation project(':signed-reader')
 }

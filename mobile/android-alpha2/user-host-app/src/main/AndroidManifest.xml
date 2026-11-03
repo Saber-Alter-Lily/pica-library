@@ -3,7 +3,10 @@
          No Reader, LocalComicStore, broad storage or source provider SDK. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="com.picalibrary.android.remote.BIND_SOURCE"/>
-    <queries><package android:name="com.picalibrary.android.localcore.qa"/></queries>
+    <queries>
+        <package android:name="com.picalibrary.android.localcore.qa"/>
+        <package android:name="com.picalibrary.android.dev"/>
+    </queries>
     <application android:allowBackup="false" android:usesCleartextTraffic="true"
         android:label="Pica Library Sources QA"
         android:theme="@android:style/Theme.Material.NoActionBar">

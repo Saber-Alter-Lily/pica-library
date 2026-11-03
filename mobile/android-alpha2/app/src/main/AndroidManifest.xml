@@ -1,5 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- QA original-product bridge to the independent same-signer Host.
+         No new site SDK; original provider runtime remains until G2. -->
+    <permission android:name="com.picalibrary.android.remote.BIND_SOURCE"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.picalibrary.android.remote.BIND_SOURCE" />
+    <queries>
+        <package android:name="com.picalibrary.android.userhost.qa" />
+    </queries>
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -19,6 +27,13 @@
         </provider>
         <service android:name="androidx.work.impl.foreground.SystemForegroundService" android:foregroundServiceType="dataSync" tools:node="merge" />
         <activity android:name=".ReaderActivity" android:screenOrientation="unspecified" />
+        <!-- Explicit exported entry is guarded by platform signature permission.
+             Its data and signed Binder pages go to this product's own store. -->
+        <activity android:name=".ExternalReaderActivity" android:exported="true"
+            android:permission="com.picalibrary.android.remote.BIND_SOURCE" />
+        <activity android:name=".ExternalImportActivity" android:exported="true"
+            android:permission="com.picalibrary.android.remote.BIND_SOURCE" />
+        <activity android:name=".LocalReaderActivity" android:exported="false" />
         <activity android:name=".LocalComicImportActivity" android:exported="false" />
         <activity android:name=".LocalComicExportActivity" android:exported="false" />
         <activity android:name=".UnifiedComicDetailActivity" android:exported="false" />

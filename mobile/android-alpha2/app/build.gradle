@@ -128,6 +128,8 @@ dependencies {
     implementation project(':local-core')
     implementation project(':local-storage')
     implementation project(':reader-view')
+    // Shared signature-bound Reader and explicit chapter importer, also used by :local-app.
+    implementation project(':signed-reader')
     // Verified Suwayomi Host protocol/IO/state lives in a reusable library.
     // No Pica/E-H/JM or provider SDK is a dependency of this module.
     implementation project(':user-host-core')

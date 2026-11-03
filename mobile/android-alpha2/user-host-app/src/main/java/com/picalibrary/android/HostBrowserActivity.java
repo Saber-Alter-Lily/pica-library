@@ -32,6 +32,29 @@ public final class HostBrowserActivity extends Activity {
     private Button save,enable,start,disconnect,refresh,select,search;
     private boolean busy,destroyed;
     private int generation;
+    // Default stays the physically source-free QA Reader; only an explicitly
+    // authorized same-signer full-product QA client can change this destination.
+    private String readerPackage="com.picalibrary.android.localcore.qa";
+    private boolean trustedReader(){
+        if(!"com.picalibrary.android.localcore.qa".equals(readerPackage)&&
+                !"com.picalibrary.android.dev".equals(readerPackage))return false;
+        android.content.pm.PackageManager pm=getPackageManager();
+        if(pm.checkSignatures(getPackageName(),readerPackage)!=
+                android.content.pm.PackageManager.SIGNATURE_MATCH)return false;
+        try{
+            for(String name:new String[]{"com.picalibrary.android.ExternalReaderActivity",
+                    "com.picalibrary.android.ExternalImportActivity"}){
+                android.content.pm.ActivityInfo info=pm.getActivityInfo(
+                    new android.content.ComponentName(readerPackage,name),0);
+                if(!info.exported||
+                        !"com.picalibrary.android.remote.BIND_SOURCE".equals(info.permission))
+                    return false;
+            }
+            return true;
+        }catch(android.content.pm.PackageManager.NameNotFoundException missing){
+            return false;
+        }
+    }
 
     private String t(String zh,String en,String ja){return HostCopy.ui(this,zh,en,ja);}
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
@@ -84,7 +107,10 @@ public final class HostBrowserActivity extends Activity {
     }
 
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);manager=HostSourceManager.get(this);
+        super.onCreate(saved);
+        String requested=getIntent().getStringExtra("pica.reader.package");
+        if(requested!=null)readerPackage=requested;
+        manager=HostSourceManager.get(this);
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(20,20,26));
         root.setPadding(dp(16),dp(18),dp(16),dp(26));
@@ -270,6 +296,12 @@ public final class HostBrowserActivity extends Activity {
         }
     }
     private void openOwnedReader(HostSourceManager.Book book,boolean save){
+        if(!trustedReader()){
+            status.setText(t("未找到同签名的阅读器，无法转入作品。",
+                "Matching signed Reader not found; cannot open work.",
+                "同じ署名の Reader が見つかりません。"));
+            return;
+        }
         // This source-only APK has NO local Reader or duplicate book inventory.
         // Selection and consent remain in the original HostSourceManager.
         task(t("准备来源…","Preparing source…","ソース準備中…"),()->{
@@ -277,7 +309,7 @@ public final class HostBrowserActivity extends Activity {
             String scope=manager.requireSession().scope;
             return ()->{
                 Intent intent=new Intent().setClassName(
-                    "com.picalibrary.android.localcore.qa",
+                    readerPackage,
                     save?"com.picalibrary.android.ExternalImportActivity":
                         "com.picalibrary.android.ExternalReaderActivity")
                     .putExtra("scope",scope).putExtra("comicId",book.id)

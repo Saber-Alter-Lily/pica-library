@@ -58,3 +58,11 @@
 - 原书库标题和四个操作在 360/393dp 或翻译后会挤在同一行，本批直接复用原 HomeActivity 标题行，窄屏/四个动作时改为上下两行；推荐卡片封面旁原三按钮改为第一行喜欢/不喜欢、第二行调节偏好，所有入口保留，无新界面框架。
 - 同时修正旧 Web/CLI CI 对 Post-stable RC 工件保留期 1 天的硬编码，明确此流水线允许 3 天，User-Host 7 天，其余保持 1 天。旧 [Web CI 失败 #41588408104](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41588408104) 只证明合同断言与实际构建设置不一致，新 HEAD 必须重新验证 Android 编译、Web/desktop、实际布局截图后才能算通过。
 - 仍未完成实体手机 360/393/480dp、多语言缩放、真实 1500 本卡顿定量及所有旧正式资料迁移；G1–G4 原有边界不减项。
+
+
+## R3 Android 原完整产品接入现有独立 Host（2026-11-02：代码已接入，待完整实测）
+
+- 原 `:local-app` 的 `BoundSourceClient`、`LocalReaderActivity`、`ExternalReaderActivity`、`ExternalImportActivity`、`LocalCopy` **物理移动到唯一共享 Android Library `:signed-reader`**；`:local-app` 与原完整 `:app` 同时依赖此模块。继续复用 `:source-bridge` AIDL、`:reader-view` 的唯一 `ReaderScreenActivity` 和 `:local-storage` 的同一个 `LocalComicStore`。没有复制两个 Reader、不新增网站 SDK/HTTP 客户端、不增加源运行时。
+- 完整原 `:app` 的 **在线 → 独立来源组件·工程候选** 入口仅在 Debug/QA 构建可见；点击时校验同签名，跳到用户单独安装的 `:user-host-app`，显式传递目标 reader applicationId。Host 只允许 `com.picalibrary.android.localcore.qa` 或 `com.picalibrary.android.dev` 两个预定 QA 目标，且逐个检查两个导出目标 Activity 的平台签名级权限和导出标志。默认没有源 APK 时不会联网，也不会改变旧账户；正式生产版不额外暴露未完成入口。
+- 用户在独立 Host 中**主动连接 Suwayomi、选择来源和作品**，Host 把图片 FD 经已存在的 Binder 传入当前完整原应用的共享 ReaderScreenActivity；确认保存的单章写入**当前原应用自己**的 `LocalComicStore`。导入后“阅读已保存的本地副本”在完整原产品中使用原 `ReaderActivity`，仅无源 QA 壳保留 `LocalReaderActivity`。不会复制到另一个 QA APK 的书库。
+- 新版完整产品 manifest 注册受 `BIND_SOURCE` signature 权限约束的来源阅读/导入入口和 Host 包可见性。旧来源仍在原完整 `:app` 内，本批**不能**宣称 Android 已完成物理无源最终产品；旧正式版包身份和签名未修改。后续需用同一 Android35 实测“完整原 Home → Host → 本机原书库 → 断源后原 Reader 继续读”，并进行生产签名所有权和旧版数据迁移核查。

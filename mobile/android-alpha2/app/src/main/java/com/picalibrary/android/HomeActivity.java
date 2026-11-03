@@ -482,8 +482,52 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         startActivity(i);
     }
 
+    private void openSignedSourceCompanion(){
+        // Temporary product-QA lane, not a production source installer.
+        final String hostPackage="com.picalibrary.android.userhost.qa";
+        if(getPackageManager().checkSignatures(getPackageName(),hostPackage)!=
+                android.content.pm.PackageManager.SIGNATURE_MATCH){
+            new AlertDialog.Builder(this)
+                .setTitle(LocalizedText.ui(this,
+                    "独立来源组件未就绪","Source companion unavailable",
+                    "外部ソースが利用できません"))
+                .setMessage(LocalizedText.ui(this,
+                    "仅支持独立安装且与当前应用同签名的可信来源组件。离线书库无需安装来源。",
+                    "Install the independently distributed, matching-signer Host companion. Your local library works without it.",
+                    "同じ署名の外部ソースが必要です。ローカル書庫はオフラインでも使用できます。"))
+                .setPositiveButton(android.R.string.ok,null).show();
+            return;
+        }
+        Intent intent=new Intent().setClassName(hostPackage,
+            "com.picalibrary.android.HostBrowserActivity");
+        intent.putExtra("pica.reader.package",getPackageName());
+        try{
+            startActivity(intent);
+        }catch(android.content.ActivityNotFoundException|SecurityException error){
+            Toast.makeText(this,LocalizedText.ui(this,
+                "独立来源组件不可用","Source companion not available",
+                "外部ソースを利用できません"),Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void onlineEntry(){
         LinearLayout p=page(true);titleRow(p,"在线");
+        // Full original-product QA now shares the same signed Binder source
+        // bridge as :local-app. Legacy provider rows are separate and remain
+        // explicitly marked as NOT physically removed until G2.
+        if(BuildConfig.DEBUG){
+            LinearLayout signed=SettingsRow.row(this,
+                LocalizedText.ui(this,"独立来源组件 · 工程候选",
+                    "Independent source component · QA",
+                    "独立した外部ソース · QA"),
+                LocalizedText.ui(this,
+                    "使用单独安装的同签名 Host · 保存在当前书库",
+                    "Optional signed Host · saves to this product library",
+                    "別途導入した Host · この書庫に保存"),
+                v->openSignedSourceCompanion());
+            signed.setTag("online-optional-user-host");
+            p.addView(signed);
+        }
         boolean pica=PicaClient.available(this);
         boolean eh=EhClient.accountAvailable(this);
         EhCapabilityStore.Snapshot exh=EhCapabilityStore.load(this);

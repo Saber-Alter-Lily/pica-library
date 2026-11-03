@@ -83,9 +83,22 @@ public final class ExternalImportActivity extends Activity {
         select.setOnClickListener(v->selectChapter());
         read.setOnClickListener(v->{
             LocalComicStore.Comic local=saved;
-            if(local!=null)startActivity(new Intent(this,LocalReaderActivity.class)
-                .putExtra("source","local").putExtra("comicId",local.id)
-                .putExtra("title",local.title));
+            if(local!=null){
+                // The full original product opens its actual ReaderActivity
+                // and the no-INTERNET QA shell opens the shared LocalReader.
+                // Both read exactly the same app-private LocalComicStore bytes.
+                Intent open=new Intent();
+                try{
+                    android.content.ComponentName original=new android.content.ComponentName(
+                        getPackageName(),"com.picalibrary.android.ReaderActivity");
+                    getPackageManager().getActivityInfo(original,0);
+                    open.setComponent(original);
+                }catch(android.content.pm.PackageManager.NameNotFoundException ignored){
+                    open.setClass(this,LocalReaderActivity.class);
+                }
+                startActivity(open.putExtra("source","local")
+                    .putExtra("comicId",local.id).putExtra("title",local.title));
+            }
         });
     }
     private void selectChapter(){

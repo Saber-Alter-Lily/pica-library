@@ -43,6 +43,8 @@ final class NativeRecommendationEngine {
     }
 
     static NativeRecommendationStore.Snapshot build(Context context,Progress progress,Control control) throws Exception {
+        if(BuildConfig.SOURCE_NEUTRAL_QA)
+            return NativePortableRecommendationCycle.build(context,progress,control);
         control.checkpoint();
         Context app=context.getApplicationContext();PicaClient client=new PicaClient(app);MobileTagRegistry registry=MobileTagRegistry.load(app);boolean picaConfigured=PicaClient.available(app);PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(app);JSONObject policyState=RecommendationPolicyStore.snapshot(app);
         emit(progress,"正在同步 Pica / E-H 收藏画像",0,2);control.checkpoint();if(picaConfigured)try{PicaFavoriteQuickSync.Result sync=PicaFavoriteQuickSync.sync(app,client,(phase,done,total)->{control.checkpoint();emit(progress,phase,done,total);});if(!sync.observed.isEmpty())UnifiedPicaCatalogSync.mergeAll(app,sync.observed);}catch(InterruptedException stopped){throw stopped;}catch(Exception ignored){}emit(progress,"正在同步 Pica / E-H 收藏画像",1,2);control.checkpoint();

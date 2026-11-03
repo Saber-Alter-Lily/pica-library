@@ -41,7 +41,7 @@ final class EhClient {
     static final class Page {final String id,pageUrl;final int position;Page(String id,String pageUrl,int position){this.id=id;this.pageUrl=pageUrl;this.position=position;}}
     private static final class FavoriteMeta {final int slot;final String note;FavoriteMeta(int slot,String note){this.slot=slot;this.note=note==null?"":note;}}
 
-    static boolean isEhId(String value){return value!=null&&value.matches("^eh:\\d+:[0-9a-fA-F]{10}$");}
+    static boolean isEhId(String value){return ComicIdFormat.isEhId(value);}
     private static String[] parseId(String value){if(!isEhId(value))throw new IllegalArgumentException("无效的 E-H 画廊标识");String[] p=value.split(":",3);return new String[]{p[1],p[2].toLowerCase(Locale.ROOT)};}
     private static String decodeHtml(String s){return s.replace("&amp;","&").replace("&quot;","\"").replace("&#39;","'").replace("&apos;","'").replace("&lt;","<").replace("&gt;",">");}
     private static String tagValue(String raw){int i=raw.indexOf(':');return (i>0?raw.substring(i+1):raw).trim();}

@@ -6,6 +6,7 @@
         tools:node="remove" />
     <application android:label="Pica Library Clean Source QA"
         tools:replace="android:label">
+        <activity android:name=".MainActivity" tools:node="remove" />
         <activity android:name=".PicaBrowseActivity" tools:node="remove" />
         <activity android:name=".PicaAccountActivity" tools:node="remove" />
         <activity android:name=".PicaRegisterActivity" tools:node="remove" />

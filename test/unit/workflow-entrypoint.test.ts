@@ -97,7 +97,8 @@ describe('built CLI entrypoint contract', () => {
                 // can download them. Keep every other recipe's one-day policy;
                 // concentrated-acceptance-build checks EACH upload is exactly 7.
                 const days = name === 'user-host-acceptance.yml' ? 7 :
-                    name === 'post-stable-rc-packages.yml' ? 3 : 1
+                    (name === 'post-stable-rc-packages.yml' ||
+                     name === 'r3-android-clean-source-qa.yml') ? 3 : 1
                 expect(content, name).toContain('retention-days: ' + days)
                 if (name === 'windows-package.yml') {
                     expect(content, name).not.toMatch(

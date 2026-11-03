@@ -11,3 +11,10 @@
 # No keep rule for JM runtime or Pica/E-H built-in provider implementations.
 -dontwarn java.awt.**
 -dontwarn javax.imageio.**
+
+# Temporary R3 excision diagnostics: explain actual source-code retention.
+# This never adds a keep rule or weakens the APK fail-closed gate.
+-whyareyoukeeping class com.picalibrary.android.PicaClient
+-whyareyoukeeping class com.picalibrary.android.EhClient
+-whyareyoukeeping class com.picalibrary.android.JmClientManager
+-whyareyoukeeping class org.picalibrary.sources.JmSource

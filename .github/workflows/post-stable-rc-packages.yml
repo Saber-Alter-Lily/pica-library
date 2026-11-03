@@ -114,7 +114,14 @@ jobs:
           $base="artifacts/release-base/Pica-Library-v$env:STABLE_VERSION-windows-x64.zip"
           ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $rcVersion -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # R4: actual released 0.5.0 executable + new helper, deliberately
+          # reject the new version during health check and verify original
+          # launcher, DB/WAL, config, style packs and personalization rollback.
+          # The second run owns an independent disposable Windows profile.
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $rcVersion -CandidateSourceSha $env:GITHUB_SHA -ForceHealthFailure -DesktopHomeName 'Pica Library R4 Recovery QA'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
+          'R4 Windows v0.5.0 actual full replacement and deliberately failed-health automatic rollback: PASS (disposable QA data only)' | Set-Content -Encoding utf8 candidate/windows/R4_ROLLBACK_QA.txt
           Copy-Item -LiteralPath $zip -Destination candidate/windows/
           Copy-Item -LiteralPath docs/POST_STABLE_RC_READINESS.md -Destination candidate/windows/READ_ME_FIRST.md
           $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()

@@ -31,3 +31,9 @@ After the established real system-SAF local CBZ import, original Reader progress
 **Boundaries:** This is an in-place upgrade proof only for the isolated `.cleanqa` identity with QA signing, not a real `com.picalibrary.android` production-signature v0.5.0 update, not actual user data, and not device/OEM manual acceptance. The Android35 push workflow must actually finish SUCCESS at the exact change HEAD before this evidence can be considered verified. If it fails, preserve screenshots/logs and fix the actual blocker instead of waiving the scenario.
 
 The Windows R4 v3 SHA-256 profile backup, preserved style packs and personalization, exact v0.5.0 ZIP replacement/rollback, and distinct G1 physical / G3 production / G4 release gates remain open as above.
+
+## R4 Windows: actual released v0.5.0 forced-health-failure rollback gate
+
+The existing `post-stable-rc-packages.yml` Windows job must now execute **two real extracted Windows application cases** using the pinned SHA-256 official v0.5.0 ZIP and the same new-source RC candidate: first normal full replacement, then the existing `test-windows-universal-full-upgrade.ps1 -ForceHealthFailure` on a second, independent temporary Desktop profile. The latter intentionally rejects the new app version during the health check, forcing the real full-upgrader helper to restore the actual old launcher plus config, database, style packs and personalization. A `R4_ROLLBACK_QA.txt` receipt is only staged after both commands succeed.
+
+This reuses the existing Windows launcher, recovery helper, PowerShell scenarios, and GitHub Actions workflow. No arbitrary kill of user processes, no real user profile, and no unapproved stable release. The exact-SHA Windows job must pass; a green contract-only PR run is not upgrade/rollback evidence. Windows completion is still **engineering/synthetic-data verification**, not production-data G3.

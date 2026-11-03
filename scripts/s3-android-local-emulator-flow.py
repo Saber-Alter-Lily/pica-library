@@ -818,7 +818,11 @@ def source_free_user_host_flow():
         page("27a-cross-app-binder-import-in-original-library")
         record("signed remote Host chapter imported into original source-free library with matching PNG bytes")
         adb("shell","input","keyevent","KEYCODE_BACK")
-        wait(("My external sources","我的外部来源","外部ソース"),seconds=25)
+        # The original Host Browser retains its scroll position after an
+        # external chapter import. Its header is intentionally off-screen;
+        # require the actionable session controls rather than a hidden title.
+        wait(("Disconnect","断开会话","セッション終了"),
+             seconds=25,only_class="Button")
 
         tap_scrolling(("Disconnect","断开会话","セッション終了"),
                       direction="up",only_class="Button")

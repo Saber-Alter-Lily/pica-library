@@ -114,7 +114,9 @@ android {
                 debuggable true
                 minifyEnabled true
                 shrinkResources true
-                proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                // The clean candidate must not inherit keep rules for legacy
+                // JM runtime classes that are only needed by the old product.
+                proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-clean-source-qa.pro'
                 matchingFallbacks = ['debug']
                 manifestPlaceholders = [
                     appLabel : 'Pica Library Clean Source QA',

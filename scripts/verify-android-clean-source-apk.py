@@ -14,7 +14,6 @@ def main():
         raise SystemExit("Usage: verify-android-clean-source-apk.py APK_FILE R8_MAPPING")
     os.environ["APP"]=sys.argv[1]
     mapping_path=sys.argv[2]
-    import os, re, sys, zipfile
     root = os.environ['APP']
     with zipfile.ZipFile(root) as apk:
         dex = [apk.read(n) for n in apk.namelist()

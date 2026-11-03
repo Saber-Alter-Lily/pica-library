@@ -5,6 +5,7 @@ on:
     branches: [codex/product-integration-r1-20261102]
     paths:
       - '.github/workflows/r3-android-clean-source-qa.yml'
+      - 'scripts/verify-android-clean-source-apk.py'
       - 'mobile/android-alpha2/app/build.gradle'
       - 'mobile/android-alpha2/app/proguard-clean-source-qa.pro'
       - 'mobile/android-alpha2/app/src/cleanSourceQa/**'

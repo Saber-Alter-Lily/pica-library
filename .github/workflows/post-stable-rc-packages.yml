@@ -10,6 +10,7 @@ on:
     paths:
       - '.github/workflows/post-stable-rc-packages.yml'
       - 'docs/R3_DUAL_CLIENT_PRODUCT_CANDIDATE_20261102.md'
+      - 'scripts/verify-android-clean-source-apk.py'
       - 'scripts/build-windows-rc-package.ps1'
       - 'scripts/build-windows-rc-launcher.ps1'
       - 'scripts/test-windows-universal-full-upgrade.ps1'

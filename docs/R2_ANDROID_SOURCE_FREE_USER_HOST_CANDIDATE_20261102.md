@@ -65,3 +65,10 @@ Host Binder `ISourceEndpoint` 继续使用同签名权限，并在每次请求�
 - 原 Reader AndroidManifest 自己**定义** `com.picalibrary.android.remote.BIND_SOURCE` 签名权限，Host APK 只请求此权限、不定义它；Reader 入口发现插件及 Binder 客户端调用时重复核对实际 APK 签名，避免仅凭包名信任冒名组件。
 - `ExternalSourceService` 的图像流和章节仍由 AIDL 与签名权限限制，不给阅读器添加 INTERNET；禁用/卸载 Host 不修改原本地书库。
 - CI 拒绝 Host APK 出现另一个 launcher、ReaderScreenActivity、LocalComicStore、具体 Pica/EH/JM 账号 SDK。以上均为 QA 状态，尚不能声称正式签名升级通过。
+
+## R2 来源组件独立管理与卸载后离线可读（2026-11-02；工程验收待结果）
+
+- 原本 `:local-app` 只有检测到已安装 Host 才展示入口；现在无论来源组件是否安装，原本地 Reader 都展示**可选来源状态**（未安装 / 同签名已安装 / 签名不匹配）。未安装时仅说明用户自行安装受信任的独立来源包，**不下载、不自动安装、不添加网络或 APK 安装权限**。
+- 已安装且同签名时，原 Reader 的 Android 原生管理菜单提供显式进入来源设置与打开**Android 系统应用详情**两条动作；由系统完成来源卸载/权限管理，Reader 从不触及来源配置文件。签名不匹配时禁止进入来源服务，只提供系统检查/卸载入口。由 `onResume` 刷新来源状态，不要求重启 Reader。
+- 现有 Android 35 ADB 实体 UI 流程新增：Reader 管理菜单 → Host（继续原 HTTP/Binder 搜索与单章导入）→ 断开来源后离线阅读 → 同 APK `adb install -r` 检查来源配置保留 → 卸载仅来源 APK → 核对原本地 PNG 字节且仍能正常打开 → 重装来源 APK 后未隐式连网。均复用现有 CI/模拟器，不新增测试框架。
+- **验证界限**：目前源码修改已提交至唯一 Draft PR #284，自动化执行结果以相应精确 HEAD 的 Workflow 为准。即使全部通过，这也仅验证“同 APK 同签名替换”及“卸载再安装”，**不能据此宣称跨版本 ABI 更新、正式发布签名、真实 Suwayomi 或哔咔/JM 插件互操作及旧 v0.5.0 迁移已通过**。R1/R2、G1–G4 继续 OPEN。

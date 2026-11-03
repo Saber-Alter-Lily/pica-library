@@ -12,7 +12,7 @@ This pipeline produces unpublished test applications, not a release or a perform
 | `INSTALLABLE_ARTIFACTS_READY_MANUAL_QA_PENDING` | Both trusted packaging jobs passed and uploaded their artifacts | Physical-device or performance acceptance |
 | `FAILED_OR_INCOMPLETE` | A required job failed, was cancelled or was skipped unexpectedly | Permission to use an older artifact as the new candidate |
 
-Read `RC_STATUS.json` together with the exact run's Windows/Android artifacts, `SOURCE_SHA.txt`, `VERSION.txt` and SHA-256 files. Status is derived from job completion, including upload success; it is not an independent download re-verification. All artifacts retain the repository's one-day retention policy. Expired artifacts require a fresh trusted run, not a release upload.
+Read `RC_STATUS.json` together with the exact run's Windows/Android artifacts, `SOURCE_SHA.txt`, `VERSION.txt` and SHA-256 files. Status is derived from job completion, including upload success; it is not an independent download re-verification. Current R3 integration artifacts retain three days for device review; historical post-stable RC artifacts previously used one day. Expired artifacts require a fresh trusted run, not a release upload.
 
 ## Build authority
 

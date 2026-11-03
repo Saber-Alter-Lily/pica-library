@@ -36,3 +36,8 @@
 此次完整 Windows RC 继续执行既有 `test-windows-universal-full-upgrade.ps1`：在**临时模拟资料**下由公开 v0.5.0 ZIP 启动并做完整替换验证，属于升级可行性工程证据，不属于用户真实数据迁移验收。Android 用原固定预览证书检查软件包身份/签名，不是 v0.5.0 正式包同身份更新。以后正式迁移必须独立满足备份、只读预检、数据一致性与失败回滚。
 
 **本批结束条件：**同一 SHA 的 Windows 和 Android 完整安装包确实上传，`RC_STATUS.json` 报成功，再进入实机 G1。R2 物理无源最终包、第三方真实站点、G3 正式旧用户迁移、G4 发布批准仍 OPEN。不因 CI 绿灯自动发版。
+
+## 首次交付构建修正记录
+
+- 提交 `4e90d64f` 启动的 [工作流 #41586827522](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41586827522) 在 `contract` 阶段因旧测试硬编码 `retention-days: 1` 而失败；Windows/Android 包装任务因此被跳过，**该轮无完整客户端包**。
+- 本次仅对齐既有短期 artifact 合同到 **3 天**，同步说明，不改任何签名检查、发布条件、正式版本或生产目录。后续执行以新的 exact-SHA 完整工作流为准；旧失败和新成功必须分开记录。

@@ -116,7 +116,7 @@ describe('post-stable RC isolation contract', () => {
             /contents:\s*write|gh release|git tag|android-preview|assembleRelease/
         )
         expect(workflow).toContain('if-no-files-found: error')
-        expect(workflow).toContain('retention-days: 1')
+        expect(workflow).toContain('retention-days: 3')
         expect(workflow).toContain('needs: [contract, windows-rc, android-rc]')
         expect(workflow).toContain('node scripts/write-rc-artifact-summary.mjs')
         expect(

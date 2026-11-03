@@ -794,20 +794,14 @@ def source_free_user_host_flow():
 
         tap_scrolling(("Disconnect","断开会话","セッション終了"),
                       direction="up",only_class="Button")
+        # The Host component owns no local inventory; Back returns to the
+        # one no-INTERNET Reader, whose original Library keeps the saved copy.
+        tap_scrolling(("Back to Reader","返回阅读器","Reader に戻る"),
                       direction="up",only_class="Button")
-        tap_scrolling("S3-QA-Hosted-Comic",direction="down")
-        dismiss_immersive_help()
-        wait_page_counter("1 / 2",seconds=40)
-        page("28-host-copy-offline-after-disconnect")
-        record("original Reader opens Host-copied chapter offline after revoking Host session")
-                      direction="up",only_class="Button")
-        tap_scrolling("S3-QA-Hosted-Comic",direction="down")
-        dismiss_immersive_help()
-        wait_page_counter("1 / 2",seconds=40)
-        page("28-host-copy-offline-after-disconnect")
-        record("original Reader opens Host-copied chapter offline after revoking Host session")
+        wait(("Import CBZ","导入 CBZ","CBZ 取込"),seconds=25)
 
-        # The original no-INTERNET Reader retains the chapter imported via
+        # Verify original Reader retains the Binder-imported chapter even
+        # after its source component was explicitly disconnected.
         STEP = "source-free-original-library-offline-after-revoke"
         PACKAGE=QA_PACKAGE
         adb("shell","am","start","-W","-n",

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # One real Android emulator pass for the independently installable, source-free QA APK.
 set -euo pipefail
+# Fail on malformed Python before the costly Android 35 emulator compilation.
+python3 -c 'import ast,pathlib; ast.parse(pathlib.Path("scripts/s3-android-local-emulator-flow.py").read_text(encoding="utf-8")); print("PASS: Android emulator flow Python syntax")'
 cd mobile/android-alpha2
 gradle :local-app:assembleDebug :app:assembleDebug :user-host-app:assembleDebug --no-daemon --max-workers=2
 # Install the SOURCE-FREE Reader first: it owns the signature-level

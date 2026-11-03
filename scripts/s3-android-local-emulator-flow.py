@@ -687,8 +687,12 @@ def source_free_user_host_flow():
     adb("shell", "am", "start", "-W", "-n",
         PACKAGE + "/com.picalibrary.android.LocalLibraryActivity",timeout=45)
     wait(("Import CBZ", "导入 CBZ", "CBZ 取込"),seconds=25)
-    tap(("My external Host", "连接我的外部 Host", "外部 Host"),
+    tap(("My external Host", "我的外接来源", "外部 Host"),
         seconds=25, only_class="Button")
+    # The source-free Reader now owns discovery and lifecycle navigation.
+    # Explicit opt-in stays separate from Android system uninstall/settings.
+    tap(("Open source settings", "打开来源设置", "ソース設定を開く"),
+        seconds=25)
     PACKAGE=USER_HOST_PACKAGE
     wait(("My external sources","我的外部来源","外部ソース"),seconds=30)
     wait(("No Host connected","尚未连接 Host","未接続"),seconds=25)
@@ -812,6 +816,53 @@ def source_free_user_host_flow():
         wait_page_counter("1 / 2",seconds=40)
         page("29-original-source-free-library-after-host-revoke")
         record("source-free Reader opens its own Binder-imported chapter with Host disconnected")
+
+        # Independently reinstall the SAME signed source APK, without touching
+        # the Reader package, and confirm the user's Host configuration remains.
+        # This is install-replacement/data-retention evidence, NOT proof of a
+        # future upgraded binary/protocol or a production signer.
+        STEP = "source-only-companion-replacement"
+        host_apk = "mobile/android-alpha2/user-host-app/build/outputs/apk/debug/user-host-app-debug.apk"
+        adb("install", "-r", host_apk, timeout=65)
+        PACKAGE=USER_HOST_PACKAGE
+        until_data("user-host-config-v1.json", lambda data:
+            data.get("label")=="QA_Host" and data.get("enabled") is True)
+        record("same-signer source APK reinstall retains its own saved Host configuration")
+
+        # Remove ONLY the source APK. The local Reader must still expose the
+        # actual already imported PNG and open it without source installation.
+        STEP = "source-only-uninstall-preserves-original-reader"
+        adb("uninstall", USER_HOST_PACKAGE, timeout=55)
+        PACKAGE=QA_PACKAGE
+        assert USER_HOST_PACKAGE not in adb("shell", "pm", "list", "packages",
+                                            USER_HOST_PACKAGE)
+        adb("shell", "am", "start", "-W", "-n",
+            PACKAGE+"/com.picalibrary.android.LocalLibraryActivity",timeout=45)
+        wait(("External sources · not installed", "外接来源 · 未安装",
+              "外部ソース · 未インストール"),seconds=30)
+        assert adb("exec-out", "run-as", PACKAGE, "cat", localRaster,
+                   binary=True)==pngs[0], "Source removal changed the imported page"
+        page("30-reader-source-component-uninstalled")
+        tap_scrolling("S3-QA-Hosted-Comic",direction="down")
+        dismiss_immersive_help()
+        wait_page_counter("1 / 2",seconds=40)
+        page("31-offline-book-still-readable-with-host-uninstalled")
+        record("source companion uninstall preserves the Reader's exact PNG, comic, and offline reading")
+
+        # Reinstalling the optional component must not auto-connect or require
+        # Reader migration; Host settings are deliberately reset by uninstall.
+        STEP = "source-only-reinstall-after-uninstall"
+        adb("install", "-r", host_apk, timeout=65)
+        adb("shell", "am", "start", "-W", "-n",
+            QA_PACKAGE+"/com.picalibrary.android.LocalLibraryActivity",timeout=45)
+        wait(("My external Host", "我的外接来源", "外部 Host"),seconds=30)
+        tap(("My external Host", "我的外接来源", "外部 Host"),
+            seconds=25,only_class="Button")
+        tap(("Open source settings", "打开来源设置", "ソース設定を開く"),seconds=25)
+        PACKAGE=USER_HOST_PACKAGE
+        wait(("No Host connected", "尚未连接 Host", "未接続"),seconds=30)
+        page("32-source-component-reinstalled-no-auto-connect")
+        record("optional source reinstall restores same-signer management without implicit network connection")
         PACKAGE=USER_HOST_PACKAGE
         assert all(item in operations for item in ("PicaSourceHostInfo",
             "PicaSourceHostSources","PicaHostSourceSearch","PicaHostManga",

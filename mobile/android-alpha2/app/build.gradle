@@ -51,7 +51,7 @@ android {
     if (sourceNeutralQa) {
         // Same original app sources, one isolated source-neutral build type.
         // Manifest removes historic provider Activity entrypoints.
-        sourceSets.cleanSourceQa.manifest.srcFile 'src/cleanSourceQa/AndroidManifest.xml'
+        sourceSets.maybeCreate('cleanSourceQa').manifest.srcFile 'src/cleanSourceQa/AndroidManifest.xml'
     }
     buildFeatures { buildConfig true }
 

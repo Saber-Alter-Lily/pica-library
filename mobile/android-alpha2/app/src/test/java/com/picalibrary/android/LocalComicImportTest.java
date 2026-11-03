@@ -267,7 +267,26 @@ public class LocalComicImportTest {
     @Test public void currentHomeShowsImportAndOwnedComicWithoutFavoriteOrProvider() throws Exception {
         overwriteGate();imported();OnboardingStore.setAutoShow(context,false);context.getSharedPreferences("pica-disclaimer-v1",0).edit().putString("accepted_version","1").commit();context.getSharedPreferences("alpha81-ui",0).edit().putBoolean("libraryRefreshed",true).commit();
         try(ActivityController<HomeActivity> controller=Robolectric.buildActivity(HomeActivity.class).setup()){
-            HomeActivity activity=controller.get();shadowOf(Looper.getMainLooper()).idle();View button=activity.getWindow().getDecorView().findViewWithTag("library-local-import");assertNotNull(button);assertEquals(1,findCollection(activity.getWindow().getDecorView()).getAdapter().getItemCount());button.performClick();assertEquals(LocalComicImportActivity.class.getName(),shadowOf(activity).getNextStartedActivity().getComponent().getClassName());
+            HomeActivity activity=controller.get();
+            View root=activity.getWindow().getDecorView();
+            View button=root.findViewWithTag("library-local-import");
+            assertNotNull(button);
+            // The real Home catalog now reconciles imports on a serialized
+            // background worker. Verify the loaded result, not a stale
+            // synchronous adapter from before the nonblocking UI change.
+            androidx.recyclerview.widget.RecyclerView list=findCollection(root);
+            for(int tries=0;tries<120;tries++){
+                shadowOf(Looper.getMainLooper()).idle();
+                if(list.getAdapter()!=null&&list.getAdapter().getItemCount()==1)break;
+                Thread.sleep(25);
+            }
+            assertNotNull("Asynchronous Home library must install its adapter",
+                list.getAdapter());
+            assertEquals(1,list.getAdapter().getItemCount());
+            button.performClick();
+            assertEquals(LocalComicImportActivity.class.getName(),
+                shadowOf(activity).getNextStartedActivity()
+                    .getComponent().getClassName());
         }
     }
 

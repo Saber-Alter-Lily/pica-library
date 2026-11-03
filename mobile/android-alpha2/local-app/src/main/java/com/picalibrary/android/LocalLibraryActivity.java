@@ -47,7 +47,7 @@ public final class LocalLibraryActivity extends Activity {
     private String query="";
     private int sortMode,readMode,refreshSerial;
     private EditText queryField;
-    private Button sortButton,readButton,continueButton;
+    private Button sortButton,readButton,continueButton,sourceButton;
     private LocalComicReaderPort.Book continueBook;
     private ReaderHistoryLedger.Session continueSession;
     private LocalComicStore.Preview pending;
@@ -74,6 +74,90 @@ public final class LocalLibraryActivity extends Activity {
         return button;
     }
 
+    // A separately installed source is optional; the original Reader never
+    // gains network, account or package-install permissions.
+    private static final String SOURCE_PACKAGE="com.picalibrary.android.userhost.qa";
+    private static final String SOURCE_ACTIVITY="com.picalibrary.android.HostBrowserActivity";
+
+    private boolean sourceInstalled(){
+        try{
+            getPackageManager().getPackageInfo(SOURCE_PACKAGE,0);
+            return true;
+        }catch(android.content.pm.PackageManager.NameNotFoundException missing){
+            return false;
+        }
+    }
+    private boolean sourceTrusted(){
+        if(getPackageManager().checkSignatures(getPackageName(),SOURCE_PACKAGE)!=
+                android.content.pm.PackageManager.SIGNATURE_MATCH)return false;
+        try{
+            getPackageManager().getActivityInfo(
+                new android.content.ComponentName(SOURCE_PACKAGE,SOURCE_ACTIVITY),0);
+            return true;
+        }catch(android.content.pm.PackageManager.NameNotFoundException missing){
+            return false;
+        }
+    }
+    private void refreshSourceButton(){
+        if(sourceButton==null)return;
+        sourceButton.setText(!sourceInstalled()?copy(
+            "外接来源 · 未安装","External sources · not installed","外部ソース · 未インストール"):
+            sourceTrusted()?copy(
+            "我的外接来源 · 已安装","My external Host · installed","外部 Host · インストール済み"):
+            copy("外接来源 · 签名不匹配","External source · untrusted signer",
+                "外部ソース · 署名が不一致"));
+    }
+    private void sourceSettings(){
+        startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package",SOURCE_PACKAGE,null)));
+    }
+    private void openSourceActions(){
+        if(!sourceInstalled()){
+            new AlertDialog.Builder(this)
+                .setTitle(copy("外接来源未安装","No source companion installed",
+                    "外部ソースは未インストール"))
+                .setMessage(copy(
+                    "离线阅读不需要来源组件。需要联网来源时，请自行安装与阅读器由同一发布者签名的可信来源组件；本应用不会自动下载或运行第三方插件。",
+                    "Local reading needs no companion. Install a trusted, matching-signer source component yourself if needed. This Reader never downloads or runs arbitrary plugins.",
+                    "オフライン閲覧に拡張は不要です。利用する場合は同じ署名の信頼できる拡張を別途導入してください。"))
+                .setPositiveButton(android.R.string.ok,null).show();
+            return;
+        }
+        boolean trusted=sourceTrusted();
+        String[] actions=trusted?new String[]{
+            copy("打开来源设置","Open source settings","ソース設定を開く"),
+            copy("在系统中管理／卸载来源","Manage or uninstall in Android settings",
+                "Android 設定で管理／削除")}:
+            new String[]{copy("在系统中检查／卸载不受信任的组件",
+                "Inspect or uninstall untrusted component",
+                "信頼できない拡張を確認／削除")};
+        new AlertDialog.Builder(this)
+            .setTitle(copy("外接来源管理","External source management","外部ソース管理"))
+            .setMessage(trusted?copy(
+                "来源仅在你主动连接后工作。卸载或更新来源不会删除阅读器已导入的漫画、书架与历史。",
+                "Sources connect only on your action. Removing or updating the companion does not delete books, shelves or history already owned by this Reader.",
+                "接続は明示的な操作時のみ。拡張の削除・更新で Reader の保存済みデータは削除されません。"):
+                copy("组件签名与阅读器不匹配，不能连接或执行其服务。",
+                    "This component does not match the Reader signature and cannot be connected.",
+                    "署名が一致しないため接続できません。"))
+            .setItems(actions,(dialog,which)->{
+                if(trusted&&which==0){
+                    try{
+                        startActivity(new Intent().setClassName(
+                            SOURCE_PACKAGE,SOURCE_ACTIVITY));
+                    }catch(android.content.ActivityNotFoundException|SecurityException error){
+                        refreshSourceButton();
+                        android.widget.Toast.makeText(this,copy(
+                            "来源已不可用","Source component unavailable",
+                            "外部ソースを利用できません"),android.widget.Toast.LENGTH_LONG).show();
+                    }
+                }else{
+                    sourceSettings();
+                }
+            })
+            .setNegativeButton(android.R.string.cancel,null).show();
+    }
+
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
         if(saved!=null){
@@ -93,35 +177,10 @@ public final class LocalLibraryActivity extends Activity {
         });
         TextView title=label(copy("本地漫画书库","Local library","ローカル書庫"),22);
         root.addView(title);
-        // The pure-local APK never declares a Host activity. The independently
-        // installable optional-Host APK alone exposes this entry.
-        boolean optionalHost=false,remoteCompanion=false;
-        try {
-            getPackageManager().getActivityInfo(new android.content.ComponentName(
-                this,"com.picalibrary.android.HostBrowserActivity"),0);
-            optionalHost=true;
-        } catch(android.content.pm.PackageManager.NameNotFoundException absent){
-            try {
-                getPackageManager().getActivityInfo(new android.content.ComponentName(
-                    "com.picalibrary.android.userhost.qa",
-                    "com.picalibrary.android.HostBrowserActivity"),0);
-                // Package name alone is not a trust anchor. The user-selected
-                // component and the no-network Reader MUST share a signer.
-                if(getPackageManager().checkSignatures(getPackageName(),
-                        "com.picalibrary.android.userhost.qa")==
-                        android.content.pm.PackageManager.SIGNATURE_MATCH){
-                    remoteCompanion=true;
-                    optionalHost=true;
-                }
-            } catch(android.content.pm.PackageManager.NameNotFoundException missing){}
-        }
-        TextView description=label(optionalHost?copy(
-            "本地漫画离线可读；外部 Host 必须由你选择并授权。",
-            "Local books stay offline; external Host requires your consent.",
-            "ローカル読書はオフライン。外部 Host は許可が必要です。"):copy(
-            "仅管理本应用导入的文件；不需要账号或网络。",
-            "Only imported files in this app; no account or network.",
-            "このアプリに取り込んだファイルのみ。アカウントや通信は不要です。"),12);
+        TextView description=label(copy(
+            "离线漫画始终可读；外部来源为可选组件，连接需由你授权。",
+            "Offline books always work. External sources are optional and require your consent.",
+            "オフライン閲覧は常に可能。外部ソースは任意で許可が必要です。"),12);
         description.setPadding(0,dp(6),0,dp(12));
         root.addView(description);
 
@@ -138,34 +197,11 @@ public final class LocalLibraryActivity extends Activity {
         localSections.addView(shelvesButton,new LinearLayout.LayoutParams(0,dp(48),1));
         localSections.addView(historyButton,new LinearLayout.LayoutParams(0,dp(48),1));
         root.addView(localSections);
-        if(optionalHost){
-            Button host=action(copy("连接我的外部 Host","My external Host","外部 Host"));
-            host.setTag("local-host-opt-in");
-            final String hostPackage=remoteCompanion
-                ?"com.picalibrary.android.userhost.qa":getPackageName();
-            host.setOnClickListener(v->{
-                if(!getPackageName().equals(hostPackage)&&
-                        getPackageManager().checkSignatures(getPackageName(),
-                            hostPackage)!=android.content.pm.PackageManager.SIGNATURE_MATCH){
-                    android.widget.Toast.makeText(this,copy(
-                        "外接来源组件的签名与阅读器不一致",
-                        "External source component has an untrusted signature",
-                        "外部ソースの署名が一致しません"),
-                        android.widget.Toast.LENGTH_LONG).show();
-                    return;
-                }
-                try {
-                    startActivity(new Intent().setClassName(hostPackage,
-                        "com.picalibrary.android.HostBrowserActivity"));
-                } catch(android.content.ActivityNotFoundException|SecurityException failure){
-                    android.widget.Toast.makeText(this,copy(
-                        "请安装同一签名的外接来源组件","Install a matching-signer source companion",
-                        "同じ署名の外部ソースが必要です"),
-                        android.widget.Toast.LENGTH_LONG).show();
-                }
-            });
-            root.addView(host,new LinearLayout.LayoutParams(-1,dp(48)));
-        }
+        sourceButton=action("");
+        sourceButton.setTag("local-host-opt-in");
+        sourceButton.setOnClickListener(v->openSourceActions());
+        root.addView(sourceButton,new LinearLayout.LayoutParams(-1,dp(48)));
+        refreshSourceButton();
         historyButton.setOnClickListener(v->startActivity(new Intent(this,LocalHistoryActivity.class)));
         shelvesButton.setOnClickListener(v->startActivity(new Intent(this,LocalShelvesActivity.class)));
         folderButton.setOnClickListener(v->choose(PICK_FOLDER));
@@ -331,6 +367,7 @@ public final class LocalLibraryActivity extends Activity {
 
     @Override protected void onResume(){
         super.onResume();
+        refreshSourceButton();
         if(adapter!=null&&!busy&&pending==null)refresh();
     }
 

@@ -85,7 +85,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm web:check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pnpm test
+          # Full cross-platform tests already run in normal CI. This Windows
+          # packaging lane exercises only release/upgrade and native PowerShell
+          # contract cases, then the actual extracted ZIP and full replacement.
+          pnpm exec vitest run test/unit/p2-unpublished-rc-package.test.ts test/unit/post-stable-rc-package.test.ts test/unit/update-reconnect-stability.test.ts --maxWorkers=2 --minWorkers=1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Download checksum-pinned released baseline
         shell: pwsh

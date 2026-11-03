@@ -41,3 +41,7 @@
 
 - 提交 `4e90d64f` 启动的 [工作流 #41586827522](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41586827522) 在 `contract` 阶段因旧测试硬编码 `retention-days: 1` 而失败；Windows/Android 包装任务因此被跳过，**该轮无完整客户端包**。
 - 本次仅对齐既有短期 artifact 合同到 **3 天**，同步说明，不改任何签名检查、发布条件、正式版本或生产目录。后续执行以新的 exact-SHA 完整工作流为准；旧失败和新成功必须分开记录。
+
+## 构建速度调整（与本轮双端交付相关）
+
+初版完整 Windows RC 在打包前重复运行全套 `pnpm test`，尽管已有常规 CI 完成。现在 Windows 打包阶段只保留包/回滚/Windows PowerShell 合同的定向 Vitest，继续运行 `pnpm type:check`、`pnpm web:check`，**绝不删除** Windows 原生 ZIP 解压启动、端口冲突、持久化和 v0.5.0 基线完整替换验收。Android 仍保留 JUnit、Lint、包身份和签名检查。工程包仍须等待此变更自身 exact-SHA CI 验收，不能继承之前旧 SHA 的成功状态。

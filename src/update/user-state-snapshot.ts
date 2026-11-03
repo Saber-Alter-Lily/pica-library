@@ -17,11 +17,13 @@ interface FileDigest {
 interface ProtectedInventory {
     configExisted: boolean
     databaseExisted: boolean
+    packsExisted?: boolean
+    personalizationExisted?: boolean
     files: FileDigest[]
 }
 
 interface VerifiedSnapshotReceipt extends ProtectedInventory {
-    schemaVersion: 2
+    schemaVersion: 3
 }
 
 const incomplete = 'User-state snapshot is incomplete or changed; recovery copies retained'
@@ -68,7 +70,10 @@ function walkDirectory(directory: string, prefix: string, files: FileDigest[]) {
     }
 }
 
-function inventory(config: string, database: string): ProtectedInventory {
+function inventory(
+    config: string, database: string,
+    extra?: { packs: string; personalization: string }
+): ProtectedInventory {
     const files: FileDigest[] = []
     const configExisted = optionalStat(config) !== null
     if (configExisted) walkDirectory(config, 'config', files)
@@ -80,13 +85,22 @@ function inventory(config: string, database: string): ProtectedInventory {
             files.push({ path: 'database/library.db' + suffix, ...digestRegularFile(file) })
         }
     }
+    const result: ProtectedInventory = { configExisted, databaseExisted, files }
+    if (extra) {
+        result.packsExisted = optionalStat(extra.packs) !== null
+        result.personalizationExisted = optionalStat(extra.personalization) !== null
+        if (result.packsExisted) walkDirectory(extra.packs, 'packs', files)
+        if (result.personalizationExisted) walkDirectory(extra.personalization, 'personalization', files)
+    }
     files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
-    return { configExisted, databaseExisted, files }
+    return result
 }
 
 function sameInventory(first: ProtectedInventory, second: ProtectedInventory) {
     return first.configExisted === second.configExisted &&
         first.databaseExisted === second.databaseExisted &&
+        first.packsExisted === second.packsExisted &&
+        first.personalizationExisted === second.personalizationExisted &&
         JSON.stringify(first.files) === JSON.stringify(second.files)
 }
 
@@ -105,9 +119,15 @@ export function snapshotUserState(instruction: UserStateSnapshotContext) {
     if (optionalStat(snapshot)) throw new Error('User-state snapshot directory already exists')
     const config = path.join(instruction.desktopHomeRoot, 'config')
     const database = path.join(instruction.libraryDirectory, 'library.db')
-    const before = inventory(config, database)
+    const extra = {
+        packs: path.join(instruction.desktopHomeRoot, 'packs'),
+        personalization: path.join(instruction.desktopHomeRoot, 'runtime-state', 'personalization')
+    }
+    const before = inventory(config, database, extra)
     fs.mkdirSync(snapshot, { recursive: true })
     if (before.configExisted) copyTree(config, path.join(snapshot, 'config'))
+    if (before.packsExisted) copyTree(extra.packs, path.join(snapshot, 'packs'))
+    if (before.personalizationExisted) copyTree(extra.personalization, path.join(snapshot, 'personalization'))
     const databaseSnapshot = path.join(snapshot, 'database')
     fs.mkdirSync(databaseSnapshot, { recursive: true })
     for (const suffix of ['', '-wal', '-shm']) {
@@ -115,10 +135,12 @@ export function snapshotUserState(instruction: UserStateSnapshotContext) {
         if (optionalStat(source))
             fs.copyFileSync(source, path.join(databaseSnapshot, 'library.db' + suffix))
     }
-    const copied = inventory(path.join(snapshot, 'config'), path.join(databaseSnapshot, 'library.db'))
-    if (!sameInventory(before, copied) || !sameInventory(before, inventory(config, database)))
+    const copied = inventory(path.join(snapshot, 'config'), path.join(databaseSnapshot, 'library.db'), {
+        packs: path.join(snapshot, 'packs'), personalization: path.join(snapshot, 'personalization')
+    })
+    if (!sameInventory(before, copied) || !sameInventory(before, inventory(config, database, extra)))
         throw new Error(incomplete)
-    const receipt: VerifiedSnapshotReceipt = { schemaVersion: 2, ...copied }
+    const receipt: VerifiedSnapshotReceipt = { schemaVersion: 3, ...copied }
     fs.writeFileSync(path.join(snapshot, 'snapshot.json'), JSON.stringify(receipt), { flag: 'wx' })
     return snapshot
 }
@@ -132,11 +154,16 @@ export function restoreUserState(instruction: UserStateSnapshotContext, snapshot
         throw new Error(incomplete)
     const version = record.schemaVersion
     let expected: ProtectedInventory | null = null
-    if (version === 2) {
+    const extended = version === 3
+    if (extended || version === 2) {
         const candidate = record as VerifiedSnapshotReceipt
-        const saved = inventory(savedConfig, path.join(savedDatabase, 'library.db'))
+        const saved = inventory(savedConfig, path.join(savedDatabase, 'library.db'), extended ? {
+            packs: path.join(snapshot, 'packs'), personalization: path.join(snapshot, 'personalization')
+        } : undefined)
         if (typeof candidate.configExisted !== 'boolean' ||
             typeof candidate.databaseExisted !== 'boolean' ||
+            (extended && (typeof candidate.packsExisted !== 'boolean' ||
+                typeof candidate.personalizationExisted !== 'boolean')) ||
             !Array.isArray(candidate.files) || !sameInventory(candidate, saved))
             throw new Error(incomplete)
         expected = saved
@@ -159,6 +186,19 @@ export function restoreUserState(instruction: UserStateSnapshotContext, snapshot
             fs.copyFileSync(source, target)
         }
     }
-    if (expected && !sameInventory(expected, inventory(config, database)))
+    if (extended) {
+        for (const [destination, source] of [
+            [path.join(instruction.desktopHomeRoot, 'packs'), path.join(snapshot, 'packs')],
+            [path.join(instruction.desktopHomeRoot, 'runtime-state', 'personalization'), path.join(snapshot, 'personalization')]
+        ]) {
+            fs.rmSync(destination, { recursive: true, force: true })
+            if (optionalStat(source)) copyTree(source, destination)
+        }
+    }
+    const liveExtra = extended ? {
+        packs: path.join(instruction.desktopHomeRoot, 'packs'),
+        personalization: path.join(instruction.desktopHomeRoot, 'runtime-state', 'personalization')
+    } : undefined
+    if (expected && !sameInventory(expected, inventory(config, database, liveExtra)))
         throw new Error(incomplete)
 }

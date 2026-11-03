@@ -132,14 +132,10 @@ public final class LocalLibraryActivity extends Activity {
                 "Inspect or uninstall untrusted component",
                 "信頼できない拡張を確認／削除")};
         new AlertDialog.Builder(this)
-            .setTitle(copy("外接来源管理","External source management","外部ソース管理"))
-            .setMessage(trusted?copy(
-                "来源仅在你主动连接后工作。卸载或更新来源不会删除阅读器已导入的漫画、书架与历史。",
-                "Sources connect only on your action. Removing or updating the companion does not delete books, shelves or history already owned by this Reader.",
-                "接続は明示的な操作時のみ。拡張の削除・更新で Reader の保存済みデータは削除されません。"):
-                copy("组件签名与阅读器不匹配，不能连接或执行其服务。",
-                    "This component does not match the Reader signature and cannot be connected.",
-                    "署名が一致しないため接続できません。"))
+            .setTitle(trusted?copy("外接来源管理","External source management",
+                "外部ソース管理"):
+                copy("来源签名不匹配","Source signature mismatch",
+                "外部ソースの署名が一致しません"))
             .setItems(actions,(dialog,which)->{
                 if(trusted&&which==0){
                     try{

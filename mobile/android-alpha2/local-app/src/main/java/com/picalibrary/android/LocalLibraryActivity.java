@@ -105,8 +105,14 @@ public final class LocalLibraryActivity extends Activity {
                 getPackageManager().getActivityInfo(new android.content.ComponentName(
                     "com.picalibrary.android.userhost.qa",
                     "com.picalibrary.android.HostBrowserActivity"),0);
-                remoteCompanion=true;
-                optionalHost=true;
+                // Package name alone is not a trust anchor. The user-selected
+                // component and the no-network Reader MUST share a signer.
+                if(getPackageManager().checkSignatures(getPackageName(),
+                        "com.picalibrary.android.userhost.qa")==
+                        android.content.pm.PackageManager.SIGNATURE_MATCH){
+                    remoteCompanion=true;
+                    optionalHost=true;
+                }
             } catch(android.content.pm.PackageManager.NameNotFoundException missing){}
         }
         TextView description=label(optionalHost?copy(
@@ -138,6 +144,16 @@ public final class LocalLibraryActivity extends Activity {
             final String hostPackage=remoteCompanion
                 ?"com.picalibrary.android.userhost.qa":getPackageName();
             host.setOnClickListener(v->{
+                if(!getPackageName().equals(hostPackage)&&
+                        getPackageManager().checkSignatures(getPackageName(),
+                            hostPackage)!=android.content.pm.PackageManager.SIGNATURE_MATCH){
+                    android.widget.Toast.makeText(this,copy(
+                        "外接来源组件的签名与阅读器不一致",
+                        "External source component has an untrusted signature",
+                        "外部ソースの署名が一致しません"),
+                        android.widget.Toast.LENGTH_LONG).show();
+                    return;
+                }
                 try {
                     startActivity(new Intent().setClassName(hostPackage,
                         "com.picalibrary.android.HostBrowserActivity"));

@@ -34,19 +34,30 @@ adb install -r "$qa_apks/user-host-v1.apk"
 original=app/build/outputs/apk/debug/app-debug.apk
 test -s "$original"
 adb install -r "$original"
+cp "$original" "$qa_apks/legacy-dev-v55.apk"
 # Build the newer QA from the SAME original clean app and debug signer.
 # This is a disposable Android packageId, never the official 0.5.0 identity.
-PICA_ANDROID_VERSION_CODE=56 gradle :app:assembleCleanSourceQa -PsourceNeutralQa=true --no-daemon --max-workers=2
+PICA_ANDROID_VERSION_CODE=56 gradle :app:assembleCleanSourceQa :app:assembleCleanCompatQa -PsourceNeutralQa=true --no-daemon --max-workers=2
 test -s "$clean"
 cp "$clean" "$qa_apks/clean-v56.apk"
+compat=app/build/outputs/apk/cleanCompatQa/app-cleanCompatQa.apk
+test -s "$compat"
+cp "$compat" "$qa_apks/clean-compat-dev-v56.apk"
+python3 ../../scripts/verify-android-clean-source-apk.py "$compat" "app/build/outputs/mapping/cleanCompatQa/mapping.txt"
 aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
 signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
 "$aapt" dump badging "$qa_apks/clean-v55.apk" | grep -F "package: name='com.picalibrary.android.cleanqa' versionCode='55'"
 "$aapt" dump badging "$qa_apks/clean-v56.apk" | grep -F "package: name='com.picalibrary.android.cleanqa' versionCode='56'"
+"$aapt" dump badging "$qa_apks/legacy-dev-v55.apk" | grep -F "package: name='com.picalibrary.android.dev' versionCode='55'"
+"$aapt" dump badging "$qa_apks/clean-compat-dev-v56.apk" | grep -F "package: name='com.picalibrary.android.dev' versionCode='56'"
 cert55=$("$signer" verify --print-certs "$qa_apks/clean-v55.apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
 cert56=$("$signer" verify --print-certs "$qa_apks/clean-v56.apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
 test -n "$cert55" && test "$cert55" = "$cert56"
-echo 'R4 source-neutral old/new QA APK identity and signing cert matched'
+old_dev_cert=$("$signer" verify --print-certs "$qa_apks/legacy-dev-v55.apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
+clean_dev_cert=$("$signer" verify --print-certs "$qa_apks/clean-compat-dev-v56.apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
+test -n "$old_dev_cert" && test "$old_dev_cert" = "$clean_dev_cert"
+test "$old_dev_cert" = "$cert55"
+echo 'R4 clean→clean and legacy-provider→clean original-app upgrade candidate identities and signing certs match'
 adb install -r "$qa_apks/clean-v55.apk"
 cd ../..
 python3 scripts/s3-android-local-emulator-flow.py

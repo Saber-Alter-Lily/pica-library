@@ -52,6 +52,9 @@ android {
         // Same original app sources, one isolated source-neutral build type.
         // Manifest removes historic provider Activity entrypoints.
         sourceSets.maybeCreate('cleanSourceQa').manifest.srcFile 'src/cleanSourceQa/AndroidManifest.xml'
+        // Same clean original-app manifest, but retain the *old Dev identity*
+        // for a disposable legacy-to-clean in-place upgrade rehearsal.
+        sourceSets.maybeCreate('cleanCompatQa').manifest.srcFile 'src/cleanSourceQa/AndroidManifest.xml'
     }
     buildFeatures { buildConfig true }
 
@@ -123,6 +126,17 @@ android {
                     pairScheme: 'picalibrary-cleanqa'
                 ]
             }
+            cleanCompatQa {
+                initWith cleanSourceQa
+                // Never reuse the actual production applicationId or signer.
+                // Overlay the historically provider-enabled *.dev QA build.
+                applicationIdSuffix '.dev'
+                versionNameSuffix '-clean-compat-qa'
+                manifestPlaceholders = [
+                    appLabel : 'Pica Library Clean Compat QA',
+                    pairScheme: 'picalibrary'
+                ]
+            }
         }
         release {
             buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', 'false'
@@ -181,6 +195,10 @@ dependencies {
             exclude group: 'io.github.darkxanter', module: 'webp-imageio'
         }
         cleanSourceQaCompileOnly 'io.github.jukomu:jmcomic-android-support:v1.1.12'
+        cleanCompatQaCompileOnly('io.github.jukomu:jmcomic-core:v1.1.12') {
+            exclude group: 'io.github.darkxanter', module: 'webp-imageio'
+        }
+        cleanCompatQaCompileOnly 'io.github.jukomu:jmcomic-android-support:v1.1.12'
     } else {
         implementation('io.github.jukomu:jmcomic-core:v1.1.12') {
             exclude group: 'io.github.darkxanter', module: 'webp-imageio'

@@ -1352,6 +1352,103 @@ def clean_original_in_place_upgrade():
     }, indent=2), encoding="utf-8")
 
 
+def legacy_dev_to_clean_compat_upgrade():
+    """Actual same-id Android update from legacy-provider original Dev to clean Reader.
+
+    This is the exact historical original four-tab application package model,
+    but on an isolated .dev identity with disposable debug signing. No access
+    to the production com.picalibrary.android identity or real user accounts.
+    """
+    global PACKAGE, STEP
+    PACKAGE = ORIGINAL_PACKAGE
+    STEP = "r4-legacy-provider-app-before-source-removal"
+    assert installed_version_code(ORIGINAL_PACKAGE) == 55
+    previous_rows = book_rows()
+    assert len(previous_rows) >= 2, "Original legacy Dev app has no two imported comics"
+    assert any(row.get("title", "").startswith("Interop Fixture CBZ") for row in previous_rows)
+    previous = []
+    for row in sorted(previous_rows, key=lambda value: value["id"]):
+        base = ("files/local-comics-v1/" + row["id"].removeprefix("local:") +
+                "/" + row["generation"] + "/")
+        previous.append({
+            "id": row["id"], "title": row["title"],
+            "pages": [hashlib.sha256(adb("exec-out", "run-as",
+                     ORIGINAL_PACKAGE, "cat", base + pg["file"],
+                     binary=True)).hexdigest() for pg in row["pages"]]
+        })
+    previous_history = ledger("reading-history-v1.json")
+    assert any(session.get("sourceKind") == "local"
+               for session in previous_history.get("sessions", []))
+    previous_disclaimer = app_file("shared_prefs/pica-disclaimer-v1.xml")
+    # The legacy original app created this provider policy at first launch;
+    # the source-neutral app must retain it as opaque old user state while
+    # keeping every provider disabled, not migrate credentials to a new host.
+    previous_policy = app_file("files/source-access-v1.json")
+    assert previous_policy and "schemaVersion" in previous_policy
+    (ROOT / "r4-legacy-original-before-source-removal.json").write_text(
+        json.dumps({"package": ORIGINAL_PACKAGE, "versionCode": 55,
+                    "bookCount": len(previous), "pageHashes":
+                        [book["pages"] for book in previous],
+                    "historyPresent": True, "legacyPolicyPresent": True,
+                    "syntheticOnly": True}, indent=2), encoding="utf-8")
+
+    STEP = "r4-legacy-to-clean-same-identity-package-replacement"
+    new_apk = "mobile/android-alpha2/s3-host-qa-apks/clean-compat-dev-v56.apk"
+    assert Path(new_apk).is_file(), "Source-neutral original Dev compatible APK missing"
+    adb("install", "-r", new_apk, timeout=95)
+    assert installed_version_code(ORIGINAL_PACKAGE) == 56
+    PACKAGE = ORIGINAL_PACKAGE
+    updated = []
+    for row in sorted(book_rows(), key=lambda value: value["id"]):
+        base = ("files/local-comics-v1/" + row["id"].removeprefix("local:") +
+                "/" + row["generation"] + "/")
+        updated.append({
+            "id": row["id"], "title": row["title"],
+            "pages": [hashlib.sha256(adb("exec-out", "run-as",
+                     ORIGINAL_PACKAGE, "cat", base + pg["file"],
+                     binary=True)).hexdigest() for pg in row["pages"]]
+        })
+    assert updated == previous, "Legacy Dev -> clean original product changed comic identities/pages"
+    assert ledger("reading-history-v1.json") == previous_history, (
+        "Legacy Dev -> clean original product changed original Reader history")
+    assert app_file("shared_prefs/pica-disclaimer-v1.xml") == previous_disclaimer, (
+        "Legacy Dev -> clean original product reset first-use consent")
+    assert app_file("files/source-access-v1.json") == previous_policy, (
+        "Legacy Dev -> clean original product mutated old provider policy")
+
+    STEP = "r4-legacy-to-clean-continue-offline-reading"
+    adb("shell", "am", "force-stop", ORIGINAL_PACKAGE)
+    adb("shell", "am", "start", "-W", "-n",
+        ORIGINAL_PACKAGE + "/com.picalibrary.android.DisclaimerActivity", timeout=55)
+    later = wait(("稍后再看", "Later", "後で"),
+                 seconds=12, required=False, only_class="Button")
+    if later:
+        adb("shell", "input", "tap", str(later[0]), str(later[1]))
+    wait(("我的书库", "My library", "マイライブラリ"), seconds=45)
+    wait("Interop Fixture CBZ", seconds=45)
+    page("45-legacy-dev-to-clean-original-home")
+    tap("Interop Fixture CBZ", seconds=25)
+    tap(("阅读", "Read", "読む"), seconds=45, only_class="Button")
+    dismiss_immersive_help()
+    wait_page_counter("1 / 2", seconds=40)
+    page("46-legacy-dev-to-clean-original-offline-reader")
+    record("real original Dev legacy-provider app upgrades in place to source-neutral "
+           "original four-tab Reader; saved local and Host-imported pages, history, "
+           "consent and opaque old source policy stay identical")
+    (ROOT / "r4-legacy-dev-to-clean-compat.json").write_text(json.dumps({
+        "status": "EMULATOR_LEGACY_TO_CLEAN_PASS",
+        "package": ORIGINAL_PACKAGE, "oldCode": 55, "newCode": 56,
+        "sameApplicationId": True, "matchingQAInstallSigners": True,
+        "actuallyReplacedUsingADB": True, "uninstallOrClearDataUsed": False,
+        "oldProviderSDKPhysicallyRemovedInNewApk": True,
+        "savedPageBytesUnchanged": True, "bookCount": len(updated),
+        "historyUnchanged": True, "firstUseConsentUnchanged": True,
+        "oldSourcePolicyOpaqueUnchanged": True, "offlineReaderReopened": True,
+        "disposableDevIdentityOnly": True,
+        "productionV050ReleaseUpgradeVerified": False
+    }, indent=2), encoding="utf-8")
+
+
 def main():
     global STEP
     try:
@@ -1375,6 +1472,7 @@ def main():
         source_free_user_host_flow()
         official_upstream_android_reader_flow()
         clean_original_in_place_upgrade()
+        legacy_dev_to_clean_compat_upgrade()
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",

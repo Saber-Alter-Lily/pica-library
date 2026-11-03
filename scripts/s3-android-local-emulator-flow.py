@@ -1259,6 +1259,92 @@ def official_upstream_android_reader_flow():
             "originalProductBoundSourceProvidersPresent": False
         }, indent=2), encoding="utf-8")
 
+def clean_original_in_place_upgrade():
+    """Real Android PackageManager install -r across two versions of one clean QA app.
+
+    Reuse the original full-product import, Reader, history and saved page stores.
+    This proves only isolated .cleanqa OTA mechanics, never the production signer.
+    """
+    global PACKAGE, STEP
+    PACKAGE = CLEAN_PACKAGE
+    STEP = "r4-clean-android-preupgrade-snapshot"
+    assert installed_version_code(CLEAN_PACKAGE) == 55
+    rows = book_rows()
+    assert len(rows) >= 2, "Clean original product lost imported local/Host copies before upgrade"
+    titles = {row.get("title", "") for row in rows}
+    assert any("S3-QA-Comic" in title for title in titles), titles
+    assert any("Interop Fixture CBZ" in title for title in titles), titles
+    before = []
+    for row in sorted(rows, key=lambda value: value["id"]):
+        base = ("files/local-comics-v1/" + row["id"].removeprefix("local:") +
+                "/" + row["generation"] + "/")
+        pages = [hashlib.sha256(adb("exec-out", "run-as", CLEAN_PACKAGE,
+                 "cat", base + page["file"], binary=True)).hexdigest()
+                 for page in row["pages"]]
+        before.append({"id": row["id"], "pages": pages, "count": len(pages)})
+    history_before = ledger("reading-history-v1.json")
+    assert any(item.get("sourceKind") == "local" and item.get("lastPage", 0) >= 1
+               for item in history_before.get("sessions", [])), (
+        "Original clean app has no real saved Reader continuation before upgrading")
+    accepted_before = app_file("shared_prefs/pica-disclaimer-v1.xml")
+    assert "accepted_version" in accepted_before and ">1<" in accepted_before, (
+        "Original clean app lacks an actual accepted first-use preference")
+    (ROOT / "r4-clean-old-before-replace.json").write_text(json.dumps({
+        "package": CLEAN_PACKAGE, "versionCode": 55,
+        "books": len(before), "pageCounts": [row["count"] for row in before],
+        "pageHashes": [row["pages"] for row in before],
+        "hasSavedLocalProgress": True, "hasAcceptedDisclaimer": True,
+        "syntheticDataOnly": True
+    }, indent=2), encoding="utf-8")
+
+    STEP = "r4-clean-android-real-install-over"
+    apk = "mobile/android-alpha2/s3-host-qa-apks/clean-v56.apk"
+    assert Path(apk).is_file(), "Next-version clean APK missing"
+    # A real PackageManager replace with no -d, uninstall, clear-data or bypass.
+    adb("install", "-r", apk, timeout=90)
+    assert installed_version_code(CLEAN_PACKAGE) == 56
+    PACKAGE = CLEAN_PACKAGE
+    after_rows = book_rows()
+    after = []
+    for row in sorted(after_rows, key=lambda value: value["id"]):
+        base = ("files/local-comics-v1/" + row["id"].removeprefix("local:") +
+                "/" + row["generation"] + "/")
+        pages = [hashlib.sha256(adb("exec-out", "run-as", CLEAN_PACKAGE,
+                 "cat", base + page["file"], binary=True)).hexdigest()
+                 for page in row["pages"]]
+        after.append({"id": row["id"], "pages": pages, "count": len(pages)})
+    assert after == before, "Android in-place upgrade changed local comic identities/pages"
+    assert ledger("reading-history-v1.json") == history_before, (
+        "Android in-place upgrade reset or changed real Reader history")
+    assert app_file("shared_prefs/pica-disclaimer-v1.xml") == accepted_before, (
+        "Android in-place upgrade lost or rewrote first-use consent")
+
+    STEP = "r4-clean-android-relaunch-resume"
+    adb("shell", "am", "force-stop", CLEAN_PACKAGE)
+    adb("shell", "am", "start", "-W", "-n",
+        CLEAN_PACKAGE + "/com.picalibrary.android.DisclaimerActivity", timeout=55)
+    wait(("我的书库", "My library", "マイライブラリ"), seconds=40)
+    wait("Interop Fixture CBZ", seconds=40)
+    page("43-clean-android-inplace-upgrade-home")
+    tap("Interop Fixture CBZ", seconds=25)
+    tap(("阅读", "Read", "読む"), seconds=35, only_class="Button")
+    dismiss_immersive_help()
+    wait_page_counter("1 / 2", seconds=40)
+    page("44-clean-android-inplace-upgrade-offline-reader")
+    record("original four-tab clean Android app survives same-package 55-to-56 install -r with "
+           "identical saved comics, byte hashes, history and consent; offline Reader reopens")
+    (ROOT / "r4-clean-android-inplace-proof.json").write_text(json.dumps({
+        "status": "EMULATOR_UPGRADE_PASS", "package": CLEAN_PACKAGE,
+        "oldVersionCode": 55, "newVersionCode": 56,
+        "sameApplicationId": True, "sameSigningCertificateCheckedBeforeInstall": True,
+        "adbReplaceInstall": True, "uninstallOrDataClearUsed": False,
+        "bookCount": len(after), "pageHashesUnchanged": True,
+        "readingHistoryUnchanged": True, "disclaimerPreferenceUnchanged": True,
+        "readerReopenedOffline": True, "syntheticUserDataOnly": True,
+        "officialV050InPlaceMigrationVerified": False
+    }, indent=2), encoding="utf-8")
+
+
 def main():
     global STEP
     try:
@@ -1281,6 +1367,7 @@ def main():
         original_app_flow()
         source_free_user_host_flow()
         official_upstream_android_reader_flow()
+        clean_original_in_place_upgrade()
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",

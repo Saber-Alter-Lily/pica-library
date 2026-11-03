@@ -21,3 +21,13 @@ The existing stopped-app full-application helper, not a new updater or backup fr
 - OPEN G3: real v0.5.0 read-only data inventory, permitted one-time backup, cross-version schema/metadata/content comparison, external libraries, physical Windows rollback, Android same-application-ID and real signing continuity. G1 real UI/1500-book performance, G2 verified multi-provider and G4 authorized signed release remain OPEN.
 
 **Release boundary:** Keep main, stable v0.5.0, Android production identity/signature, OTA, and real profiles unchanged until user-approved release acceptance.
+
+## R4 Android: original clean-app in-place install evidence (2026-11-03)
+
+The existing `s3-android-local-emulator` Android 35 flow is extended, not replaced. It now builds **two** actual original four-tab physically source-neutral APKs from the same app code at `versionCode=55` and `56`, keeps both outside Gradle output, and checks package ID `com.picalibrary.android.cleanqa` plus matching signing certificate before installation. No alternate Reader, data store, plugin host, test framework or application ID is introduced.
+
+After the established real system-SAF local CBZ import, original Reader progress, official Suwayomi built-in local-source Binder-to-original-product chapter import, and Host stop/offline playback, this flow snapshots **the app's actual private** local-book manifests, saved PNG SHA-256 digests, `reading-history-v1.json`, and first-use disclaimer preference. It then performs `adb install -r` of the newer matching-cert APK with no uninstall, no clear-data, and no downgrade, verifies `versionCode=56`, compares original data/bytes, force-stops/relaunches the original four-tab Home, and reopens the already saved Host-imported offline chapter. Results include synthetic-only SHA/count evidence and screenshots in the existing emulator artifact.
+
+**Boundaries:** This is an in-place upgrade proof only for the isolated `.cleanqa` identity with QA signing, not a real `com.picalibrary.android` production-signature v0.5.0 update, not actual user data, and not device/OEM manual acceptance. The Android35 push workflow must actually finish SUCCESS at the exact change HEAD before this evidence can be considered verified. If it fails, preserve screenshots/logs and fix the actual blocker instead of waiving the scenario.
+
+The Windows R4 v3 SHA-256 profile backup, preserved style packs and personalization, exact v0.5.0 ZIP replacement/rollback, and distinct G1 physical / G3 production / G4 release gates remain open as above.

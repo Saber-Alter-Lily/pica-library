@@ -6,7 +6,7 @@ python3 -c 'import ast,pathlib; ast.parse(pathlib.Path("scripts/s3-android-local
 cd mobile/android-alpha2
 # Reuse the same original full-product source set for the physically clean
 # R8 build; its APK and :user-host-app use the SAME Gradle debug signer.
-gradle :local-app:assembleDebug :app:assembleDebug :app:assembleCleanSourceQa :user-host-app:assembleDebug -PsourceNeutralQa=true --no-daemon --max-workers=2
+PICA_ANDROID_VERSION_CODE=55 gradle :local-app:assembleDebug :app:assembleDebug :app:assembleCleanSourceQa :user-host-app:assembleDebug -PsourceNeutralQa=true --no-daemon --max-workers=2
 # Install the SOURCE-FREE Reader first: it owns the signature-level
 # Binder permission; the optional Host may never define the trust root.
 apk=local-app/build/outputs/apk/debug/local-app-debug.apk
@@ -20,6 +20,9 @@ test -s "$host"
 qa_apks=s3-host-qa-apks
 mkdir -p "$qa_apks"
 cp "$host" "$qa_apks/user-host-v1.apk"
+clean=app/build/outputs/apk/cleanSourceQa/app-cleanSourceQa.apk
+test -s "$clean"
+cp "$clean" "$qa_apks/clean-v55.apk"
 gradle :user-host-app:assembleDebug -PqaHostVersionCode=2 --no-daemon --max-workers=2
 test -s "$host"
 cp "$host" "$qa_apks/user-host-v2.apk"
@@ -31,8 +34,19 @@ adb install -r "$qa_apks/user-host-v1.apk"
 original=app/build/outputs/apk/debug/app-debug.apk
 test -s "$original"
 adb install -r "$original"
-clean=app/build/outputs/apk/cleanSourceQa/app-cleanSourceQa.apk
+# Build the newer QA from the SAME original clean app and debug signer.
+# This is a disposable Android packageId, never the official 0.5.0 identity.
+PICA_ANDROID_VERSION_CODE=56 gradle :app:assembleCleanSourceQa -PsourceNeutralQa=true --no-daemon --max-workers=2
 test -s "$clean"
-adb install -r "$clean"
+cp "$clean" "$qa_apks/clean-v56.apk"
+aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+"$aapt" dump badging "$qa_apks/clean-v55.apk" | grep -F "package: name='com.picalibrary.android.cleanqa' versionCode='55'"
+"$aapt" dump badging "$qa_apks/clean-v56.apk" | grep -F "package: name='com.picalibrary.android.cleanqa' versionCode='56'"
+cert55=$("$signer" verify --print-certs "$qa_apks/clean-v55.apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
+cert56=$("$signer" verify --print-certs "$qa_apks/clean-v56.apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
+test -n "$cert55" && test "$cert55" = "$cert56"
+echo 'R4 source-neutral old/new QA APK identity and signing cert matched'
+adb install -r "$qa_apks/clean-v55.apk"
 cd ../..
 python3 scripts/s3-android-local-emulator-flow.py

@@ -118,6 +118,12 @@ describe('post-stable RC isolation contract', () => {
         expect(workflow).toContain('if-no-files-found: error')
         expect(workflow).toContain('retention-days: 3')
         expect(workflow).toContain('needs: [contract, windows-rc, android-rc]')
+        // A useful downloadable product requires its source-only companion to
+        // be signed by the same fixed preview identity in the SAME CI job.
+        expect(workflow).toContain(':app:assembleDebug :user-host-app:assembleDebug')
+        expect(workflow).toContain('test "$host_cert" = "$cert"')
+        expect(workflow).toContain('Pica-Library-Post-Stable-RC-User-Host.apk')
+        expect(workflow).toContain('HOST_CERTIFICATE_SHA256.txt')
         expect(workflow).toContain('node scripts/write-rc-artifact-summary.mjs')
         expect(
             workflow.match(/if: github.event_name != 'pull_request'/g)

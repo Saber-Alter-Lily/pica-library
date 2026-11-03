@@ -1,5 +1,13 @@
 plugins { id 'com.android.application' }
 
+// Reuse the SAME optional preview signing identity as :app when the trusted
+// isolated full-product RC builder supplies it. Ordinary emulator/CI builds
+// retain the established Gradle debug signer; no key is tracked in the repo.
+def previewKeystorePath = System.getenv('ANDROID_PREVIEW_KEYSTORE_PATH')
+def previewKeystorePassword = System.getenv('ANDROID_PREVIEW_KEYSTORE_PASSWORD')
+def previewSigning = previewKeystorePath != null && !previewKeystorePath.isBlank() &&
+    previewKeystorePassword != null && !previewKeystorePassword.isBlank()
+
 // Independent optional source component only. Uses the platform Binder ABI;
 // the real Reader, local storage, shelves and history live exclusively in
 // the physically separate no-INTERNET :local-app.
@@ -18,6 +26,23 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+    signingConfigs {
+        if (previewSigning) {
+            preview {
+                storeFile file(previewKeystorePath)
+                storePassword previewKeystorePassword
+                keyAlias 'pica-preview'
+                keyPassword previewKeystorePassword
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            if (previewSigning) signingConfig signingConfigs.preview
+        }
     }
 }
 

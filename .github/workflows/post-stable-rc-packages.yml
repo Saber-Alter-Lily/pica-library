@@ -172,7 +172,10 @@ jobs:
           trap 'rm -rf -- "$signing_dir"' EXIT
           printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
           unset ANDROID_PREVIEW_KEYSTORE_B64
-          gradle :app:assembleDebug --no-daemon
+          # Build both APKs with the SAME temporary reviewed preview signer.
+          # Building a Host in a different workflow would produce a different
+          # debug certificate and be unusable with the complete QA Reader.
+          gradle :app:assembleDebug :user-host-app:assembleDebug --no-daemon
           apk=app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/postrc-cert.txt"
           cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/postrc-cert.txt" | head -1 | tr 'A-F' 'a-f')
@@ -182,14 +185,34 @@ jobs:
           grep -q "versionCode='55'" "$RUNNER_TEMP/postrc-package.txt"
           grep -q "versionName='$rc_version-dev-pr35'" "$RUNNER_TEMP/postrc-package.txt"
           grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/postrc-package.txt"
+          host=user-host-app/build/outputs/apk/debug/user-host-app-debug.apk
+          test -s "$host"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$host" > "$RUNNER_TEMP/postrc-host-cert.txt"
+          host_cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/postrc-host-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$host_cert" = "$EXPECTED_CERT"
+          test "$host_cert" = "$cert"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$host" > "$RUNNER_TEMP/postrc-host-package.txt"
+          grep -q "package: name='com.picalibrary.android.userhost.qa'" "$RUNNER_TEMP/postrc-host-package.txt"
+          grep -q "versionCode='1'" "$RUNNER_TEMP/postrc-host-package.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$host" > "$RUNNER_TEMP/postrc-host-permissions.txt"
+          grep -q 'com.picalibrary.android.remote.BIND_SOURCE' "$RUNNER_TEMP/postrc-host-permissions.txt"
+          grep -q 'android.permission.INTERNET' "$RUNNER_TEMP/postrc-host-permissions.txt"
+          if grep -Eq 'android.permission.(CAMERA|REQUEST_INSTALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE)' "$RUNNER_TEMP/postrc-host-permissions.txt"; then
+            echo 'Source-only Host requested a disallowed device permission' >&2
+            exit 1
+          fi
           mkdir -p candidate-postrc
           cp "$apk" candidate-postrc/Pica-Library-Post-Stable-RC-Android.apk
+          cp "$host" candidate-postrc/Pica-Library-Post-Stable-RC-User-Host.apk
           cp "$RUNNER_TEMP/postrc-package.txt" candidate-postrc/PACKAGE_INFO.txt
+          cp "$RUNNER_TEMP/postrc-host-package.txt" candidate-postrc/HOST_PACKAGE_INFO.txt
+          cp "$RUNNER_TEMP/postrc-host-permissions.txt" candidate-postrc/HOST_PERMISSIONS.txt
           printf '%s\n' "$cert" > candidate-postrc/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$host_cert" > candidate-postrc/HOST_CERTIFICATE_SHA256.txt
           printf '%s\n' "$GITHUB_SHA" > candidate-postrc/SOURCE_SHA.txt
           printf '%s\n' "$rc_version" > candidate-postrc/VERSION.txt
-          printf '%s\n' 'UNPUBLISHED side-by-side Dev RC. Formal OTA unchanged. Do not uninstall the existing Dev app; stop on signature mismatch. Physical-device QA remains pending.' > candidate-postrc/STATUS.txt
-          (cd candidate-postrc && sha256sum Pica-Library-Post-Stable-RC-Android.apk > SHA256SUMS.txt)
+          printf '%s\n' 'UNPUBLISHED same-source AND same-preview-signer QA pair: install Pica-Library-Post-Stable-RC-Android.apk (com.picalibrary.android.dev), then Pica-Library-Post-Stable-RC-User-Host.apk (com.picalibrary.android.userhost.qa) only if no conflicting source package/signature is already present. Open the optional source from the full app Online tab. No automatic source install or connection, no site SDK in Host. Keep stable v0.5.0 installed; never uninstall existing Dev data to bypass a signer/version mismatch. Physical UX and real legacy migration remain pending.' > candidate-postrc/STATUS.txt
+          (cd candidate-postrc && sha256sum Pica-Library-Post-Stable-RC-Android.apk Pica-Library-Post-Stable-RC-User-Host.apk > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
           name: Pica-Library-Post-Stable-RC-Android

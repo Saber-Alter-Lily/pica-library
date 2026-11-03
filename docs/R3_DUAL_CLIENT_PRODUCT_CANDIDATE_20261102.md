@@ -70,3 +70,13 @@
 ### R3 实机自动化新增：原完整产品的真实官方 Host 闭环
 
 在现有 Android 35 模拟器及同一个官方 Suwayomi v2.4.2366 自带 Local Source（两页自建测试 CBZ）上，追加一条**原完整 Android app** 的实际用户流程：四标签 Home 的 Debug 独立来源入口 → 同签名来源 APK → 主动授权 → 上游作品搜索 → 共享原 ReaderScreenActivity 第二页 → 单章确认 → 写入**原完整 app 私有 LocalComicStore**、逐页 PNG 字节校验 → 点击本地副本打开原产品 `ReaderActivity` → 断开并停止 Host → 原 Home 列表重新找到作品 → 原 Reader 离线打开。测试检查的是实际 Android Activity/安装身份和真实上游图片，不是 mock 假象。新增屏幕及 `real-upstream-host-proof.json`；仅在该 exact-SHA 模拟器 PASS 才能把本项标记为工程通过。旧单独无源 Reader 的全部 R2 流程继续保留；原完整 app 的物理无源改造与 v0.5.0 签名迁移仍未完成。
+
+
+### 同签名双 APK 完整产品 QA 交付（2026-11-02）
+
+此前原完整 Android Dev APK 与来源 Host APK 分别从 Post-stable RC 和普通 CI 构建，前者使用固定预览证书、后者使用临时 Debug 证书，**不能把它们作为一对可互通的真实用户安装包**。已将现有 Post-stable RC 打包扩展为**同一次构建签署两 APK**：不新增签名密钥、不改变稳定版来源与证书，仍只在现有受信 CI 密钥环境中启用。
+
+- `user-host-app/build.gradle` 复用完整 `:app` 的 `ANDROID_PREVIEW_KEYSTORE_PATH` / `ANDROID_PREVIEW_KEYSTORE_PASSWORD` 配置、`pica-preview` Alias；未提供 CI 凭据时继续用原默认 Debug signer，S3 模拟器流程不改。
+- 现有 `post-stable-rc-packages.yml` 的 Android job 同一次执行 `:app:assembleDebug :user-host-app:assembleDebug`，核验 **两者均为固定预览证书 SHA256 `64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d`**；来源 APK 独立 package `com.picalibrary.android.userhost.qa` / versionCode 1，必须声明签名级 Binder 绑定权限和 INTERNET，但不能请求摄像头/广域读写/安装其他 APK 权限。
+- 同一 `Pica-Library-Post-Stable-RC-Android` GitHub Actions 工件新增第二文件 `Pica-Library-Post-Stable-RC-User-Host.apk`，带 `HOST_CERTIFICATE_SHA256.txt`、来源包元数据及两 APK 的 `SHA256SUMS.txt`。先安装完整 Dev，再选择安装独立 Host；同一个浏览器来源仍需要显式 Host 地址、授权、选来源。无第三方站点 SDK，也不额外创建用户数据。
+- 该 QA 配对依旧不能原地升级正式 v0.5.0，也不能与历史由不同 Debug signer 签名的 Host/Reader QA 混用。安装遇到签名冲突时**必须报告而不是卸载旧应用以绕过**；真实物理设备和 G2/G3/G4 仍开放。最终结论必须以新精确 SHA 的两 APK 证书/上传工件和原完整用户流程为依据。

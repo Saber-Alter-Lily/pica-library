@@ -167,6 +167,16 @@ dependencies {
     // The clean original app does NOT redistribute the JM source binary.
     // Regular Debug/Release/benchmark builds retain their existing dependency.
     if (sourceNeutralQa) {
+        // A Gradle invocation may assemble BOTH the historical Dev product
+        // and the physically clean full product. Keep JM available only for
+        // legacy build types; the clean variant sees its API as compileOnly
+        // and the R8/DEX audit must still prove zero packaged JM runtime.
+        ['debugImplementation', 'releaseImplementation', 'benchmarkImplementation'].each { bucket ->
+            add(bucket, 'io.github.jukomu:jmcomic-core:v1.1.12') {
+                exclude group: 'io.github.darkxanter', module: 'webp-imageio'
+            }
+            add(bucket, 'io.github.jukomu:jmcomic-android-support:v1.1.12')
+        }
         cleanSourceQaCompileOnly('io.github.jukomu:jmcomic-core:v1.1.12') {
             exclude group: 'io.github.darkxanter', module: 'webp-imageio'
         }

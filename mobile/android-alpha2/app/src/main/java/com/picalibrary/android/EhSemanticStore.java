@@ -33,13 +33,13 @@ final class EhSemanticStore {
         try(InputStream in=new FileInputStream(source);ByteArrayOutputStream out=new ByteArrayOutputStream()){
             byte[] b=new byte[16384];int n;while((n=in.read(b))>0)out.write(b,0,n);
             JSONObject root=new JSONObject(out.toString("UTF-8"));snapshot.updatedAt=root.optString("updatedAt","");JSONArray rows=root.optJSONArray("records");
-            if(rows!=null)for(int i=0;i<rows.length();i++){JSONObject o=rows.optJSONObject(i);if(o==null)continue;String id=o.optString("comicId","");if(!EhClient.isEhId(id))continue;Record r=new Record(id);r.rawCategory=o.optString("rawCategory","");r.updatedAt=o.optString("updatedAt","");JSONArray surfaces=o.optJSONArray("surfaceBindings");if(surfaces!=null)for(int j=0;j<surfaces.length();j++){String value=surfaces.optString(j,"").trim().toLowerCase(Locale.ROOT);if("eh".equals(value)||"exh".equals(value))r.surfaceBindings.add(value);}JSONArray tags=o.optJSONArray("rawTags");if(tags!=null)for(int j=0;j<tags.length();j++){JSONObject t=tags.optJSONObject(j);if(t==null)continue;Tag tag=new Tag(t.optString("namespace",""),t.optString("value",""));if(!tag.value.isEmpty())addUnique(r.rawTags,tag);}snapshot.byComicId.put(id,r);}
+            if(rows!=null)for(int i=0;i<rows.length();i++){JSONObject o=rows.optJSONObject(i);if(o==null)continue;String id=o.optString("comicId","");if(!ComicIdFormat.isEhId(id))continue;Record r=new Record(id);r.rawCategory=o.optString("rawCategory","");r.updatedAt=o.optString("updatedAt","");JSONArray surfaces=o.optJSONArray("surfaceBindings");if(surfaces!=null)for(int j=0;j<surfaces.length();j++){String value=surfaces.optString(j,"").trim().toLowerCase(Locale.ROOT);if("eh".equals(value)||"exh".equals(value))r.surfaceBindings.add(value);}JSONArray tags=o.optJSONArray("rawTags");if(tags!=null)for(int j=0;j<tags.length();j++){JSONObject t=tags.optJSONObject(j);if(t==null)continue;Tag tag=new Tag(t.optString("namespace",""),t.optString("value",""));if(!tag.value.isEmpty())addUnique(r.rawTags,tag);}snapshot.byComicId.put(id,r);}
         }catch(Exception ignored){}
         return snapshot;
     }
 
-    static synchronized void merge(Context context,EhClient.Comic comic){if(comic==null||!EhClient.isEhId(comic.id))return;Snapshot snapshot=load(context);apply(snapshot,comic);save(context,snapshot);}
-    static synchronized void mergeAll(Context context,List<EhClient.Comic> comics){if(comics==null||comics.isEmpty())return;Snapshot snapshot=load(context);for(EhClient.Comic comic:comics)if(comic!=null&&EhClient.isEhId(comic.id))apply(snapshot,comic);save(context,snapshot);}
+    static synchronized void merge(Context context,EhClient.Comic comic){if(comic==null||!ComicIdFormat.isEhId(comic.id))return;Snapshot snapshot=load(context);apply(snapshot,comic);save(context,snapshot);}
+    static synchronized void mergeAll(Context context,List<EhClient.Comic> comics){if(comics==null||comics.isEmpty())return;Snapshot snapshot=load(context);for(EhClient.Comic comic:comics)if(comic!=null&&ComicIdFormat.isEhId(comic.id))apply(snapshot,comic);save(context,snapshot);}
 
     static Record get(Context context,String comicId){return load(context).byComicId.get(comicId);}
 

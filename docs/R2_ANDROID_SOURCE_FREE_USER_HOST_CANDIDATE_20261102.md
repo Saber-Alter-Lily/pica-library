@@ -58,3 +58,10 @@
 Host Binder `ISourceEndpoint` 继续使用同签名权限，并在每次请求时检查来源授权。Host 配置页被外部进程启动时不会自动读取或连接来源。CI 现在把“Host APK 含有本地 Reader、SQLite 或导入器”视为硬失败。Android 35 验收改为从独立 Reader 打开 Host、搜索、跨进程阅读与直接写入独立 Reader 书库、撤销 Host 后离线打开；没有 Host 自己的第二套漫画库。
 
 该结构仍只是 **QA 来源组件**，具体外部站点互操作、应用升级签名连续性与生产用户资料迁移仍 G1–G4 OPEN。
+
+### 来源组件不新增启动图标和权限归属（R2）
+
+- 由于用户只需要一个 Reader，独立来源 APK 不向 Launcher 暴露第二个主界面。来源管理页面 `HostBrowserActivity` 只能由相同签名的原无源 Reader 显式调用。
+- 原 Reader AndroidManifest 自己**定义** `com.picalibrary.android.remote.BIND_SOURCE` 签名权限，Host APK 只请求此权限、不定义它；Reader 入口发现插件及 Binder 客户端调用时重复核对实际 APK 签名，避免仅凭包名信任冒名组件。
+- `ExternalSourceService` 的图像流和章节仍由 AIDL 与签名权限限制，不给阅读器添加 INTERNET；禁用/卸载 Host 不修改原本地书库。
+- CI 拒绝 Host APK 出现另一个 launcher、ReaderScreenActivity、LocalComicStore、具体 Pica/EH/JM 账号 SDK。以上均为 QA 状态，尚不能声称正式签名升级通过。

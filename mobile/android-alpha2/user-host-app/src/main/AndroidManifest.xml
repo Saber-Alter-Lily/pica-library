@@ -12,14 +12,10 @@
             android:permission="com.picalibrary.android.remote.BIND_SOURCE">
             <intent-filter><action android:name="com.picalibrary.android.remote.BIND_SOURCE"/></intent-filter>
         </service>
-        <!-- A user-visible config UI can be opened by the original Reader
-             or Launcher. It grants no authority on launch; its IPC is signed. -->
+        <!-- Expose one Reader launcher only. Its same-signer UI may open
+             this permission-protected source settings Activity explicitly. -->
         <activity android:name="com.picalibrary.android.HostBrowserActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
+            android:exported="true"
+            android:permission="com.picalibrary.android.remote.BIND_SOURCE"/>
     </application>
 </manifest>

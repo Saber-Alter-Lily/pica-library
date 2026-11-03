@@ -91,7 +91,9 @@ jobs:
           test -s "$apk"
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
           "$aapt" dump badging "$apk" | grep -F "package: name='com.picalibrary.android.userhost.qa'"
-          "$aapt" dump badging "$apk" | grep -F "launchable-activity: name='com.picalibrary.android.HostBrowserActivity'"
+          if "$aapt" dump badging "$apk" | grep -F 'launchable-activity:'; then
+            echo 'Optional source component must not add another Reader/launcher icon'; exit 1
+          fi
           "$aapt" dump permissions "$apk" | grep -F 'android.permission.INTERNET'
           "$aapt" dump permissions "$apk" | grep -F 'com.picalibrary.android.remote.BIND_SOURCE'
           if "$aapt" dump permissions "$apk" | grep -E 'android.permission.(CAMERA|REQUEST_INSTALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE)'; then

@@ -680,36 +680,23 @@ def original_app_flow():
 def source_free_user_host_flow():
     """Drive separate real Host-capable APK; no actual source or account installed."""
     global PACKAGE, STEP
-    PACKAGE = USER_HOST_PACKAGE
-    STEP = "user-host-app-initial"
+    # From the offline Reader, open the installed *source-only* component.
+    # There is no second library, reader or local files in that package.
+    PACKAGE = QA_PACKAGE
+    STEP = "source-free-reader-opens-source-companion"
     adb("shell", "am", "start", "-W", "-n",
-        PACKAGE + "/com.picalibrary.android.LocalLibraryActivity", timeout=50)
-    wait(("Import CBZ", "导入 CBZ", "CBZ 取込"), seconds=30)
+        PACKAGE + "/com.picalibrary.android.LocalLibraryActivity",timeout=45)
+    wait(("Import CBZ", "导入 CBZ", "CBZ 取込"),seconds=25)
     tap(("My external Host", "连接我的外部 Host", "外部 Host"),
         seconds=25, only_class="Button")
-    wait(("My external sources", "我的外部来源", "外部ソース"), seconds=25)
-    wait(("No Host connected", "尚未连接 Host", "未接続"), seconds=25)
-    page("22-standalone-source-free-user-host")
-    record("separate source-free user-Host APK exposes manual opt-in, no auto-connect")
-    adb("shell", "input", "keyevent", "KEYCODE_BACK")
-    wait(("Import CBZ", "导入 CBZ", "CBZ 取込"), seconds=25)
-    tap(("Import CBZ", "导入 CBZ", "CBZ 取込"), seconds=20, only_class="Button")
-    locate_document("S3-QA-Comic.cbz")
-    tap(("Save to library", "保存到书库", "書庫に保存"), seconds=40)
-    wait(("4 pages", "4 页", "4 ページ"), seconds=50)
-    tap("S3-QA-Comic")
-    dismiss_immersive_help()
-    wait_page_counter("1 / 3", seconds=40)
-    page("23-standalone-host-app-offline-reader")
-    record("optional Host APK reuses original local CBZ import and Reader without any Host connection")
+    PACKAGE=USER_HOST_PACKAGE
+    wait(("My external sources","我的外部来源","外部ソース"),seconds=30)
+    wait(("No Host connected","尚未连接 Host","未接続"),seconds=25)
+    page("22-only-external-source-companion")
+    record("offline Reader opens independent source-only Host component without auto-connect")
 
-    adb("shell","input","keyevent","KEYCODE_BACK")
-    wait(("Import CBZ","导入 CBZ","CBZ 取込"), seconds=25)
     with synthetic_user_host() as (port, operations, pngs):
         STEP = "user-host-real-http-config"
-        tap(("My external Host","连接我的外部 Host","外部 Host"),
-            only_class="Button")
-        wait(("No Host connected","尚未连接 Host","未接続"),seconds=25)
         type_into_host(("Host name","连接名称","接続名"),"QA_Host")
         type_into_host(("Host URL","Host URL (http:// 或 https://)"),
                        f"http://127.0.0.1:{port}/")
@@ -761,31 +748,12 @@ def source_free_user_host_flow():
             PACKAGE=current_package
         record("external source progress persists in original source-free Reader profile")
 
-        STEP = "user-host-offline-save-and-revoke"
-        adb("shell","input","keyevent","KEYCODE_BACK")
-        tap_scrolling(("Save chapter offline","保存本地副本","章をローカル保存"),
-                      only_class="Button")
-        tap(("Synthetic chapter",),seconds=35)
-        tap(("Save","确认保存","保存"),exact=True,only_class="Button")
-        end=time.monotonic()+65
-        imported=None
-        while time.monotonic()<end:
-            imported=next((row for row in book_rows() if
-                row["title"].startswith("S3-QA-Hosted-Comic") and
-                len(row["pages"])==2),None)
-            if imported:break
-            time.sleep(.75)
-        assert imported, "Host chapter was not committed to the original local inventory"
-        local_page=("files/local-comics-v1/"+imported["id"].removeprefix("local:")+
-                    "/"+imported["generation"]+"/"+imported["pages"][0]["file"])
-        assert adb("exec-out","run-as",PACKAGE,"cat",local_page,
-                   binary=True)==pngs[0], "Host saved local raster differs from source"
-        page("27-host-chapter-explicitly-saved")
-        record("authorized Host chapter copied via original owned LocalComicStore")
-
         STEP = "user-host-binder-import-to-original-library"
-        tap_scrolling(("Save to separate Reader library",
-                       "保存到独立阅读器的书库","別の Reader 書庫に保存"),
+        adb("shell","input","keyevent","KEYCODE_BACK")
+        # No Host-side local inventory: user explicitly saves straight into
+        # the sole original Reader library through the signed Binder bridge.
+        tap_scrolling(("Save to Reader library",
+                       "保存到阅读器书库","Reader 書庫に保存"),
                       direction="down",only_class="Button")
         wait(("Save to original Reader","保存到原阅读器书库","元の Reader に保存"),
              seconds=35)
@@ -826,7 +794,12 @@ def source_free_user_host_flow():
 
         tap_scrolling(("Disconnect","断开会话","セッション終了"),
                       direction="up",only_class="Button")
-        tap_scrolling(("Back to library","返回书库","書庫に戻る"),
+                      direction="up",only_class="Button")
+        tap_scrolling("S3-QA-Hosted-Comic",direction="down")
+        dismiss_immersive_help()
+        wait_page_counter("1 / 2",seconds=40)
+        page("28-host-copy-offline-after-disconnect")
+        record("original Reader opens Host-copied chapter offline after revoking Host session")
                       direction="up",only_class="Button")
         tap_scrolling("S3-QA-Hosted-Comic",direction="down")
         dismiss_immersive_help()
@@ -834,8 +807,7 @@ def source_free_user_host_flow():
         page("28-host-copy-offline-after-disconnect")
         record("original Reader opens Host-copied chapter offline after revoking Host session")
 
-        # The original no-network Reader must ALSO retain the image copied via
-        # the signed Binder service, inside its own independent library.
+        # The original no-INTERNET Reader retains the chapter imported via
         STEP = "source-free-original-library-offline-after-revoke"
         PACKAGE=QA_PACKAGE
         adb("shell","am","start","-W","-n",

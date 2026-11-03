@@ -6,7 +6,7 @@ import { HOST_READER_OPERATIONS, HOST_DISCOVERY_OPERATIONS } from '../../src/sou
 // These are Node source/resource drift gates, NOT Android compilation or runtime tests.
 const base = 'mobile/android-alpha2/app/src/'
 const host = 'mobile/android-alpha2/user-host-core/src/main/'
-const hostNames = new Set(['HostProtocol','HostEndpoint','HostJson','HostConfigStore','HostSavedBooks','HostHttp','HostSourceManager','HostOfflineSaver','SourceHttpConnection','sources/SourceAccessPolicy'])
+const hostNames = new Set(['HostProtocol','HostEndpoint','HostJson','HostConfigStore','HostSavedBooks','HostHttp','HostSourceManager','SourceHttpConnection','sources/SourceAccessPolicy'])
 // Host code was MOVED into its own Gradle library; the original app UI
 // still owns only its reader adapter, not duplicate Host implementation.
 const read = (file: string) => fs.readFileSync(base + file, 'utf8')

@@ -49,3 +49,12 @@
 - `:user-host-app` 仅在独立 Host 进程内运行已有 `HostSourceManager` 及固定 Suwayomi 操作；导出 `ExternalSourceService`，权限 `com.picalibrary.android.remote.BIND_SOURCE` 为 `signature`。Service 每次 Binder 调用核实 caller UID 与签名，仅返回已授权的 opaque chapter/page IDs、会话 scope 和 ParcelFileDescriptor 流。
 - 无 `INTERNET` 权限的 `:local-app` 保持原来 LocalComicStore、ShelfLedger、ReaderScreenActivity 和 ReaderProgressLedger；新增 `BoundSourceClient` 延迟绑定 Host，`ExternalReaderActivity` 在原 Reader 上展示远端图片，`ExternalImportActivity` 在原书库内显式选择并保存单章，服务不写入 Reader 私有目录。
 - 本方案当前只用于同签名第一方 Host companion 与源中立 Reader 的工程候选；它不是任意用户下载的第三方 APK 执行权限，也未验证真实 Source SDK、源站许可证、旧 v0.5.0 签名延续或正式升级。当前 exact-head 实机与 Android 35 端到端验收仍 OPEN。
+## R2 来源 APK 彻底去除第二套书库和 Reader（2026-11-02）
+
+此前的可选 Host APK 仍以测试方便为由打包了 local-app 原书库与 Reader，并且在 Host 内可单独保存章节。这违背只保留一个 Reader 和一本地书库的最终架构。
+
+现已将 `:user-host-app` 收窄为**仅外接来源组件**：只编译 `HostBrowserActivity`、`ExternalSourceService`、`HostCopy`、已有 Suwayomi `:user-host-core` 与 Android AIDL `:source-bridge`，彻底不再依赖 `:local-storage`/`:reader-view`，不包含 `LocalComicStore`、`LocalLibraryActivity`、`LocalReaderActivity`、`HostReaderActivity` 或站点 SDK。原 `HostOfflineSaver` 仅为兼容原 provider-enabled `:app` 保留在原 App，不再污染独立来源库。Host 可以被 Launcher 单独打开，也可从无网络权限的独立 Reader 显式进入，但真正读取/保存都由 Reader 的现有 `ReaderScreenActivity`、`LocalComicStore` 执行。
+
+Host Binder `ISourceEndpoint` 继续使用同签名权限，并在每次请求时检查来源授权。Host 配置页被外部进程启动时不会自动读取或连接来源。CI 现在把“Host APK 含有本地 Reader、SQLite 或导入器”视为硬失败。Android 35 验收改为从独立 Reader 打开 Host、搜索、跨进程阅读与直接写入独立 Reader 书库、撤销 Host 后离线打开；没有 Host 自己的第二套漫画库。
+
+该结构仍只是 **QA 来源组件**，具体外部站点互操作、应用升级签名连续性与生产用户资料迁移仍 G1–G4 OPEN。

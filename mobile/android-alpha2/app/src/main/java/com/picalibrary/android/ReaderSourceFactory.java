@@ -18,12 +18,18 @@ final class ReaderSourceFactory {
             return new LocalComicReaderSource(context);
         }
         if(BuildConfig.SOURCE_NEUTRAL_QA){
-            String source=kind(value);
-            // Existing Desktop/phone/WebDAV/local readers are user-owned media.
-            // Legacy provider and in-process Host routes are NOT allowed.
-            if("pica".equals(source)||"eh".equals(source)||
-                    "jm".equals(source)||"host".equals(source))
-                throw new IllegalArgumentException("Use the optional signed external Host");
+            // This exhaustive source-neutral path is important: no path in a
+            // clean build can ever instantiate the legacy source adapters.
+            // Simply rejecting legacy names before falling into the old switch
+            // kept Pica/E-H/JM reader classes reachable in the *actual APK*.
+            switch(kind(value)){
+                case "local": return new LocalComicReaderSource(context);
+                case "phone": return new PhoneDownloadReaderSource(context);
+                case "remote": return new RemoteReaderSource(context);
+                case "desktop": return new DesktopReaderSource(context);
+                default: throw new IllegalArgumentException(
+                    "Use the optional signed external Host for online sources");
+            }
         }
         switch (kind(value)) {
             case "host": return new HostReaderSource(context);

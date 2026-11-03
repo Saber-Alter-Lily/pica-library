@@ -30,3 +30,11 @@ For the exact product-signed Host and original Android full-app source/Reader/by
 At `1ec32503` the actual `-whyareyoukeeping` log identified the precise retained chains. `PicaClient` and `JmClientManager` were still instantiated by `ReaderSourceFactory.create` via the manifest-rooted original `ReaderActivity`; `EhClient` was retained through `AuthorWorksActivity.renderShell` → `EhCapabilityStore.load`. Merely guarding providers in an earlier if-branch did not make the later legacy switch unreachable.
 
 The original Reader factory now has a **complete early-return/throw switch** for source-neutral builds, preserving only owned local/phone/Desktop/WebDAV readers; no in-process provider instantiation remains on that path. The original author works screen keeps cached metadata and its filter UI, but refresh is **local only** and the ExH availability probe is removed for clean QA. Old Debug/Release paths are unchanged. The existing real R8 DEX/mapping audit is still authoritative and no forbidden-name/permission checks are softened. If any unwanted classes remain, inspect the updated reachability graph instead of marking G2 passed.
+
+## Source worker & historical library closure (2026-11-03)
+
+At exact `e88b15da`, R8 still showed `PicaClient` from `PicaDownloadWorker.doWork`, `JmClientManager`/JmSource from `JmDownloadWorker.doWork`, and `EhClient` from `HistoryActivity.importLegacySources`. Android WorkManager's `Worker.doWork` dispatch keeps these worker entrypoints conservatively reachable even after automatic source work is disabled.
+
+The original Pica/E-H/JM Download Workers and Pica Bootstrap Worker now **fail closed immediately** in the source-neutral QA variant, including tasks persisted before a future upgrade. User-owned local/Reader/import/transfer tasks are unchanged. All THREE history ID format uses were switched from `EhClient.isEhId` to the identical pure `ComicIdFormat.isEhId`, so the original Home history keeps importing Desktop and WebDAV session metadata without depending on an E-H network client.
+
+This is a targeted dependency cut, not a new Reader/DB/scheduler; ordinary stable/Dev variants remain unchanged. The existing R8 real-APK source-exclusion gate remains strict and must return PASS before distributing a clean QA artifact.

@@ -16,6 +16,7 @@ public final class JmDownloadWorker extends Worker {
     public JmDownloadWorker(@NonNull Context context, @NonNull WorkerParameters parameters) { super(context, parameters); }
 
     @NonNull @Override public Result doWork() {
+        if(BuildConfig.SOURCE_NEUTRAL_QA)return Result.failure();
         Context context = getApplicationContext();
         String comic = getInputData().getString(KEY_COMIC), episode = getInputData().getString(KEY_EPISODE);
         String binding = getInputData().getString(KEY_SESSION);

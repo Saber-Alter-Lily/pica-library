@@ -100,7 +100,7 @@ public final class HistoryActivity extends LocaleAwareActivity {
     private void openHost(ReadingHistoryStore.Session row){Toast.makeText(this,R.string.host_resume_grant,Toast.LENGTH_LONG).show();startActivity(new Intent(this,HostSourceActivity.class).putExtra("hostQuery",row.title));}
     private void openDetail(ReadingHistoryStore.Session row){if("host".equals(row.sourceKind)){openHost(row);return;}Intent i=new Intent(this,UnifiedComicDetailActivity.class);i.putExtra("comicId",row.comicId);i.putExtra("title",row.title);i.putExtra("author",row.author);startActivity(i);}
     private void continueReading(ReadingHistoryStore.Session row){if(!resumeSupported(row)){openDetail(row);return;}if(!"local".equals(row.sourceKind))ReaderProgress.seedOneShotPosition(this,row.comicId,row.chapterId,row.lastPage);Intent i=new Intent(this,ReaderActivity.class);i.putExtra("comicId",row.comicId);i.putExtra("title",row.title);i.putExtra("author",row.author);i.putExtra("episodeId",row.chapterId);i.putExtra("source",row.sourceKind);startActivity(i);}
-    private boolean resumeSupported(ReadingHistoryStore.Session row){if(row.chapterId.isEmpty())return false;if("host".equals(row.sourceKind))return HostSourceManager.get(this).canResume(row.comicId);if("local".equals(row.sourceKind))return LocalComicStore.has(this,row.comicId);if("phone".equals(row.sourceKind))return PhoneDownloadStore.has(this,row.comicId);if("remote".equals(row.sourceKind))return RemoteConfigStore.load(this).configured();if("desktop".equals(row.sourceKind))return BridgeStore.paired(this);if("pica".equals(row.sourceKind))return PicaClient.available(this);if("eh".equals(row.sourceKind))return EhClient.isEhId(row.comicId);return false;}
+    private boolean resumeSupported(ReadingHistoryStore.Session row){if(row.chapterId.isEmpty())return false;if("host".equals(row.sourceKind))return HostSourceManager.get(this).canResume(row.comicId);if("local".equals(row.sourceKind))return LocalComicStore.has(this,row.comicId);if("phone".equals(row.sourceKind))return PhoneDownloadStore.has(this,row.comicId);if("remote".equals(row.sourceKind))return RemoteConfigStore.load(this).configured();if("desktop".equals(row.sourceKind))return BridgeStore.paired(this);if("pica".equals(row.sourceKind))return PicaClient.available(this);if("eh".equals(row.sourceKind))return ComicIdFormat.isEhId(row.comicId);return false;}
     private void importLegacySources(){
         if(importing)return;
         importing=true;
@@ -113,14 +113,14 @@ public final class HistoryActivity extends LocaleAwareActivity {
                     UnifiedCatalogStore.Entry c=catalog.byId.get(e.comicId);
                     String title=!e.comicTitle.isEmpty()?e.comicTitle:c==null?"漫画":c.title;
                     String author=!e.author.isEmpty()?e.author:c==null?"未知作者":c.displayAuthor();
-                    String provider=c==null?(EhClient.isEhId(e.comicId)?"eh":""):c.providerId;
+                    String provider=c==null?(ComicIdFormat.isEhId(e.comicId)?"eh":""):c.providerId;
                     rows.add(new ReadingHistoryStore.Legacy("webdav",e.comicId,e.episodeId,title,author,e.episodeTitle,e.episodeOrder,provider,"remote",e.pageIndex,e.updatedAt,e.deviceId));
                 }
             }catch(Exception ignored){}
             if(BridgeStore.paired(this))try{
                 for(BridgeClient.RecentItem r:BridgeClient.recent(this,200)){
                     UnifiedCatalogStore.Entry c=catalog.byId.get(r.comic.id);
-                    String provider=c==null?(EhClient.isEhId(r.comic.id)?"eh":"pica"):c.providerId;
+                    String provider=c==null?(ComicIdFormat.isEhId(r.comic.id)?"eh":"pica"):c.providerId;
                     rows.add(new ReadingHistoryStore.Legacy("desktop",r.comic.id,r.episodeId,r.comic.title,r.comic.author,r.episodeTitle,r.episodeOrder,provider,"desktop",r.pageIndex,r.updatedAt,"desktop"));
                     CoverRepository.prefetchDesktop(this,r.comic.id,r.comic.coverPath);
                 }

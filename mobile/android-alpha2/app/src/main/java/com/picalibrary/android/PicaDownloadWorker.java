@@ -23,6 +23,8 @@ public final class PicaDownloadWorker extends Worker {
     public PicaDownloadWorker(@NonNull Context context,@NonNull WorkerParameters params){super(context,params);}
 
     @NonNull @Override public Result doWork(){
+        // Never resume inherited legacy source network jobs after clean install.
+        if(BuildConfig.SOURCE_NEUTRAL_QA)return Result.failure();
         String comicId=getInputData().getString(KEY_COMIC),selected=getInputData().getString(KEY_EPISODE);if(comicId==null||comicId.isEmpty())return Result.failure();
         try{
             PicaClient client=new PicaClient(getApplicationContext());PicaClient.Comic online=client.comic(comicId);setForegroundAsync(foreground(comicId,online.title,"正在准备下载",0,0));List<PicaClient.Episode> episodes=client.episodes(comicId);if(selected!=null&&!selected.isEmpty())episodes.removeIf(e->!e.id.equals(selected));if(episodes.isEmpty())return failure("没有可下载章节");

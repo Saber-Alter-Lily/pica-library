@@ -22,6 +22,7 @@ public final class PicaBootstrapWorker extends Worker {
     public PicaBootstrapWorker(@NonNull Context context,@NonNull WorkerParameters params){super(context,params);}
 
     @NonNull @Override public Result doWork(){
+        if(BuildConfig.SOURCE_NEUTRAL_QA)return Result.failure();
         try{
             Context app=getApplicationContext();SourceAccess.require(app,"pica");if(isStopped()||!PicaAccountStore.load(app).configured())return Result.failure();
             setForegroundAsync(foreground("正在导入 Pica 收藏元数据",0,0));

@@ -37,7 +37,8 @@ public final class HostBrowserActivity extends Activity {
     private String readerPackage="com.picalibrary.android.localcore.qa";
     private boolean trustedReader(){
         if(!"com.picalibrary.android.localcore.qa".equals(readerPackage)&&
-                !"com.picalibrary.android.dev".equals(readerPackage))return false;
+                !"com.picalibrary.android.dev".equals(readerPackage)&&
+                !"com.picalibrary.android.cleanqa".equals(readerPackage))return false;
         android.content.pm.PackageManager pm=getPackageManager();
         if(pm.checkSignatures(getPackageName(),readerPackage)!=
                 android.content.pm.PackageManager.SIGNATURE_MATCH)return false;

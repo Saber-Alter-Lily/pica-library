@@ -35,8 +35,18 @@ final class SourceAccess {
     }
     static synchronized SourceAccess get(Context context){Context app=context.getApplicationContext();String key=app.getFilesDir().getAbsolutePath();SourceAccess value=INSTANCES.get(key);if(value==null){value=new SourceAccess(app);INSTANCES.put(key,value);}return value;}
     static synchronized void resetForTests(){INSTANCES.clear();}
-    static boolean enabled(Context context,String id){return get(context).loadError.isEmpty()&&get(context).policy.enabled(id);}
-    static SourceAccessPolicy.Permit bind(Context context,String id){return get(context).policy.bind(id);}
+    static boolean enabled(Context context,String id){
+        // Source-neutral full product never enables a bundled content provider.
+        // Do not inspect or rewrite any inherited account/approval preferences.
+        if(BuildConfig.SOURCE_NEUTRAL_QA)return false;
+        return get(context).loadError.isEmpty()&&get(context).policy.enabled(id);
+    }
+    static SourceAccessPolicy.Permit bind(Context context,String id){
+        if(BuildConfig.SOURCE_NEUTRAL_QA)
+            return new SourceAccessPolicy(
+                new SourceAccessPolicy.Snapshot(0,Collections.emptySet())).bind(id);
+        return get(context).policy.bind(id);
+    }
     static void require(Context context,String id){if(!enabled(context,id))throw new SourceAccessPolicy.Disabled(id);}
     static <T>T commit(SourceAccessPolicy.Access permit,SourceAccessPolicy.Commit<T> action){
         try{return permit==null?action.run():permit.commit(action);}
@@ -50,6 +60,8 @@ final class SourceAccess {
     SourceAccessPolicy.Snapshot snapshot(){return policy.snapshot();}
     String loadError(){return loadError;}
     synchronized SourceAccessPolicy.Snapshot save(long revision,Collection<String> choices) throws IOException {
+        if(BuildConfig.SOURCE_NEUTRAL_QA)
+            throw new IOException("Legacy provider opt-in is unavailable in clean-source QA");
         if(!loadError.isEmpty())throw new IOException(loadError); // retain damaged file; no silent repair/default opt-in
         SourceAccessPolicy.Snapshot before=policy.snapshot(),next=policy.save(revision,choices,this::write);
         for(String id:before.enabled)if(!next.enabled.contains(id))SourceTasks.pause(context,id);

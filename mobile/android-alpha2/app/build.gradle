@@ -17,6 +17,9 @@ if (isolatedQaSuffix && !(isolatedQaSuffix ==~ /^\.s1qa[1-9][0-9]{0,2}$/)) {
 // Optional, separately installed LOCAL workflow. The existing Gradle tasks and
 // default Android app remain unchanged when this flag is absent.
 def localOnlyDraft = System.getenv('PICA_ANDROID_LOCAL_ONLY_DRAFT') == '1'
+// Explicit unshipped QA variant of the ORIGINAL four-tab product, not a
+// replacement app or a way to override its production signing identity.
+def sourceNeutralQa = project.findProperty('sourceNeutralQa') == 'true'
 if (localOnlyDraft && isolatedQaSuffix)
     throw new GradleException('Local-only draft and S1 snapshot identity cannot be combined')
 def debugAppSuffix = isolatedQaSuffix ? isolatedQaSuffix : '.dev'
@@ -45,6 +48,11 @@ android {
         // Overlay disables internet/pairing and launches only the local shell.
         sourceSets.debug.manifest.srcFile 'src/localOnly/AndroidManifest.xml'
     }
+    if (sourceNeutralQa) {
+        // Same original app sources, one isolated source-neutral build type.
+        // Manifest removes historic provider Activity entrypoints.
+        sourceSets.cleanSourceQa.manifest.srcFile 'src/cleanSourceQa/AndroidManifest.xml'
+    }
     buildFeatures { buildConfig true }
 
     defaultConfig {
@@ -54,6 +62,7 @@ android {
         versionCode buildVersionCode
         versionName buildVersionName
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        buildConfigField 'boolean', 'SOURCE_NEUTRAL_QA', 'false'
         manifestPlaceholders = [
                 appLabel  : 'Pica Library',
                 pairScheme: 'picalibrary'
@@ -93,6 +102,24 @@ android {
             // can upgrade the previous Dev installation without shipping a private key.
             if (previewSigningConfigured) {
                 signingConfig signingConfigs.preview
+            }
+        }
+        if (sourceNeutralQa) {
+            cleanSourceQa {
+                initWith debug
+                applicationIdSuffix '.cleanqa'
+                versionNameSuffix '-clean-source-qa'
+                buildConfigField 'boolean', 'SOURCE_NEUTRAL_QA', 'true'
+                buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', 'false'
+                debuggable true
+                minifyEnabled true
+                shrinkResources true
+                proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                matchingFallbacks = ['debug']
+                manifestPlaceholders = [
+                    appLabel : 'Pica Library Clean Source QA',
+                    pairScheme: 'picalibrary-cleanqa'
+                ]
             }
         }
         release {

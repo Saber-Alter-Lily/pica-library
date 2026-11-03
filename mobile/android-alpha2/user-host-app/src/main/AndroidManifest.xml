@@ -6,6 +6,7 @@
     <queries>
         <package android:name="com.picalibrary.android.localcore.qa"/>
         <package android:name="com.picalibrary.android.dev"/>
+        <package android:name="com.picalibrary.android.cleanqa"/>
     </queries>
     <application android:allowBackup="false" android:usesCleartextTraffic="true"
         android:label="Pica Library Sources QA"

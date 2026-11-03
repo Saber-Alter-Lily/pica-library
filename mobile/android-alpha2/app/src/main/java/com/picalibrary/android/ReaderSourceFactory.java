@@ -17,6 +17,14 @@ final class ReaderSourceFactory {
                 throw new IllegalArgumentException("This local-only build opens imported comics only");
             return new LocalComicReaderSource(context);
         }
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            String source=kind(value);
+            // Existing Desktop/phone/WebDAV/local readers are user-owned media.
+            // Legacy provider and in-process Host routes are NOT allowed.
+            if("pica".equals(source)||"eh".equals(source)||
+                    "jm".equals(source)||"host".equals(source))
+                throw new IllegalArgumentException("Use the optional signed external Host");
+        }
         switch (kind(value)) {
             case "host": return new HostReaderSource(context);
             case "local": return new LocalComicReaderSource(context);

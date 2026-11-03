@@ -1323,6 +1323,13 @@ def clean_original_in_place_upgrade():
     adb("shell", "am", "force-stop", CLEAN_PACKAGE)
     adb("shell", "am", "start", "-W", "-n",
         CLEAN_PACKAGE + "/com.picalibrary.android.DisclaimerActivity", timeout=55)
+    # A versioned onboarding may legitimately appear after a clean APK update.
+    # Reuse the existing visible "Later" action; never disable the guide or
+    # mutate user preferences to make an upgrade check pass.
+    later = wait(("稍后再看", "Later", "後で"), seconds=12,
+                 required=False, only_class="Button")
+    if later:
+        adb("shell", "input", "tap", str(later[0]), str(later[1]))
     wait(("我的书库", "My library", "マイライブラリ"), seconds=40)
     wait("Interop Fixture CBZ", seconds=40)
     page("43-clean-android-inplace-upgrade-home")

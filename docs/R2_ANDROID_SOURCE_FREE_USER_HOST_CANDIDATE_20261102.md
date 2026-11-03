@@ -79,3 +79,12 @@ Host Binder `ISourceEndpoint` 继续使用同签名权限，并在每次请求�
 - 在模拟器先安装 v1，由用户明确连接 Host、阅读、按章导入且断开；其后独立安装 v2，校验 Android 包管理器真实版本号从 1 升为 2、原 Host 授权配置仍由来源组件拥有、升级时不隐式发出任何 Host 请求，且无网络权限的 Reader 已导入 PNG 字节不变。
 - 卸载来源 APK 后，模拟 **Reader 进程全停并重新打开**：必须显示“未安装”、私有本地书库仍可浏览且仍能读导入章节；重新安装来源 v2 后，来源配置按照 Android 正常卸载语义重置，只有用户再次明确进入来源设置才能重新连网。
 - 这验证的是 **同签名 QA v1→v2 APK 替换、卸载与新进程离线阅读**，不能替代 Android 正式签名连续性、不同 AIDL 版本兼容、真实 Suwayomi 源或 v0.5.0 用户数据迁移。对应 G1–G4、R1/R2 发布门槛仍 OPEN。
+
+
+## R2 安卓真实上游 Suwayomi Local Source（2026-11-02，工程候选；精确 CI 结果待确认）
+
+- 沿用已经验证过的 Suwayomi Server **v2.4.2366 官方 JAR**（182952426 字节；SHA256 `af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd`），不编译、打包或安装第三方漫画源。CI 在隔离的临时目录运行官方自带 Local Source（source ID `0`），以两张测试自行生成的 PNG 组成 CBZ，默认无扩展仓库及自动下载。
+- JVM 配置由原 `scripts/lib/source-host-interop-fixture.mjs` 的 `realHostJavaArguments` **直接复用**，Android UI 继续使用既有 `HostBrowserActivity` / `:user-host-core` / AIDL `ISourceEndpoint` / 原 `ReaderScreenActivity` 和原 `LocalComicStore`，不新增 JS/HTTP 执行器、Reader 或数据库。
+- 在同一个 Android 35 模拟器内先走已验收的独立 Host v1→v2/卸载流程，再用**真实上游 HTTP/GraphQL 与实际 PNG URL**完成：显式配置 → 允许 Host → 选择真实内置来源 → 搜索用户自建 CBZ → Binder 翻页 → 手工确认单章导入 → 两页字节相等 → 断开 Host、停进程、关闭 Reader 再启动离线打开。新证据 `real-upstream-host-proof.json` 只记录程序和计数，不上传 JAR、测试图、账号或宿主配置。
+- CI Java 21 仅供官方上游进程，Java 17 仍默认用于原 Android Gradle；宿主仅监听 Runner 的 `127.0.0.1:4567`，Android 通过系统 `adb reverse` 连接，使用完受控停止。此场景尚未采用前一独立 Node 测试的 Linux 网络 namespace，**不能将 loopback 监听说成内核级出站沙箱**。
+- 此新增场景是 **真实官方 Host + 其内置无站点来源**，不是哔咔/JM 或别的真实第三方站点扩展；不能代替未来发布签名、OEM 物理手机、第三方许可审核、正式 v0.5.0 数据迁移、G1–G4 最终验收。构建或 CI 未返回最终 PASS 前严禁标记本项通过。

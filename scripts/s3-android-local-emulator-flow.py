@@ -5,13 +5,18 @@ Uses Python's standard library, Android's own UI hierarchy and the original
 application files. No extra test framework, simulated Reader or source login.
 """
 import json
-import re
+import hashlib
+import os
+import tempfile
+import urllib.request
 import threading
+import re
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import struct
 import subprocess
 import sys
+import shlex
 import time
 import xml.etree.ElementTree as ET
 import zipfile
@@ -893,6 +898,217 @@ def source_free_user_host_flow():
             {"operations":operations,"syntheticOnly":True},indent=2),
             encoding="utf-8")
 
+@contextmanager
+def pinned_official_suwayomi_local_source():
+    """The ACTUAL pinned upstream JAR, with only its built-in local fixture.
+
+    Reuse source-host-interop-fixture.mjs for official supported JVM options;
+    no bundled Host, plugin SDK, account, private data or second Reader.
+    """
+    global STEP
+    if (os.environ.get("GITHUB_ACTIONS") != "true" or
+            os.environ.get("GITHUB_REPOSITORY") != "Saber-Alter-Lily/pica-library" or
+            os.environ.get("GITHUB_REF") !=
+            "refs/heads/codex/product-integration-r1-20261102"):
+        raise AssertionError("Official Host Android runtime is CI integration branch only")
+    jar = Path(os.environ["PICA_R2_REAL_HOST_JAR"]).resolve(strict=True)
+    if jar.stat().st_size != 182952426:
+        raise AssertionError("Unpinned Suwayomi binary size")
+    digest = hashlib.sha256()
+    with jar.open("rb") as image:
+        for piece in iter(lambda: image.read(1024 * 1024), b""):
+            digest.update(piece)
+    if digest.hexdigest() != "af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd":
+        raise AssertionError("Unpinned Suwayomi binary digest")
+    java_home = Path(os.environ["JAVA_HOME_21_X64"]).resolve(strict=True)
+    java = java_home / "bin" / "java"
+    if not java.is_file():
+        raise AssertionError("Pinned upstream runtime requires JDK 21")
+    with tempfile.TemporaryDirectory(
+            prefix="pica-r2-official-host-",
+            dir=os.environ["RUNNER_TEMP"]) as temp_root:
+        root = Path(temp_root)
+        for directory in ("home", "java-tmp", "host/local/Interop Fixture CBZ"):
+            (root / directory).mkdir(parents=True)
+        images = (original_png(60, 80, 175), original_png(160, 130, 45))
+        with zipfile.ZipFile(root / "host/local/Interop Fixture CBZ/Chapter 1.cbz",
+                             "w", zipfile.ZIP_DEFLATED) as archive:
+            for index, contents in enumerate(images, 1):
+                archive.writestr(f"{index}.png", contents)
+        # This is the EXACT pre-existing official-host JVM-options helper.
+        command = ("import {realHostJavaArguments} "
+                   "from './scripts/lib/source-host-interop-fixture.mjs'; "
+                   "console.log(JSON.stringify(realHostJavaArguments("
+                   "process.argv[1],process.argv[2])))")
+        args = json.loads(run("node", "--input-type=module", "-e", command,
+                              str(root), str(jar)))
+        host_log = root / "host-startup.log"
+        java_env = {"PATH": str(java_home / "bin") + ":/usr/bin:/bin",
+                    "HOME": str(root / "home"),
+                    "TMPDIR": str(root / "java-tmp"),
+                    "LANG": "C.UTF-8", "JAVA_HOME": str(java_home)}
+        with host_log.open("wb") as output:
+            process = subprocess.Popen([str(java)] + args, cwd=str(root),
+                                       stdin=subprocess.DEVNULL,
+                                       stdout=output, stderr=subprocess.STDOUT,
+                                       env=java_env)
+            try:
+                info = {"operationName": "PicaSourceHostInfo",
+                        "query": "query PicaSourceHostInfo { aboutServer { name version } }",
+                        "variables": {}}
+                sources = {"operationName": "PicaSourceHostSources",
+                           "query": ("query PicaSourceHostSources($first: Int!, $offset: Int!) "
+                                     "{ sources(first: $first, offset: $offset) { "
+                                     "nodes { id name lang supportsLatest } "
+                                     "pageInfo { hasNextPage hasPreviousPage } totalCount } }"),
+                           "variables": {"first": 25, "offset": 0}}
+                def graphql(query):
+                    data = json.dumps(query).encode("utf-8")
+                    request = urllib.request.Request(
+                        "http://127.0.0.1:4567/api/graphql", data=data,
+                        headers={"content-type": "application/json"})
+                    with urllib.request.urlopen(request, timeout=2) as reply:
+                        return json.loads(reply.read(20000).decode("utf-8"))["data"]
+                ready = False
+                for _ in range(180):
+                    if process.poll() is not None:
+                        break
+                    try:
+                        about = graphql(info)["aboutServer"]
+                        if about["version"].lstrip("v") == "2.4.2366":
+                            records = graphql(sources)["sources"]["nodes"]
+                            if len(records) == 1 and records[0]["id"] == "0":
+                                ready = True
+                                break
+                    except (OSError, ValueError, KeyError, TimeoutError):
+                        pass
+                    time.sleep(.5)
+                if not ready:
+                    print("Pinned Host startup last lines: " +
+                          host_log.read_text(errors="replace")[-3500:],
+                          file=sys.stderr, flush=True)
+                    raise AssertionError("OFFICIAL_SUWAYOMI_LOCAL_SOURCE_NOT_READY")
+                adb("reverse", "tcp:4567", "tcp:4567")
+                yield images
+            finally:
+                adb("reverse", "--remove", "tcp:4567", check=False)
+                if process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=8)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=8)
+
+
+def official_upstream_android_reader_flow():
+    """Official runtime -> owned Host APK -> existing Reader -> local offline PNG."""
+    global PACKAGE, STEP
+    STEP = "r2-official-upstream-local-source"
+    with pinned_official_suwayomi_local_source() as original_pages:
+        PACKAGE = USER_HOST_PACKAGE
+        wait(("No Host connected", "尚未连接 Host", "未接続"), seconds=25)
+        # Previous scenario has uninstalled and reinstalled the Host-only APK.
+        # Its Android data were reset: no prior connection or implicit log-in.
+        type_into_host(("Host name", "连接名称", "接続名"), "Upstream_Local")
+        type_into_host(("Host URL", "Host URL (http:// 或 https://)"),
+                       "http://127.0.0.1:4567/")
+        tap_scrolling(("Save configuration", "保存配置", "設定を保存"),
+                      only_class="Button")
+        until_data("user-host-config-v1.json", lambda data:
+            data.get("endpoint") == "http://127.0.0.1:4567/" and
+            data.get("enabled") is False)
+        tap_scrolling(("Authorize this Host session",
+                       "我授权本次连接自己的 Host", "この接続を許可します"),
+                      only_class="CheckBox")
+        tap_scrolling(("Enable / disable Host", "启用 / 停用 Host",
+                       "Host 有効／無効"), only_class="Button")
+        until_data("user-host-config-v1.json",
+                   lambda data: data.get("enabled") is True)
+        STEP = "r2-official-upstream-source-discovery"
+        tap_scrolling(("Connect and list sources", "连接并读取来源",
+                       "接続してソースを表示"), only_class="Button")
+        tap_scrolling(("Use selected source", "选择此来源",
+                       "ソースを選択"), only_class="Button")
+        type_into_host(("Search works", "搜索作品", "作品を検索"), "CBZ")
+        tap_scrolling(("Search selected source", "搜索选中来源",
+                       "選択ソースで検索"), only_class="Button")
+        tap_scrolling("Read · Interop Fixture CBZ",
+                      direction="down", only_class="Button")
+        wait_page_counter("1 / 2", seconds=50)
+        active = adb("shell", "dumpsys", "activity", "activities", timeout=35)
+        assert ("com.picalibrary.android.ExternalReaderActivity" in active and
+                QA_PACKAGE in active), "Official Host bypassed the original Reader"
+        page("33-official-upstream-real-host-reader")
+        advance_reader_next()
+        wait_page_counter("2 / 2", seconds=40)
+        page("34-official-upstream-real-host-next-page")
+        record("official Suwayomi v2.4.2366 built-in local source -> Android signed Binder -> original Reader page 2")
+
+        STEP = "r2-official-upstream-optional-chapter-import"
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        tap_scrolling(("Save to Reader library",
+                       "保存到阅读器书库", "Reader 書庫に保存"),
+                      direction="down", only_class="Button")
+        wait(("Save to original Reader", "保存到原阅读器书库",
+              "元の Reader に保存"), seconds=35)
+        tap(("Choose chapter to save", "选择要保存的章节",
+             "保存する章を選択"), seconds=25, only_class="Button")
+        tap(("Chapter 1",), seconds=35)
+        tap(("Save this chapter", "保存这一章", "この章を保存"),
+            exact=True, only_class="Button", seconds=20)
+        PACKAGE = QA_PACKAGE
+        local = None
+        deadline = time.monotonic() + 80
+        while time.monotonic() < deadline:
+            local = next((entry for entry in book_rows() if
+                          entry["title"].startswith("Interop Fixture CBZ") and
+                          len(entry["pages"]) == 2), None)
+            if local:
+                break
+            time.sleep(.7)
+        assert local, "Official upstream chapter did not enter original local library"
+        file_root = ("files/local-comics-v1/" + local["id"].removeprefix("local:") +
+                     "/" + local["generation"] + "/")
+        for i, page_record in enumerate(local["pages"]):
+            actual = adb("exec-out", "run-as", QA_PACKAGE, "cat",
+                         file_root + page_record["file"], binary=True)
+            assert actual == original_pages[i], "Official upstream PNG bytes mismatch"
+        PACKAGE = USER_HOST_PACKAGE
+        record("official upstream Suwayomi CBZ chapter copied with exact two-page bytes to original Reader-owned inventory")
+        page("35-official-upstream-imported-original-reader")
+
+        STEP = "r2-official-upstream-revoke-offline"
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        tap_scrolling(("Disconnect", "断开会话",
+                       "セッション終了"), direction="up", only_class="Button")
+        adb("shell", "am", "force-stop", USER_HOST_PACKAGE)
+        adb("shell", "am", "force-stop", QA_PACKAGE)
+        PACKAGE = QA_PACKAGE
+        adb("shell", "am", "start", "-W", "-n",
+            QA_PACKAGE + "/com.picalibrary.android.LocalLibraryActivity",
+            timeout=45)
+        wait(("Import CBZ", "导入 CBZ", "CBZ 取込"), seconds=30)
+        tap_scrolling("Interop Fixture CBZ", direction="down")
+        dismiss_immersive_help()
+        wait_page_counter("1 / 2", seconds=40)
+        page("36-official-host-stopped-offline-original-reader")
+        record("official Host disabled and stopped: separate offline Reader still opens stored real-upstream chapter")
+        (ROOT / "real-upstream-host-proof.json").write_text(json.dumps({
+            "upstreamTag": "v2.4.2366",
+            "sourceId": "0",
+            "actualJarSha256": "af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd",
+            "officialUpstreamRuntime": True,
+            "thirdPartyExtensionInstalled": False,
+            "testComic": "Interop Fixture CBZ",
+            "realProviderOrCredentialsUsed": False,
+            "readerPackage": QA_PACKAGE,
+            "hostPackage": USER_HOST_PACKAGE,
+            "sourceFreeReaderHasNetworkPermission": False,
+            "byteIdenticalPages": 2,
+            "offlineAfterHostStop": True
+        }, indent=2), encoding="utf-8")
+
 def main():
     global STEP
     try:
@@ -914,12 +1130,13 @@ def main():
         export_cbz()
         original_app_flow()
         source_free_user_host_flow()
+        official_upstream_android_reader_flow()
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",
             "package": QA_PACKAGE,
             "also_tested": [ORIGINAL_PACKAGE, USER_HOST_PACKAGE],
-            "network_source": "synthetic loopback Suwayomi only"},
+            "network_source": "synthetic loopback and pinned official Suwayomi built-in local source only"},
             ensure_ascii=False, indent=2), encoding="utf-8")
         print("S3 LOCAL END-TO-END PASS", flush=True)
     except Exception as error:

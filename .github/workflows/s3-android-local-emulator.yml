@@ -41,13 +41,32 @@ jobs:
   local-ui-flow:
     if: github.repository == 'Saber-Alter-Lily/pica-library' && (github.event_name != 'pull_request' || github.head_ref != 'codex/product-integration-r1-20261102')
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+      # Real Suwayomi needs Java 21. Keep Java 17 as the default for
+      # the existing Android Gradle build; never ship Java or the Host in APKs.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fetch pinned official Suwayomi for user-Host integration
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --retry-delay 3 --max-time 180 \
+            'https://github.com/Suwayomi/Suwayomi-Server/releases/download/v2.4.2366/Suwayomi-Server-v2.4.2366.jar' \
+            --output "$RUNNER_TEMP/pica-r2-official-host.jar"
+          printf '%s  %s\n' \
+            'af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd' \
+            "$RUNNER_TEMP/pica-r2-official-host.jar" | sha256sum --check -
+          test "$(stat --format=%s "$RUNNER_TEMP/pica-r2-official-host.jar")" = '182952426'
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
@@ -60,8 +79,10 @@ jobs:
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
-      - name: Use Android 35 system picker and original app on emulator
+      - name: Use Android 35 system picker, source-only Host, and official Suwayomi on emulator
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          PICA_R2_REAL_HOST_JAR: ${{ runner.temp }}/pica-r2-official-host.jar
         with:
           api-level: 35
           arch: x86_64

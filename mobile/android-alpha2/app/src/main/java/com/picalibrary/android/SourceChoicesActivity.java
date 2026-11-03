@@ -15,6 +15,26 @@ public final class SourceChoicesActivity extends LocaleAwareActivity {
     private boolean busy,needsReload;
     @Override public void onCreate(Bundle state){
         super.onCreate(state);Ui.applyWindow(this);
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            LinearLayout neutral=new LinearLayout(this);
+            neutral.setOrientation(LinearLayout.VERTICAL);
+            neutral.setPadding(Ui.dp(this,16),Ui.dp(this,24),
+                Ui.dp(this,16),Ui.dp(this,16));
+            neutral.addView(Ui.rawText(this,LocalizedText.ui(this,
+                "外接来源","External sources","外部ソース"),22,Ui.TEXT,true));
+            neutral.addView(Ui.rawText(this,LocalizedText.ui(this,
+                "旧版内置来源已停用，本地书库、WebDAV 和电脑端继续可用。请自行安装可信的同签名来源组件。",
+                "Bundled providers are disabled; local books, WebDAV and desktop sync work. Install a trusted matching-signer Host separately.",
+                "内蔵ソースは無効です。ローカル書庫と WebDAV、PC 同期は利用できます。"),
+                14,Ui.MUTED,false));
+            neutral.addView(Ui.button(this,LocalizedText.ui(this,
+                "打开独立来源","Open independent Host","外部ソースを開く"),
+                v->SignedSourceLauncher.open(this),false));
+            neutral.addView(Ui.button(this,getString(R.string.common_back),
+                v->finish(),true));
+            setContentView(neutral);
+            return;
+        }
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
         root.setPadding(Ui.dp(this,16),0,Ui.dp(this,16),0);
         root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(Ui.dp(this,16),i.getSystemWindowInsetTop(),Ui.dp(this,16),i.getSystemWindowInsetBottom());return i;});

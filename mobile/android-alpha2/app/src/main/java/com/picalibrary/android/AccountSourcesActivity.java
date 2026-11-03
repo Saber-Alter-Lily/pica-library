@@ -36,7 +36,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
     @Override protected void onResume(){
         super.onResume();
         renderContent();
-        if(!guidePreview)refreshDesktopAccountState();
+        if(!guidePreview&&!BuildConfig.SOURCE_NEUTRAL_QA)refreshDesktopAccountState();
     }
 
     @Override protected void onDestroy(){
@@ -83,6 +83,25 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         if(content==null)return;
         probeSerial++;
         content.removeAllViews();
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            LinearLayout source=SettingsRow.row(this,
+                LocalizedText.ui(this,"外接来源","External sources","外部ソース"),
+                "Signed user-owned Host",
+                v->SignedSourceLauncher.open(this));
+            source.setTag(AndroidOnboarding.ADV_SOURCE_HOST);
+            content.addView(source);
+            content.addView(SettingsRow.row(this,
+                LocalizedText.ui(this,"本地漫画","Local comics","ローカル漫画"),
+                "Folder / CBZ",
+                v->startActivity(new Intent(this,LocalComicImportActivity.class))));
+            content.addView(SettingsRow.row(this,"WebDAV","Your remote files",
+                v->startActivity(new Intent(this,RemoteStorageActivity.class))));
+            content.addView(SettingsRow.row(this,
+                LocalizedText.ui(this,"连接电脑","Pair Desktop","PCに接続"),
+                "Library / recommendations",
+                v->startActivity(new Intent(this,PairingActivity.class))));
+            return;
+        }
         LinearLayout sourceChoices=SettingsRow.row(this,getString(R.string.source_choices_title),getString(R.string.source_choices_summary),v->startActivity(new Intent(this,SourceChoicesActivity.class)));
         sourceChoices.setTag(AndroidOnboarding.ADV_SOURCE_CHOICES);
         content.addView(sourceChoices);

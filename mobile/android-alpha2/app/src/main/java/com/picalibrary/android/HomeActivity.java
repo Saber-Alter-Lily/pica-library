@@ -268,6 +268,14 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         new AlertDialog.Builder(this).setTitle("从“"+name+"”移出 "+entries.size()+" 本？").setMessage("只移出书架，不会取消收藏或删除漫画。").setNegativeButton(LocalizedText.ui("取消"),null).setPositiveButton("移出",(d,w)->{ShelfStore.setMemberships(this,shelfId,entries,false);if(collectionSelection!=null)collectionSelection.finish();Toast.makeText(this,"已从“"+name+"”移出",Toast.LENGTH_SHORT).show();if(BridgeStore.paired(this))syncShelves();show();}).show();
     }
     @Override public void removeSelectedFavorites(List<UnifiedCatalogStore.Entry> entries){
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            Toast.makeText(this,LocalizedText.ui(this,
+                "内置来源已禁用；请在外接来源中管理云端收藏",
+                "Bundled sources disabled. Manage remote favorites in your Host.",
+                "内蔵ソースは無効です。外部ソースで管理してください。"),
+                Toast.LENGTH_LONG).show();
+            return;
+        }
         if(entries==null||entries.isEmpty())return;List<UnifiedCatalogStore.Entry> selected=new ArrayList<>();for(UnifiedCatalogStore.Entry item:entries)if(item.favorite&&!item.id.startsWith("local:"))selected.add(item);if(selected.isEmpty()){Toast.makeText(this,getString(R.string.local_import_remove_warning),Toast.LENGTH_LONG).show();return;}
         new AlertDialog.Builder(this).setTitle("取消收藏 "+selected.size()+" 本？").setMessage("会按各来源取消收藏；已经下载的文件和书架记录不会删除。").setNegativeButton(LocalizedText.ui("取消"),null).setPositiveButton("取消收藏",(d,w)->{if(collectionSelection!=null)collectionSelection.finish();Toast.makeText(this,"正在取消 "+selected.size()+" 本收藏…",Toast.LENGTH_SHORT).show();worker.submit(()->batchRemoveFavorites(selected));}).show();
     }
@@ -303,7 +311,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
                     PortableRecommendationPackageStore.load(app);
                 UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(app);
                 int sessionCount=RecommendationEvidenceStore.sessionCount(app);
-                boolean canRun=PicaClient.available(app)||portable.available();
+                boolean canRun=(!BuildConfig.SOURCE_NEUTRAL_QA&&PicaClient.available(app))||portable.available();
                 boolean paired=BridgeStore.paired(app);
                 runOnUiThread(()->{
                     if(isFinishing()||isDestroyed()||ticket!=serial||current!=1||
@@ -451,7 +459,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         final int ticket=serial;
         recommendationWorker.execute(()->{
             android.content.Context app=getApplicationContext();
-            boolean available=PicaClient.available(app)||
+            boolean available=(!BuildConfig.SOURCE_NEUTRAL_QA&&PicaClient.available(app))||
                 PortableRecommendationPackageStore.load(app).available();
             boolean paired=BridgeStore.paired(app);
             runOnUiThread(()->{
@@ -482,36 +490,36 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         startActivity(i);
     }
 
-    private void openSignedSourceCompanion(){
-        // Temporary product-QA lane, not a production source installer.
-        final String hostPackage="com.picalibrary.android.userhost.qa";
-        if(getPackageManager().checkSignatures(getPackageName(),hostPackage)!=
-                android.content.pm.PackageManager.SIGNATURE_MATCH){
-            new AlertDialog.Builder(this)
-                .setTitle(LocalizedText.ui(this,
-                    "独立来源组件未就绪","Source companion unavailable",
-                    "外部ソースが利用できません"))
-                .setMessage(LocalizedText.ui(this,
-                    "仅支持独立安装且与当前应用同签名的可信来源组件。离线书库无需安装来源。",
-                    "Install the independently distributed, matching-signer Host companion. Your local library works without it.",
-                    "同じ署名の外部ソースが必要です。ローカル書庫はオフラインでも使用できます。"))
-                .setPositiveButton(android.R.string.ok,null).show();
-            return;
-        }
-        Intent intent=new Intent().setClassName(hostPackage,
-            "com.picalibrary.android.HostBrowserActivity");
-        intent.putExtra("pica.reader.package",getPackageName());
-        try{
-            startActivity(intent);
-        }catch(android.content.ActivityNotFoundException|SecurityException error){
-            Toast.makeText(this,LocalizedText.ui(this,
-                "独立来源组件不可用","Source companion not available",
-                "外部ソースを利用できません"),Toast.LENGTH_LONG).show();
-        }
-    }
+    private void openSignedSourceCompanion(){SignedSourceLauncher.open(this);}
 
     private void onlineEntry(){
         LinearLayout p=page(true);titleRow(p,"在线");
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            LinearLayout source=SettingsRow.row(this,
+                LocalizedText.ui(this,"我的外接来源","My external sources","外部ソース"),
+                LocalizedText.ui(this,
+                    "仅手动授权连接独立来源组件","Connect independent Host only with consent",
+                    "明示的な許可で外部 Host に接続"),
+                v->openSignedSourceCompanion());
+            source.setTag("online-optional-user-host");
+            p.addView(source);
+            p.addView(SettingsRow.row(this,
+                LocalizedText.ui(this,"导入本地漫画","Import local comics","ローカル漫画を取り込む"),
+                "Folder / CBZ",v->startActivity(new Intent(this,LocalComicImportActivity.class))));
+            p.addView(SettingsRow.row(this,"WebDAV",
+                LocalizedText.ui(this,"自己的网盘","Your cloud storage","自分のクラウド"),
+                v->startActivity(new Intent(this,RemoteStorageActivity.class))));
+            p.addView(SettingsRow.row(this,
+                LocalizedText.ui(this,"连接电脑","Pair Desktop","PCに接続"),
+                LocalizedText.ui(this,"书库、推荐与同步","Library, recommendations and sync","書庫・おすすめ・同期"),
+                v->startActivity(new Intent(this,PairingActivity.class))));
+            p.addView(Ui.rawText(this,LocalizedText.ui(this,
+                "内置站点已停用；可选来源由用户独立安装和管理。",
+                "Bundled site sources are disabled. Optional sources are independently installed.",
+                "内蔵サイトは無効です。外部ソースは個別に導入します。"),
+                13,Ui.MUTED,false));
+            return;
+        }
         // Full original-product QA now shares the same signed Binder source
         // bridge as :local-app. Legacy provider rows are separate and remain
         // explicitly marked as NOT physically removed until G2.
@@ -558,6 +566,42 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
             p.addView(SettingsRow.row(this,getString(R.string.settings_language),getString(R.string.settings_language_summary),v->startActivity(new Intent(this,LanguageActivity.class))));
             p.addView(SettingsRow.row(this,"个性化",ThemeStore.label(this),v->startActivity(new Intent(this,AppearanceActivity.class))));
             p.addView(SettingsRow.row(this,LocalizedText.ui(this,"关于","About","情報"),LocalizedText.ui(this,"本地阅读开发版本","Local reading development build","ローカル閲覧開発版"),v->startActivity(new Intent(this,AboutActivity.class))));
+            return;
+        }
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            boolean paired=BridgeStore.paired(this);
+            LinearLayout language=SettingsRow.row(this,
+                getString(R.string.settings_language),
+                getString(R.string.settings_language_summary),
+                v->startActivity(new Intent(this,LanguageActivity.class)));
+            language.setTag(AndroidOnboarding.SETTINGS_LANGUAGE);
+            p.addView(language);
+            p.addView(SettingsRow.row(this,
+                LocalizedText.ui(this,"外接来源","External sources","外部ソース"),
+                "Signed optional Host",v->openSignedSourceCompanion()));
+            LinearLayout pair=SettingsRow.row(this,"连接电脑",
+                paired?"已连接":"未连接",
+                v->startActivity(new Intent(this,PairingActivity.class)));
+            pair.setTag(AndroidOnboarding.SETTINGS_PAIR);
+            p.addView(pair);
+            p.addView(SettingsRow.row(this,"存储 / WebDAV",
+                "Local / Desktop / WebDAV",
+                v->startActivity(new Intent(this,StorageHubActivity.class))));
+            p.addView(SettingsRow.row(this,"推荐与画风",
+                "Local / synced candidates",
+                v->startActivity(new Intent(this,RecommendationStyleActivity.class))));
+            p.addView(SettingsRow.row(this,"个性化",ThemeStore.label(this),
+                v->startActivity(new Intent(this,AppearanceActivity.class))));
+            p.addView(SettingsRow.row(this,"本地数据与缓存","Storage",
+                v->startActivity(new Intent(this,StorageSettingsActivity.class))));
+            LinearLayout help=SettingsRow.row(this,
+                getString(R.string.onboarding_settings_title),
+                getString(R.string.onboarding_replay_summary),
+                v->startActivity(new Intent(this,OnboardingSettingsActivity.class)));
+            help.setTag(AndroidOnboarding.SETTINGS_HELP);
+            p.addView(help);
+            p.addView(SettingsRow.row(this,"关于","Source-neutral QA · no OTA",
+                v->startActivity(new Intent(this,AboutActivity.class))));
             return;
         }
         boolean paired=BridgeStore.paired(this);

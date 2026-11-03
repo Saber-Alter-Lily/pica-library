@@ -131,9 +131,14 @@ final class RecommendationPolicyStore {
     private static double cacheRebaseScore(Context c,JSONObject state,NativeRecommendationStore.Item item,List<UnifiedCatalogStore.Entry> favorites){
         double author=0,category=0;Set<String> target=new HashSet<>();for(String value:item.categories)target.add(norm(value));
         for(UnifiedCatalogStore.Entry entry:favorites){if(!norm(item.author).isEmpty()&&norm(item.author).equals(norm(entry.displayAuthor())))author++;Set<String> other=new HashSet<>();for(String value:entry.categories)other.add(norm(value));int common=0;for(String value:target)if(other.contains(value))common++;category=Math.max(category,common/(double)Math.max(1,Math.max(target.size(),other.size())));}
-        PicaClient.Comic comic=new PicaClient.Comic(item.comicId,item.title,item.author,"","","",item.tags,item.categories,false,false,0,0,0,0);
-        // Missing route/popularity/visual features are neutral, not inferred from old rank.
-        return NativeRecommendationPolicy.frozenNeutralScore(author/Math.max(1,favorites.size()),category,0,0)+adjustment(state,item)+RecommendationEvidenceStore.recentAdjustment(c,comic,state)+RecommendationEvidenceStore.sessionAdjustment(c,comic,state);
+        // The original PicaClient.Comic wrapper carried only metadata; avoid
+        // rooting an old site API merely to rebase a local recommendation.
+        // The evidence weighting/TagParticipation implementation is shared.
+        return NativeRecommendationPolicy.frozenNeutralScore(
+            author/Math.max(1,favorites.size()),category,0,0)
+            +adjustment(state,item)
+            +RecommendationEvidenceStore.recentAdjustment(c,item,state)
+            +RecommendationEvidenceStore.sessionAdjustment(c,item,state);
     }
 
     static synchronized void setLocalTagPolicy(Context c,JSONObject input,JSONObject expected){

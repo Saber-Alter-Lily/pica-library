@@ -9,7 +9,7 @@ final class ReaderProgress extends ReaderProgressLedger {
         public Metadata resolve(Context context,ReaderChapterSource source,String comicId){
             String id=comicId==null?"":comicId;
             String title="漫画",author="未知作者";
-            String provider=EhClient.isEhId(id)?"eh":(id.startsWith("jm:")?"jm":
+            String provider=ComicIdFormat.isEhId(id)?"eh":(id.startsWith("jm:")?"jm":
                     ("pica".equals(source.kind())?"pica":("host".equals(source.kind())?"host":"")));
             String supplied=source.displayTitle(id);
             if(supplied!=null&&!supplied.trim().isEmpty())title=supplied;

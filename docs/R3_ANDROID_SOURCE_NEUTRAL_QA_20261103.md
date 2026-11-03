@@ -38,3 +38,9 @@ At exact `e88b15da`, R8 still showed `PicaClient` from `PicaDownloadWorker.doWor
 The original Pica/E-H/JM Download Workers and Pica Bootstrap Worker now **fail closed immediately** in the source-neutral QA variant, including tasks persisted before a future upgrade. User-owned local/Reader/import/transfer tasks are unchanged. All THREE history ID format uses were switched from `EhClient.isEhId` to the identical pure `ComicIdFormat.isEhId`, so the original Home history keeps importing Desktop and WebDAV session metadata without depending on an E-H network client.
 
 This is a targeted dependency cut, not a new Reader/DB/scheduler; ordinary stable/Dev variants remain unchanged. The existing R8 real-APK source-exclusion gate remains strict and must return PASS before distributing a clean QA artifact.
+
+## Final two R8 roots: history resume and reader metadata
+
+At `35a80429`, the physical audit now reports only `EhClient`, `PicaClient`, and its metadata DTO `PicaClient$Comic`. R8 says `PicaClient` is rooted by `HistoryActivity.resumeSupported` for direct Pica resume; `EhClient` by `ReaderProgress.HISTORY.resolve` merely to classify an ID. The original history now **continues showing imported/cached sessions** but in clean QA refuses *direct in-process* source resume, preserving local/phone/Desktop/WebDAV resume. Reader history's provider label uses the exact same pure `ComicIdFormat` regex.
+
+The remaining Pica metadata coupling was also removed from the original `RecommendationPolicyStore.cacheRebaseScore`: `RecommendationEvidenceStore` now provides overloads for `NativeRecommendationStore.Item`, both invoking **one identical shared evidence-weighting implementation**. No change to scoring weights, TagParticipation, stored recommendation cycles, live old-variant Provider ranking or user's saved tag policy. The physical R8 DEX mapping must still return zero residual source classes before uploading a clean QA APK.

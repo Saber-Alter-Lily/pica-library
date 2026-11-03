@@ -189,27 +189,58 @@ final class RecommendationEvidenceStore {
     static double recentAdjustment(Context c,PicaClient.Comic comic){
         return recentAdjustment(c,comic,RecommendationPolicyStore.snapshot(c));
     }
-    static double recentAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){return adjustment(c,comic,false,TagParticipation.of(c,policy));}
+    static double recentAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){
+        return comic==null?0d:adjustment(c,comic.id,comic.author,comic.tags,
+            comic.categories,false,TagParticipation.of(c,policy));
+    }
     static double sessionAdjustment(Context c,PicaClient.Comic comic){
         return sessionAdjustment(c,comic,RecommendationPolicyStore.snapshot(c));
     }
-    static double sessionAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){return adjustment(c,comic,true,TagParticipation.of(c,policy));}
-    private static double adjustment(Context c,PicaClient.Comic comic,boolean sessionOnly,TagParticipation participation){
-        if(comic==null)return 0d;double score=0d;long now=System.currentTimeMillis();
+    static double sessionAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){
+        return comic==null?0d:adjustment(c,comic.id,comic.author,comic.tags,
+            comic.categories,true,TagParticipation.of(c,policy));
+    }
+
+    // Source-neutral overloads reuse EXACTLY the same evidence weighting.
+    // A synced local/portable recommendation never needs a Pica API DTO.
+    static double recentAdjustment(Context c,NativeRecommendationStore.Item item,
+            JSONObject policy){
+        return item==null?0d:adjustment(c,item.comicId,item.author,item.tags,
+            item.categories,false,TagParticipation.of(c,policy));
+    }
+    static double sessionAdjustment(Context c,NativeRecommendationStore.Item item,
+            JSONObject policy){
+        return item==null?0d:adjustment(c,item.comicId,item.author,item.tags,
+            item.categories,true,TagParticipation.of(c,policy));
+    }
+    private static double adjustment(Context c,String comicId,String comicAuthor,
+            List<String> comicTags,List<String> comicCategories,
+            boolean sessionOnly,TagParticipation participation){
+        double score=0d;long now=System.currentTimeMillis();
         long maxAge=sessionOnly?Long.MAX_VALUE:30L*24L*60L*60L*1000L;
-        String author=MobileTagRegistry.normalize(comic.author);Set<String> tags=normalized(participation.tags(comic.id,comic.tags,true)),categories=normalized(comic.categories);
+        String author=MobileTagRegistry.normalize(comicAuthor);
+        Set<String> tags=normalized(participation.tags(comicId,comicTags,true)),
+            categories=normalized(comicCategories);
         for(EvidenceRow row:rows(c)){
             if(sessionOnly&&!PROCESS_SESSION_ID.equals(row.sessionId))continue;
             if(!sessionOnly&&ageMillis(row,now)>maxAge)continue;
             String type=row.eventType;
-            if("recommend_impression".equals(type)&&comic.id.equals(row.comicId)){score-=sessionOnly?0.08:0.03;continue;}
-            double weight="reader_complete".equals(type)?0.035:"recommend_detail_open".equals(type)?0.018:0d;
+            if("recommend_impression".equals(type)&&comicId.equals(row.comicId)){
+                score-=sessionOnly?0.08:0.03;
+                continue;
+            }
+            double weight="reader_complete".equals(type)?0.035:
+                "recommend_detail_open".equals(type)?0.018:0d;
             if(weight<=0)continue;
-            if(!author.isEmpty()&&author.equals(MobileTagRegistry.normalize(row.author)))score+=weight;
-            score+=Math.min(weight,overlapNormalized(tags,normalized(participation.tags(row.comicId,row.tags,true)))*weight*0.25);
-            score+=Math.min(weight*0.6,overlapNormalized(categories,row.normalizedCategories)*weight*0.2);
+            if(!author.isEmpty()&&author.equals(MobileTagRegistry.normalize(row.author)))
+                score+=weight;
+            score+=Math.min(weight,overlapNormalized(tags,
+                normalized(participation.tags(row.comicId,row.tags,true)))*weight*0.25);
+            score+=Math.min(weight*0.6,
+                overlapNormalized(categories,row.normalizedCategories)*weight*0.2);
         }
-        double cap=sessionOnly?0.15:0.10;return Math.max(-cap,Math.min(cap,score));
+        double cap=sessionOnly?0.15:0.10;
+        return Math.max(-cap,Math.min(cap,score));
     }
 
     static List<Signal> topSignals(Context c,boolean sessionOnly,int limit){

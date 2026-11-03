@@ -829,7 +829,7 @@ def source_free_user_host_flow():
         # -> 2, without replacing the Reader, granting network to the Reader,
         # or writing its private library. Both versions use the same QA signer.
         STEP = "source-only-companion-versioned-upgrade"
-        host_apk = "mobile/android-alpha2/user-host-app/build/outputs/apk/debug/user-host-app-v2-debug.apk"
+        host_apk = "mobile/android-alpha2/s3-host-qa-apks/user-host-v2.apk"
         assert installed_version_code(USER_HOST_PACKAGE)==1
         operations_before_upgrade=len(operations)
         adb("install", "-r", host_apk, timeout=65)

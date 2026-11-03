@@ -13,17 +13,19 @@ adb install -r "$apk"
 host_dir=user-host-app/build/outputs/apk/debug
 host="$host_dir/user-host-app-debug.apk"
 test -s "$host"
-# Keep the first installed source APK intact, then build a distinct higher
-# versionCode with the exact same Android debug signer and Binder ABI.
-cp "$host" "$host_dir/user-host-app-v1-debug.apk"
+# Android Gradle may replace the entire outputs/apk directory on the second
+# build. Store BOTH QA versions outside Gradle-owned output directories.
+qa_apks=s3-host-qa-apks
+mkdir -p "$qa_apks"
+cp "$host" "$qa_apks/user-host-v1.apk"
 gradle :user-host-app:assembleDebug -PqaHostVersionCode=2 --no-daemon --max-workers=2
 test -s "$host"
-cp "$host" "$host_dir/user-host-app-v2-debug.apk"
-if cmp -s "$host_dir/user-host-app-v1-debug.apk" "$host_dir/user-host-app-v2-debug.apk"; then
+cp "$host" "$qa_apks/user-host-v2.apk"
+if cmp -s "$qa_apks/user-host-v1.apk" "$qa_apks/user-host-v2.apk"; then
     echo "Host QA v1/v2 APKs must be distinct artifacts" >&2
     exit 1
 fi
-adb install -r "$host_dir/user-host-app-v1-debug.apk"
+adb install -r "$qa_apks/user-host-v1.apk"
 original=app/build/outputs/apk/debug/app-debug.apk
 test -s "$original"
 adb install -r "$original"

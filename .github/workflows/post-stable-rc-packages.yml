@@ -175,7 +175,7 @@ jobs:
           # Build both APKs with the SAME temporary reviewed preview signer.
           # Building a Host in a different workflow would produce a different
           # debug certificate and be unusable with the complete QA Reader.
-          gradle :app:assembleDebug :user-host-app:assembleDebug --no-daemon
+          gradle :app:assembleDebug :user-host-app:assembleDebug :app:assembleCleanSourceQa -PsourceNeutralQa=true --no-daemon
           apk=app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/postrc-cert.txt"
           cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/postrc-cert.txt" | head -1 | tr 'A-F' 'a-f')
@@ -201,18 +201,41 @@ jobs:
             echo 'Source-only Host requested a disallowed device permission' >&2
             exit 1
           fi
+          # Original full four-tab CLEAN PRODUCT: the exact same R8/DEX
+          # exclusion gate as the ordinary audit, with the fixed preview key.
+          clean=app/build/outputs/apk/cleanSourceQa/app-cleanSourceQa.apk
+          test -s "$clean"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$clean" > "$RUNNER_TEMP/postrc-clean-cert.txt"
+          clean_cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/postrc-clean-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$clean_cert" = "$EXPECTED_CERT"
+          test "$clean_cert" = "$host_cert"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$clean" > "$RUNNER_TEMP/postrc-clean-package.txt"
+          grep -q "package: name='com.picalibrary.android.cleanqa'" "$RUNNER_TEMP/postrc-clean-package.txt"
+          grep -q "versionCode='55'" "$RUNNER_TEMP/postrc-clean-package.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$clean" > "$RUNNER_TEMP/postrc-clean-permissions.txt"
+          grep -q 'com.picalibrary.android.remote.BIND_SOURCE' "$RUNNER_TEMP/postrc-clean-permissions.txt"
+          grep -q 'android.permission.INTERNET' "$RUNNER_TEMP/postrc-clean-permissions.txt"
+          if grep -Eq 'android.permission.(REQUEST_INSTALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE)' "$RUNNER_TEMP/postrc-clean-permissions.txt"; then
+            echo 'Clean four-tab product requested a disallowed device permission' >&2
+            exit 1
+          fi
+          python3 ../../scripts/verify-android-clean-source-apk.py "$clean" "app/build/outputs/mapping/cleanSourceQa/mapping.txt"
           mkdir -p candidate-postrc
           cp "$apk" candidate-postrc/Pica-Library-Post-Stable-RC-Android.apk
+          cp "$clean" candidate-postrc/Pica-Library-Post-Stable-RC-Clean-Android.apk
           cp "$host" candidate-postrc/Pica-Library-Post-Stable-RC-User-Host.apk
           cp "$RUNNER_TEMP/postrc-package.txt" candidate-postrc/PACKAGE_INFO.txt
           cp "$RUNNER_TEMP/postrc-host-package.txt" candidate-postrc/HOST_PACKAGE_INFO.txt
           cp "$RUNNER_TEMP/postrc-host-permissions.txt" candidate-postrc/HOST_PERMISSIONS.txt
+          cp "$RUNNER_TEMP/postrc-clean-package.txt" candidate-postrc/CLEAN_PACKAGE_INFO.txt
+          cp "$RUNNER_TEMP/postrc-clean-permissions.txt" candidate-postrc/CLEAN_PERMISSIONS.txt
           printf '%s\n' "$cert" > candidate-postrc/CERTIFICATE_SHA256.txt
           printf '%s\n' "$host_cert" > candidate-postrc/HOST_CERTIFICATE_SHA256.txt
+          printf '%s\n' "$clean_cert" > candidate-postrc/CLEAN_CERTIFICATE_SHA256.txt
           printf '%s\n' "$GITHUB_SHA" > candidate-postrc/SOURCE_SHA.txt
           printf '%s\n' "$rc_version" > candidate-postrc/VERSION.txt
-          printf '%s\n' 'UNPUBLISHED same-source AND same-preview-signer QA pair: install Pica-Library-Post-Stable-RC-Android.apk (com.picalibrary.android.dev), then Pica-Library-Post-Stable-RC-User-Host.apk (com.picalibrary.android.userhost.qa) only if no conflicting source package/signature is already present. Open the optional source from the full app Online tab. No automatic source install or connection, no site SDK in Host. Keep stable v0.5.0 installed; stop on signature mismatch; never uninstall existing Dev data to bypass a signer/version mismatch. Physical UX and real legacy migration remain pending.' > candidate-postrc/STATUS.txt
-          (cd candidate-postrc && sha256sum Pica-Library-Post-Stable-RC-Android.apk Pica-Library-Post-Stable-RC-User-Host.apk > SHA256SUMS.txt)
+          printf '%s\n' 'UNPUBLISHED QA, three same-source/same-preview-signer APKs: Pica-Library-Post-Stable-RC-Android.apk is the historical-provider Dev client (com.picalibrary.android.dev); Pica-Library-Post-Stable-RC-Clean-Android.apk is the original four-tab source-neutral R8-verified client (com.picalibrary.android.cleanqa); Pica-Library-Post-Stable-RC-User-Host.apk is the optional source-only Host (com.picalibrary.android.userhost.qa). To try the clean product, install ONLY the Clean-Android and optional User-Host files from this SAME artifact. No source or account is installed/connected automatically. Keep stable v0.5.0 installed. Stop on signature mismatch; NEVER uninstall an existing QA app to bypass signature/version mismatch or erase its data. No production upgrade or release has been authorized. Manual device UX and real v0.5.0 migration/rollback remain pending.' > candidate-postrc/STATUS.txt
+          (cd candidate-postrc && sha256sum Pica-Library-Post-Stable-RC-Android.apk Pica-Library-Post-Stable-RC-Clean-Android.apk Pica-Library-Post-Stable-RC-User-Host.apk > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
           name: Pica-Library-Post-Stable-RC-Android

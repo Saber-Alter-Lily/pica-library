@@ -65,40 +65,7 @@ jobs:
             echo 'Clean original-product QA requested a disallowed privilege' >&2
             exit 1
           fi
-          APP="$app" python3 - <<'PY'
-          import os, re, sys, zipfile
-          root = os.environ['APP']
-          with zipfile.ZipFile(root) as apk:
-              dex = [apk.read(n) for n in apk.namelist()
-                     if re.fullmatch(r'classes[0-9]*\.dex', n)]
-              if not dex:
-                  raise SystemExit('No compiled Android DEX')
-              contents = b''.join(dex)
-              direct = [x for x in (
-                  b'Lio/github/jukomu/',
-                  b'Lorg/picalibrary/sources/JmSource;',
-                  b'PicaAccountActivity', b'EhAccountActivity',
-                  b'JmSourceActivity', b'PicaBrowseActivity')
-                  if x in contents]
-          mapping = 'app/build/outputs/mapping/cleanSourceQa/mapping.txt'
-          if not os.path.isfile(mapping):
-              raise SystemExit('R8 mapping missing: no physical source proof')
-          lines = open(mapping, encoding='utf-8').read().splitlines()
-          expected_excluded = (
-              'com.picalibrary.android.PicaClient',
-              'com.picalibrary.android.EhClient',
-              'com.picalibrary.android.JmClientManager',
-              'com.picalibrary.android.JmSourceActivity',
-              'org.picalibrary.sources.JmSource',
-              'io.github.jukomu.')
-          leaked = [line.split(' -> ')[0] for line in lines if ' -> ' in line
-                    and line.startswith(expected_excluded)]
-          print('SOURCE_NEUTRAL_APK_AUDIT', {'dex_count': len(dex),
-                'source_leaks': leaked[:25], 'direct_forbidden': [repr(x) for x in direct]}, flush=True)
-          if leaked or direct:
-              raise SystemExit('UNVERIFIED: bundled legacy provider remains physically reachable')
-          print('PASS: original product clean-source QA DEX contains no listed bundled providers')
-          PY
+          python3 ../../scripts/verify-android-clean-source-apk.py "$app" "app/build/outputs/mapping/cleanSourceQa/mapping.txt"
       - name: Upload source-neutral original product and matching source-only Host only on actual audit PASS
         if: success() && github.event.repository.private == false
         uses: actions/upload-artifact@v4

@@ -124,6 +124,9 @@ describe('post-stable RC isolation contract', () => {
         expect(workflow).toContain('test "$host_cert" = "$cert"')
         expect(workflow).toContain('Pica-Library-Post-Stable-RC-User-Host.apk')
         expect(workflow).toContain('HOST_CERTIFICATE_SHA256.txt')
+        expect(workflow).toContain('Pica-Library-Post-Stable-RC-Clean-Android.apk')
+        expect(workflow).toContain('test "$clean_cert" = "$host_cert"')
+        expect(workflow).toContain('verify-android-clean-source-apk.py')
         expect(workflow).toContain('node scripts/write-rc-artifact-summary.mjs')
         expect(
             workflow.match(/if: github.event_name != 'pull_request'/g)

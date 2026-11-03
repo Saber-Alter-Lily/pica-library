@@ -80,3 +80,11 @@
 - 现有 `post-stable-rc-packages.yml` 的 Android job 同一次执行 `:app:assembleDebug :user-host-app:assembleDebug`，核验 **两者均为固定预览证书 SHA256 `64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d`**；来源 APK 独立 package `com.picalibrary.android.userhost.qa` / versionCode 1，必须声明签名级 Binder 绑定权限和 INTERNET，但不能请求摄像头/广域读写/安装其他 APK 权限。
 - 同一 `Pica-Library-Post-Stable-RC-Android` GitHub Actions 工件新增第二文件 `Pica-Library-Post-Stable-RC-User-Host.apk`，带 `HOST_CERTIFICATE_SHA256.txt`、来源包元数据及两 APK 的 `SHA256SUMS.txt`。先安装完整 Dev，再选择安装独立 Host；同一个浏览器来源仍需要显式 Host 地址、授权、选来源。无第三方站点 SDK，也不额外创建用户数据。
 - 该 QA 配对依旧不能原地升级正式 v0.5.0，也不能与历史由不同 Debug signer 签名的 Host/Reader QA 混用。安装遇到签名冲突时**必须报告而不是卸载旧应用以绕过**；真实物理设备和 G2/G3/G4 仍开放。最终结论必须以新精确 SHA 的两 APK 证书/上传工件和原完整用户流程为依据。
+
+## 同一预览证书的 Android 清洁原产品交付（2026-11-03）
+
+在原 `Post-stable Isolated RC Packages` Android job 内**复用**同一 Gradle 构建和固定的 `pica-preview` 签名，同时生成三份用途明确的独立 APK：历史完整 Dev（`com.picalibrary.android.dev`）、真正从原 `:app` 源码构建且经 R8 缩减的四标签清洁版（`com.picalibrary.android.cleanqa`）、来源唯一且可卸载的 Host（`com.picalibrary.android.userhost.qa`）。三者的实际 `apksigner` SHA-256 必须相同且等于现有受信 QA 证书，包身份分别核验；原 Dev 不被改造成清洁版，旧用户资料/正式签名不接触。
+
+无内置源的物理审核 **不复制另一套规则**：把已通过的 R8 + APK DEX 检查抽至 `scripts/verify-android-clean-source-apk.py`，供 `r3-android-clean-source-qa.yml` 与原固定签名 RC 两处调用。只要 `PicaClient/EhClient/JmClientManager` 或 JM 第三方 runtime 仍出现在实际映射/DEX，直接停止上传清洁 QA 工件，不得“菜单隐藏即通过”。现有原 Windows 安装替换、Android JUnit/Lint、QA 签名、源 APK 权限与 SHA/状态文件检查原样保留。
+
+**下载选择**：要验证清洁版，只配套安装 `Pica-Library-Post-Stable-RC-Clean-Android.apk` + `Pica-Library-Post-Stable-RC-User-Host.apk`，均必须取自同一 Actions 工件；不自动安装漫画源、不要求用户登陆任何源、不删旧版以绕过签名冲突。原完整 Dev 可独立作旧功能对照，但不要与清洁版混淆。仅当前实际构建/签名/DEX 审核成功，才能称候选包已交付；后续仍需真实手机 G1、正式签名/来源 G2、v0.5.0 无损迁移 G3 和发布 G4。

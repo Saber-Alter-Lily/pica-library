@@ -112,7 +112,16 @@ describe('native local body export source contracts, not native runtime proof', 
         expect(ui).not.toMatch(/FLAG_GRANT_READ_URI_PERMISSION|FLAG_GRANT_PERSISTABLE_URI_PERMISSION|takePersistableUriPermission/)
         const manifest = read(root + 'main/AndroidManifest.xml')
         expect(manifest).toContain('android:name=".LocalComicExportActivity" android:exported="false"')
-        expect([...manifest.matchAll(/<uses-permission[^>]*\/>/g)].map(m => m[0]).sort()).toEqual(authority.permissions)
+        // The production importer/exporter keeps its exact frozen permission
+        // authority; the shared same-signer Binder route contributes ONE new
+        // platform-signature permission, not broad storage or a new network grant.
+        const permissions = [...manifest.matchAll(/<uses-permission[^>]*\/>/g)]
+            .map(m => m[0]).sort()
+        expect(permissions).toEqual([...authority.permissions,
+            '<uses-permission android:name="com.picalibrary.android.remote.BIND_SOURCE" />'
+        ].sort())
+        expect(manifest).toContain('android:protectionLevel="signature"')
+        expect(manifest).toContain('android:permission="com.picalibrary.android.remote.BIND_SOURCE"')
     })
     it('rejects path/URL and own FileProvider destinations and never deletes external documents', () => {
         expect(adapter).toContain('!"content".equals(destination.getScheme())')

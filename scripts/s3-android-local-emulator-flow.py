@@ -1001,6 +1001,124 @@ def pinned_official_suwayomi_local_source():
                         process.wait(timeout=8)
 
 
+
+def original_full_product_signed_host_flow(upstream_pages):
+    """REAL original four-tab app -> separately installed Host -> its own Reader/local store."""
+    global PACKAGE, STEP
+    STEP = "r3-original-product-signed-source-entry"
+    adb("shell", "am", "force-stop", ORIGINAL_PACKAGE)
+    adb("shell", "am", "start", "-W", "-n",
+        ORIGINAL_PACKAGE + "/com.picalibrary.android.DisclaimerActivity",
+        timeout=48)
+    PACKAGE = ORIGINAL_PACKAGE
+    later = wait(("稍后再看", "Later", "後で"), seconds=8,
+                 required=False, only_class="Button")
+    if later:
+        adb("shell", "input", "tap", str(later[0]), str(later[1]))
+    wait(("我的书库", "My library", "マイライブラリ"), seconds=40)
+    tap(("在线", "Online", "オンライン"), seconds=22,
+        exact=True, only_class="Button")
+    tap(("独立来源组件 · 工程候选", "Independent source component · QA",
+         "独立した外部ソース · QA"), seconds=25)
+    PACKAGE = USER_HOST_PACKAGE
+    wait(("No Host connected", "尚未连接 Host", "未接続"), seconds=30)
+    page("37-original-product-opens-independent-source")
+    record("original four-tab Android product opens same-signer independent Host without auto-connect")
+
+    STEP = "r3-original-product-host-real-upstream"
+    tap_scrolling(("Authorize this Host session",
+                   "我授权本次连接自己的 Host", "この接続を許可します"),
+                  only_class="CheckBox")
+    tap_scrolling(("Connect and list sources", "连接并读取来源",
+                   "接続してソースを表示"), only_class="Button")
+    tap_scrolling(("Use selected source", "选择此来源",
+                   "ソースを選択"), only_class="Button")
+    type_into_host(("Search works", "搜索作品", "作品を検索"), "CBZ")
+    tap_scrolling(("Search selected source", "搜索选中来源",
+                   "選択ソースで検索"), only_class="Button")
+    tap_scrolling("Read · Interop Fixture CBZ",
+                  direction="down", only_class="Button")
+    wait_page_counter("1 / 2", seconds=45)
+    active = adb("shell", "dumpsys", "activity", "activities", timeout=35)
+    assert ("com.picalibrary.android.ExternalReaderActivity" in active and
+            ORIGINAL_PACKAGE in active), (
+        "Source-only Host did not open the ORIGINAL full product Reader")
+    advance_reader_next()
+    wait_page_counter("2 / 2", seconds=40)
+    page("38-original-product-binder-reader-page-2")
+    record("official Suwayomi -> signed Host -> full original Android product Reader page 2")
+
+    STEP = "r3-original-product-authorized-import"
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    tap_scrolling(("Save to Reader library", "保存到阅读器书库",
+                   "Reader 書庫に保存"), direction="down", only_class="Button")
+    wait(("Save to original Reader", "保存到原阅读器书库",
+          "元の Reader に保存"), seconds=35)
+    tap(("Choose chapter to save", "选择要保存的章节",
+         "保存する章を選択"), seconds=30, only_class="Button")
+    tap(("Chapter 1",), seconds=35)
+    tap(("Save this chapter", "保存这一章", "この章を保存"),
+        exact=True, only_class="Button", seconds=20)
+    PACKAGE = ORIGINAL_PACKAGE
+    imported = None
+    deadline = time.monotonic() + 80
+    while time.monotonic() < deadline:
+        imported = next((row for row in book_rows() if
+                         row["title"].startswith("Interop Fixture CBZ") and
+                         len(row["pages"]) == 2), None)
+        if imported is not None:
+            break
+        time.sleep(.7)
+    assert imported is not None, (
+        "Signed source never copied into the original product's private LocalComicStore")
+    first = "files/local-comics-v1/" + imported["id"].removeprefix("local:") + (
+        "/" + imported["generation"] + "/")
+    for i, pg in enumerate(imported["pages"]):
+        actual = adb("exec-out", "run-as", ORIGINAL_PACKAGE,
+                     "cat", first + pg["file"], binary=True)
+        assert actual == upstream_pages[i], "Original app imported wrong upstream PNG bytes"
+    page("39-original-product-signed-import-owns-pages")
+    record("source-only Host copied upstream two-page chapter into ORIGINAL product library byte-for-byte")
+
+    STEP = "r3-original-product-original-reader"
+    tap(("Read saved local copy", "阅读已保存的本地副本",
+         "保存済みの作品を読む"), seconds=35, only_class="Button")
+    dismiss_immersive_help()
+    wait_page_counter("1 / 2", seconds=45)
+    active = adb("shell", "dumpsys", "activity", "activities", timeout=35)
+    assert ("com.picalibrary.android.ReaderActivity" in active and
+            ORIGINAL_PACKAGE in active), (
+        "Imported local copy did not open the actual full-product ReaderActivity")
+    page("40-original-product-real-reader-offline-copy")
+    record("full original Android ReaderActivity reads identical source-imported local chapter")
+
+    STEP = "r3-original-product-source-disconnect"
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    PACKAGE = USER_HOST_PACKAGE
+    tap_scrolling(("Disconnect", "断开会话",
+                   "セッション終了"), direction="up", only_class="Button")
+    adb("shell", "am", "force-stop", USER_HOST_PACKAGE)
+    adb("shell", "am", "force-stop", ORIGINAL_PACKAGE)
+    adb("shell", "am", "start", "-W", "-n",
+        ORIGINAL_PACKAGE + "/com.picalibrary.android.DisclaimerActivity",
+        timeout=45)
+    PACKAGE = ORIGINAL_PACKAGE
+    later = wait(("稍后再看", "Later", "後で"), seconds=8,
+                 required=False, only_class="Button")
+    if later:
+        adb("shell", "input", "tap", str(later[0]), str(later[1]))
+    wait(("我的书库", "My library", "マイライブラリ"), seconds=40)
+    wait("Interop Fixture CBZ", seconds=50)
+    page("41-original-product-library-after-host-stopped")
+    tap("Interop Fixture CBZ", seconds=25)
+    tap(("阅读", "Read", "読む"), seconds=55, only_class="Button")
+    dismiss_immersive_help()
+    wait_page_counter("1 / 2", seconds=40)
+    page("42-original-product-owned-offline-reader")
+    record("Host stopped, original four-tab Home still browses saved chapter via its own Reader")
+
+
 def official_upstream_android_reader_flow():
     """Official runtime -> owned Host APK -> existing Reader -> local offline PNG."""
     global PACKAGE, STEP
@@ -1094,6 +1212,7 @@ def official_upstream_android_reader_flow():
         wait_page_counter("1 / 2", seconds=40)
         page("36-official-host-stopped-offline-original-reader")
         record("official Host disabled and stopped: separate offline Reader still opens stored real-upstream chapter")
+        original_full_product_signed_host_flow(original_pages)
         (ROOT / "real-upstream-host-proof.json").write_text(json.dumps({
             "upstreamTag": "v2.4.2366",
             "sourceId": "0",
@@ -1106,7 +1225,11 @@ def official_upstream_android_reader_flow():
             "hostPackage": USER_HOST_PACKAGE,
             "sourceFreeReaderHasNetworkPermission": False,
             "byteIdenticalPages": 2,
-            "offlineAfterHostStop": True
+            "offlineAfterHostStop": True,
+            "originalFullProductSignedCompanionFlow": True,
+            "originalProductPackage": ORIGINAL_PACKAGE,
+            "originalProductOwnLocalPages": 2,
+            "originalProductReaderResumesAfterHostStop": True
         }, indent=2), encoding="utf-8")
 
 def main():

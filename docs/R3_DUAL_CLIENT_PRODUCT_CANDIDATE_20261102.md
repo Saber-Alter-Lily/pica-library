@@ -66,3 +66,7 @@
 - 完整原 `:app` 的 **在线 → 独立来源组件·工程候选** 入口仅在 Debug/QA 构建可见；点击时校验同签名，跳到用户单独安装的 `:user-host-app`，显式传递目标 reader applicationId。Host 只允许 `com.picalibrary.android.localcore.qa` 或 `com.picalibrary.android.dev` 两个预定 QA 目标，且逐个检查两个导出目标 Activity 的平台签名级权限和导出标志。默认没有源 APK 时不会联网，也不会改变旧账户；正式生产版不额外暴露未完成入口。
 - 用户在独立 Host 中**主动连接 Suwayomi、选择来源和作品**，Host 把图片 FD 经已存在的 Binder 传入当前完整原应用的共享 ReaderScreenActivity；确认保存的单章写入**当前原应用自己**的 `LocalComicStore`。导入后“阅读已保存的本地副本”在完整原产品中使用原 `ReaderActivity`，仅无源 QA 壳保留 `LocalReaderActivity`。不会复制到另一个 QA APK 的书库。
 - 新版完整产品 manifest 注册受 `BIND_SOURCE` signature 权限约束的来源阅读/导入入口和 Host 包可见性。旧来源仍在原完整 `:app` 内，本批**不能**宣称 Android 已完成物理无源最终产品；旧正式版包身份和签名未修改。后续需用同一 Android35 实测“完整原 Home → Host → 本机原书库 → 断源后原 Reader 继续读”，并进行生产签名所有权和旧版数据迁移核查。
+
+### R3 实机自动化新增：原完整产品的真实官方 Host 闭环
+
+在现有 Android 35 模拟器及同一个官方 Suwayomi v2.4.2366 自带 Local Source（两页自建测试 CBZ）上，追加一条**原完整 Android app** 的实际用户流程：四标签 Home 的 Debug 独立来源入口 → 同签名来源 APK → 主动授权 → 上游作品搜索 → 共享原 ReaderScreenActivity 第二页 → 单章确认 → 写入**原完整 app 私有 LocalComicStore**、逐页 PNG 字节校验 → 点击本地副本打开原产品 `ReaderActivity` → 断开并停止 Host → 原 Home 列表重新找到作品 → 原 Reader 离线打开。测试检查的是实际 Android Activity/安装身份和真实上游图片，不是 mock 假象。新增屏幕及 `real-upstream-host-proof.json`；仅在该 exact-SHA 模拟器 PASS 才能把本项标记为工程通过。旧单独无源 Reader 的全部 R2 流程继续保留；原完整 app 的物理无源改造与 v0.5.0 签名迁移仍未完成。

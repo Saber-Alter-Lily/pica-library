@@ -51,3 +51,10 @@
 - [构建 #41587857309](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41587857309) 的合同与 Android 完整 QA 均成功，Windows 在临时完整程序组装时被旧版 Launcher 复用保护中止：`Launcher source changed since accepted stable package; a full install is required`。这是**实际新架构与旧版增量复用约束不兼容**，不是 Windows 语法或用户资料故障。未生成该轮 Windows 候选。
 - 当前变更只在 `-PostStable` **独立、完整替换 RC** 路径中临时禁止尝试继承公开版的旧 Launcher；继续使用本仓库当前 Launcher 编译成全量暂存包，并在最终独立 RC 中照常重新编译 `RcLauncher.cs`。这两个旧版复用环境变量在 `finally` 中恢复。普通生产 `scripts/build-windows-package.ps1` 本身及其正式旧版 Launcher 哈希锁**一字未改**，标准增量升级仍必须遵守原规则。
 - 仍先校验公开 v0.5.0 ZIP 的固定 SHA-256；新 RC 只上传独立 ZIP，最终强制验证完整包原生启动、端口冲突、进度和本地数据持久化，并进行已有的合成 v0.5.0 完整替换/回滚。不能据此推断老用户真实数据迁移 PASS。
+
+## R3 原完整 Android 推荐与书库窄屏用户流程
+
+- 原 HomeActivity 推荐页之前在主线程直接读取 NativeRecommendationStore、PortableRecommendationPackageStore、RecommendationPolicyStore 和 UnifiedCatalogStore，且切换上一批/下一批同步写入存储，1500 部书库下存在主线程卡顿风险。本批沿用已有原生单线程 Executor，把初次载入/本机策略投影/候选读取/批次移动与历史标记转为顺序后台处理。用户进入推荐页立即见到加载状态；翻批次有可见反馈、同一时间不启动多次写入；离开当前页面后不把过期结果画回新页面。现有推荐算法、负反馈策略、缓存身份、生成任务和书库没有更换。
+- 原书库标题和四个操作在 360/393dp 或翻译后会挤在同一行，本批直接复用原 HomeActivity 标题行，窄屏/四个动作时改为上下两行；推荐卡片封面旁原三按钮改为第一行喜欢/不喜欢、第二行调节偏好，所有入口保留，无新界面框架。
+- 同时修正旧 Web/CLI CI 对 Post-stable RC 工件保留期 1 天的硬编码，明确此流水线允许 3 天，User-Host 7 天，其余保持 1 天。旧 [Web CI 失败 #41588408104](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41588408104) 只证明合同断言与实际构建设置不一致，新 HEAD 必须重新验证 Android 编译、Web/desktop、实际布局截图后才能算通过。
+- 仍未完成实体手机 360/393/480dp、多语言缩放、真实 1500 本卡顿定量及所有旧正式资料迁移；G1–G4 原有边界不减项。

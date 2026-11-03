@@ -96,7 +96,9 @@ describe('built CLI entrypoint contract', () => {
                 // public binaries/synthetic evidence for seven days so the user
                 // can download them. Keep every other recipe's one-day policy;
                 // concentrated-acceptance-build checks EACH upload is exactly 7.
-                expect(content, name).toContain(name === 'user-host-acceptance.yml' ? 'retention-days: 7' : 'retention-days: 1')
+                const days = name === 'user-host-acceptance.yml' ? 7 :
+                    name === 'post-stable-rc-packages.yml' ? 3 : 1
+                expect(content, name).toContain('retention-days: ' + days)
                 if (name === 'windows-package.yml') {
                     expect(content, name).not.toMatch(
                         /secrets\.PICA_(ACCOUNT|PASSWORD)/

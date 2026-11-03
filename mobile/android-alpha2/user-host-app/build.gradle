@@ -1,8 +1,8 @@
 plugins { id 'com.android.application' }
 
-// Original local-app Java sources and original :reader-view are shared,
-// not copied. Host transport is from the independently compiled original
-// :user-host-core; there is NO provider-specific SDK dependency.
+// Independent optional source component only. Uses the platform Binder ABI;
+// the real Reader, local storage, shelves and history live exclusively in
+// the physically separate no-INTERNET :local-app.
 android {
     namespace 'com.picalibrary.android.hostapp'
     compileSdk 35
@@ -13,7 +13,6 @@ android {
         versionCode 1
         versionName '0.5.0-user-host-qa'
     }
-    sourceSets.main.java.srcDir '../local-app/src/main/java'
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -22,8 +21,6 @@ android {
 
 dependencies {
     implementation project(':local-core')
-    implementation project(':local-storage')
-    implementation project(':reader-view')
     implementation project(':user-host-core')
     implementation project(':source-bridge')
 }

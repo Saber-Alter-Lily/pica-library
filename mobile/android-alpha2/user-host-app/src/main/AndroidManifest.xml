@@ -1,37 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- INTERNET is for an explicitly configured user-owned Suwayomi Host.
-         No provider SDK, broad storage, install packages or background source. -->
+    <!-- Only user-authorized external Host transport requests INTERNET.
+         No Reader, LocalComicStore, broad storage or source provider SDK. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <permission android:name="com.picalibrary.android.remote.BIND_SOURCE"
         android:protectionLevel="signature"/>
     <uses-permission android:name="com.picalibrary.android.remote.BIND_SOURCE"/>
-    <queries>
-        <package android:name="com.picalibrary.android.localcore.qa"/>
-    </queries>
-    <application
-        android:label="Pica Library User Host QA"
-        android:allowBackup="false"
-        android:usesCleartextTraffic="true"
+    <queries><package android:name="com.picalibrary.android.localcore.qa"/></queries>
+    <application android:allowBackup="false" android:usesCleartextTraffic="true"
+        android:label="Pica Library Sources QA"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <service android:name="com.picalibrary.android.ExternalSourceService"
             android:exported="true"
             android:permission="com.picalibrary.android.remote.BIND_SOURCE">
-            <intent-filter>
-                <action android:name="com.picalibrary.android.remote.BIND_SOURCE"/>
-            </intent-filter>
+            <intent-filter><action android:name="com.picalibrary.android.remote.BIND_SOURCE"/></intent-filter>
         </service>
+        <!-- A user-visible config UI can be opened by the original Reader
+             or Launcher. It grants no authority on launch; its IPC is signed. -->
         <activity android:name="com.picalibrary.android.HostBrowserActivity"
-            android:exported="true"
-            android:permission="com.picalibrary.android.remote.BIND_SOURCE"/>
-        <activity android:name="com.picalibrary.android.HostReaderActivity"
-            android:exported="false"/>
-        <activity android:name="com.picalibrary.android.LocalHistoryActivity"
-            android:exported="false"/>
-        <activity android:name="com.picalibrary.android.LocalShelvesActivity"
-            android:exported="false"/>
-        <activity android:name="com.picalibrary.android.LocalReaderActivity"
-            android:exported="false"/>
-        <activity android:name="com.picalibrary.android.LocalLibraryActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

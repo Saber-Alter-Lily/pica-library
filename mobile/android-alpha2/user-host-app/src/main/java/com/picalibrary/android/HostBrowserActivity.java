@@ -1,7 +1,6 @@
 package com.picalibrary.android;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -34,7 +33,7 @@ public final class HostBrowserActivity extends Activity {
     private boolean busy,destroyed;
     private int generation;
 
-    private String t(String zh,String en,String ja){return LocalCopy.ui(this,zh,en,ja);}
+    private String t(String zh,String en,String ja){return HostCopy.ui(this,zh,en,ja);}
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private TextView text(String s,int size){
         TextView v=new TextView(this);v.setText(s);v.setTextSize(size);
@@ -106,7 +105,7 @@ public final class HostBrowserActivity extends Activity {
         status=text("",13);status.setTag("host.qa.status");
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         root.addView(status);
-        Button back=action(root,t("返回书库","Back to library","書庫に戻る"));
+        Button back=action(root,t("返回阅读器","Back to Reader","Reader に戻る"));
         back.setOnClickListener(v->finish());
         toggleSetup=action(root,t("显示/隐藏 Host 配置","Show / hide Host setup",
             "Host 設定を表示／隠す"));
@@ -257,103 +256,41 @@ public final class HostBrowserActivity extends Activity {
 
     private void showResults(List<HostSourceManager.Book> books){
         results.removeAllViews();
-        if(books.isEmpty()){results.addView(text(t("没有匹配作品","No matches",
-            "一致する作品なし"),14));return;}
+        if(books.isEmpty()){
+            results.addView(text(t("没有匹配作品","No matches","一致する作品なし"),14));
+            return;
+        }
         for(HostSourceManager.Book book:books){
             results.addView(text(book.title,17));
             Button read=action(results,t("阅读","Read","読む")+" · "+book.title);
-            read.setOnClickListener(v->task(t("准备章节…","Preparing reader…","閲覧準備中…"),()->{
-                manager.select(book.id);
-                String scope=manager.requireSession().scope;
-                return ()->openOwnedReader(book,scope);
-            }));
-            Button saveChapter=action(results,t("保存本地副本","Save chapter offline",
-                "章をローカル保存"));
-            saveChapter.setOnClickListener(v->chooseChapter(book));            Button intoReader=action(results,t("保存到独立阅读器的书库",
-                "Save to separate Reader library","別の Reader 書庫に保存"));
-            intoReader.setOnClickListener(v->task(
-                t("准备复制章节…","Preparing import…","取込準備中…"),()->{
-                manager.select(book.id);
-                String scope=manager.requireSession().scope;
-                return ()->{
-                    Intent importOne=new Intent().setClassName(
-                        "com.picalibrary.android.localcore.qa",
-                        "com.picalibrary.android.ExternalImportActivity")
-                        .putExtra("scope",scope).putExtra("comicId",book.id)
-                        .putExtra("title",book.title);
-                    try{startActivity(importOne);}
-                    catch(android.content.ActivityNotFoundException|SecurityException error){
-                        status.setText(t("请安装同一签名的独立阅读器",
-                            "Install the matching signed standalone Reader",
-                            "同じ署名の別 Reader をインストールしてください"));
-                    }
-                };
-            }));
+            read.setOnClickListener(v->openOwnedReader(book,false));
+            Button save=action(results,t("保存到阅读器书库",
+                "Save to Reader library","Reader 書庫に保存"));
+            save.setOnClickListener(v->openOwnedReader(book,true));
         }
     }
-
-    private void openOwnedReader(HostSourceManager.Book book,String scope){
-        // Prefer the EXACT original source-free Reader in its separate app
-        // identity, via the first-party signature-protected Binder bridge.
-        // If it is not installed, keep the existing Host APK Reader usable.
-        Intent original=new Intent().setClassName(
-                "com.picalibrary.android.localcore.qa",
-                "com.picalibrary.android.ExternalReaderActivity")
-            .putExtra("source","host").putExtra("comicId",book.id)
-            .putExtra("title",book.title).putExtra("scope",scope);
-        try {
-            startActivity(original);
-            status.setText(t("已在独立阅读器中打开",
-                "Opened in the separate Reader",
-                "別アプリの Reader で開きました"));
-        }catch(android.content.ActivityNotFoundException|SecurityException missing){
-            startActivity(new Intent(this,HostReaderActivity.class)
-                .putExtra("source","host").putExtra("comicId",book.id)
-                .putExtra("title",book.title));
-        }
-    }
-
-    private void chooseChapter(HostSourceManager.Book book){
-        task(t("读取章节…","Loading chapters…","章を取得中…"),()->{
-            HostSourceManager.Session grant=manager.requireSession();
+    private void openOwnedReader(HostSourceManager.Book book,boolean save){
+        // This source-only APK has NO local Reader or duplicate book inventory.
+        // Selection and consent remain in the original HostSourceManager.
+        task(t("准备来源…","Preparing source…","ソース準備中…"),()->{
             manager.select(book.id);
-            List<ReaderContent.Chapter> chapters=manager.chapters(grant,book.id);
+            String scope=manager.requireSession().scope;
             return ()->{
-                if(chapters.isEmpty()){
-                    status.setText(t("没有章节","No chapters","章がありません"));return;
+                Intent intent=new Intent().setClassName(
+                    "com.picalibrary.android.localcore.qa",
+                    save?"com.picalibrary.android.ExternalImportActivity":
+                        "com.picalibrary.android.ExternalReaderActivity")
+                    .putExtra("scope",scope).putExtra("comicId",book.id)
+                    .putExtra("title",book.title);
+                if(!save)intent.putExtra("source","host");
+                try{startActivity(intent);}
+                catch(android.content.ActivityNotFoundException|SecurityException failure){
+                    status.setText(t("请安装同一签名的独立阅读器",
+                        "Install the matching signed Reader",
+                        "同じ署名の Reader が必要です"));
                 }
-                String[] names=new String[chapters.size()];
-                for(int i=0;i<chapters.size();i++)names[i]=chapters.get(i).title;
-                new AlertDialog.Builder(this)
-                    .setTitle(t("选择要保存的章节","Select chapter","章を選択"))
-                    .setItems(names,(dialog,index)->
-                        confirmSave(grant,book,chapters.get(index)))
-                    .setNegativeButton(android.R.string.cancel,null).show();
             };
         });
-    }
-
-    private void confirmSave(HostSourceManager.Session grant,
-            HostSourceManager.Book book,ReaderContent.Chapter chapter){
-        new AlertDialog.Builder(this)
-            .setTitle(t("保存本地副本？","Save a local copy?","ローカル保存しますか"))
-            .setMessage(t("仅保存你获授权使用的这一章。完成后离线可读，"+
-                "不会修改原 Host 收藏。",
-                "Copy only this authorized chapter. It stays readable offline; "+
-                "Host favorites are unchanged.",
-                "許可された章だけ保存します。Host のお気に入りは変更しません。"))
-            .setNegativeButton(android.R.string.cancel,null)
-            .setPositiveButton(t("确认保存","Save","保存"),(dialog,which)->
-                task(t("保存中…","Saving…","保存中…"),()->{
-                    LocalComicStore.Comic result=HostOfflineSaver.save(this,
-                        manager,grant,book.id,chapter.id,true,(done,total)->
-                            runOnUiThread(()->{
-                                if(!destroyed)status.setText(done+" / "+total);
-                            }));
-                    return ()->status.setText(t("已保存本地：","Saved locally: ",
-                        "ローカル保存：")+result.title);
-                }))
-            .show();
     }
     @Override protected void onResume(){
         super.onResume();

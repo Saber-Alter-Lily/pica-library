@@ -25,6 +25,7 @@ from pathlib import Path
 
 QA_PACKAGE = "com.picalibrary.android.localcore.qa"
 ORIGINAL_PACKAGE = "com.picalibrary.android.dev"
+CLEAN_PACKAGE = "com.picalibrary.android.cleanqa"
 USER_HOST_PACKAGE = "com.picalibrary.android.userhost.qa"
 PACKAGE = QA_PACKAGE
 ROOT = Path("mobile/android-alpha2/s3-local-emulator-evidence")
@@ -677,6 +678,11 @@ def original_app_flow():
     wait_page_counter("2 / 3", seconds=40)
     page("20-original-restart-resume")
     record("force-stop/relaunch original Home retains local book and saved page")
+    if ORIGINAL_PACKAGE == CLEAN_PACKAGE:
+        # The physically clean original full app has no legacy HostSourceActivity
+        # or bundled provider menu. Its standalone Host path is exercised below.
+        record("clean original four-tab app imports, reads and resumes local CBZ")
+        return
 
     # Exercise the ORIGINAL app’s new, source-neutral Host entry.
     # Navigating there must not depend on a provider account or start a Host.
@@ -1018,8 +1024,11 @@ def original_full_product_signed_host_flow(upstream_pages):
     wait(("我的书库", "My library", "マイライブラリ"), seconds=40)
     tap(("在线", "Online", "オンライン"), seconds=22,
         exact=True, only_class="Button")
-    tap(("独立来源组件 · 工程候选", "Independent source component · QA",
-         "独立した外部ソース · QA"), seconds=25)
+    if ORIGINAL_PACKAGE == CLEAN_PACKAGE:
+        tap(("我的外接来源", "My external sources", "外部ソース"), seconds=25)
+    else:
+        tap(("独立来源组件 · 工程候选", "Independent source component · QA",
+             "独立した外部ソース · QA"), seconds=25)
     PACKAGE = USER_HOST_PACKAGE
     wait(("No Host connected", "尚未连接 Host", "未接続"), seconds=30)
     page("37-original-product-opens-independent-source")
@@ -1213,6 +1222,19 @@ def official_upstream_android_reader_flow():
         page("36-official-host-stopped-offline-original-reader")
         record("official Host disabled and stopped: separate offline Reader still opens stored real-upstream chapter")
         original_full_product_signed_host_flow(original_pages)
+        # Exercise the EXACT original full-product Home/Reader/navigation, now
+        # with its compiled Pica/E-H/JM transports physically absent from DEX.
+        # Reuse the existing Host, original CBZ fixture and real upstream JAR.
+        global ORIGINAL_PACKAGE
+        previous_original = ORIGINAL_PACKAGE
+        ORIGINAL_PACKAGE = CLEAN_PACKAGE
+        try:
+            PACKAGE = CLEAN_PACKAGE
+            original_app_flow()
+            original_full_product_signed_host_flow(original_pages)
+            record("clean full product imports and reads real upstream CBZ after Host stop")
+        finally:
+            ORIGINAL_PACKAGE = previous_original
         (ROOT / "real-upstream-host-proof.json").write_text(json.dumps({
             "upstreamTag": "v2.4.2366",
             "sourceId": "0",
@@ -1229,7 +1251,12 @@ def official_upstream_android_reader_flow():
             "originalFullProductSignedCompanionFlow": True,
             "originalProductPackage": ORIGINAL_PACKAGE,
             "originalProductOwnLocalPages": 2,
-            "originalProductReaderResumesAfterHostStop": True
+            "originalProductReaderResumesAfterHostStop": True,
+            "cleanFourTabOriginalProductTested": True,
+            "cleanProductPackage": CLEAN_PACKAGE,
+            "cleanProductOwnLocalPages": 2,
+            "cleanProductOfflineAfterHostStop": True,
+            "originalProductBoundSourceProvidersPresent": False
         }, indent=2), encoding="utf-8")
 
 def main():
@@ -1258,7 +1285,7 @@ def main():
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",
             "package": QA_PACKAGE,
-            "also_tested": [ORIGINAL_PACKAGE, USER_HOST_PACKAGE],
+            "also_tested": [ORIGINAL_PACKAGE, CLEAN_PACKAGE, USER_HOST_PACKAGE],
             "network_source": "synthetic loopback and pinned official Suwayomi built-in local source only"},
             ensure_ascii=False, indent=2), encoding="utf-8")
         print("S3 LOCAL END-TO-END PASS", flush=True)

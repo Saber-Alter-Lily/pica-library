@@ -13,6 +13,8 @@ on:
       - 'mobile/android-alpha2/reader-view/**'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/LocalComicImportActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
+      - 'mobile/android-alpha2/app/src/cleanSourceQa/**'
+      - 'mobile/android-alpha2/app/build.gradle'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HostSourceActivity.java'
       - 'scripts/run-s3-android-local-emulator.sh'
       - 'scripts/s3-android-local-emulator-flow.py'

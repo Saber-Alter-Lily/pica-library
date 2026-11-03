@@ -185,6 +185,13 @@ try {
     if (-not (Test-Path -LiteralPath $database)) {
         throw 'Baseline did not create the external Library database'
     }
+    # R4: Actual v0.5.0 executable upgrade/rollback must preserve these existing
+    # private profile directories, without copying the manga page body tree.
+    $packMarker = Join-Path $desktopHome 'packs\r4-style-profile.json'
+    $tasteMarker = Join-Path $desktopHome 'runtime-state\personalization\r4-taste.json'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packMarker),(Split-Path -Parent $tasteMarker) | Out-Null
+    [IO.File]::WriteAllText($packMarker, '{"r4":"old-style-preserved"}')
+    [IO.File]::WriteAllText($tasteMarker, '{"r4":"old-preference-preserved"}')
 
     $bootstrapRuntime = Join-Path $bootstrap 'node.exe'
     $bootstrapHelper = Join-Path $bootstrap 'full-upgrader.js'
@@ -272,6 +279,23 @@ try {
             -not (Test-Path -LiteralPath $database)) {
             throw 'Rollback did not preserve external configuration/database'
         }
+        if (-not (Test-Path -LiteralPath $packMarker) -or
+            [IO.File]::ReadAllText($packMarker) -ne '{"r4":"old-style-preserved"}' -or
+            -not (Test-Path -LiteralPath $tasteMarker) -or
+            [IO.File]::ReadAllText($tasteMarker) -ne '{"r4":"old-preference-preserved"}') {
+            throw 'R4 rollback did not restore exact original style and personalization state'
+        }
+        $snapshotReceiptPath = Join-Path $bootstrap 'user-state-snapshot\snapshot.json'
+        if (-not (Test-Path -LiteralPath $snapshotReceiptPath)) {
+            throw 'R4 rollback did not retain the profile integrity receipt'
+        }
+        $snapshotReceipt = Get-Content -Raw -LiteralPath $snapshotReceiptPath | ConvertFrom-Json
+        $snapshotPaths = @($snapshotReceipt.files | ForEach-Object { $_.path })
+        if ($snapshotReceipt.schemaVersion -ne 3 -or
+            $snapshotPaths -notcontains 'packs/r4-style-profile.json' -or
+            $snapshotPaths -notcontains 'personalization/r4-taste.json') {
+            throw 'R4 rollback profile integrity receipt lacks style/personalization evidence'
+        }
         Assert-DeepDatabaseCanary (Join-Path $candidateRoot 'runtime\node.exe') $database
         Stop-Desktop $restored
         $currentInstance = $null
@@ -287,6 +311,8 @@ try {
             original_tag_asset_bytes_restored = $true
             external_config_preserved = $true
             external_database_preserved = $true
+            r4_style_and_personalization_rollback = 'PASS'
+            r4_integrity_receipt_verified = $true
             library_database_path_characters = $database.Length
             same_source_recovery_fixture = $baselineSha -eq $CandidateSourceSha
             source_sha = $CandidateSourceSha
@@ -325,6 +351,12 @@ try {
     if (-not (Test-Path -LiteralPath $database)) {
         throw 'External Library database was not preserved'
     }
+    if (-not (Test-Path -LiteralPath $packMarker) -or
+        [IO.File]::ReadAllText($packMarker) -ne '{"r4":"old-style-preserved"}' -or
+        -not (Test-Path -LiteralPath $tasteMarker) -or
+        [IO.File]::ReadAllText($tasteMarker) -ne '{"r4":"old-preference-preserved"}') {
+        throw 'R4 upgrade did not preserve exact original style and personalization state'
+    }
     Assert-DeepDatabaseCanary (Join-Path $candidateRoot 'runtime\node.exe') $database
     if ($candidateSchema -gt $baselineSchema) {
         $migrationBackup = "$database.pre-migration-v$candidateSchema.bak"
@@ -347,6 +379,7 @@ try {
         candidate_version = $CandidateVersion
         source_sha = $CandidateSourceSha
         tag_runtime_full_replacement = 'PASS'
+        r4_style_and_personalization_preserved = 'PASS'
         legacy_review_evidence_removed = $true
         external_config_preserved = $true
         external_database_preserved = $true

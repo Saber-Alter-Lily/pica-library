@@ -211,7 +211,7 @@ jobs:
           printf '%s\n' "$host_cert" > candidate-postrc/HOST_CERTIFICATE_SHA256.txt
           printf '%s\n' "$GITHUB_SHA" > candidate-postrc/SOURCE_SHA.txt
           printf '%s\n' "$rc_version" > candidate-postrc/VERSION.txt
-          printf '%s\n' 'UNPUBLISHED same-source AND same-preview-signer QA pair: install Pica-Library-Post-Stable-RC-Android.apk (com.picalibrary.android.dev), then Pica-Library-Post-Stable-RC-User-Host.apk (com.picalibrary.android.userhost.qa) only if no conflicting source package/signature is already present. Open the optional source from the full app Online tab. No automatic source install or connection, no site SDK in Host. Keep stable v0.5.0 installed; never uninstall existing Dev data to bypass a signer/version mismatch. Physical UX and real legacy migration remain pending.' > candidate-postrc/STATUS.txt
+          printf '%s\n' 'UNPUBLISHED same-source AND same-preview-signer QA pair: install Pica-Library-Post-Stable-RC-Android.apk (com.picalibrary.android.dev), then Pica-Library-Post-Stable-RC-User-Host.apk (com.picalibrary.android.userhost.qa) only if no conflicting source package/signature is already present. Open the optional source from the full app Online tab. No automatic source install or connection, no site SDK in Host. Keep stable v0.5.0 installed; stop on signature mismatch; never uninstall existing Dev data to bypass a signer/version mismatch. Physical UX and real legacy migration remain pending.' > candidate-postrc/STATUS.txt
           (cd candidate-postrc && sha256sum Pica-Library-Post-Stable-RC-Android.apk Pica-Library-Post-Stable-RC-User-Host.apk > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:

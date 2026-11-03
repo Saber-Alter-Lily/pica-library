@@ -14,7 +14,7 @@ import java.util.concurrent.*;
 
 /** Product shell: library and recommendations live here; Online and Settings own separate screens. */
 public final class HomeActivity extends LocaleAwareActivity implements CollectionSelectionController.Host {
-    private FrameLayout body;private LinearLayout bottomNavigationHost;private SharedPreferences prefs;private final ExecutorService worker=Executors.newFixedThreadPool(4);private Future<?> pending;private int serial,current,collectionMode;private String libraryQuery="",activeShelfId="",themeKey="";private boolean showingShelves;
+    private FrameLayout body;private LinearLayout bottomNavigationHost;private SharedPreferences prefs;private final ExecutorService worker=Executors.newFixedThreadPool(4);private final ExecutorService recommendationWorker=Executors.newSingleThreadExecutor();private Future<?> pending;private boolean recommendationSwitching;private int serial,current,collectionMode;private String libraryQuery="",activeShelfId="",themeKey="";private boolean showingShelves;
     private LinearLayout recommendationBatchList;private TextView recommendationBatchLabel;private UnifiedCatalogStore.Snapshot recommendationCatalog;private NativeRecommendationStore.Snapshot recommendationVisibleSnapshot;
     private ImageButton libraryRefreshButton;private TextView libraryRefreshStatus;
     private CollectionSelectionController collectionSelection;
@@ -26,7 +26,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     @Override protected void onResume(){super.onResume();if(BuildConfig.LOCAL_ONLY_DRAFT){if(body!=null)show();return;}RecommendationSyncActivity.maybeOfferOnConnection(this);String key=ThemeStore.effectiveKey(this);if(!key.equals(themeKey)){themeKey=key;Ui.applyWindow(this);renderShell();show();}else if(body!=null)show();if(!onboardingPromptScheduled&&body!=null&&OnboardingStore.shouldPrompt(this)){onboardingPromptScheduled=true;body.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&OnboardingStore.shouldPrompt(this))AndroidOnboarding.maybePrompt(this);},700);}else if(body!=null)body.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&!OnboardingStore.shouldPrompt(this))AutoUpdatePrompt.maybePrompt(this);},900);}
     @Override protected void onSaveInstanceState(Bundle out){captureCurrentViewport();out.putInt("tab",current);out.putBoolean("shelves",showingShelves);out.putString("libraryQuery",libraryQuery);out.putIntArray("tabScrollY",tabScrollY);out.putIntArray("tabListPosition",tabListPosition);out.putIntArray("tabListOffset",tabListOffset);super.onSaveInstanceState(out);}
     @Override protected void onPause(){captureCurrentViewport();super.onPause();}
-    @Override protected void onDestroy(){++serial;if(collectionSelection!=null)collectionSelection.detach();if(pending!=null)pending.cancel(true);worker.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){++serial;if(collectionSelection!=null)collectionSelection.detach();if(pending!=null)pending.cancel(true);worker.shutdownNow();recommendationWorker.shutdown();super.onDestroy();}
 
     private void renderShell(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});body=new FrameLayout(this);body.setBackgroundColor(Ui.BG);root.addView(body,new LinearLayout.LayoutParams(-1,0,1));bottomNavigationHost=new LinearLayout(this);bottomNavigationHost.setOrientation(LinearLayout.VERTICAL);root.addView(bottomNavigationHost,new LinearLayout.LayoutParams(-1,-2));showNormalBottomNavigation();setContentView(root);root.requestApplyInsets();}
     private Button compact(String label,View.OnClickListener action){return Ui.button(this,label,action,true);}
@@ -82,9 +82,52 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     void startOnboardingTour(){onboardingPromptScheduled=true;AndroidOnboarding.start(this);}
     void onboardingShowTab(int tab,Runnable after){showingShelves=false;current=ShellPolicy.clampTab(tab);renderShell();show();if(body!=null)body.postDelayed(after,160);}
 
-    private void show(){captureCurrentViewport();if(collectionSelection!=null)collectionSelection.detach();++serial;if(pending!=null)pending.cancel(true);pending=null;body.removeAllViews();activeScroll=null;activeList=null;activeViewportTab=-1;recommendationBatchList=null;recommendationBatchLabel=null;recommendationCatalog=null;recommendationVisibleSnapshot=null;libraryRefreshButton=null;libraryRefreshStatus=null;if(showingShelves){shelves();return;}if(BuildConfig.LOCAL_ONLY_DRAFT){if(current==3)settingsEntry();else library();return;}if(current==0)library();else if(current==1)recommendations();else if(current==2)onlineEntry();else settingsEntry();}
+    private void show(){captureCurrentViewport();if(collectionSelection!=null)collectionSelection.detach();++serial;if(pending!=null)pending.cancel(true);pending=null;body.removeAllViews();activeScroll=null;activeList=null;activeViewportTab=-1;recommendationBatchList=null;recommendationBatchLabel=null;recommendationCatalog=null;recommendationVisibleSnapshot=null;recommendationSwitching=false;libraryRefreshButton=null;libraryRefreshStatus=null;if(showingShelves){shelves();return;}if(BuildConfig.LOCAL_ONLY_DRAFT){if(current==3)settingsEntry();else library();return;}if(current==0)library();else if(current==1)recommendations();else if(current==2)onlineEntry();else settingsEntry();}
     private LinearLayout page(boolean scroll){LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setBackgroundColor(Ui.BG);p.setPadding(Ui.dp(this,12),Ui.dp(this,8),Ui.dp(this,12),Ui.dp(this,8));if(scroll){final int tab=current;ScrollView s=new ScrollView(this);activeScroll=s;activeList=null;activeViewportTab=tab;s.setBackgroundColor(Ui.BG);s.addView(p);body.addView(s,new FrameLayout.LayoutParams(-1,-1));s.post(()->s.scrollTo(0,Math.max(0,tabScrollY[tab])));}else{activeScroll=null;activeList=null;activeViewportTab=-1;body.addView(p,new FrameLayout.LayoutParams(-1,-1));}return p;}
-    private void titleRow(LinearLayout p,String title,View... actions){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);TextView label=Ui.text(this,title,26,Ui.TEXT,true);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));for(View action:actions){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.setMargins(Ui.dp(this,4),0,0,0);row.addView(action,lp);}p.addView(row);}
+    private void titleRow(LinearLayout p,String title,View... actions){
+        TextView label=Ui.text(this,title,26,Ui.TEXT,true);
+        label.setMaxLines(2);
+        // Library's four actions and translated headers must remain visible at
+        // 360/393dp. Keep the existing actions, but give them a separate row.
+        boolean stacked=actions.length>=3||
+            (actions.length>=2&&getResources().getConfiguration().screenWidthDp<=420);
+        if(stacked){
+            LinearLayout group=new LinearLayout(this);
+            group.setOrientation(LinearLayout.VERTICAL);
+            group.addView(label,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout controls=new LinearLayout(this);
+            controls.setGravity(Gravity.CENTER_VERTICAL);
+            controls.setPadding(0,Ui.dp(this,5),0,Ui.dp(this,3));
+            for(View action:actions){
+                LinearLayout.LayoutParams lp;
+                if(action instanceof ImageButton){
+                    lp=new LinearLayout.LayoutParams(Ui.dp(this,52),Ui.dp(this,52));
+                }else{
+                    lp=new LinearLayout.LayoutParams(0,Ui.dp(this,52),1);
+                    if(action instanceof Button){
+                        Button b=(Button)action;
+                        b.setSingleLine(false);
+                        b.setMaxLines(2);
+                        b.setGravity(Gravity.CENTER);
+                    }
+                }
+                lp.setMargins(Ui.dp(this,3),0,Ui.dp(this,3),0);
+                controls.addView(action,lp);
+            }
+            group.addView(controls);
+            p.addView(group);
+            return;
+        }
+        LinearLayout row=new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+        for(View action:actions){
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);
+            lp.setMargins(Ui.dp(this,4),0,0,0);
+            row.addView(action,lp);
+        }
+        p.addView(row);
+    }
     private RecyclerView collection(LinearLayout p,int mode){final int tab=current;RecyclerView v=new RecyclerView(this);activeScroll=null;activeList=v;activeViewportTab=tab;v.setClipToPadding(false);v.setPadding(0,Ui.dp(this,4),0,Ui.dp(this,16));setCollectionLayout(v,mode);p.addView(v,new LinearLayout.LayoutParams(-1,0,1));return v;}
     private void rememberListPosition(RecyclerView v,int tab){RecyclerView.LayoutManager raw=v.getLayoutManager();if(!(raw instanceof LinearLayoutManager))return;LinearLayoutManager lm=(LinearLayoutManager)raw;int position=lm.findFirstVisibleItemPosition();if(position<0)return;View first=lm.findViewByPosition(position);tabListPosition[tab]=position;tabListOffset[tab]=first==null?0:first.getTop()-v.getPaddingTop();}
     private void captureCurrentViewport(){int tab=activeViewportTab;if(tab<0||tab>=4)return;if(activeScroll!=null){tabScrollY[tab]=Math.max(0,activeScroll.getScrollY());return;}if(activeList!=null)rememberListPosition(activeList,tab);}
@@ -196,24 +239,68 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         titleRow(p,"为你推荐",preferences,refresh);
         p.addView(progress);
 
-        NativeRecommendationStore.Snapshot stored=NativeRecommendationStore.load(this);
-        NativeRecommendationStore.Snapshot snapshot=RecommendationPolicyStore.applyLocalPolicy(this,stored);recommendationVisibleSnapshot=snapshot;
-        PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
+        LinearLayout loading=SettingsRow.panel(this,null);
+        loading.addView(new ProgressBar(this));
+        loading.addView(Ui.rawText(this,LocalizedText.ui(this,
+            "正在读取本机推荐…","Loading phone recommendations…",
+            "おすすめを読み込み中…"),14,Ui.MUTED,false));
+        p.addView(loading);
+        final int ticket=serial;
+        recommendationWorker.execute(()->{
+            try{
+                android.content.Context app=getApplicationContext();
+                NativeRecommendationStore.Snapshot stored=NativeRecommendationStore.load(app);
+                NativeRecommendationStore.Snapshot snapshot=
+                    RecommendationPolicyStore.applyLocalPolicy(app,stored);
+                PortableRecommendationPackageStore.Snapshot portable=
+                    PortableRecommendationPackageStore.load(app);
+                UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(app);
+                int sessionCount=RecommendationEvidenceStore.sessionCount(app);
+                boolean canRun=PicaClient.available(app)||portable.available();
+                boolean paired=BridgeStore.paired(app);
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed()||ticket!=serial||current!=1||
+                            p.getParent()==null)return;
+                    p.removeView(loading);
+                    renderRecommendationLoaded(p,progress,stored,snapshot,
+                        portable,catalog,sessionCount,canRun,paired);
+                });
+            }catch(RuntimeException error){
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed()||ticket!=serial||current!=1||
+                            p.getParent()==null)return;
+                    loading.removeAllViews();
+                    loading.addView(Ui.rawText(this,LocalizedText.ui(this,
+                        "读取失败，原数据未修改。","Load failed; data unchanged.",
+                        "読み込み失敗。データは変更していません。"),14,Ui.BAD,false));
+                    loading.addView(compact(LocalizedText.ui(this,
+                        "重试","Retry","再試行"),v->show()));
+                });
+            }
+        });
+    }
 
+    private void renderRecommendationLoaded(LinearLayout p,
+            RecommendationProgressPanel progress,
+            NativeRecommendationStore.Snapshot stored,
+            NativeRecommendationStore.Snapshot snapshot,
+            PortableRecommendationPackageStore.Snapshot portable,
+            UnifiedCatalogStore.Snapshot catalog,
+            int sessionCount,boolean canRun,boolean paired){
+        recommendationVisibleSnapshot=snapshot;
         LinearLayout statusCard=SettingsRow.panel(this,null);
         statusCard.addView(SettingsRow.statusLine(this,"运行节点",Ui.text(this,"Android 本机",12,Ui.TEXT,true)));
         statusCard.addView(SettingsRow.statusLine(this,"当前 Cycle",Ui.text(this,stored.cycleId.isEmpty()?"尚未生成":stored.cycleId.substring(0,Math.min(12,stored.cycleId.length())),12,Ui.MUTED,true)));
         statusCard.addView(SettingsRow.statusLine(this,"候选基础",Ui.rawText(this,portable.available()?LocalizedText.ui(this,portable.candidates.size()+" 个 · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length())),portable.candidates.size()+" items · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length())),portable.candidates.size()+" 件 · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length()))):LocalizedText.ui(this,"尚未同步","Not synced yet","未同期"),12,Ui.MUTED,true)));
-        statusCard.addView(SettingsRow.statusLine(this,"本次 Session",Ui.rawText(this,LocalizedText.ui(this,RecommendationEvidenceStore.sessionCount(this)+" 条行为 · 仅手机",RecommendationEvidenceStore.sessionCount(this)+" behaviors · phone only",RecommendationEvidenceStore.sessionCount(this)+" 件の行動 · スマートフォンのみ"),12,Ui.MUTED,true)));
+        statusCard.addView(SettingsRow.statusLine(this,"本次 Session",Ui.rawText(this,LocalizedText.ui(this,sessionCount+" 条行为 · 仅手机",sessionCount+" behaviors · phone only",sessionCount+" 件の行動 · スマートフォンのみ"),12,Ui.MUTED,true)));
         p.addView(statusCard);
 
         if(!snapshot.available()){
             TextView t=Ui.text(this,stored.available()?"当前候选已被本机反馈或屏蔽规则耗尽。":"还没有手机本地推荐周期。",14,Ui.MUTED,false);
             t.setPadding(0,Ui.dp(this,12),0,Ui.dp(this,10));p.addView(t);
-            boolean canRun=PicaClient.available(this)||portable.available();
             if(canRun){
                 p.addView(compact("生成手机推荐",v->{NativeRecommendationJobs.refresh(this);progress.begin();}));
-            }else if(BridgeStore.paired(this)){
+            }else if(paired){
                 p.addView(compact("同步候选基础",v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
             }else{
                 p.addView(compact("连接电脑或配置在线来源",v->startActivity(new Intent(this,PairingActivity.class))));
@@ -229,18 +316,44 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         pager.addView(compact("下一批",v->switchHomeRecommendationBatch(1)),new LinearLayout.LayoutParams(0,-2,1));
         p.addView(pager);
 
-        recommendationCatalog=UnifiedCatalogStore.load(this);
+        recommendationCatalog=catalog;
         recommendationBatchList=new LinearLayout(this);recommendationBatchList.setOrientation(LinearLayout.VERTICAL);p.addView(recommendationBatchList);
         renderHomeRecommendationBatch(snapshot);
-        NativeRecommendationStore.markSeen(this,snapshot.current());
+        recommendationWorker.execute(()->NativeRecommendationStore.markSeen(getApplicationContext(),snapshot.current()));
     }
 
     private void switchHomeRecommendationBatch(int delta){
-        if(recommendationBatchList==null||recommendationBatchLabel==null)return;
-        RecommendationPolicyStore.moveVisibleBatch(this,delta);
-        NativeRecommendationStore.Snapshot visible=RecommendationPolicyStore.applyLocalPolicy(this,NativeRecommendationStore.load(this));recommendationVisibleSnapshot=visible;
-        renderHomeRecommendationBatch(visible);
-        NativeRecommendationStore.markSeen(this,visible.current());
+        if(recommendationBatchList==null||recommendationBatchLabel==null||
+                recommendationSwitching)return;
+        recommendationSwitching=true;
+        recommendationBatchLabel.setText(LocalizedText.ui(this,
+            "切换中…","Switching…","切り替え中…"));
+        final int ticket=serial;
+        recommendationWorker.execute(()->{
+            NativeRecommendationStore.Snapshot visible=null;
+            try{
+                android.content.Context app=getApplicationContext();
+                RecommendationPolicyStore.moveVisibleBatch(app,delta);
+                visible=RecommendationPolicyStore.applyLocalPolicy(
+                    app,NativeRecommendationStore.load(app));
+                NativeRecommendationStore.markSeen(app,visible.current());
+            }catch(RuntimeException error){
+                // Prior persisted batch remains the last committed state.
+            }
+            NativeRecommendationStore.Snapshot result=visible;
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed()||ticket!=serial||current!=1)return;
+                recommendationSwitching=false;
+                if(result==null){
+                    recommendationBatchLabel.setText(LocalizedText.ui(this,
+                        "切换失败 · 重试","Switch failed · retry",
+                        "切替失敗 · 再試行"));
+                    return;
+                }
+                recommendationVisibleSnapshot=result;
+                renderHomeRecommendationBatch(result);
+            });
+        });
     }
 
     private void renderHomeRecommendationBatch(NativeRecommendationStore.Snapshot snapshot){
@@ -262,29 +375,55 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
                 feedbackState.setPadding(0,Ui.dp(this,7),0,0);copy.addView(feedbackState);
                 if(disliked)cover.setAlpha(.55f);
             }
-            LinearLayout feedback=new LinearLayout(this);feedback.setPadding(0,Ui.dp(this,8),0,0);
-            feedback.addView(compact(liked?"👍 已喜欢":"👍 喜欢",v->recommendationFeedback(item,"like")));Ui.gap(feedback,this,6);
-            feedback.addView(compact(disliked?"👎 已不喜欢":"👎 不喜欢",v->recommendationFeedback(item,"dislike")));Ui.gap(feedback,this,6);
+            // On 360dp a fixed cover leaves no room for three feedback
+            // buttons on one row. Keep every action visible and tappable.
+            LinearLayout feedback=new LinearLayout(this);
+            feedback.setOrientation(LinearLayout.VERTICAL);
+            feedback.setPadding(0,Ui.dp(this,8),0,0);
+            LinearLayout opinions=new LinearLayout(this);
+            Button like=compact(liked?"👍 已喜欢":"👍 喜欢",
+                v->recommendationFeedback(item,"like"));
+            Button dislike=compact(disliked?"👎 已不喜欢":"👎 不喜欢",
+                v->recommendationFeedback(item,"dislike"));
+            like.setSingleLine(false);like.setMaxLines(2);
+            dislike.setSingleLine(false);dislike.setMaxLines(2);
+            opinions.addView(like,new LinearLayout.LayoutParams(0,Ui.dp(this,48),1));
+            Ui.gap(opinions,this,4);
+            opinions.addView(dislike,new LinearLayout.LayoutParams(0,Ui.dp(this,48),1));
+            feedback.addView(opinions);
             UnifiedCatalogStore.Entry target=e;
-            feedback.addView(compact("⚙ 调节",v->RecommendationItemControlDialog.show(this,target,this::show)));copy.addView(feedback);
+            feedback.addView(compact("⚙ 调节偏好",
+                v->RecommendationItemControlDialog.show(this,target,this::show)),
+                new LinearLayout.LayoutParams(-1,Ui.dp(this,48)));
+            copy.addView(feedback);
             card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));card.setOnClickListener(v->openRecommendation(target));CoverRepository.load(this,cover,e,Ui.PLACEHOLDER);recommendationBatchList.addView(card);
         }
     }
 
     private void refreshRecommendations(RecommendationProgressPanel progress){
-        PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
-        if(PicaClient.available(this)||portable.available()){
-            NativeRecommendationJobs.refresh(this);
-            progress.begin();
-            Toast.makeText(this,LocalizedText.ui("手机正在独立生成新的推荐周期"),Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if(BridgeStore.paired(this)){
-            Toast.makeText(this,LocalizedText.ui("先同步候选基础；同步不会替换当前手机推荐周期"),Toast.LENGTH_LONG).show();
-            startActivity(new Intent(this,RecommendationSyncActivity.class));
-            return;
-        }
-        Toast.makeText(this,LocalizedText.ui("请先连接电脑或配置可用的在线来源"),Toast.LENGTH_LONG).show();
+        final int ticket=serial;
+        recommendationWorker.execute(()->{
+            android.content.Context app=getApplicationContext();
+            boolean available=PicaClient.available(app)||
+                PortableRecommendationPackageStore.load(app).available();
+            boolean paired=BridgeStore.paired(app);
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed()||ticket!=serial||current!=1)return;
+                if(available){
+                    NativeRecommendationJobs.refresh(this);
+                    progress.begin();
+                    Toast.makeText(this,LocalizedText.ui(
+                        "手机正在独立生成新的推荐周期"),Toast.LENGTH_SHORT).show();
+                }else if(paired){
+                    Toast.makeText(this,LocalizedText.ui(
+                        "先同步候选基础；同步不会替换当前手机推荐周期"),Toast.LENGTH_LONG).show();
+                    startActivity(new Intent(this,RecommendationSyncActivity.class));
+                }else{
+                    Toast.makeText(this,LocalizedText.ui(
+                        "请先连接电脑或配置可用的在线来源"),Toast.LENGTH_LONG).show();
+                }
+            });
+        });
     }
 
     private void refreshCurrentRecommendationFeedback(){if(recommendationVisibleSnapshot!=null&&recommendationBatchList!=null&&recommendationBatchLabel!=null)renderHomeRecommendationBatch(recommendationVisibleSnapshot);}

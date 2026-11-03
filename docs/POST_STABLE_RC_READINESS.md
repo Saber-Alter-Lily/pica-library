@@ -73,3 +73,7 @@ The separate local issue fixes and Reader gesture slice are recorded under [已�
 K1 Windows, K2 Android, K3 real download/Reader, K4 Windows/manual and Android/OEM, J7B real Provider, J10 real Visual and low-end Windows CPU/jank traces remain pending until representative evidence is collected and reconciled. Their harnesses already exist; building this RC does not supply their results.
 
 H2B threshold decisions, C3/G20 resource enforcement, P4 platform promotion and later Remote Web stages remain outside this change. See `DEVELOPMENT_TASK_LOG.md` NEXT-33–37 for the current queue, community issues and bounded Reader follow-up.
+
+## R3 integration candidate use (2026-11-02)
+
+The same existing workflow is now available on the active `codex/product-integration-r1-20261102` branch for one **complete Windows + original Android application QA packaging** milestone. Its mainline release/tag/update path remains unchanged. The existing stable-source pin, isolated desktop root, pinned preview Android signer, SHA/version checks, and synthetic full-upgrade test all remain in force. Only a small explicitly selected integration handoff/build-script change triggers the extra push build; other branch changes continue through standard CI. Artifacts live for three days for device review; a successful run is **not** signed stable distribution, a source-free complete Android product, or successful migration of any actual v0.5.0 user profile. See [R3 dual-client candidate handoff](R3_DUAL_CLIENT_PRODUCT_CANDIDATE_20261102.md).

@@ -1,8 +1,19 @@
 name: Post-stable Isolated RC Packages
 
 on:
+  # One installable dual-client checkpoint when this integration handoff is
+  # updated, not every micro-commit. Existing workflow_dispatch remains.
   push:
-    branches: [codex/post-v050-rc-readiness]
+    branches:
+      - codex/post-v050-rc-readiness
+      - codex/product-integration-r1-20261102
+    paths:
+      - '.github/workflows/post-stable-rc-packages.yml'
+      - 'docs/R3_DUAL_CLIENT_PRODUCT_CANDIDATE_20261102.md'
+      - 'scripts/build-windows-rc-package.ps1'
+      - 'scripts/build-windows-rc-launcher.ps1'
+      - 'scripts/test-windows-universal-full-upgrade.ps1'
+      - 'scripts/write-rc-artifact-summary.mjs'
   pull_request:
     paths:
       - '.github/workflows/post-stable-rc-packages.yml'
@@ -107,7 +118,7 @@ jobs:
         with:
           name: Pica-Library-Post-Stable-RC-Windows
           path: candidate/windows/
-          retention-days: 1
+          retention-days: 3
           if-no-files-found: error
 
   android-rc:
@@ -180,7 +191,7 @@ jobs:
         with:
           name: Pica-Library-Post-Stable-RC-Android
           path: mobile/android-alpha2/candidate-postrc/
-          retention-days: 1
+          retention-days: 3
           if-no-files-found: error
 
   artifact-summary:
@@ -205,5 +216,5 @@ jobs:
         with:
           name: Pica-Library-Post-Stable-RC-Status
           path: candidate/RC_STATUS.json
-          retention-days: 1
+          retention-days: 3
           if-no-files-found: error

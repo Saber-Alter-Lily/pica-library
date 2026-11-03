@@ -70,3 +70,7 @@ R1 完成定义：同一固定 HEAD 的 Windows/Android 构建与核心流程测
 **当前动作**：以 #282 已通过的工程 HEAD 建立唯一集成主干及 Draft 对 main 的审查入口，随后集中进入 R1 双端产品化。此文件不是 G1–G4 通过声明，也不授权接触真实账号或发布新安装包。
 
 历史详细计划：PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md；历史原 42+新增验收：PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md；流水日志：../DEVELOPMENT_TASK_LOG.md。
+
+### R3 首批交付节点：完整双端可安装 RC（2026-11-02）
+
+为避免再在独立 QA 模块与局部测试中原地打转，已启用当前唯一集成分支上的**现有** Post-stable Isolated RC Packages 全量产品打包。把原 Windows 完整应用和原 Android 完整应用作为实机 R3 候选，与物理无源模块 QA 分开记录。不得将原完整包错误宣称为无具体站点 SDK 的正式清洁版本。实际安装包存在性以相同 SHA 的 `contract`/`windows-rc`/`android-rc` 和 `RC_STATUS.json` 为准；当前节点需要等待真实结果后更新。完整手工验收与 G3 旧版升级边界见 [R3 双端完整产品候选](R3_DUAL_CLIENT_PRODUCT_CANDIDATE_20261102.md)。主线顺序仍为 R3 真正全功能日常使用 → R4 可回滚迁移 → 单一正式分发；此前源组件更多合成样本不再是优先事项。

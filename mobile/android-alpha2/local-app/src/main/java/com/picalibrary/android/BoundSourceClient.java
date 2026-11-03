@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
@@ -53,6 +54,11 @@ final class BoundSourceClient implements AutoCloseable {
     }
     private ISourceEndpoint ready()throws IOException{
         if(closed)throw new IOException("SOURCE_HOST_CANCELLED");
+        // Neither an exported Reader intent nor a claimed package name is
+        // authority. Verify the companion signing identity before each IPC.
+        if(context.getPackageManager().checkSignatures(
+                context.getPackageName(),PACKAGE)!=PackageManager.SIGNATURE_MATCH)
+            throw new IOException("SOURCE_HOST_AUTH_REQUIRED");
         if(Looper.myLooper()==Looper.getMainLooper())
             throw new IOException("SOURCE_HOST_UNAVAILABLE");
         if(!started){

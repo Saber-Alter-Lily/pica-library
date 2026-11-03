@@ -2,6 +2,10 @@
     <!-- No INTERNET, provider account, package install, camera or broad storage permission. SAF is user-selected. -->
     <!-- The source-free Reader cannot make network requests. An optional,
          same-signer companion may provide owned images through Binder only. -->
+    <!-- Permission ownership belongs to the Reader, NOT the optional Host.
+         This prevents a separately installed source from defining Reader trust. -->
+    <permission android:name="com.picalibrary.android.remote.BIND_SOURCE"
+        android:protectionLevel="signature"/>
     <uses-permission android:name="com.picalibrary.android.remote.BIND_SOURCE"/>
     <queries>
         <package android:name="com.picalibrary.android.userhost.qa"/>

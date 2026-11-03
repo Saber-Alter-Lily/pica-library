@@ -2,8 +2,6 @@
     <!-- Only user-authorized external Host transport requests INTERNET.
          No Reader, LocalComicStore, broad storage or source provider SDK. -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <permission android:name="com.picalibrary.android.remote.BIND_SOURCE"
-        android:protectionLevel="signature"/>
     <uses-permission android:name="com.picalibrary.android.remote.BIND_SOURCE"/>
     <queries><package android:name="com.picalibrary.android.localcore.qa"/></queries>
     <application android:allowBackup="false" android:usesCleartextTraffic="true"

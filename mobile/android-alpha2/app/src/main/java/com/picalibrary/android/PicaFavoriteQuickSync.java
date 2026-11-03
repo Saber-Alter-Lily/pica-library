@@ -88,7 +88,7 @@ final class PicaFavoriteQuickSync {
 
     private static List<String> picaIds(List<BridgeClient.ComicItem> items){
         List<String> out=new ArrayList<>();
-        for(BridgeClient.ComicItem item:items)if(item!=null&&!EhClient.isEhId(item.id)&&!item.id.isEmpty())out.add(item.id);
+        for(BridgeClient.ComicItem item:items)if(item!=null&&!ComicIdFormat.isEhId(item.id)&&!item.id.isEmpty())out.add(item.id);
         return out;
     }
 
@@ -121,7 +121,7 @@ final class PicaFavoriteQuickSync {
             int downloaded=previous==null?0:previous.downloadedPictures;
             next.add(new BridgeClient.ComicItem(id,title,author,cover,downloaded));
         }
-        for(BridgeClient.ComicItem item:prior.items)if(EhClient.isEhId(item.id))next.add(item);
+        for(BridgeClient.ComicItem item:prior.items)if(ComicIdFormat.isEhId(item.id))next.add(item);
         FavoriteCacheStore.save(context,next,false);
     }
 }

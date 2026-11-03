@@ -54,7 +54,7 @@ final class CoverRepository {
         if(!BuildConfig.SOURCE_NEUTRAL_QA&&bitmap==null&&entry.picaCoverUrl!=null&&!entry.picaCoverUrl.isEmpty()){
             HttpURLConnection c=null;try{if(entry.id.startsWith("jm:")){sourcePermit=SourceAccess.bind(context,"jm");c=SourceMedia.thumbnail(entry.picaCoverUrl,sourcePermit);}else{PicaClient client=new PicaClient(context);sourcePermit=client.access;c=client.media(entry.picaCoverUrl);}bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
         }
-        if(!BuildConfig.SOURCE_NEUTRAL_QA&&bitmap==null&&EhClient.isEhId(entry.id)){
+        if(!BuildConfig.SOURCE_NEUTRAL_QA&&bitmap==null&&ComicIdFormat.isEhId(entry.id)){
             try{EhClient client=new EhClient(context);sourcePermit=client.access;EhClient.Comic comic=client.comic(entry.id);UnifiedCatalogStore.Entry refreshed=UnifiedEhCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.thumbnail(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}catch(Exception ignored){}
         }
         if(!BuildConfig.SOURCE_NEUTRAL_QA&&bitmap==null&&!entry.id.contains(":")&&PicaClient.available(context)){

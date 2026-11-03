@@ -84,6 +84,18 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         probeSerial++;
         content.removeAllViews();
         if(BuildConfig.SOURCE_NEUTRAL_QA){
+            // The advanced eight-chapter guide needs two real, visible
+            // controls. Source policy remains read-only in this build;
+            // only the installed same-signer Host can browse online.
+            LinearLayout choices=SettingsRow.row(this,
+                LocalizedText.ui(this,"来源管理","Source management","ソース管理"),
+                LocalizedText.ui(this,
+                    "查看独立来源的安装与授权说明",
+                    "Review independent source trust and consent",
+                    "外部ソースのインストールと承認について"),
+                v->startActivity(new Intent(this,SourceChoicesActivity.class)));
+            choices.setTag(AndroidOnboarding.ADV_SOURCE_CHOICES);
+            content.addView(choices);
             LinearLayout source=SettingsRow.row(this,
                 LocalizedText.ui(this,"外接来源","External sources","外部ソース"),
                 "Signed user-owned Host",

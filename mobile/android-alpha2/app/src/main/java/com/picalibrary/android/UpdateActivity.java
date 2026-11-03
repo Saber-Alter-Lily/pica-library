@@ -62,6 +62,13 @@ public final class UpdateActivity extends LocaleAwareActivity {
         lastBytes=prefs().getLong(P_LAST_BYTES,-1);
         lastProgressAt=prefs().getLong(P_LAST_PROGRESS,0);
         render();register();
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            // The source-neutral QA is an isolated installation, NOT the
+            // production upgrade channel. Keep the real update tour targets
+            // visible but never download/install the formal release here.
+            renderCleanQaStatus();
+            return;
+        }
         if(guidePreview){
             loading.setVisibility(View.GONE);
             status.setText(R.string.advanced_guide_update_preview);
@@ -73,6 +80,26 @@ public final class UpdateActivity extends LocaleAwareActivity {
         out.putBoolean("guidePreview",guidePreview);
         super.onSaveInstanceState(out);
     }
+    private void renderCleanQaStatus(){
+        loading.setVisibility(View.GONE);
+        status.setText(LocalizedText.ui(this,
+            "清洁版测试 · 应用内更新已停用",
+            "Source-neutral QA · in-app updates disabled",
+            "ソース分離 QA · アプリ内更新は無効"));
+        detail.setText(BuildConfig.VERSION_NAME);
+        cancel.setVisibility(View.GONE);
+        action.setText(LocalizedText.ui(this,
+            "查看当前版本","Show current version","現在のバージョン"));
+        action.setEnabled(true);
+        action.setOnClickListener(v->{
+            status.setText(LocalizedText.ui(this,
+                "此 QA 包不会自动更新正式软件",
+                "This QA build does not update the published application",
+                "この QA 版は正式アプリを更新しません"));
+            detail.setText(BuildConfig.VERSION_NAME);
+        });
+    }
+
     private android.content.SharedPreferences prefs(){return getSharedPreferences(PREFS,MODE_PRIVATE);}
     private Button button(String label,View.OnClickListener click){return Ui.button(this,label,click,false);}
 
@@ -100,9 +127,15 @@ public final class UpdateActivity extends LocaleAwareActivity {
         setContentView(root);root.requestApplyInsets();
     }
 
-    private void register(){IntentFilter filter=new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);ContextCompat.registerReceiver(this,receiver,filter,ContextCompat.RECEIVER_EXPORTED);registered=true;}
+    private void register(){
+        if(BuildConfig.SOURCE_NEUTRAL_QA)return;
+        IntentFilter filter=new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);ContextCompat.registerReceiver(this,receiver,filter,ContextCompat.RECEIVER_EXPORTED);registered=true;}
 
     private void check(){
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            renderCleanQaStatus();
+            return;
+        }
         guidePreview=false; // After the user explicitly presses Check, normal update behavior resumes.
         stopPolling();loading.setVisibility(View.VISIBLE);loading.setIndeterminate(true);action.setEnabled(false);cancel.setVisibility(View.GONE);status.setText(LocalizedText.ui("正在检查更新…"));detail.setText("");
         worker.submit(()->{try{UpdateClient.Info value=UpdateClient.check(this);runOnUiThread(()->{if(!destroyed)show(value);});}catch(Exception e){runOnUiThread(()->{if(destroyed)return;loading.setVisibility(View.GONE);status.setText(LocalizedText.ui("检查更新失败"));detail.setText(LocalizedText.ui("请检查网络后重试"));retryCheckButton();});}});

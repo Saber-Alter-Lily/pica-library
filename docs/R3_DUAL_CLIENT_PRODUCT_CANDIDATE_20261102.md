@@ -147,3 +147,11 @@ The same existing Android35 driver now writes bounded JSON to the disposable ori
 修复复用原 `LinearLayoutManager.scrollToPositionWithOffset`、现有四 Tab 位置数组及同一 `RecyclerView`：增加仅 HomeActivity 生命周期内的每书架独立滚动位置映射，使用**实际已渲染的书架 ID**保存滚动；加载中的书架不覆盖普通书库位置；进入另一书架恢复它自己的位置。未持久化多书架位置到用户数据库、未修改推荐/同步/来源/阅读器。
 
 延长**同一现有** Android35 1,500 项场景，在大书架内实际滑动并读取可见书名，切换至 5 项书架后返回，检查前次大书架可见作品恢复且没有跳到第 1 本，随后返回普通书库。记录原截图和用时。仅有新 SHA 实际 Android35 成功才能标工程通过；G1 实机和带真实封面/漫画的规模负载仍单独待验收。
+
+## R3 Android original UI: reuse existing nine-scenario locale/width matrix (2026-11-04)
+
+Original Android G1 has a separately tracked layout/translation requirement: 360/393/480dp, Simplified Chinese/English/Japanese, light/dark and 1.0/1.3/1.5 system font scales. The repository **already contains** `s1-android-locale-matrix.yml`, `scripts/run-s1-android-locale-matrix.sh`, and `S1AndroidLocaleMatrixTest.java` for nine carefully selected real Android35 emulator scenarios and seven original app pages. These workflows were configured for an old recovery branch, so the current unified Draft branch did not automatically receive fresh exact-HEAD evidence.
+
+This batch **reuses** the existing workflow, instrumentation UI, screenshots and layout checks; it only allows the unified integration branch to trigger that matrix and adds original `HomeActivity.java` as a relevant path. It does not invent a new screenshot framework, Reader implementation, UI hierarchy, manual acceptance status or production build. The Debug APK is the historical original product (`com.picalibrary.android.dev`), **not** the source-neutral `.cleanqa` physical boundary; that is verified independently. The matrix may reveal genuine layout defects; it cannot close physical handset G1 by itself.
+
+PASS requires actual nine-case runtime result and surviving captured images for the new commit. Any failed scenario remains OPEN until its root cause is resolved; do not mark the old recovery-branch screenshot pass as current integration acceptance.

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/product-recovery-s0-s1-20261027
+      - codex/product-integration-r1-20261102
     paths:
       - '.github/workflows/s1-android-locale-matrix.yml'
       - 'scripts/run-s1-android-locale-matrix.sh'
@@ -17,6 +18,7 @@ on:
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/Ui.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/TagParticipationActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
       - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/TagParticipationActivityTest.java'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsRow.java'
       - 'mobile/android-alpha2/app/src/main/res/**/guide_strings.xml'

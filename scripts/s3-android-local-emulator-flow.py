@@ -1516,8 +1516,13 @@ def original_large_shelf_flow():
     def write_private(filename, value):
         data = json.dumps(value, separators=(",", ":"),
                           ensure_ascii=False).encode("utf-8")
+        # adb shell re-parses argv before invoking run-as. A bare 'sh -c'
+        # redirection can run as the unprivileged shell instead of this app.
+        # Use Android's existing toybox tee inside run-as with a direct,
+        # package-private absolute path (never shell-level redirection).
+        private_file = "/data/user/0/" + PACKAGE + "/files/" + filename
         command = ["adb", "shell", "-T", "run-as", PACKAGE,
-                   "sh", "-c", "cat > files/" + filename]
+                   "tee", private_file]
         result = subprocess.run(command, input=data, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, timeout=65)
         if result.returncode:
@@ -1525,7 +1530,7 @@ def original_large_shelf_flow():
                 f"Cannot seed synthetic original app store: {filename}: "
                 + result.stderr.decode(errors="replace")[-400:])
         observed = adb("exec-out", "run-as", PACKAGE, "cat",
-                       "files/" + filename, binary=True)
+                       private_file, binary=True)
         if observed != data:
             raise AssertionError("Original app private store changed during QA write")
     write_private("unified-catalog-v1.json", catalog)
@@ -1544,7 +1549,9 @@ def original_large_shelf_flow():
     tap(("书架", "Shelves", "本棚"), seconds=30,
         exact=True, only_class="Button")
     wait("QA_LOAD_1500", seconds=45)
-    wait("1500 本", seconds=45)
+    if not wait("1500 本", seconds=8, required=False):
+        tap("QA_LOAD_1500", seconds=20, only_class="Button")
+        wait("1500 本", seconds=45)
     open_ms = round((time.monotonic() - start) * 1000)
     page("47-original-clean-real-1500-shelf")
     record("real original four-tab Shelf screen displays 1500 catalog works using its RecyclerView")

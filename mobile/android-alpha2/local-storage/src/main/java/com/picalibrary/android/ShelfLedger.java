@@ -1,6 +1,7 @@
 package com.picalibrary.android;
 
 import android.content.Context;
+import android.util.AtomicFile;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -55,13 +56,42 @@ class ShelfLedger {
         return new Snapshot(root.optString("updatedAt",""),root.optString("lastDesktopSyncAt",""),shelves);
     }
 
-    static Snapshot load(File file){
-        File f=file;if(!f.isFile())return new Snapshot("","",new ArrayList<>());
-        try(InputStream in=new FileInputStream(f);ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))>0)out.write(b,0,n);return fromRemote(new JSONObject(out.toString("UTF-8")));}catch(Exception e){return new Snapshot("","",new ArrayList<>());}
+    static synchronized Snapshot load(File file){
+        // AtomicFile reads an existing .bak from an interrupted write. Never
+        // silently replace an unreadable old shelf with an empty bookcase.
+        AtomicFile atomic=new AtomicFile(file);
+        if(!file.isFile()&&!new File(file.getPath()+".bak").isFile()){
+            if(new File(file.getPath()+".tmp").exists()||
+                    new File(file.getPath()+".new").exists())
+                throw new IllegalStateException("书架有未完成的写入；原文件已保留");
+            return new Snapshot("","",new ArrayList<>());
+        }
+        try(InputStream in=atomic.openRead();
+            ByteArrayOutputStream out=new ByteArrayOutputStream()){
+            byte[] block=new byte[8192];int n;
+            while((n=in.read(block))>0)out.write(block,0,n);
+            return fromRemote(new JSONObject(out.toString("UTF-8")));
+        }catch(Exception e){
+            throw new IllegalStateException("书架读取失败；原文件已保留",e);
+        }
     }
 
     static synchronized void save(File file,Snapshot snapshot){
-        try{snapshot.updatedAt=now();JSONObject root=json(snapshot);File target=file;target.getParentFile().mkdirs();File tmp=new File(target.getParentFile(),target.getName()+".tmp");try(OutputStream out=new FileOutputStream(tmp)){out.write(root.toString().getBytes(StandardCharsets.UTF_8));}if(target.exists()&&!target.delete())throw new IOException("replace failed");if(!tmp.renameTo(target))throw new IOException("rename failed");}catch(Exception e){throw new IllegalStateException("无法保存本地书架",e);}
+        FileOutputStream stream=null;
+        AtomicFile atomic=new AtomicFile(file);
+        try{
+            snapshot.updatedAt=now();
+            byte[] bytes=json(snapshot).toString().getBytes(StandardCharsets.UTF_8);
+            file.getParentFile().mkdirs();
+            stream=atomic.startWrite();
+            stream.write(bytes);
+            stream.getFD().sync();
+            atomic.finishWrite(stream);
+            stream=null;
+        }catch(Exception e){
+            if(stream!=null)atomic.failWrite(stream);
+            throw new IllegalStateException("无法保存本地书架；旧数据保持不变",e);
+        }
     }
 
     static synchronized Shelf create(File file,String rawName){String name=rawName==null?"":rawName.trim();if(name.isEmpty())throw new IllegalArgumentException("书架名称不能为空");Snapshot s=load(file);for(Shelf shelf:s.activeShelves())if(shelf.name.equalsIgnoreCase(name))throw new IllegalArgumentException("已存在同名书架");String t=now();Shelf shelf=new Shelf(UUID.randomUUID().toString(),"",name,t,"",new ArrayList<>());s.shelves.add(shelf);save(file,s);return shelf;}

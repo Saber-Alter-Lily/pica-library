@@ -125,3 +125,15 @@ At source commit `c87e5937`, the strict [R3 clean-source physical APK job](https
 **实际模拟器工程负载：** 扩展现有 Android35 原完整清洁 App E2E（非第二套工具）：在既有 `.cleanqa` QA 私有目录最后阶段注入 1,500 个合成目录条目与一个 1,500 项书架、一个 5 项书架（使用原始 `portable-shelves-v1.json` schema 2 和 `unified-catalog-v1.json` schema 4）。操作真实 `HomeActivity` 的书架入口、1,500 ↔ 5 项切换、返回书库，保存真实截图和各操作观察耗时。真实原本地漫画、账号及用户电脑不接触；测试仅使用零封面合成条目，不等同真实 1,500 部漫画和图片缓存的设备负载，因此 **G1 真实手机/正式资料、K3 p95/帧/ANR 预算仍 OPEN**。
 
 **验收：** Android35 `S3 Android local Reader real emulator flow` 与当前 PR 的原 CI 需要在相同新 HEAD 实际通过才标 `ENGINEERING_VERIFIED`；先前的工程通过不能继承到这次修改。若有 UI 控件/读写错误，记录并修复实际失败，不放松原阅读器和来源撤销关口。
+
+### 大书架编辑的原子写入（同批数据保护收口）
+
+审查上述 1,500 项书架真实编辑路径时同时发现，共享 `ShelfLedger.save()` 仍使用历史的“写 `.tmp` → 删除原 `portable-shelves-v1.json` → 重命名 `.tmp`”三步；在后两步之间发生磁盘错误或异常终止时，用户可能失去原有书架文件。旧版载入异常还会静默返回空书架，使后续创建操作可能覆盖现有资料。
+
+改为直接复用 Android `AtomicFile`（同项目 PhoneDownloadStore 已使用的成熟系统组件）进行 commit/rollback；从原 schema 2 的书架 JSON 读取，保留先前有效文件，支持 `.bak` 回退，遇到损坏文件或遗留孤立 `.tmp` 时拒绝写入并保留原字节。正式书架入口已能显示读取失败；不自动清除、不重新生成空目录。专用回归复用现有 Robolectric 环境，覆盖旧数据原子改写、损坏拒绝与中断残留。实际完成状态仍以新 SHA 的 Android CI 结果为准。
+
+### Android35 1,500-item QA fixture correction (2026-11-04)
+
+At exact source `a5e804e5`, 30 checks succeeded and one intentionally skipped; the only failed run was the **last** Android35 S3 flow [#41840983361](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41840983361). All earlier real S3 CBZ/Reader/official Suwayomi/Binder/clean-to-clean and legacy-to-clean upgrade subflows passed. The new large-shelf step FAILED **before opening Shelves** because `adb shell -T run-as ... sh -c "cat > files/..."` caused the shell-level redirect to run outside the application identity; the target relative `files/` directory was not found. This did not demonstrate any slowdown, corrupt Android app data, or failing shelf UI.
+
+The same existing Android35 driver now writes bounded JSON to the disposable original application's actual private file using Android's existing `run-as <package> tee /data/user/0/<package>/files/<filename>` (no shell redirect), reads back exact bytes before resuming Home, and selects the large shelf explicitly if another previously active shelf was selected. This is **synthetic test-fixture IO only**, with no new app protocol or production-data access. The 1,500-item UI outcome remains unverified until the next exact-head real emulator run completes.

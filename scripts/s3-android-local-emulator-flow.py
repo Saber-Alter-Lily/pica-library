@@ -1102,9 +1102,17 @@ def original_full_product_signed_host_flow(upstream_pages):
     record("full original Android ReaderActivity reads identical source-imported local chapter")
 
     STEP = "r3-original-product-source-disconnect"
+    # Leave the original Reader once, then use the existing import screen's
+    # actual Back button. A blind second Android BACK may only dismiss reader
+    # controls or leave ExternalImportActivity visible under the Host window.
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
-    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    if wait(("Save to original Reader", "保存到原阅读器书库",
+             "元の Reader に保存"), seconds=12, required=False):
+        tap(("Back", "返回", "戻る"), exact=True, only_class="Button",
+            seconds=20)
     PACKAGE = USER_HOST_PACKAGE
+    # Prove we are back on the Host management screen before revoking its
+    # session. Never claim disconnection while the import UI still covers it.
     tap_scrolling(("Disconnect", "断开会话",
                    "セッション終了"), direction="up", only_class="Button")
     adb("shell", "am", "force-stop", USER_HOST_PACKAGE)

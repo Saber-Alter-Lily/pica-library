@@ -113,9 +113,7 @@ jobs:
           disable-linux-hw-accel: false
           script: |
             python3 -c 'import ast,pathlib; ast.parse(pathlib.Path("scripts/r4-v050-android-signed-inplace-flow.py").read_text(encoding="utf-8")); print("PASS: signed migration UI Python syntax")'
-            python3 scripts/r4-v050-android-signed-inplace-flow.py \
-              "$RUNNER_TEMP/pica-public-v050-v55.apk" \
-              mobile/android-alpha2/app/build/outputs/apk/cleanProductionUpgradeQa/app-cleanProductionUpgradeQa.apk
+            python3 scripts/r4-v050-android-signed-inplace-flow.py "$RUNNER_TEMP/pica-public-v050-v55.apk" mobile/android-alpha2/app/build/outputs/apk/cleanProductionUpgradeQa/app-cleanProductionUpgradeQa.apk
 
       - name: Publish only synthetic UI, version and diagnostic evidence, never candidate APK or signing material
         if: always() && github.event.repository.private == false

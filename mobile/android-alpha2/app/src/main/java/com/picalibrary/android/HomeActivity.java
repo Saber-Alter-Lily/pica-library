@@ -20,6 +20,10 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     private CollectionSelectionController collectionSelection;
     private UnifiedLibraryFilter.Spec librarySpec;private UnifiedLibraryFilter.Facets libraryFacets=new UnifiedLibraryFilter.Facets(new ArrayList<>(),new ArrayList<>(),new ArrayList<>());
     private final int[] tabScrollY=new int[4],tabListPosition=new int[4],tabListOffset=new int[4];private ScrollView activeScroll;private RecyclerView activeList;private int activeViewportTab=-1;private boolean onboardingPromptScheduled,fullyDrawnReported,shelfAutoSyncStarted;
+    // Shelf rows must never overwrite the Library tab's own viewport.
+    // An empty string means the async shelf page is loading.
+    private String visibleShelfViewportId=null;
+    private final Map<String,int[]> shelfViewports=new HashMap<>();
 
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);themeKey=ThemeStore.effectiveKey(this);prefs=getSharedPreferences("alpha81-ui",MODE_PRIVATE);collectionSelection=new CollectionSelectionController(this,this);collectionMode=UnifiedComicCollectionAdapter.normalizeMode(prefs.getInt("collectionMode",UnifiedComicCollectionAdapter.MODE_GRID_MEDIUM));activeShelfId=prefs.getString("activeShelfId","");librarySpec=UnifiedFilterStore.load(getSharedPreferences("library-display",MODE_PRIVATE));librarySpec.favoriteOnly=false;if(saved!=null){current=ShellPolicy.clampTab(saved.getInt("tab",0));showingShelves=saved.getBoolean("shelves",false);libraryQuery=saved.getString("libraryQuery","");int[] sy=saved.getIntArray("tabScrollY"),sp=saved.getIntArray("tabListPosition"),so=saved.getIntArray("tabListOffset");if(sy!=null&&sy.length==4)System.arraycopy(sy,0,tabScrollY,0,4);if(sp!=null&&sp.length==4)System.arraycopy(sp,0,tabListPosition,0,4);if(so!=null&&so.length==4)System.arraycopy(so,0,tabListOffset,0,4);}else current=ShellPolicy.clampTab(getIntent().getIntExtra("tab",0));if(BuildConfig.LOCAL_ONLY_DRAFT){current=current==3?3:0;showingShelves=getIntent().getBooleanExtra("localShelf",showingShelves);}renderShell();show();if(!BuildConfig.LOCAL_ONLY_DRAFT&&getIntent().getBooleanExtra("startOnboarding",false)){getIntent().removeExtra("startOnboarding");body.postDelayed(this::startOnboardingTour,250);}}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);showingShelves=BuildConfig.LOCAL_ONLY_DRAFT&&intent.getBooleanExtra("localShelf",false);current=ShellPolicy.clampTab(intent.getIntExtra("tab",0));if(BuildConfig.LOCAL_ONLY_DRAFT)current=current==3?3:0;renderShell();show();if(!BuildConfig.LOCAL_ONLY_DRAFT&&intent.getBooleanExtra("startOnboarding",false)){intent.removeExtra("startOnboarding");body.postDelayed(this::startOnboardingTour,250);}}
@@ -82,7 +86,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     void startOnboardingTour(){onboardingPromptScheduled=true;AndroidOnboarding.start(this);}
     void onboardingShowTab(int tab,Runnable after){showingShelves=false;current=ShellPolicy.clampTab(tab);renderShell();show();if(body!=null)body.postDelayed(after,160);}
 
-    private void show(){captureCurrentViewport();if(collectionSelection!=null)collectionSelection.detach();++serial;if(pending!=null)pending.cancel(true);pending=null;body.removeAllViews();activeScroll=null;activeList=null;activeViewportTab=-1;recommendationBatchList=null;recommendationBatchLabel=null;recommendationCatalog=null;recommendationVisibleSnapshot=null;recommendationSwitching=false;libraryRefreshButton=null;libraryRefreshStatus=null;if(showingShelves){shelves();return;}if(BuildConfig.LOCAL_ONLY_DRAFT){if(current==3)settingsEntry();else library();return;}if(current==0)library();else if(current==1)recommendations();else if(current==2)onlineEntry();else settingsEntry();}
+    private void show(){captureCurrentViewport();if(collectionSelection!=null)collectionSelection.detach();++serial;if(pending!=null)pending.cancel(true);pending=null;body.removeAllViews();activeScroll=null;activeList=null;activeViewportTab=-1;visibleShelfViewportId=null;recommendationBatchList=null;recommendationBatchLabel=null;recommendationCatalog=null;recommendationVisibleSnapshot=null;recommendationSwitching=false;libraryRefreshButton=null;libraryRefreshStatus=null;if(showingShelves){shelves();return;}if(BuildConfig.LOCAL_ONLY_DRAFT){if(current==3)settingsEntry();else library();return;}if(current==0)library();else if(current==1)recommendations();else if(current==2)onlineEntry();else settingsEntry();}
     private LinearLayout page(boolean scroll){LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setBackgroundColor(Ui.BG);p.setPadding(Ui.dp(this,12),Ui.dp(this,8),Ui.dp(this,12),Ui.dp(this,8));if(scroll){final int tab=current;ScrollView s=new ScrollView(this);activeScroll=s;activeList=null;activeViewportTab=tab;s.setBackgroundColor(Ui.BG);s.addView(p);body.addView(s,new FrameLayout.LayoutParams(-1,-1));s.post(()->s.scrollTo(0,Math.max(0,tabScrollY[tab])));}else{activeScroll=null;activeList=null;activeViewportTab=-1;body.addView(p,new FrameLayout.LayoutParams(-1,-1));}return p;}
     private void titleRow(LinearLayout p,String title,View... actions){
         TextView label=Ui.text(this,title,26,Ui.TEXT,true);
@@ -129,9 +133,46 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         p.addView(row);
     }
     private RecyclerView collection(LinearLayout p,int mode){final int tab=current;RecyclerView v=new RecyclerView(this);activeScroll=null;activeList=v;activeViewportTab=tab;v.setClipToPadding(false);v.setPadding(0,Ui.dp(this,4),0,Ui.dp(this,16));setCollectionLayout(v,mode);p.addView(v,new LinearLayout.LayoutParams(-1,0,1));return v;}
-    private void rememberListPosition(RecyclerView v,int tab){RecyclerView.LayoutManager raw=v.getLayoutManager();if(!(raw instanceof LinearLayoutManager))return;LinearLayoutManager lm=(LinearLayoutManager)raw;int position=lm.findFirstVisibleItemPosition();if(position<0)return;View first=lm.findViewByPosition(position);tabListPosition[tab]=position;tabListOffset[tab]=first==null?0:first.getTop()-v.getPaddingTop();}
-    private void captureCurrentViewport(){int tab=activeViewportTab;if(tab<0||tab>=4)return;if(activeScroll!=null){tabScrollY[tab]=Math.max(0,activeScroll.getScrollY());return;}if(activeList!=null)rememberListPosition(activeList,tab);}
-    private void restoreListPosition(RecyclerView v,int tab){int position=Math.max(0,tabListPosition[tab]),offset=tabListOffset[tab];v.post(()->{RecyclerView.LayoutManager raw=v.getLayoutManager();if(raw instanceof LinearLayoutManager)((LinearLayoutManager)raw).scrollToPositionWithOffset(position,offset);});}
+    private void rememberListPosition(RecyclerView v,int tab){
+        RecyclerView.LayoutManager raw=v.getLayoutManager();
+        if(!(raw instanceof LinearLayoutManager))return;
+        LinearLayoutManager lm=(LinearLayoutManager)raw;
+        int position=lm.findFirstVisibleItemPosition();
+        if(position<0)return;
+        View first=lm.findViewByPosition(position);
+        int offset=first==null?0:first.getTop()-v.getPaddingTop();
+        if(visibleShelfViewportId!=null){
+            if(!visibleShelfViewportId.isEmpty())
+                shelfViewports.put(visibleShelfViewportId,new int[]{position,offset});
+            return;
+        }
+        tabListPosition[tab]=position;
+        tabListOffset[tab]=offset;
+    }
+    private void captureCurrentViewport(){
+        int tab=activeViewportTab;
+        if(tab<0||tab>=4)return;
+        if(activeScroll!=null){
+            tabScrollY[tab]=Math.max(0,activeScroll.getScrollY());
+            return;
+        }
+        if(activeList!=null)rememberListPosition(activeList,tab);
+    }
+    private void restoreListPosition(RecyclerView v,int tab){
+        restorePosition(v,tabListPosition[tab],tabListOffset[tab]);
+    }
+    private void restoreShelfListPosition(RecyclerView v,String shelfId){
+        int[] saved=shelfViewports.get(shelfId);
+        if(saved!=null)restorePosition(v,saved[0],saved[1]);
+    }
+    private void restorePosition(RecyclerView v,int position,int offset){
+        v.post(()->{
+            RecyclerView.LayoutManager raw=v.getLayoutManager();
+            if(raw instanceof LinearLayoutManager)
+                ((LinearLayoutManager)raw).scrollToPositionWithOffset(
+                    Math.max(0,position),offset);
+        });
+    }
     private void setCollectionLayout(RecyclerView v,int mode){if(mode==UnifiedComicCollectionAdapter.MODE_LIST)v.setLayoutManager(new LinearLayoutManager(this));else v.setLayoutManager(new GridLayoutManager(this,Math.max(2,mode)));v.setItemAnimator(null);}
     private void open(UnifiedCatalogStore.Entry e){if(BuildConfig.LOCAL_ONLY_DRAFT){if(!e.localImported)return;Intent local=new Intent(this,ReaderActivity.class);local.putExtra("source","local");local.putExtra("comicId",e.id);local.putExtra("title",e.title);startActivity(local);return;}Intent i=new Intent(this,UnifiedComicDetailActivity.class);i.putExtra("comicId",e.id);i.putExtra("title",e.title);i.putExtra("author",e.displayAuthor());startActivity(i);}
     private void openRecommendation(UnifiedCatalogStore.Entry e){RecommendationEvidenceStore.recordDetailOpen(this,e.id,e.displayAuthor(),e.tags,e.categories);open(e);}
@@ -248,6 +289,8 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
      * Reuse the library worker and the same original RecyclerView/ledger.
      */
     private void shelves(){
+        // Keep the current Library scroll separate while loading shelves.
+        visibleShelfViewportId="";
         LinearLayout p=page(false);
         titleRow(p,"书架",compact("返回",v->{showingShelves=false;show();}),
                 compact("＋",v->createShelf()),compact("▦",v->chooseCollectionMode()));
@@ -295,11 +338,13 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
                     status.setVisibility(View.GONE);
                     controls.removeAllViews();
                     if(selected==null){
+                        visibleShelfViewportId="";
                         status.setText(LocalizedText.ui(this,"还没有书架",
                                 "No shelves yet","本棚がありません"));
                         status.setVisibility(View.VISIBLE);
                         controls.addView(compact("新建书架",v->createShelf()));
                     }else{
+                        visibleShelfViewportId=selected.id;
                         activeShelfId=selected.id;
                         prefs.edit().putString("activeShelfId",activeShelfId).apply();
                         HorizontalScrollView scroller=new HorizontalScrollView(this);
@@ -333,7 +378,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
                                 new UnifiedComicCollectionAdapter(this,mode,entries,this::open);
                         list.setAdapter(adapter);
                         collectionSelection.attach(adapter,entries,true,selected.id);
-                        restoreListPosition(list,0);
+                        restoreShelfListPosition(list,selected.id);
                     }
                     // Previously each successful remote sync called show(), which
                     // immediately scheduled another sync. Once per Home session

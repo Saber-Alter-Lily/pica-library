@@ -1556,6 +1556,23 @@ def original_large_shelf_flow():
     page("47-original-clean-real-1500-shelf")
     record("real original four-tab Shelf screen displays 1500 catalog works using its RecyclerView")
 
+    STEP = "r3-1500-shelf-own-scroll-position"
+    def shelf_titles():
+        return {title for title, _, _, _ in nodes()
+                if re.fullmatch(r"QA_LOAD_\d{4}", title)}
+    scrolled_titles = set()
+    for _ in range(5):
+        adb("shell", "input", "swipe", "360", "965", "360", "410", "300")
+        scrolled_titles = shelf_titles()
+        if len(scrolled_titles) >= 2 and "QA_LOAD_0000" not in scrolled_titles:
+            break
+    assert len(scrolled_titles) >= 2, (
+        "Original 1500-member RecyclerView did not expose navigable work rows")
+    assert "QA_LOAD_0000" not in scrolled_titles, (
+        "Original large shelf did not scroll away from first work")
+    page("47b-original-clean-1500-shelf-scrolled")
+    record("original 1500-work shelf scrolls through work cards without freezing")
+
     STEP = "r3-1500-switch-between-existing-shelves"
     start = time.monotonic()
     tap("QA_SMALL_5", seconds=20, only_class="Button")
@@ -1566,8 +1583,15 @@ def original_large_shelf_flow():
     tap("QA_LOAD_1500", seconds=20, only_class="Button")
     wait("1500 本", seconds=45)
     restore_ms = round((time.monotonic() - start) * 1000)
+    restored_titles = shelf_titles()
+    assert len(scrolled_titles & restored_titles) >= 1, (
+        "Switching away from 1500-work shelf lost its independently saved scroll position: "
+        + str(sorted(scrolled_titles)[:7]) + " vs "
+        + str(sorted(restored_titles)[:7]))
+    assert "QA_LOAD_0000" not in restored_titles, (
+        "Switching back to the large shelf unexpectedly jumped to its first work")
     page("49-original-clean-large-shelf-returned")
-    record("real original 1500-work shelf switches to 5-work shelf and back without stuck UI")
+    record("real original 1500-work shelf switches to 5-work shelf and restores prior scroll viewport")
 
     STEP = "r3-1500-back-to-library-and-filter"
     start = time.monotonic()
@@ -1586,6 +1610,9 @@ def original_large_shelf_flow():
         "openLargeShelfMsObserved": open_ms,
         "switchToSmallShelfMsObserved": small_ms,
         "switchBackToLargeShelfMsObserved": restore_ms,
+        "scrolledWorkTitles": len(scrolled_titles),
+        "largeShelfScrollPreservedAcrossSwitch": True,
+        "libraryAndShelvesUseIndependentViewports": True,
         "returnToOriginalLibraryMsObserved": library_ms,
         "actualRealBooksUsed": False,
         "actualPhysicalDeviceUsed": False, "performanceBudgetApproved": False,

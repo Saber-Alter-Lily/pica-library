@@ -137,3 +137,13 @@ At source commit `c87e5937`, the strict [R3 clean-source physical APK job](https
 At exact source `a5e804e5`, 30 checks succeeded and one intentionally skipped; the only failed run was the **last** Android35 S3 flow [#41840983361](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41840983361). All earlier real S3 CBZ/Reader/official Suwayomi/Binder/clean-to-clean and legacy-to-clean upgrade subflows passed. The new large-shelf step FAILED **before opening Shelves** because `adb shell -T run-as ... sh -c "cat > files/..."` caused the shell-level redirect to run outside the application identity; the target relative `files/` directory was not found. This did not demonstrate any slowdown, corrupt Android app data, or failing shelf UI.
 
 The same existing Android35 driver now writes bounded JSON to the disposable original application's actual private file using Android's existing `run-as <package> tee /data/user/0/<package>/files/<filename>` (no shell redirect), reads back exact bytes before resuming Home, and selects the large shelf explicitly if another previously active shelf was selected. This is **synthetic test-fixture IO only**, with no new app protocol or production-data access. The 1,500-item UI outcome remains unverified until the next exact-head real emulator run completes.
+
+## R3 大书库滚动位置隔离与切换（2026-11-04）
+
+在上一轮原版 Android35 实体 UI 工程验收中，真实 `HomeActivity` + 原 `RecyclerView` 已用 1,500 条合成作品成功完成大书架 → 5 条小书架 → 大书架 → 书库：[exact `bab0f898` #41845126489](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41845126489) **PASS**，所有该 HEAD 的 30 个工作流均成功（另 1 个按 PR 设计跳过）。这证明基本交互没有卡死，但**不能**证明真实 1,500 本带封面作品的帧/内存预算。
+
+新发现原代码的具体体验缺陷：`HomeActivity` 将普通书库和所有书架的 `RecyclerView` 阅读位置都写进 `tabListPosition[0]`。用户在大书架滚动到后面的作品，再切换一个书架或返回普通书库，可能错误跳到之前另一个页面的位置。原本 `show()` 在触发页切换前会抓取当前 Viewport，但 `activeShelfId` 通常已经变成新书架，使以 activeShelfId 判断旧列表身份不准确。
+
+修复复用原 `LinearLayoutManager.scrollToPositionWithOffset`、现有四 Tab 位置数组及同一 `RecyclerView`：增加仅 HomeActivity 生命周期内的每书架独立滚动位置映射，使用**实际已渲染的书架 ID**保存滚动；加载中的书架不覆盖普通书库位置；进入另一书架恢复它自己的位置。未持久化多书架位置到用户数据库、未修改推荐/同步/来源/阅读器。
+
+延长**同一现有** Android35 1,500 项场景，在大书架内实际滑动并读取可见书名，切换至 5 项书架后返回，检查前次大书架可见作品恢复且没有跳到第 1 本，随后返回普通书库。记录原截图和用时。仅有新 SHA 实际 Android35 成功才能标工程通过；G1 实机和带真实封面/漫画的规模负载仍单独待验收。

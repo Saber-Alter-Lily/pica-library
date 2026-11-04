@@ -1457,6 +1457,135 @@ def legacy_dev_to_clean_compat_upgrade():
     }, indent=2), encoding="utf-8")
 
 
+def original_large_shelf_flow():
+    """Exercise the ORIGINAL four-tab clean Home with 1,500 owned catalog rows.
+
+    This is a disposable, synthetic Android35 engineering load check, NOT a
+    physical-device 1,500-real-book acceptance or a real source download.
+    The real UI and existing ShelfLedger/UnifiedCatalogStore files are used;
+    there is no alternate app, mock RecyclerView or second data format.
+    """
+    global PACKAGE, STEP
+    PACKAGE = CLEAN_PACKAGE
+    STEP = "r3-1500-seed-real-app-private-stores"
+    adb("shell", "am", "force-stop", PACKAGE)
+    timestamp = "2026-11-03T00:00:00Z"
+    fake_entries = []
+    fake_items = []
+    for index in range(1500):
+        comic_id = f"qa-load:{index:04d}"
+        title = f"QA_LOAD_{index:04d}"
+        fake_entries.append({
+            "id": comic_id, "title": title, "author": "QA author",
+            "favorite": True, "favoriteRank": index, "inShelf": True,
+            "tags": ["QA load"], "categories": ["Synthetic QA"]
+        })
+        fake_items.append({
+            "comicId": comic_id, "title": title, "author": "QA author",
+            "canonicalAuthor": "", "tags": ["QA load"],
+            "categories": ["Synthetic QA"], "finished": False,
+            "downloadedPictures": 0, "knownPictures": 0,
+            "updatedAt": timestamp, "deletedAt": ""
+        })
+    def old_json(filename, empty):
+        try:
+            return json.loads(adb("exec-out", "run-as", PACKAGE,
+                                  "cat", "files/" + filename, binary=True))
+        except (ValueError, RuntimeError):
+            return empty
+    catalog = old_json("unified-catalog-v1.json",
+                       {"schemaVersion": 4, "entries": []})
+    catalog["schemaVersion"] = 4
+    catalog["entries"] = [entry for entry in catalog.get("entries", [])
+                          if not str(entry.get("id", "")).startswith("qa-load:")]
+    catalog["entries"].extend(fake_entries)
+    shelves = old_json("portable-shelves-v1.json",
+                       {"schemaVersion": 2, "shelves": []})
+    shelves["schemaVersion"] = 2
+    shelves["updatedAt"] = timestamp
+    shelves["shelves"] = [shelf for shelf in shelves.get("shelves", [])
+                          if not str(shelf.get("id", "")).startswith("qa-load-")]
+    shelves["shelves"].extend([
+        {"id": "qa-load-large", "name": "QA_LOAD_1500",
+         "desktopId": "", "updatedAt": timestamp, "deletedAt": "",
+         "items": fake_items},
+        {"id": "qa-load-small", "name": "QA_SMALL_5",
+         "desktopId": "", "updatedAt": timestamp, "deletedAt": "",
+         "items": fake_items[:5]}
+    ])
+    def write_private(filename, value):
+        data = json.dumps(value, separators=(",", ":"),
+                          ensure_ascii=False).encode("utf-8")
+        command = ["adb", "shell", "-T", "run-as", PACKAGE,
+                   "sh", "-c", "cat > files/" + filename]
+        result = subprocess.run(command, input=data, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, timeout=65)
+        if result.returncode:
+            raise AssertionError(
+                f"Cannot seed synthetic original app store: {filename}: "
+                + result.stderr.decode(errors="replace")[-400:])
+        observed = adb("exec-out", "run-as", PACKAGE, "cat",
+                       "files/" + filename, binary=True)
+        if observed != data:
+            raise AssertionError("Original app private store changed during QA write")
+    write_private("unified-catalog-v1.json", catalog)
+    write_private("portable-shelves-v1.json", shelves)
+    record("actual original clean app-private catalog/shelf schema seeded with exactly 1500 synthetic works")
+
+    STEP = "r3-1500-original-home-open"
+    adb("shell", "am", "start", "-W", "-n",
+        PACKAGE + "/com.picalibrary.android.DisclaimerActivity", timeout=55)
+    later = wait(("稍后再看", "Later", "後で"), seconds=8,
+                 required=False, only_class="Button")
+    if later:
+        adb("shell", "input", "tap", str(later[0]), str(later[1]))
+    wait(("我的书库", "My library", "マイライブラリ"), seconds=45)
+    start = time.monotonic()
+    tap(("书架", "Shelves", "本棚"), seconds=30,
+        exact=True, only_class="Button")
+    wait("QA_LOAD_1500", seconds=45)
+    wait("1500 本", seconds=45)
+    open_ms = round((time.monotonic() - start) * 1000)
+    page("47-original-clean-real-1500-shelf")
+    record("real original four-tab Shelf screen displays 1500 catalog works using its RecyclerView")
+
+    STEP = "r3-1500-switch-between-existing-shelves"
+    start = time.monotonic()
+    tap("QA_SMALL_5", seconds=20, only_class="Button")
+    wait("5 本", seconds=45)
+    small_ms = round((time.monotonic() - start) * 1000)
+    page("48-original-clean-small-shelf-after-large")
+    start = time.monotonic()
+    tap("QA_LOAD_1500", seconds=20, only_class="Button")
+    wait("1500 本", seconds=45)
+    restore_ms = round((time.monotonic() - start) * 1000)
+    page("49-original-clean-large-shelf-returned")
+    record("real original 1500-work shelf switches to 5-work shelf and back without stuck UI")
+
+    STEP = "r3-1500-back-to-library-and-filter"
+    start = time.monotonic()
+    tap(("返回", "Back", "戻る"), seconds=20,
+        exact=True, only_class="Button")
+    wait(("我的书库", "My library", "マイライブラリ"), seconds=45)
+    library_ms = round((time.monotonic() - start) * 1000)
+    page("50-original-clean-library-after-1500-shelf")
+    record("original Library remains navigable after 1500-work shelf projection and switches")
+
+    (ROOT / "r3-original-1500-shelf-load.json").write_text(json.dumps({
+        "result": "EMULATOR_UI_PASS", "originalApp": CLEAN_PACKAGE,
+        "catalogRowsSynthetic": 1500, "largeShelfMembers": 1500,
+        "smallShelfMembers": 5, "originalShelfStoreUsed": True,
+        "originalUnifiedCatalogUsed": True, "originalRecyclerViewUsed": True,
+        "openLargeShelfMsObserved": open_ms,
+        "switchToSmallShelfMsObserved": small_ms,
+        "switchBackToLargeShelfMsObserved": restore_ms,
+        "returnToOriginalLibraryMsObserved": library_ms,
+        "actualRealBooksUsed": False,
+        "actualPhysicalDeviceUsed": False, "performanceBudgetApproved": False,
+        "syncedOrUserProfilesTouched": False
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def main():
     global STEP
     try:
@@ -1481,6 +1610,7 @@ def main():
         official_upstream_android_reader_flow()
         clean_original_in_place_upgrade()
         legacy_dev_to_clean_compat_upgrade()
+        original_large_shelf_flow()
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",

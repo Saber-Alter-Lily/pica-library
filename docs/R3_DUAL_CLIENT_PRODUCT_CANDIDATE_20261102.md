@@ -115,3 +115,13 @@ A focused **original Android full-product** UX batch is implemented at [`c87e593
 4. Verify the source-neutral original app still uses the same local/Reader/Host flow, that the optional source-only Host stays a separate signed APK, and that old production v0.5.0 is not upgraded or reset by this QA install.
 
 At source commit `c87e5937`, the strict [R3 clean-source physical APK job](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41635722298) is **SUCCESS**. Full CI and device/user G1 are **independent checks**; this document update deliberately requests one new **post-stable signed QA pair + Windows RC** via the existing bounded package workflow. Do not report package readiness until its *own* exact-head `contract/windows-rc/android-rc/artifact-summary` have succeeded and uploaded the actual ZIPs. R1–R4 product-level gates remain OPEN.
+
+## R3 1,500 部书架的原版 Android 产品性能收口（2026-11-04）
+
+**实际产品问题：** 原 `HomeActivity.shelves()` 每次进入/切换书架都在 Android 主线程同步读取完整 `portable-shelves-v1.json` 和 `unified-catalog-v1.json`，为当前书架遍历所有成员，且在已配对时每次重绘又触发 Desktop 同步，成功后 `show()` 再次调用 `shelves()`，存在自动重复同步链。对约 1,500 部书库尤其不利；此前首页书库和推荐已移至后台线程，但书架遗漏了相同优化。
+
+**本批产品修复：** 复用现成 `libraryWorker` 和原 `ShelfLedger` / `UnifiedCatalogStore` / `UnifiedComicCollectionAdapter` / `RecyclerView`，让首次打开、切换书架和整理已有作品列表全部后台读取；打开时可见加载状态，页面离开后旧读取结果不能覆盖新页面。创建/改名/删除书架以及批量加入、移出书架的全量 JSON/目录写入也改为原后台队列执行，点击即时显示保存反馈，成功后再刷新可视状态。已配对情况下只在本次 Home 生命周期的首次书架进入自动同步一次；用户明确修改书架时仍保持原同步路径。未更换数据 Schema、同步冲突规则、漫画身份、阅读器或书架页 UI 模型。
+
+**实际模拟器工程负载：** 扩展现有 Android35 原完整清洁 App E2E（非第二套工具）：在既有 `.cleanqa` QA 私有目录最后阶段注入 1,500 个合成目录条目与一个 1,500 项书架、一个 5 项书架（使用原始 `portable-shelves-v1.json` schema 2 和 `unified-catalog-v1.json` schema 4）。操作真实 `HomeActivity` 的书架入口、1,500 ↔ 5 项切换、返回书库，保存真实截图和各操作观察耗时。真实原本地漫画、账号及用户电脑不接触；测试仅使用零封面合成条目，不等同真实 1,500 部漫画和图片缓存的设备负载，因此 **G1 真实手机/正式资料、K3 p95/帧/ANR 预算仍 OPEN**。
+
+**验收：** Android35 `S3 Android local Reader real emulator flow` 与当前 PR 的原 CI 需要在相同新 HEAD 实际通过才标 `ENGINEERING_VERIFIED`；先前的工程通过不能继承到这次修改。若有 UI 控件/读写错误，记录并修复实际失败，不放松原阅读器和来源撤销关口。

@@ -19,7 +19,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     private ImageButton libraryRefreshButton;private TextView libraryRefreshStatus;
     private CollectionSelectionController collectionSelection;
     private UnifiedLibraryFilter.Spec librarySpec;private UnifiedLibraryFilter.Facets libraryFacets=new UnifiedLibraryFilter.Facets(new ArrayList<>(),new ArrayList<>(),new ArrayList<>());
-    private final int[] tabScrollY=new int[4],tabListPosition=new int[4],tabListOffset=new int[4];private ScrollView activeScroll;private RecyclerView activeList;private int activeViewportTab=-1;private boolean onboardingPromptScheduled,fullyDrawnReported;
+    private final int[] tabScrollY=new int[4],tabListPosition=new int[4],tabListOffset=new int[4];private ScrollView activeScroll;private RecyclerView activeList;private int activeViewportTab=-1;private boolean onboardingPromptScheduled,fullyDrawnReported,shelfAutoSyncStarted;
 
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);themeKey=ThemeStore.effectiveKey(this);prefs=getSharedPreferences("alpha81-ui",MODE_PRIVATE);collectionSelection=new CollectionSelectionController(this,this);collectionMode=UnifiedComicCollectionAdapter.normalizeMode(prefs.getInt("collectionMode",UnifiedComicCollectionAdapter.MODE_GRID_MEDIUM));activeShelfId=prefs.getString("activeShelfId","");librarySpec=UnifiedFilterStore.load(getSharedPreferences("library-display",MODE_PRIVATE));librarySpec.favoriteOnly=false;if(saved!=null){current=ShellPolicy.clampTab(saved.getInt("tab",0));showingShelves=saved.getBoolean("shelves",false);libraryQuery=saved.getString("libraryQuery","");int[] sy=saved.getIntArray("tabScrollY"),sp=saved.getIntArray("tabListPosition"),so=saved.getIntArray("tabListOffset");if(sy!=null&&sy.length==4)System.arraycopy(sy,0,tabScrollY,0,4);if(sp!=null&&sp.length==4)System.arraycopy(sp,0,tabListPosition,0,4);if(so!=null&&so.length==4)System.arraycopy(so,0,tabListOffset,0,4);}else current=ShellPolicy.clampTab(getIntent().getIntExtra("tab",0));if(BuildConfig.LOCAL_ONLY_DRAFT){current=current==3?3:0;showingShelves=getIntent().getBooleanExtra("localShelf",showingShelves);}renderShell();show();if(!BuildConfig.LOCAL_ONLY_DRAFT&&getIntent().getBooleanExtra("startOnboarding",false)){getIntent().removeExtra("startOnboarding");body.postDelayed(this::startOnboardingTour,250);}}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);showingShelves=BuildConfig.LOCAL_ONLY_DRAFT&&intent.getBooleanExtra("localShelf",false);current=ShellPolicy.clampTab(intent.getIntExtra("tab",0));if(BuildConfig.LOCAL_ONLY_DRAFT)current=current==3?3:0;renderShell();show();if(!BuildConfig.LOCAL_ONLY_DRAFT&&intent.getBooleanExtra("startOnboarding",false)){intent.removeExtra("startOnboarding");body.postDelayed(this::startOnboardingTour,250);}}
@@ -242,30 +242,280 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     private void refreshLibrary(boolean force){final int id=serial;if(!force&&prefs.getBoolean("libraryRefreshed",false))return;prefs.edit().putBoolean("libraryRefreshed",true).apply();if(BuildConfig.LOCAL_ONLY_DRAFT){setLibraryRefreshPhase("正在整理本地漫画…",true);pending=libraryWorker.submit(()->{try{UnifiedCatalogStore.reconcileLocalReferences(this);runOnUiThread(()->{if(id==serial&&!isDestroyed())show();});}catch(Exception e){setLibraryRefreshPhase("本地书库刷新失败",false);}});return;}setLibraryRefreshPhase("正在检查书库变化…",true);pending=libraryWorker.submit(()->{try{if(BridgeStore.paired(this)){setLibraryRefreshPhase("正在检查电脑端书库…",true);BridgeClient.device(this);UnifiedCatalogStore.refreshDesktop(this);setLibraryRefreshPhase("正在同步收藏与书架…",true);try{FavoriteCacheStore.syncFromDesktop(this,false,(done,total,phase)->setLibraryRefreshPhase(phase,true));}catch(Exception ignored){}try{ShelfStore.syncWithDesktop(this);}catch(Exception ignored){}}if(RemoteConfigStore.load(this).configured()){setLibraryRefreshPhase("正在检查远程书库…",true);try{RemoteLibraryClient client=new RemoteLibraryClient(this);UnifiedCatalogStore.refreshRemote(this);FavoriteCacheStore.Snapshot f=FavoriteCacheStore.fromRemote(client.favorites());FavoriteCacheStore.save(this,f.items,false);if(ShelfStore.load(this).activeShelves().isEmpty())try{ShelfStore.save(this,ShelfStore.fromRemote(client.shelves()));}catch(Exception ignored){}}catch(Exception ignored){}}setLibraryRefreshPhase("正在整理本地引用…",true);UnifiedCatalogStore.reconcileLocalReferences(this);runOnUiThread(()->{if(id==serial&&!isDestroyed())show();});}catch(Exception e){setLibraryRefreshPhase("刷新失败 · "+(e.getMessage()==null?"请稍后重试":e.getMessage()),false);}});}
     private void chooseCollectionMode(){String[] labels={"列表","网格 · 大（2列）","网格 · 中（3列）","网格 · 小（5列）"};int[] modes={0,2,3,5};int checked=0;for(int i=0;i<modes.length;i++)if(modes[i]==collectionMode)checked=i;new AlertDialog.Builder(this).setTitle(LocalizedText.ui("显示方式")).setSingleChoiceItems(LocalizedText.ui(labels),checked,(d,which)->{collectionMode=modes[which];prefs.edit().putInt("collectionMode",collectionMode).apply();d.dismiss();show();}).show();}
 
-    private void shelves(){LinearLayout p=page(false);titleRow(p,"书架",compact("返回",v->{showingShelves=false;show();}),compact("＋",v->createShelf()),compact("▦",v->chooseCollectionMode()));ShelfStore.Snapshot snapshot=ShelfStore.load(this);List<ShelfStore.Shelf> shelves=snapshot.activeShelves();if(shelves.isEmpty()){TextView empty=Ui.text(this,"还没有书架",15,Ui.MUTED,false);empty.setGravity(Gravity.CENTER);empty.setPadding(0,Ui.dp(this,80),0,Ui.dp(this,16));p.addView(empty);p.addView(compact("新建书架",v->createShelf()));if(BridgeStore.paired(this))syncShelves();return;}ShelfStore.Shelf active=null;for(ShelfStore.Shelf s:shelves)if(s.id.equals(activeShelfId)){active=s;break;}if(active==null)active=shelves.get(0);activeShelfId=active.id;prefs.edit().putString("activeShelfId",activeShelfId).apply();HorizontalScrollView scroller=new HorizontalScrollView(this);LinearLayout tabs=new LinearLayout(this);tabs.setPadding(0,Ui.dp(this,6),0,Ui.dp(this,4));for(ShelfStore.Shelf s:shelves){Button b=compact(s.name+(s.id.equals(activeShelfId)?" ✓":""),v->{activeShelfId=s.id;prefs.edit().putString("activeShelfId",activeShelfId).apply();show();});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.setMargins(0,0,Ui.dp(this,6),0);tabs.addView(b,lp);}scroller.addView(tabs);p.addView(scroller);LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.addView(Ui.rawText(this,LocalizedText.ui(this,active.activeItems().size()+" 本",active.activeItems().size()+" works",active.activeItems().size()+" 作品"),13,Ui.MUTED,false),new LinearLayout.LayoutParams(0,-2,1));ShelfStore.Shelf selected=active;bar.addView(compact("重命名",v->renameShelf(selected)));Ui.gap(bar,this,6);bar.addView(compact("删除",v->deleteShelf(selected)));p.addView(bar);RecyclerView list=collection(p,collectionMode);List<UnifiedCatalogStore.Entry> entries=new ArrayList<>();UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);for(ShelfStore.Item item:active.activeItems()){UnifiedCatalogStore.Entry e=catalog.byId.get(item.comicId);if(e==null){e=new UnifiedCatalogStore.Entry(item.comicId,item.title,item.author);e.canonicalAuthor=item.canonicalAuthor;e.tags.addAll(item.tags);e.categories.addAll(item.categories);e.finished=item.finished;e.knownPictures=item.knownPictures;e.inShelf=true;}entries.add(e);}UnifiedComicCollectionAdapter adapter=new UnifiedComicCollectionAdapter(this,collectionMode,entries,this::open);list.setAdapter(adapter);collectionSelection.attach(adapter,entries,true,activeShelfId);restoreListPosition(list,0);if(BridgeStore.paired(this))syncShelves();}
-    private void createShelf(){final EditText input=new EditText(this);input.setHint(LocalizedText.ui("书架名称"));Ui.styleField(input,this);new AlertDialog.Builder(this).setTitle(LocalizedText.ui("新建书架")).setView(input).setNegativeButton(LocalizedText.ui("取消"),null).setPositiveButton(LocalizedText.ui("创建"),(d,w)->{try{ShelfStore.Shelf shelf=ShelfStore.create(this,input.getText().toString());activeShelfId=shelf.id;prefs.edit().putString("activeShelfId",activeShelfId).apply();syncShelves();show();}catch(Exception e){Toast.makeText(this,e.getMessage(),Toast.LENGTH_LONG).show();}}).show();}
-    private void renameShelf(ShelfStore.Shelf shelf){final EditText input=new EditText(this);input.setText(shelf.name);Ui.styleField(input,this);new AlertDialog.Builder(this).setTitle(LocalizedText.ui("重命名书架")).setView(input).setNegativeButton(LocalizedText.ui("取消"),null).setPositiveButton(LocalizedText.ui("保存"),(d,w)->{try{ShelfStore.rename(this,shelf.id,input.getText().toString());syncShelves();show();}catch(Exception e){Toast.makeText(this,e.getMessage(),Toast.LENGTH_LONG).show();}}).show();}
-    private void deleteShelf(ShelfStore.Shelf shelf){new AlertDialog.Builder(this).setTitle(LocalizedText.ui("删除“")+shelf.name+"”？").setMessage(LocalizedText.ui("只删除书架，不删除漫画。")) .setNegativeButton(LocalizedText.ui("取消"),null).setPositiveButton(LocalizedText.ui("删除"),(d,w)->{ShelfStore.delete(this,shelf.id);activeShelfId="";syncShelves();show();}).show();}
-    private void syncShelves(){if(BuildConfig.LOCAL_ONLY_DRAFT||!BridgeStore.paired(this))return;worker.submit(()->{try{BridgeClient.device(this);ShelfStore.syncWithDesktop(this);runOnUiThread(()->{if(showingShelves&&!isDestroyed())show();});}catch(Exception ignored){}});}
+    /**
+     * The original Shelves tab used to parse both complete JSON stores on
+     * the Android UI thread, even when the shelf held 1,500+ works.
+     * Reuse the library worker and the same original RecyclerView/ledger.
+     */
+    private void shelves(){
+        LinearLayout p=page(false);
+        titleRow(p,"书架",compact("返回",v->{showingShelves=false;show();}),
+                compact("＋",v->createShelf()),compact("▦",v->chooseCollectionMode()));
+        TextView status=Ui.text(this,LocalizedText.ui(this,
+                "正在读取书架…","Loading shelves…","本棚を読み込み中…"),14,Ui.MUTED,false);
+        status.setGravity(Gravity.CENTER);
+        p.addView(status);
+        LinearLayout controls=new LinearLayout(this);
+        controls.setOrientation(LinearLayout.VERTICAL);
+        p.addView(controls);
+        RecyclerView list=collection(p,collectionMode);
+        final int ticket=serial,mode=collectionMode;
+        final String selectedId=activeShelfId;
+        libraryWorker.execute(()->{
+            try{
+                ShelfStore.Snapshot snapshot=ShelfStore.load(getApplicationContext());
+                List<ShelfStore.Shelf> shelves=snapshot.activeShelves();
+                ShelfStore.Shelf active=null;
+                for(ShelfStore.Shelf shelf:shelves)
+                    if(shelf.id.equals(selectedId)){active=shelf;break;}
+                if(active==null&&!shelves.isEmpty())active=shelves.get(0);
+                final ShelfStore.Shelf selected=active;
+                List<UnifiedCatalogStore.Entry> entries=new ArrayList<>();
+                if(selected!=null){
+                    UnifiedCatalogStore.Snapshot catalog=
+                            UnifiedCatalogStore.load(getApplicationContext());
+                    for(ShelfStore.Item item:selected.activeItems()){
+                        UnifiedCatalogStore.Entry entry=catalog.byId.get(item.comicId);
+                        if(entry==null){
+                            entry=new UnifiedCatalogStore.Entry(
+                                    item.comicId,item.title,item.author);
+                            entry.canonicalAuthor=item.canonicalAuthor;
+                            entry.tags.addAll(item.tags);
+                            entry.categories.addAll(item.categories);
+                            entry.finished=item.finished;
+                            entry.knownPictures=item.knownPictures;
+                            entry.inShelf=true;
+                        }
+                        entries.add(entry);
+                    }
+                }
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed()||ticket!=serial||
+                            !showingShelves||list.getParent()==null)return;
+                    status.setVisibility(View.GONE);
+                    controls.removeAllViews();
+                    if(selected==null){
+                        status.setText(LocalizedText.ui(this,"还没有书架",
+                                "No shelves yet","本棚がありません"));
+                        status.setVisibility(View.VISIBLE);
+                        controls.addView(compact("新建书架",v->createShelf()));
+                    }else{
+                        activeShelfId=selected.id;
+                        prefs.edit().putString("activeShelfId",activeShelfId).apply();
+                        HorizontalScrollView scroller=new HorizontalScrollView(this);
+                        LinearLayout tabs=new LinearLayout(this);
+                        tabs.setPadding(0,Ui.dp(this,6),0,Ui.dp(this,4));
+                        for(ShelfStore.Shelf shelf:shelves){
+                            Button button=compact(shelf.name+
+                                    (shelf.id.equals(activeShelfId)?" ✓":""),v->{
+                                activeShelfId=shelf.id;
+                                prefs.edit().putString("activeShelfId",activeShelfId).apply();
+                                show();
+                            });
+                            LinearLayout.LayoutParams lp=
+                                    new LinearLayout.LayoutParams(-2,-2);
+                            lp.setMargins(0,0,Ui.dp(this,6),0);
+                            tabs.addView(button,lp);
+                        }
+                        scroller.addView(tabs);
+                        controls.addView(scroller);
+                        LinearLayout bar=new LinearLayout(this);
+                        bar.setGravity(Gravity.CENTER_VERTICAL);
+                        bar.addView(Ui.rawText(this,LocalizedText.ui(this,
+                                entries.size()+" 本",entries.size()+" works",
+                                entries.size()+" 作品"),13,Ui.MUTED,false),
+                                new LinearLayout.LayoutParams(0,-2,1));
+                        bar.addView(compact("重命名",v->renameShelf(selected)));
+                        Ui.gap(bar,this,6);
+                        bar.addView(compact("删除",v->deleteShelf(selected)));
+                        controls.addView(bar);
+                        UnifiedComicCollectionAdapter adapter=
+                                new UnifiedComicCollectionAdapter(this,mode,entries,this::open);
+                        list.setAdapter(adapter);
+                        collectionSelection.attach(adapter,entries,true,selected.id);
+                        restoreListPosition(list,0);
+                    }
+                    // Previously each successful remote sync called show(), which
+                    // immediately scheduled another sync. Once per Home session
+                    // retains the original first-entry behavior without a loop.
+                    if(!BuildConfig.LOCAL_ONLY_DRAFT&&!shelfAutoSyncStarted&&
+                            BridgeStore.paired(this)){
+                        shelfAutoSyncStarted=true;
+                        syncShelves();
+                    }
+                });
+            }catch(RuntimeException failure){
+                runOnUiThread(()->{
+                    if(isDestroyed()||isFinishing()||ticket!=serial||
+                            !showingShelves||list.getParent()==null)return;
+                    status.setText(LocalizedText.ui(this,"书架读取失败",
+                            "Could not load shelves","本棚を読み込めません"));
+                });
+            }
+        });
+    }
+    /** Preserve shelf CRUD and metadata reconciliation without blocking taps. */
+    private void editShelf(java.util.concurrent.Callable<String> change,
+                           java.util.function.Consumer<String> onSaved){
+        Toast.makeText(this,LocalizedText.ui(this,"正在保存书架…",
+                "Saving shelf…","本棚を保存中…"),Toast.LENGTH_SHORT).show();
+        libraryWorker.execute(()->{
+            String id=null,error=null;
+            try{id=change.call();}
+            catch(Exception failure){error=failure.getMessage()==null?
+                    "书架保存失败":failure.getMessage();}
+            final String saved=id,problem=error;
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed())return;
+                if(problem!=null){
+                    Toast.makeText(this,problem,Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if(onSaved!=null)onSaved.accept(saved);
+                if(showingShelves)show();
+                if(BridgeStore.paired(this)){
+                    shelfAutoSyncStarted=true;
+                    syncShelves();
+                }
+            });
+        });
+    }
+    private void createShelf(){
+        final EditText input=new EditText(this);
+        input.setHint(LocalizedText.ui("书架名称"));
+        Ui.styleField(input,this);
+        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("新建书架"))
+                .setView(input).setNegativeButton(LocalizedText.ui("取消"),null)
+                .setPositiveButton(LocalizedText.ui("创建"),(d,w)->{
+                    String name=input.getText().toString();
+                    editShelf(()->ShelfStore.create(getApplicationContext(),name).id,
+                            id->{activeShelfId=id;
+                                prefs.edit().putString("activeShelfId",id).apply();});
+                }).show();
+    }
+    private void renameShelf(ShelfStore.Shelf shelf){
+        final EditText input=new EditText(this);
+        input.setText(shelf.name);
+        Ui.styleField(input,this);
+        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("重命名书架"))
+                .setView(input).setNegativeButton(LocalizedText.ui("取消"),null)
+                .setPositiveButton(LocalizedText.ui("保存"),(d,w)->{
+                    String name=input.getText().toString();
+                    editShelf(()->{
+                        ShelfStore.rename(getApplicationContext(),shelf.id,name);
+                        return shelf.id;
+                    },null);
+                }).show();
+    }
+    private void deleteShelf(ShelfStore.Shelf shelf){
+        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("删除“")+shelf.name+"”？")
+                .setMessage(LocalizedText.ui("只删除书架，不删除漫画。"))
+                .setNegativeButton(LocalizedText.ui("取消"),null)
+                .setPositiveButton(LocalizedText.ui("删除"),(d,w)->editShelf(()->{
+                    ShelfStore.delete(getApplicationContext(),shelf.id);
+                    return "";
+                },id->{activeShelfId="";
+                    prefs.edit().putString("activeShelfId","").apply();})).show();
+    }
+    private void syncShelves(){
+        if(BuildConfig.LOCAL_ONLY_DRAFT||!BridgeStore.paired(this))return;
+        worker.submit(()->{
+            try{
+                BridgeClient.device(this);
+                ShelfStore.syncWithDesktop(this);
+                runOnUiThread(()->{
+                    if(showingShelves&&!isDestroyed()&&!isFinishing())show();
+                });
+            }catch(Exception ignored){
+                // The local shelf is still usable when optional Desktop is offline.
+            }
+        });
+    }
 
     @Override public void addSelectedToShelf(List<UnifiedCatalogStore.Entry> entries){
         if(entries==null||entries.isEmpty())return;
-        List<ShelfStore.Shelf> shelves=ShelfStore.load(this).activeShelves();
-        List<ShelfStore.Shelf> choices=new ArrayList<>();
-        for(ShelfStore.Shelf shelf:shelves)if(!showingShelves||!shelf.id.equals(activeShelfId))choices.add(shelf);
-        String[] labels=new String[choices.size()+1];for(int i=0;i<choices.size();i++)labels[i]=choices.get(i).name;labels[labels.length-1]="＋ 新建书架";
-        new AlertDialog.Builder(this).setTitle("将 "+entries.size()+" 本加入书架").setItems(labels,(d,w)->{
-            if(w==choices.size()){createShelfForSelection(entries);return;}
-            ShelfStore.Shelf target=choices.get(w);ShelfStore.setMemberships(this,target.id,entries,true);if(collectionSelection!=null)collectionSelection.finish();Toast.makeText(this,"已加入“"+target.name+"”",Toast.LENGTH_SHORT).show();if(BridgeStore.paired(this))syncShelves();else if(showingShelves)show();
-        }).setNegativeButton(LocalizedText.ui("取消"),null).show();
+        List<UnifiedCatalogStore.Entry> selected=new ArrayList<>(entries);
+        final int request=serial;
+        // A 1,500-entry shelf ledger must not be parsed on a button tap.
+        libraryWorker.execute(()->{
+            List<ShelfStore.Shelf> available=ShelfStore.load(getApplicationContext()).activeShelves();
+            List<ShelfStore.Shelf> choices=new ArrayList<>();
+            for(ShelfStore.Shelf shelf:available)
+                if(!showingShelves||!shelf.id.equals(activeShelfId))choices.add(shelf);
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed()||request!=serial)return;
+                String[] labels=new String[choices.size()+1];
+                for(int i=0;i<choices.size();i++)labels[i]=choices.get(i).name;
+                labels[choices.size()]="＋ 新建书架";
+                new AlertDialog.Builder(this)
+                        .setTitle("将 "+selected.size()+" 本加入书架")
+                        .setItems(labels,(d,w)->{
+                            if(w==choices.size()){
+                                createShelfForSelection(selected);
+                                return;
+                            }
+                            ShelfStore.Shelf target=choices.get(w);
+                            editShelf(()->{
+                                ShelfStore.setMemberships(getApplicationContext(),
+                                        target.id,selected,true);
+                                return target.name;
+                            },name->{
+                                if(collectionSelection!=null)collectionSelection.finish();
+                                Toast.makeText(this,"已加入“"+name+"”",Toast.LENGTH_SHORT).show();
+                            });
+                        }).setNegativeButton(LocalizedText.ui("取消"),null).show();
+            });
+        });
     }
     private void createShelfForSelection(List<UnifiedCatalogStore.Entry> entries){
-        EditText input=new EditText(this);input.setHint(LocalizedText.ui("书架名称"));Ui.styleField(input,this);
-        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("新建书架")).setView(input).setNegativeButton(LocalizedText.ui("取消"),null).setPositiveButton(LocalizedText.ui("创建"),(d,w)->{try{ShelfStore.Shelf shelf=ShelfStore.create(this,input.getText().toString());ShelfStore.setMemberships(this,shelf.id,entries,true);if(collectionSelection!=null)collectionSelection.finish();Toast.makeText(this,"已将 "+entries.size()+" 本加入“"+shelf.name+"”",Toast.LENGTH_SHORT).show();if(BridgeStore.paired(this))syncShelves();else if(showingShelves)show();}catch(Exception e){Toast.makeText(this,e.getMessage(),Toast.LENGTH_LONG).show();}}).show();
+        EditText input=new EditText(this);
+        input.setHint(LocalizedText.ui("书架名称"));
+        Ui.styleField(input,this);
+        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("新建书架"))
+                .setView(input).setNegativeButton(LocalizedText.ui("取消"),null)
+                .setPositiveButton(LocalizedText.ui("创建"),(d,w)->{
+                    String name=input.getText().toString();
+                    List<UnifiedCatalogStore.Entry> selected=new ArrayList<>(entries);
+                    editShelf(()->{
+                        ShelfStore.Shelf shelf=ShelfStore.create(getApplicationContext(),name);
+                        ShelfStore.setMemberships(getApplicationContext(),
+                                shelf.id,selected,true);
+                        return shelf.name;
+                    },created->{
+                        if(collectionSelection!=null)collectionSelection.finish();
+                        Toast.makeText(this,"已将 "+selected.size()+" 本加入“"+
+                                created+"”",Toast.LENGTH_SHORT).show();
+                    });
+                }).show();
     }
-    @Override public void removeSelectedFromShelf(String shelfId,List<UnifiedCatalogStore.Entry> entries){
-        if(entries==null||entries.isEmpty()||shelfId==null||shelfId.isEmpty())return;String shelfName="当前书架";for(ShelfStore.Shelf shelf:ShelfStore.load(this).activeShelves())if(shelf.id.equals(shelfId)){shelfName=shelf.name;break;}final String name=shelfName;
-        new AlertDialog.Builder(this).setTitle("从“"+name+"”移出 "+entries.size()+" 本？").setMessage("只移出书架，不会取消收藏或删除漫画。").setNegativeButton(LocalizedText.ui("取消"),null).setPositiveButton("移出",(d,w)->{ShelfStore.setMemberships(this,shelfId,entries,false);if(collectionSelection!=null)collectionSelection.finish();Toast.makeText(this,"已从“"+name+"”移出",Toast.LENGTH_SHORT).show();if(BridgeStore.paired(this))syncShelves();show();}).show();
+    @Override public void removeSelectedFromShelf(
+            String shelfId,List<UnifiedCatalogStore.Entry> entries){
+        if(entries==null||entries.isEmpty()||shelfId==null||shelfId.isEmpty())return;
+        final int request=serial;
+        List<UnifiedCatalogStore.Entry> selected=new ArrayList<>(entries);
+        libraryWorker.execute(()->{
+            String shelfName="当前书架";
+            for(ShelfStore.Shelf shelf: ShelfStore.load(
+                    getApplicationContext()).activeShelves())
+                if(shelf.id.equals(shelfId)){shelfName=shelf.name;break;}
+            final String name=shelfName;
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed()||request!=serial)return;
+                new AlertDialog.Builder(this)
+                        .setTitle("从“"+name+"”移出 "+selected.size()+" 本？")
+                        .setMessage("只移出书架，不会取消收藏或删除漫画。")
+                        .setNegativeButton(LocalizedText.ui("取消"),null)
+                        .setPositiveButton("移出",(d,w)->editShelf(()->{
+                            ShelfStore.setMemberships(getApplicationContext(),
+                                    shelfId,selected,false);
+                            return name;
+                        },updated->{
+                            if(collectionSelection!=null)collectionSelection.finish();
+                            Toast.makeText(this,"已从“"+updated+"”移出",
+                                    Toast.LENGTH_SHORT).show();
+                        })).show();
+            });
+        });
     }
     @Override public void removeSelectedFavorites(List<UnifiedCatalogStore.Entry> entries){
         if(BuildConfig.SOURCE_NEUTRAL_QA){

@@ -25,13 +25,15 @@ public final class HostBrowserActivity extends Activity {
     private EditText label,endpoint,username,password,query;
     private CheckBox allowLan,permission,basicAuth;
     private Spinner sourceChoices;
+    private TextView sourcePageStatus;
     private LinearLayout results,setupPanel;
     private Button toggleSetup;
     private ScrollView scroller;
     private TextView status;
-    private Button save,enable,start,disconnect,refresh,select,search;
+    private Button save,enable,start,disconnect,refresh,select,search,previousSources,nextSources;
     private boolean busy,destroyed;
-    private int generation;
+    private int generation,sourceOffset;
+    private boolean sourceHasNext;
     // Default stays the physically source-free QA Reader; only an explicitly
     // authorized same-signer full-product QA client can change this destination.
     private String readerPackage="com.picalibrary.android.localcore.qa";
@@ -105,6 +107,8 @@ public final class HostBrowserActivity extends Activity {
         refresh.setEnabled(!busy&&session&&manager.selectedSource().isEmpty());
         select.setEnabled(!busy&&session&&manager.selectedSource().isEmpty()&&!sources.isEmpty());
         search.setEnabled(!busy&&session&&!manager.selectedSource().isEmpty());
+        previousSources.setEnabled(!busy&&session&&manager.selectedSource().isEmpty()&&sourceOffset>=25);
+        nextSources.setEnabled(!busy&&session&&manager.selectedSource().isEmpty()&&sourceHasNext&&sourceOffset<5000);
     }
 
     @Override public void onCreate(Bundle saved){
@@ -175,6 +179,17 @@ public final class HostBrowserActivity extends Activity {
         disconnect=action(root,t("断开会话","Disconnect","セッション終了"));
         refresh=action(root,t("刷新来源","Refresh sources","ソース更新"));
         sourceChoices=new Spinner(this);root.addView(sourceChoices);
+        sourcePageStatus=text(t("尚未读取来源","Sources not loaded","ソース未取得"),13);
+        sourcePageStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        root.addView(sourcePageStatus);
+        LinearLayout pager=new LinearLayout(this);pager.setOrientation(LinearLayout.HORIZONTAL);
+        root.addView(pager,new LinearLayout.LayoutParams(-1,dp(48)));
+        previousSources=new Button(this);previousSources.setAllCaps(false);
+        previousSources.setText(t("上一页","Previous","前へ"));
+        pager.addView(previousSources,new LinearLayout.LayoutParams(0,-1,1));
+        nextSources=new Button(this);nextSources.setAllCaps(false);
+        nextSources.setText(t("下一页","Next","次へ"));
+        pager.addView(nextSources,new LinearLayout.LayoutParams(0,-1,1));
         select=action(root,t("选择此来源","Use selected source","ソースを選択"));
         query=field(root,t("搜索作品","Search works","作品を検索"),false);
         query.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
@@ -197,7 +212,7 @@ public final class HostBrowserActivity extends Activity {
             long revision=manager.config().revision;
             task(t("保存中…","Saving…","保存中…"),()->{
                 manager.configure(revision,name,url,mode,allow);
-                return ()->{sources.clear();results.removeAllViews();
+                return ()->{clearSources();results.removeAllViews();
                     setupPanel.setVisibility(View.GONE);
                     scroller.smoothScrollTo(0,0);
                     status.setText(t("已保存；没有自动连接","Saved; no connection started",
@@ -227,19 +242,18 @@ public final class HostBrowserActivity extends Activity {
             task(t("正在连接 Host…","Connecting…","接続中…"),()->{
                 manager.start(user,secret,true);
                 HostProtocol.Sources available=manager.sources(0);
-                return ()->{showSources(available);
+                return ()->{showSources(available,0);
                     status.setText(t("请选择来源","Select a source","ソースを選択"));};
             });
         });
         disconnect.setOnClickListener(v->{
-            manager.end();sources.clear();results.removeAllViews();
+            manager.end();clearSources();results.removeAllViews();
             permission.setChecked(false);
             status.setText(t("已断开","Disconnected","切断しました"));controls();
         });
-        refresh.setOnClickListener(v->task(t("读取来源…","Loading sources…","取得中…"),()->{
-            HostProtocol.Sources available=manager.sources(0);
-            return ()->showSources(available);
-        }));
+        refresh.setOnClickListener(v->loadSources(sourceOffset));
+        previousSources.setOnClickListener(v->loadSources(sourceOffset-25));
+        nextSources.setOnClickListener(v->loadSources(sourceOffset+25));
         select.setOnClickListener(v->{
             int chosen=sourceChoices.getSelectedItemPosition();
             if(chosen<0||chosen>=sources.size())return;
@@ -272,12 +286,34 @@ public final class HostBrowserActivity extends Activity {
         controls();
     }
 
-    private void showSources(HostProtocol.Sources page){
+    private void loadSources(int offset){
+        if(offset<0||offset>5000||offset%25!=0)return;
+        task(t("读取来源…","Loading sources…","取得中…"),()->{
+            HostProtocol.Sources page=manager.sources(offset);
+            return ()->showSources(page,offset);
+        });
+    }
+    private void clearSources(){
+        sources.clear();sourceOffset=0;sourceHasNext=false;
+        sourceChoices.setAdapter(new ArrayAdapter<>(this,
+            android.R.layout.simple_spinner_dropdown_item,new ArrayList<String>()));
+        sourcePageStatus.setText(t("尚未读取来源","Sources not loaded","ソース未取得"));
+    }
+    private void showSources(HostProtocol.Sources page,int offset){
         sources.clear();sources.addAll(page.rows);
+        sourceOffset=offset;sourceHasNext=page.next;
         List<String> labels=new ArrayList<>();
         for(HostProtocol.Source item:sources)labels.add(item.name+" · "+item.language);
         sourceChoices.setAdapter(new ArrayAdapter<>(this,
             android.R.layout.simple_spinner_dropdown_item,labels));
+        int first=page.rows.isEmpty()?0:offset+1,last=offset+page.rows.size();
+        sourcePageStatus.setText(page.rows.isEmpty()?
+            t("本页没有来源，请在自己的 Host 中管理扩展。",
+              "No sources on this page. Manage extensions in your Host.",
+              "このページにソースはありません。Host 側で管理してください。"):
+            t("已安装来源 "+first+"–"+last+(page.next?" · 还有下一页":""),
+              "Installed sources "+first+"–"+last+(page.next?" · more available":""),
+              "導入済みソース "+first+"–"+last+(page.next?" · 次ページあり":"")));
         controls();
     }
 

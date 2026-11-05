@@ -163,3 +163,11 @@ PASS requires actual nine-case runtime result and surviving captured images for 
 扩展**已有**的 `S1AndroidLocaleMatrixTest`/`run-s1-android-locale-matrix.sh`，不新建 Activity、Reader 或测试工具：每个原九场景（zh-CN/en/ja、亮/暗、360/393/480dp、1.0/1.3/1.5 字体）额外运行同一个原 `HomeActivity` 的四个 `tab` 入口，验证真实底部导航的可见触摸区域，及每页真实控件：书库的书架/本地导入、推荐生成、在线 Host、设置语言。保留原非黑屏、无系统弹窗遮挡、实际 App 所属前台窗口以及真实 PNG 证据要求。UI 截图仍只来自隔离的 `.dev`，不等同 `.cleanqa` 真机验收。
 
 新版矩阵总计 **9 × 11 = 99 个原应用页面场景**，仍为旧脚本、旧 instrumentation 框架和同一 GitHub workflow；不创建新截图平台或重复执行媒体下载。新集成 HEAD 的原 Android35 工作流必须完整 SUCCESS 才能标工程通过；仍需使用物理手机验证 G1 手势、系统字体与 OEM 行为。
+
+## R3 original Android first-frame duplicate-render and clean-QA update prompt (2026-11-04)
+
+Inspection of the original four-tab `HomeActivity` found that `onCreate()` calls `renderShell(); show()`, then Android immediately invokes `onResume()` and unconditionally calls `show()` a second time. The first render schedules its own Library/Recommendation JSON scan, rescinds the first `serial` identity, and starts another scan. On a larger catalog this repeats expensive work at cold startup and can momentarily expose two independent loading states. Returning from Reader/Settings **does** require refresh and must remain unchanged.
+
+Small production-path fix: the existing instance skips only the `onResume()` redraw immediately following its own `onCreate()` initial `show()`, then restores all normal redraws on later resumes and explicit tab/intent navigation. This uses the same original asynchronous store workers and does not change catalog JSON/schema/reader/history. In the explicitly source-neutral isolated QA app, the legacy formal OTA auto-prompt/check is suppressed because `UpdateActivity` already deliberately disables production updates there; normal production/Dev update checks remain intact.
+
+Original 99-page-screen (nine scenario) locale matrix and existing Android35 Reader/Host/real-signer upgrade workflows are reused for regression. These updates must not be called verified until an exact source commit's CI and UI flows finish successfully.

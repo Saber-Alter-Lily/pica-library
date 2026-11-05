@@ -191,9 +191,15 @@ def synthetic_user_host():
             if name=="PicaSourceHostInfo":
                 data={"aboutServer":{"name":"Suwayomi-Server","version":"v2.4.2366"}}
             elif name=="PicaSourceHostSources":
-                data={"sources":{"nodes":[{"id":source,"name":"User installed fixture",
-                      "lang":"en","supportsLatest":True}],
-                      "pageInfo":{"hasNextPage":False,"hasPreviousPage":False},"totalCount":1}}
+                offset=int(request.get("variables",{}).get("offset",0))
+                listed=[{"id":str(10000+i),"name":f"Other installed {i+1}",
+                         "lang":"en","supportsLatest":True} for i in range(25)]
+                listed.append({"id":source,"name":"User installed fixture",
+                               "lang":"en","supportsLatest":True})
+                data={"sources":{"nodes":listed[offset:offset+25],
+                      "pageInfo":{"hasNextPage":offset+25<len(listed),
+                                  "hasPreviousPage":offset>0},
+                      "totalCount":len(listed)}}
             elif name=="PicaHostSourceSearch":
                 data={"fetchSourceManga":{"mangas":[book],"hasNextPage":False}}
             elif name=="PicaHostManga":
@@ -742,6 +748,18 @@ def source_free_user_host_flow():
         tap_scrolling(("Connect and list sources","连接并读取来源","接続してソースを表示"),
                       only_class="Button")
         wait_host_operation(operations,"PicaSourceHostSources")
+        tap_scrolling(("Next","下一页","次へ"),only_class="Button")
+        wait(("Installed sources 26", "已安装来源 26", "導入済みソース 26"),
+             seconds=30)
+        assert operations.count("PicaSourceHostSources")>=2, (
+            "Host did not request second installed-source page")
+        tap_scrolling(("Previous","上一页","前へ"),only_class="Button")
+        wait(("Installed sources 1", "已安装来源 1", "導入済みソース 1"),
+             seconds=30)
+        tap_scrolling(("Next","下一页","次へ"),only_class="Button")
+        wait(("Installed sources 26", "已安装来源 26", "導入済みソース 26"),
+             seconds=30)
+        record("Android signed Host can browse a 26-source catalogue and select from page 2")
         tap_scrolling(("Use selected source","选择此来源","ソースを選択"),
                       only_class="Button")
         type_into_host(("Search works","搜索作品","作品を検索"),"synthetic")

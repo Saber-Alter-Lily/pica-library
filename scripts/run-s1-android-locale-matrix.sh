@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nine pairwise Android-only UI variants; synthetic app state, no login, download, sync or update.
+# Nine pairwise Android-only UI variants across 11 real product pages; synthetic app state, no login, download, sync or update.
 set -euo pipefail
 cd mobile/android-alpha2
 test -f settings.gradle || test -f settings.gradle.kts
@@ -8,7 +8,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell wm density 320
 mkdir -p s1-locale-matrix-evidence
-pages=(guide sources downloads recommendation webdav pairing tags)
+pages=(guide sources downloads recommendation webdav pairing tags home-library home-recommend home-online home-settings)
 # Read all scenarios before starting adb. adb shell/exec-out may consume
 # its inherited stdin and otherwise terminate the here-doc while-loop early.
 mapfile -t scenarios <<'S1_CASES'

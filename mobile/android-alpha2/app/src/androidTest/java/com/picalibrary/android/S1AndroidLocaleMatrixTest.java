@@ -25,10 +25,12 @@ public final class S1AndroidLocaleMatrixTest {
     private static final Class<? extends Activity>[] PAGES=new Class[]{
         AdvancedGuideActivity.class,AccountSourcesActivity.class,DownloadsActivity.class,
         RecommendationStyleActivity.class,RemoteStorageActivity.class,PairingActivity.class,
-        TagParticipationActivity.class
+        TagParticipationActivity.class,
+        HomeActivity.class,HomeActivity.class,HomeActivity.class,HomeActivity.class
     };
     private static final String[] NAMES={
-        "guide","sources","downloads","recommendation","webdav","pairing","tags"
+        "guide","sources","downloads","recommendation","webdav","pairing","tags",
+        "home-library","home-recommend","home-online","home-settings"
     };
 
     @Test public void sixRealPagesRenderAtRequestedLocaleThemeFontAndWidth() throws Exception {
@@ -63,6 +65,10 @@ public final class S1AndroidLocaleMatrixTest {
         app.getSharedPreferences("pica-disclaimer-v1",Context.MODE_PRIVATE)
             .edit().putString("accepted_version","1").commit();
         OnboardingStore.setAutoShow(app,false);
+        // Avoid unrelated OTA prompts during disposable screenshot acquisition.
+        app.getSharedPreferences("updater-v1",Context.MODE_PRIVATE).edit()
+            .putLong("lastAutoCheckAt",System.currentTimeMillis())
+            .putInt("latestVersionCode",0).commit();
         LocaleStore.set(app,locale);
         app.getSharedPreferences("appearance-v1",Context.MODE_PRIVATE)
             .edit().putString("mode",theme).commit();
@@ -75,7 +81,11 @@ public final class S1AndroidLocaleMatrixTest {
             Instrumentation.ActivityMonitor monitor=inst.addMonitor(type.getName(),null,false);
             Activity opened=null;
             try{
-                app.startActivity(new Intent(app,type).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                Intent launch=new Intent(app,type).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                // Use the actual four-tab full product, not a parallel QA screen.
+                final int homeTab=i-7;
+                if(type==HomeActivity.class)launch.putExtra("tab",homeTab);
+                app.startActivity(launch);
                 Activity seen=monitor.waitForActivityWithTimeout(20000);
                 assertNotNull("Page not launched: "+page,seen);
                 assertTrue("Incorrect Activity: "+page,type.isInstance(seen));
@@ -115,6 +125,27 @@ public final class S1AndroidLocaleMatrixTest {
                         assertTrue("Back control not in viewport",back.getGlobalVisibleRect(left));
                         assertTrue("Tag heading not in viewport",anchor.getGlobalVisibleRect(right));
                         assertTrue("Tag heading overlaps back",right.left>=left.right);
+                    }else if(current instanceof HomeActivity){
+                        assertTrue("Invalid original Home tab",homeTab>=0&&homeTab<4);
+                        View nav=decor.findViewWithTag("pica-tour-nav-"+homeTab);
+                        assertNotNull(page+": original bottom tab missing",nav);
+                        android.graphics.Rect visible=new android.graphics.Rect();
+                        assertTrue(page+": original bottom tab outside viewport",nav.getGlobalVisibleRect(visible));
+                        assertTrue(page+": original bottom tab has no touch area",
+                            visible.width()>=45&&visible.height()>=44);
+                        String control=homeTab==0?AndroidOnboarding.LIBRARY_SHELVES:
+                            homeTab==1?AndroidOnboarding.RECOMMEND_BUILD:
+                            homeTab==2?"online-user-host":AndroidOnboarding.SETTINGS_LANGUAGE;
+                        anchor=decor.findViewWithTag(control);
+                        assertNotNull(page+": original content anchor missing: "+control,anchor);
+                        assertTrue(page+": original content control outside viewport",
+                            anchor.getGlobalVisibleRect(visible));
+                        if(homeTab==0){
+                            View local=decor.findViewWithTag("library-local-import");
+                            assertNotNull("Original Library local import missing",local);
+                            assertTrue("Import inaccessible at "+width+"dp font "+font,
+                                local.getGlobalVisibleRect(visible));
+                        }
                     }
                     assertNotNull(page+": actual control is missing",anchor);
                     assertTrue(page+": actual control is not visible",anchor.isShown());

@@ -56,7 +56,7 @@ jobs:
           test -e /dev/kvm || exit 1
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
-      - name: Real seven-page Android UI under nine representative scenarios
+      - name: Real 11-page original Android UI under nine representative scenarios
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35

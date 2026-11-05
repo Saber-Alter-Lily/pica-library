@@ -155,3 +155,11 @@ Original Android G1 has a separately tracked layout/translation requirement: 360
 This batch **reuses** the existing workflow, instrumentation UI, screenshots and layout checks; it only allows the unified integration branch to trigger that matrix and adds original `HomeActivity.java` as a relevant path. It does not invent a new screenshot framework, Reader implementation, UI hierarchy, manual acceptance status or production build. The Debug APK is the historical original product (`com.picalibrary.android.dev`), **not** the source-neutral `.cleanqa` physical boundary; that is verified independently. The matrix may reveal genuine layout defects; it cannot close physical handset G1 by itself.
 
 PASS requires actual nine-case runtime result and surviving captured images for the new commit. Any failed scenario remains OPEN until its root cause is resolved; do not mark the old recovery-branch screenshot pass as current integration acceptance.
+
+## R3 九场景矩阵覆盖原 Android 四大主标签（2026-11-04）
+
+此前 [九场景 UI 运行 #41851438528](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41851438528) 已成功，但只覆盖原 `AdvancedGuide`, `AccountSources`, `Downloads`, `RecommendationStyle`, `RemoteStorage`, `Pairing`, `TagParticipation` 七个功能页，不包括用户真正频繁访问的四大主导航。因此不能用这轮成功声称原 Android 首页布局已被覆盖。
+
+扩展**已有**的 `S1AndroidLocaleMatrixTest`/`run-s1-android-locale-matrix.sh`，不新建 Activity、Reader 或测试工具：每个原九场景（zh-CN/en/ja、亮/暗、360/393/480dp、1.0/1.3/1.5 字体）额外运行同一个原 `HomeActivity` 的四个 `tab` 入口，验证真实底部导航的可见触摸区域，及每页真实控件：书库的书架/本地导入、推荐生成、在线 Host、设置语言。保留原非黑屏、无系统弹窗遮挡、实际 App 所属前台窗口以及真实 PNG 证据要求。UI 截图仍只来自隔离的 `.dev`，不等同 `.cleanqa` 真机验收。
+
+新版矩阵总计 **9 × 11 = 99 个原应用页面场景**，仍为旧脚本、旧 instrumentation 框架和同一 GitHub workflow；不创建新截图平台或重复执行媒体下载。新集成 HEAD 的原 Android35 工作流必须完整 SUCCESS 才能标工程通过；仍需使用物理手机验证 G1 手势、系统字体与 OEM 行为。

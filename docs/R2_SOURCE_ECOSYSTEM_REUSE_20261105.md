@@ -47,3 +47,16 @@ Metadata and repo updates are different from actually using a plugin: E-Hentai 1
 ### Completed original-product UX increment / pending verification
 
 An online bookmark saved in the existing independent Android Host now offers **Connect to resume bookmarks** while disconnected. It collapses the bookmark list to expose existing consent and Host configuration without a long scroll, then restores the same list once the user has **manually** authorized the connection. The already built bounded source ID discovery can then resume the original Reader without searching for the comic again. Neither this UI shortcut nor the identity check automatically starts a Host session. The existing Android35 flow covers this specific action and must finish SUCCESS on its exact commit; G1–G4 remain OPEN.
+
+### Authoritative Keiyoushi JAR discovery, replacing earlier APK-only assumption
+
+On 2026-11-06, GitHub's actual release asset metadata for [Keiyoushi release 4591fbc-2](https://github.com/keiyoushi/extensions/releases/tag/4591fbc-2) confirmed that **both Picacomic and Jinman Tiantang ship native JAR artifacts as well as APKs**. The Hyperion aggregate's local `repo/jar/` inventory was therefore insufficient to infer those two projects had no JAR. The earlier APK matrix was correctly stopped by SHA-256 checks because `keiyoushi/extensions/release-assets.json` contains package-level signature-related values, **not the GitHub artifact digests**. Never disable verification to work around this discrepancy.
+
+Exact GitHub-managed release asset evidence:
+
+| Artifact | Bytes | GitHub asset SHA-256 |
+| --- | ---: | --- |
+| `tachiyomi-zh.picacomic-v1.6.14.jar` | 215702 | `c62a89ce82e67640ef6de0feff3c76030622066d185530fd576264e98f40cb0a` |
+| `tachiyomi-zh.jinmantiantang-v1.6.64.jar` | 263387 | `5eebd0bae530be491fe1cae32d1940c3914b224c46e7b9d6dd596415ef2c8be7` |
+
+The isolated three-case CI now uses these immutable-release JARs and exact byte digests. **JAR exists / SHA validates does not prove Suwayomi loads it, nor does loading prove real-site availability.** Each case still requires a terminal install + source-ID + revoke PASS. The verified E-Hentai 1.6.36 JAR lifecycle result is separate and remains valid.

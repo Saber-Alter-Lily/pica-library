@@ -24,12 +24,12 @@ EXTENSIONS = {
         "source": "57122881048805941", "version": "1.6.36",
     },
     "picacomic": {
-        "digest": "9e71cddbfa00309f4f3f2d4f8c301bb532a942740f0c8e8dbcba78e9fb7019eb",
+        "digest": "c62a89ce82e67640ef6de0feff3c76030622066d185530fd576264e98f40cb0a",
         "package": "eu.kanade.tachiyomi.extension.zh.picacomic",
         "source": "5768337869316468367", "version": "1.6.14",
     },
     "jinmantiantang": {
-        "digest": "4b705e6f10e59f318a4cabbf4122bacee08b1647a5826036a079eeb26d7265a1",
+        "digest": "5eebd0bae530be491fe1cae32d1940c3914b224c46e7b9d6dd596415ef2c8be7",
         "package": "eu.kanade.tachiyomi.extension.zh.jinmantiantang",
         "source": "6286738698187452081", "version": "1.6.64",
     },

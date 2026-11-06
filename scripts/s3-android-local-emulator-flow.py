@@ -795,7 +795,7 @@ def source_free_user_host_flow():
             len(data.get("books",[]))==1 and
             data["books"][0].get("title")=="S3-QA-Hosted-Comic")
         tap_scrolling(("Saved online works","已保存的在线作品",
-                       "保存済みオンライン作品"),direction="down",only_class="Button")
+                       "保存済みオンライン作品"),direction="up",only_class="Button")
         wait(("Online bookmarks 1","在线书签 1",
               "オンラインブックマーク 1"),seconds=30)
         tap_scrolling(("Resume online (same source required)",
@@ -830,7 +830,7 @@ def source_free_user_host_flow():
         # the sole original Reader library through the signed Binder bridge.
         tap_scrolling(("Save to Reader library",
                        "保存到阅读器书库","Reader 書庫に保存"),
-                      direction="up",only_class="Button")
+                      direction="down",only_class="Button")
         wait(("Save to original Reader","保存到原阅读器书库","元の Reader に保存"),
              seconds=35)
         tap(("Choose chapter to save","选择要保存的章节","保存する章を選択"),
@@ -940,7 +940,7 @@ def source_free_user_host_flow():
                       only_class="Button")
         tap_scrolling(("Resume online (same source required)",
                        "继续在线阅读（需连接同一来源）","オンライン読書を再開"),
-                      direction="down",only_class="Button")
+                      direction="up",only_class="Button")
         wait_page_counter("2 / 2",seconds=50)
         page("29a-bookmark-resume-after-v2-host-restart")
         record("versioned Host install preserves source-only bookmark and original Reader page-2 resume")

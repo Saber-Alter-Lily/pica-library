@@ -908,6 +908,50 @@ def source_free_user_host_flow():
             "Source update triggered a Host request without user action")
         record("different versionCode QA source APK upgrades in place and retains consent/config without auto-connecting")
 
+        # Exercise the real user return path on a NEW Host process/version.
+        # Merely checking the JSON after install does not prove bookmarked works
+        # remain actionable without repeating a source search.
+        STEP = "saved-online-bookmark-resume-after-source-v2-upgrade"
+        PACKAGE = QA_PACKAGE
+        adb("shell","input","keyevent","KEYCODE_BACK")
+        wait(("Import CBZ", "导入 CBZ", "CBZ 取込"),seconds=30)
+        tap(("My external Host","我的外接来源","外部 Host"),
+            seconds=25,only_class="Button")
+        tap(("Open source settings","打开来源设置","ソース設定を開く"),
+            seconds=25)
+        PACKAGE = USER_HOST_PACKAGE
+        wait(("My external sources","我的外部来源","外部ソース"),seconds=30)
+        wait(("No Host connected","尚未连接 Host","未接続"),seconds=30)
+        tap_scrolling(("Saved online works","已保存的在线作品",
+                       "保存済みオンライン作品"),direction="down",only_class="Button")
+        wait(("Online bookmarks 1","在线书签 1",
+              "オンラインブックマーク 1"),seconds=30)
+        record("saved online metadata is visible on a newly launched upgraded Host with no session")
+        tap_scrolling(("Authorize this Host session","我授权本次连接自己的 Host",
+                       "この接続を許可します"),direction="up",only_class="CheckBox")
+        tap_scrolling(("Connect and list sources","连接并读取来源",
+                       "接続してソースを表示"),direction="down",only_class="Button")
+        wait(("Installed sources 1","已安装来源 1",
+              "導入済みソース 1"),seconds=40)
+        tap_scrolling(("Next","下一页","次へ"),only_class="Button")
+        wait(("Installed sources 26","已安装来源 26",
+              "導入済みソース 26"),seconds=30)
+        tap_scrolling(("Use selected source","选择此来源","ソースを選択"),
+                      only_class="Button")
+        tap_scrolling(("Resume online (same source required)",
+                       "继续在线阅读（需连接同一来源）","オンライン読書を再開"),
+                      direction="down",only_class="Button")
+        wait_page_counter("2 / 2",seconds=50)
+        page("29a-bookmark-resume-after-v2-host-restart")
+        record("versioned Host install preserves source-only bookmark and original Reader page-2 resume")
+        adb("shell","input","keyevent","KEYCODE_BACK")
+        tap_scrolling(("Disconnect","断开会话","セッション終了"),
+                      direction="up",only_class="Button")
+        tap_scrolling(("Back to Reader","返回阅读器","Reader に戻る"),
+                      direction="up",only_class="Button")
+        PACKAGE = QA_PACKAGE
+        wait(("Import CBZ", "导入 CBZ", "CBZ 取込"),seconds=30)
+
         # Remove ONLY the source APK. The local Reader must still expose the
         # actual already imported PNG and open it without source installation.
         STEP = "source-only-uninstall-preserves-original-reader"

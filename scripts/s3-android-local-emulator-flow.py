@@ -945,8 +945,19 @@ def source_free_user_host_flow():
         page("29a-bookmark-resume-after-v2-host-restart")
         record("versioned Host install preserves source-only bookmark and original Reader page-2 resume")
         adb("shell","input","keyevent","KEYCODE_BACK")
-        tap_scrolling(("Disconnect","断开会话","セッション終了"),
-                      direction="up",only_class="Button")
+        # Switching source is an explicit session revocation, not a silent
+        # reuse of live credentials or a hidden source change in the Reader.
+        STEP="signed-host-user-changes-source"
+        tap_scrolling(("Change source (end session)","更换来源（结束当前会话）",
+                       "ソース変更（接続を終了）"),direction="up",only_class="Button")
+        tap(("End and change","结束并更换","終了して変更"),
+            exact=True,only_class="Button",seconds=25)
+        wait(("Session ended. Authorize and reconnect to choose a source.",
+              "已结束当前会话，请重新授权后选择来源。",
+              "接続を終了しました。再認証してソースを選択してください。"),seconds=25)
+        wait(("Connect and list sources","连接并读取来源",
+              "接続してソースを表示"),seconds=25)
+        record("explicit source switch revokes old Host session while retaining saved online and offline work")
         tap_scrolling(("Back to Reader","返回阅读器","Reader に戻る"),
                       direction="up",only_class="Button")
         PACKAGE = QA_PACKAGE

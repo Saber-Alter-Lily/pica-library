@@ -787,8 +787,22 @@ def source_free_user_host_flow():
         assert operations.count("PicaHostSourceSearch")>=4, (
             "Host did not request search pages 1→2→1→2")
         record("Android Host browses multiple search pages and chooses a page-2 work")
-        tap_scrolling("S3-QA-Hosted-Comic",direction="down",only_class="Button")
+        STEP = "user-host-bookmark-save-and-original-reader-resume"
+        tap_scrolling(("Save online bookmark (no download)",
+                       "保存在线书签（不下载）","オンラインブックマークを保存"),
+                      direction="down",only_class="Button")
+        until_data("user-host-saved-books-v1.json",lambda data:
+            len(data.get("books",[]))==1 and
+            data["books"][0].get("title")=="S3-QA-Hosted-Comic")
+        tap_scrolling(("Saved online works","已保存的在线作品",
+                       "保存済みオンライン作品"),direction="down",only_class="Button")
+        wait(("Online bookmarks 1","在线书签 1",
+              "オンラインブックマーク 1"),seconds=30)
+        tap_scrolling(("Resume online (same source required)",
+                       "继续在线阅读（需连接同一来源）","オンライン読書を再開"),
+                      direction="down",only_class="Button")
         wait_page_counter("1 / 2",seconds=45)
+        record("persistent source-only bookmark opens existing original Reader without repeating search")
         # The Host app must open the separately installed no-INTERNET Reader,
         # not silently fall back to the Host companion Reader.
         active=adb("shell","dumpsys","activity","activities",timeout=35)
@@ -816,7 +830,7 @@ def source_free_user_host_flow():
         # the sole original Reader library through the signed Binder bridge.
         tap_scrolling(("Save to Reader library",
                        "保存到阅读器书库","Reader 書庫に保存"),
-                      direction="down",only_class="Button")
+                      direction="up",only_class="Button")
         wait(("Save to original Reader","保存到原阅读器书库","元の Reader に保存"),
              seconds=35)
         tap(("Choose chapter to save","选择要保存的章节","保存する章を選択"),
@@ -887,6 +901,9 @@ def source_free_user_host_flow():
         PACKAGE=USER_HOST_PACKAGE
         until_data("user-host-config-v1.json", lambda data:
             data.get("label")=="QA_Host" and data.get("enabled") is True)
+        until_data("user-host-saved-books-v1.json",lambda data:
+            len(data.get("books",[]))==1 and
+            data["books"][0].get("title")=="S3-QA-Hosted-Comic")
         assert len(operations)==operations_before_upgrade, (
             "Source update triggered a Host request without user action")
         record("different versionCode QA source APK upgrades in place and retains consent/config without auto-connecting")

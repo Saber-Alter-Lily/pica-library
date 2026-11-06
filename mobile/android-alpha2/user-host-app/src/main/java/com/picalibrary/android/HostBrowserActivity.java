@@ -224,10 +224,10 @@ public final class HostBrowserActivity extends Activity {
         LinearLayout pager=new LinearLayout(this);pager.setOrientation(LinearLayout.HORIZONTAL);
         sourcePanel.addView(pager,new LinearLayout.LayoutParams(-1,dp(48)));
         previousSources=new Button(this);previousSources.setAllCaps(false);
-        previousSources.setText(t("上一页","Previous","前へ"));
+        previousSources.setText(t("上一页来源","Prev sources","前のソース"));
         pager.addView(previousSources,new LinearLayout.LayoutParams(0,-1,1));
         nextSources=new Button(this);nextSources.setAllCaps(false);
-        nextSources.setText(t("下一页","Next","次へ"));
+        nextSources.setText(t("下一页来源","Next sources","次のソース"));
         pager.addView(nextSources,new LinearLayout.LayoutParams(0,-1,1));
         select=action(sourcePanel,t("选择此来源","Use selected source","ソースを選択"));
         searchPanel=new LinearLayout(this);searchPanel.setOrientation(LinearLayout.VERTICAL);

@@ -968,6 +968,10 @@ def source_free_user_host_flow():
                       direction="up",only_class="Button")
         PACKAGE = QA_PACKAGE
         wait(("Import CBZ", "导入 CBZ", "CBZ 取込"),seconds=30)
+        # Explicitly approved re-connect and saved-source discovery above
+        # legitimately issued additional GraphQL calls after the v1→v2
+        # upgrade. Snapshot only after the user has revoked that session.
+        operations_before_reinstall=len(operations)
 
         # Remove ONLY the source APK. The local Reader must still expose the
         # actual already imported PNG and open it without source installation.
@@ -1010,8 +1014,8 @@ def source_free_user_host_flow():
         PACKAGE=USER_HOST_PACKAGE
         wait(("No Host connected", "尚未连接 Host", "未接続"),seconds=30)
         page("32-source-component-reinstalled-no-auto-connect")
-        assert len(operations)==operations_before_upgrade, (
-            "Source reinstall triggered a Host request without user action")
+        assert len(operations)==operations_before_reinstall, (
+            "Source uninstall/reinstall triggered a Host request after revocation")
         record("optional v2 source reinstall restores same-signer management without implicit network connection")
         PACKAGE=USER_HOST_PACKAGE
         assert all(item in operations for item in ("PicaSourceHostInfo",

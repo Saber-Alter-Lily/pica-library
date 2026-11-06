@@ -90,6 +90,17 @@ function render() {
         const confirm = document.createElement('div'); confirm.hidden = true
         confirm.append(text('p', t('仅移除此连接，不会删除本地或宿主上的漫画、账号或阅读数据。确认？', 'Remove only this connection, not local or hosted comics, accounts or reading data. Confirm?', 'この接続設定のみ削除し、ローカル・ホスト上の漫画・アカウント・閲覧データは削除しません。確認しますか？')), button(t('确认移除', 'Confirm removal', '削除を確認'), () => void request('connections', { action: 'remove', id: host.id, expectedRevision: host.revision, consent: true })), button(t('取消', 'Cancel', '取消'), () => { remove.hidden = false; confirm.hidden = true }))
         card.append(remove, confirm)
+        // Open only the endpoint the user has already saved. The browser, not
+        // Pica Library, owns extension-store changes and any Host login.
+        if (host.endpoint.startsWith('https://') || host.endpoint.startsWith('http://')) {
+            const hostPage = text('a', t('在浏览器管理我的 Host 来源', 'Manage sources in my Host browser', 'ブラウザで Host のソースを管理'))
+            hostPage.href = host.endpoint
+            hostPage.target = '_blank'
+            hostPage.rel = 'noopener noreferrer'
+            hostPage.referrerPolicy = 'no-referrer'
+            hostPage.dataset.hostManagement = host.id
+            card.append(text('p', t('在你自己的 Host WebUI 中管理扩展与更新；本软件不安装漫画源，也不转发账号密码。', 'Manage extensions and updates in your own Host WebUI. Pica does not install sources or forward credentials.', 'Host の WebUI で拡張を管理します。Pica はソースをインストールせず、認証情報も送りません。')), hostPage)
+        }
         const library = button(t('另行授权读取宿主书库', 'Authorize hosted-library reading separately', 'ホスト書庫の読書を別途許可'), () => document.dispatchEvent(new CustomEvent('pica-host-library-config', { detail: { ...host } })))
         library.dataset.hostLibrary = host.id
         library.disabled ||= !host.enabled

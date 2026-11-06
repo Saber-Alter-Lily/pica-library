@@ -181,7 +181,7 @@ public final class HostBrowserActivity extends Activity {
         toggleSetup.setOnClickListener(v->{
             boolean show=setupPanel.getVisibility()!=View.VISIBLE;
             setupPanel.setVisibility(show?View.VISIBLE:View.GONE);
-            if(show)scroller.smoothScrollTo(0,setupPanel.getTop());
+            if(show)scroller.smoothScrollTo(0,connectionPanel.getTop()+setupPanel.getTop());
         });
         label=field(setupPanel,t("连接名称","Host name","接続名"),false);
         endpoint=field(setupPanel,t("Host URL (http:// 或 https://)","Host URL","Host URL"),false);
@@ -322,7 +322,7 @@ public final class HostBrowserActivity extends Activity {
                     status.setText(t("来源已就绪，可搜索","Source ready to search",
                     "検索できます"));
                     query.requestFocus();
-                    scroller.post(()->scroller.smoothScrollTo(0,query.getTop()));};
+                    scroller.post(()->scroller.smoothScrollTo(0,searchPanel.getTop()));};
             });
         });
         search.setOnClickListener(v->loadResults(query.getText().toString().trim(),1));
@@ -399,7 +399,7 @@ public final class HostBrowserActivity extends Activity {
             "Search page "+page+" · "+count+" works"+(found.next?" · more available":""),
             "検索 "+page+" ページ · "+count+" 件"+(found.next?" · 次ページあり":"")));
         controls();
-        scroller.post(()->scroller.smoothScrollTo(0,resultPageStatus.getTop()));
+        scroller.post(()->scroller.smoothScrollTo(0,searchPanel.getTop()+resultPageStatus.getTop()));
         if(found.books.isEmpty()){
             results.addView(text(t("没有匹配作品","No matches","一致する作品なし"),14));
             return;

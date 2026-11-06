@@ -97,6 +97,14 @@ public final class HostBrowserActivity extends Activity {
                 if(destroyed||ticket!=generation)return;
                 busy=false;
                 if(error==null&&completed!=null)completed.run();
+                else if(error!=null&&"SOURCE_HOST_SOURCE_SELECTION_REQUIRED".equals(error.getMessage()))
+                    status.setText(t("未在当前 Host 已检查的前 200 个来源中找到此书签的来源，请在 Host 中检查扩展或手动选择。",
+                        "The bookmark source was not found in the first 200 Host entries. Check extensions in your Host or select the source manually.",
+                        "先頭200件にブックマークのソースが見つかりません。Host で確認するか手動で選択してください。"));
+                else if(error!=null&&"SOURCE_HOST_SCOPE_REQUIRED".equals(error.getMessage()))
+                    status.setText(t("此书签属于不同的 Host、账号或已选择的来源。请连接原 Host 并选择对应来源。",
+                        "This bookmark belongs to a different Host, account, or selected source. Use its original Host.",
+                        "別の Host・アカウント・ソースのブックマークです。元の Host に接続してください。"));
                 else status.setText(t("操作失败：检查 Host 地址、会话或授权。",
                     "Operation failed. Check Host, session and permissions.",
                     "操作に失敗しました。Host と接続を確認してください。"));
@@ -129,7 +137,7 @@ public final class HostBrowserActivity extends Activity {
         savedPrevious.setEnabled(!busy&&savedOffset>=20);
         savedNext.setEnabled(!busy&&savedOffset+20<savedRows.size());
         for(Map.Entry<Button,HostSavedBooks.Book> entry:savedResumeButtons.entrySet())
-            entry.getKey().setEnabled(!busy&&manager.canResumeSaved(entry.getValue()));
+            entry.getKey().setEnabled(!busy&&manager.canLocateSaved(entry.getValue()));
     }
 
     @Override public void onCreate(Bundle saved){
@@ -492,6 +500,9 @@ public final class HostBrowserActivity extends Activity {
         int maximum=savedRows.isEmpty()?0:((savedRows.size()-1)/20)*20;
         savedOffset=Math.min(Math.max(0,offset),maximum);
         savedPanel.setVisibility(View.VISIBLE);
+        status.setText(t("在线书签已就绪，不代表已下载漫画。",
+            "Online bookmarks loaded. No comic pages were downloaded.",
+            "オンラインブックマークを読み込みました。漫画はダウンロードしていません。"));
         renderSaved();
     }
     private void renderSaved(){
@@ -505,11 +516,21 @@ public final class HostBrowserActivity extends Activity {
             savedResults.addView(text(t("还没有在线书签。可在搜索结果中单独保存。",
                 "No online bookmarks. Save one from a search result.",
                 "保存済みの作品はありません。検索結果から追加できます。"),14));
+        else if(!manager.hasSession())
+            savedResults.addView(text(t(
+                "请先在下方授权并连接原 Host，再从书签继续阅读。不会自动登录、安装或下载来源。",
+                "Authorize and connect to the original Host below before resuming. No automatic login, source installation or download.",
+                "下で元の Host への接続を許可してください。自動ログイン・拡張のインストール・ダウンロードは行いません。"),14));
+        else if(manager.selectedSource().isEmpty())
+            savedResults.addView(text(t(
+                "继续阅读将检查当前 Host 最多前 200 个已安装来源，定位该书签对应的来源后打开原阅读器。",
+                "Resume checks up to 200 installed sources in this Host, then opens the existing Reader.",
+                "再開時に現在の Host の先頭200件までのソースを確認し、既存の Reader で開きます。"),14));
         for(int i=savedOffset;i<end;i++){
             HostSavedBooks.Book book=savedRows.get(i);
             savedResults.addView(text(book.title+" · "+book.hostLabel,16));
-            Button resume=action(savedResults,t("继续在线阅读（需连接同一来源）",
-                "Resume online (same source required)","オンライン読書を再開"));
+            Button resume=action(savedResults,t("继续在线阅读（自动定位原来源）",
+                "Resume online (find saved source)","オンライン読書を再開（ソースを探す）"));
             savedResumeButtons.put(resume,book);
             resume.setOnClickListener(v->resumeSaved(book));
             Button remove=action(savedResults,t("移除此在线书签",
@@ -536,7 +557,7 @@ public final class HostBrowserActivity extends Activity {
                 "同じ署名の Reader が見つかりません。"));return;
         }
         task(t("恢复在线作品…","Resuming online work…","作品を再開中…"),()->{
-            manager.resumeSavedBook(book.comicId,true);
+            manager.locateAndResumeSavedBook(book.comicId,true);
             String scope=manager.requireSession().scope;
             return ()->launchReader(book.comicId,book.title,false,scope);
         });

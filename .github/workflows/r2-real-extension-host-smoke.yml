@@ -1,0 +1,58 @@
+name: R2 Real Suwayomi external extension lifecycle (unpublished)
+
+on:
+  push:
+    branches: [codex/product-integration-r1-20261102]
+    paths:
+      - '.github/workflows/r2-real-extension-host-smoke.yml'
+      - 'scripts/r2-real-extension-host-smoke.py'
+      - 'scripts/lib/source-host-interop-fixture.mjs'
+  workflow_dispatch:
+
+concurrency:
+  group: r2-real-extension-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-real-source:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fetch checksum-pinned official Host and third-party E-Hentai JAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --retry-delay 3 --max-time 180 \
+            'https://github.com/Suwayomi/Suwayomi-Server/releases/download/v2.4.2366/Suwayomi-Server-v2.4.2366.jar' \
+            --output "$RUNNER_TEMP/pica-r2-host.jar"
+          printf '%s  %s\n' \
+            'af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd' \
+            "$RUNNER_TEMP/pica-r2-host.jar" | sha256sum --check -
+          curl --fail --location --retry 2 --retry-delay 3 --max-time 120 \
+            'https://raw.githubusercontent.com/HyperionHXH/Mihon-Extensions/5cb6eff6ea0104ac958993066a011282c38dfd7b/repo/jar/tachiyomi-en.ehentai-v1.6.36.jar' \
+            --output "$RUNNER_TEMP/pica-r2-eh.jar"
+          printf '%s  %s\n' \
+            '6e120f5a488381d4ae8960be3288e31d4d0a50b51b1e70beb0041bb692a88b74' \
+            "$RUNNER_TEMP/pica-r2-eh.jar" | sha256sum --check -
+      - name: Verify actual extension install, source list and revocation
+        shell: bash
+        env:
+          PICA_R2_HOST_JAR: ${{ runner.temp }}/pica-r2-host.jar
+          PICA_R2_EXTENSION_JAR: ${{ runner.temp }}/pica-r2-eh.jar
+        run: |
+          python3 -m py_compile scripts/r2-real-extension-host-smoke.py
+          python3 scripts/r2-real-extension-host-smoke.py

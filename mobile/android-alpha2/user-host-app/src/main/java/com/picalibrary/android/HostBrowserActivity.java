@@ -31,7 +31,7 @@ public final class HostBrowserActivity extends Activity {
     private CheckBox allowLan,permission,basicAuth;
     private Spinner sourceChoices;
     private TextView sourcePageStatus,resultPageStatus;
-    private LinearLayout results,setupPanel,savedPanel,savedResults;
+    private LinearLayout results,setupPanel,savedPanel,savedResults,connectionPanel,sourcePanel,searchPanel;
     private Button toggleSetup;
     private ScrollView scroller;
     private TextView status,savedStatus;
@@ -106,6 +106,11 @@ public final class HostBrowserActivity extends Activity {
     private void controls(){
         if(manager==null||save==null)return;
         boolean session=manager.hasSession();
+        boolean bound=session&&!manager.selectedSource().isEmpty();
+        connectionPanel.setVisibility(session?View.GONE:View.VISIBLE);
+        disconnect.setVisibility(session?View.VISIBLE:View.GONE);
+        sourcePanel.setVisibility(session&&!bound?View.VISIBLE:View.GONE);
+        searchPanel.setVisibility(bound?View.VISIBLE:View.GONE);
         save.setEnabled(!busy);
         enable.setEnabled(!busy&&manager.config().configured());
         start.setEnabled(!busy&&manager.config().enabled&&!session);
@@ -151,81 +156,6 @@ public final class HostBrowserActivity extends Activity {
         root.addView(status);
         Button back=action(root,t("返回阅读器","Back to Reader","Reader に戻る"));
         back.setOnClickListener(v->finish());
-        toggleSetup=action(root,t("显示/隐藏 Host 配置","Show / hide Host setup",
-            "Host 設定を表示／隠す"));
-        setupPanel=new LinearLayout(this);setupPanel.setOrientation(LinearLayout.VERTICAL);
-        root.addView(setupPanel);
-        toggleSetup.setOnClickListener(v->{
-            boolean show=setupPanel.getVisibility()!=View.VISIBLE;
-            setupPanel.setVisibility(show?View.VISIBLE:View.GONE);
-            if(show)scroller.smoothScrollTo(0,setupPanel.getTop());
-        });
-        label=field(setupPanel,t("连接名称","Host name","接続名"),false);
-        endpoint=field(setupPanel,t("Host URL (http:// 或 https://)","Host URL","Host URL"),false);
-        allowLan=new CheckBox(this);
-        allowLan.setText(t("本次允许我明确输入的局域网地址使用 HTTP",
-            "Allow HTTP for this explicitly entered private LAN IP",
-            "指定した LAN IP で HTTP を許可"));
-        allowLan.setTextColor(Color.WHITE);setupPanel.addView(allowLan);
-        save=action(setupPanel,t("保存配置","Save configuration","設定を保存"));
-        enable=action(root,t("启用 / 停用 Host","Enable / disable Host","Host 有効／無効"));
-        basicAuth=new CheckBox(this);
-        basicAuth.setText(t("此 Host 使用 Basic 认证",
-            "This Host uses Basic authentication","Basic 認証を使用"));
-        basicAuth.setTextColor(Color.WHITE);setupPanel.addView(basicAuth);
-        username=field(root,t("Basic 用户名（如有）","Basic username (if needed)","ユーザー名"),false);
-        password=field(root,t("Basic 密码（如有）","Basic password (if needed)","パスワード"),true);
-        username.setSaveEnabled(false);password.setSaveEnabled(false);
-        username.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
-        password.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
-        // Auth mode is persisted; credentials remain visible only for a
-        // user-authorized session and are never persisted or autofilled.
-        basicAuth.setOnCheckedChangeListener((view,checked)->{
-            username.setVisibility(checked?View.VISIBLE:View.GONE);
-            password.setVisibility(checked?View.VISIBLE:View.GONE);
-        });
-        permission=new CheckBox(this);
-        permission.setText(t("我授权本次连接自己的 Host","Authorize this Host session",
-            "この接続を許可します"));
-        permission.setTextColor(Color.WHITE);root.addView(permission);
-        start=action(root,t("连接并读取来源","Connect and list sources","接続してソースを表示"));
-        disconnect=action(root,t("断开会话","Disconnect","セッション終了"));
-        refresh=action(root,t("刷新来源","Refresh sources","ソース更新"));
-        sourceChoices=new Spinner(this);root.addView(sourceChoices);
-        sourcePageStatus=text(t("尚未读取来源","Sources not loaded","ソース未取得"),13);
-        sourcePageStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-        root.addView(sourcePageStatus);
-        LinearLayout pager=new LinearLayout(this);pager.setOrientation(LinearLayout.HORIZONTAL);
-        root.addView(pager,new LinearLayout.LayoutParams(-1,dp(48)));
-        previousSources=new Button(this);previousSources.setAllCaps(false);
-        previousSources.setText(t("上一页","Previous","前へ"));
-        pager.addView(previousSources,new LinearLayout.LayoutParams(0,-1,1));
-        nextSources=new Button(this);nextSources.setAllCaps(false);
-        nextSources.setText(t("下一页","Next","次へ"));
-        pager.addView(nextSources,new LinearLayout.LayoutParams(0,-1,1));
-        select=action(root,t("选择此来源","Use selected source","ソースを選択"));
-        query=field(root,t("搜索作品","Search works","作品を検索"),false);
-        query.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-        search=action(root,t("搜索选中来源","Search selected source","選択ソースで検索"));
-        resultPageStatus=text(t("尚未搜索作品","No search performed","まだ検索していません"),13);
-        resultPageStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-        resultPageStatus.setTag("host.qa.results.page");
-        root.addView(resultPageStatus);
-        LinearLayout resultPager=new LinearLayout(this);
-        resultPager.setOrientation(LinearLayout.HORIZONTAL);
-        root.addView(resultPager,new LinearLayout.LayoutParams(-1,dp(48)));
-        previousResults=new Button(this);previousResults.setAllCaps(false);
-        previousResults.setText(t("上一批结果","Previous results","前の検索結果"));
-        resultPager.addView(previousResults,new LinearLayout.LayoutParams(0,-1,1));
-        nextResults=new Button(this);nextResults.setAllCaps(false);
-        nextResults.setText(t("下一批结果","Next results","次の検索結果"));
-        resultPager.addView(nextResults,new LinearLayout.LayoutParams(0,-1,1));
-        query.setOnEditorActionListener((view,action,event)->{
-            if(action==EditorInfo.IME_ACTION_SEARCH){search.performClick();return true;}
-            return false;
-        });
-        results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);
-        root.addView(results);
         savedToggle=action(root,t("已保存的在线作品","Saved online works","保存済みオンライン作品"));
         savedPanel=new LinearLayout(this);savedPanel.setOrientation(LinearLayout.VERTICAL);
         root.addView(savedPanel);
@@ -242,6 +172,89 @@ public final class HostBrowserActivity extends Activity {
         savedPager.addView(savedNext,new LinearLayout.LayoutParams(0,-1,1));
         savedResults=new LinearLayout(this);savedResults.setOrientation(LinearLayout.VERTICAL);
         savedPanel.addView(savedResults);savedPanel.setVisibility(View.GONE);
+        connectionPanel=new LinearLayout(this);connectionPanel.setOrientation(LinearLayout.VERTICAL);
+        root.addView(connectionPanel);
+        toggleSetup=action(connectionPanel,t("显示/隐藏 Host 配置","Show / hide Host setup",
+            "Host 設定を表示／隠す"));
+        setupPanel=new LinearLayout(this);setupPanel.setOrientation(LinearLayout.VERTICAL);
+        connectionPanel.addView(setupPanel);
+        toggleSetup.setOnClickListener(v->{
+            boolean show=setupPanel.getVisibility()!=View.VISIBLE;
+            setupPanel.setVisibility(show?View.VISIBLE:View.GONE);
+            if(show)scroller.smoothScrollTo(0,setupPanel.getTop());
+        });
+        label=field(setupPanel,t("连接名称","Host name","接続名"),false);
+        endpoint=field(setupPanel,t("Host URL (http:// 或 https://)","Host URL","Host URL"),false);
+        allowLan=new CheckBox(this);
+        allowLan.setText(t("本次允许我明确输入的局域网地址使用 HTTP",
+            "Allow HTTP for this explicitly entered private LAN IP",
+            "指定した LAN IP で HTTP を許可"));
+        allowLan.setTextColor(Color.WHITE);setupPanel.addView(allowLan);
+        save=action(setupPanel,t("保存配置","Save configuration","設定を保存"));
+        enable=action(connectionPanel,t("启用 / 停用 Host","Enable / disable Host","Host 有効／無効"));
+        basicAuth=new CheckBox(this);
+        basicAuth.setText(t("此 Host 使用 Basic 认证",
+            "This Host uses Basic authentication","Basic 認証を使用"));
+        basicAuth.setTextColor(Color.WHITE);setupPanel.addView(basicAuth);
+        username=field(connectionPanel,t("Basic 用户名（如有）","Basic username (if needed)","ユーザー名"),false);
+        password=field(connectionPanel,t("Basic 密码（如有）","Basic password (if needed)","パスワード"),true);
+        username.setSaveEnabled(false);password.setSaveEnabled(false);
+        username.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        password.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        // Auth mode is persisted; credentials remain visible only for a
+        // user-authorized session and are never persisted or autofilled.
+        basicAuth.setOnCheckedChangeListener((view,checked)->{
+            username.setVisibility(checked?View.VISIBLE:View.GONE);
+            password.setVisibility(checked?View.VISIBLE:View.GONE);
+        });
+        permission=new CheckBox(this);
+        permission.setText(t("我授权本次连接自己的 Host","Authorize this Host session",
+            "この接続を許可します"));
+        permission.setTextColor(Color.WHITE);connectionPanel.addView(permission);
+        start=action(connectionPanel,t("连接并读取来源","Connect and list sources","接続してソースを表示"));
+        disconnect=action(root,t("断开会话","Disconnect","セッション終了"));
+        sourcePanel=new LinearLayout(this);sourcePanel.setOrientation(LinearLayout.VERTICAL);
+        root.addView(sourcePanel);
+        sourcePanel.addView(text(t("选择已安装来源","Select installed source","導入済みソースを選択"),16));
+        refresh=action(sourcePanel,t("刷新来源","Refresh sources","ソース更新"));
+        sourceChoices=new Spinner(this);sourcePanel.addView(sourceChoices);
+        sourcePageStatus=text(t("尚未读取来源","Sources not loaded","ソース未取得"),13);
+        sourcePageStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        sourcePanel.addView(sourcePageStatus);
+        LinearLayout pager=new LinearLayout(this);pager.setOrientation(LinearLayout.HORIZONTAL);
+        sourcePanel.addView(pager,new LinearLayout.LayoutParams(-1,dp(48)));
+        previousSources=new Button(this);previousSources.setAllCaps(false);
+        previousSources.setText(t("上一页","Previous","前へ"));
+        pager.addView(previousSources,new LinearLayout.LayoutParams(0,-1,1));
+        nextSources=new Button(this);nextSources.setAllCaps(false);
+        nextSources.setText(t("下一页","Next","次へ"));
+        pager.addView(nextSources,new LinearLayout.LayoutParams(0,-1,1));
+        select=action(sourcePanel,t("选择此来源","Use selected source","ソースを選択"));
+        searchPanel=new LinearLayout(this);searchPanel.setOrientation(LinearLayout.VERTICAL);
+        root.addView(searchPanel);
+        searchPanel.addView(text(t("搜索当前来源","Search selected source","選択ソースを検索"),16));
+        query=field(searchPanel,t("搜索作品","Search works","作品を検索"),false);
+        query.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        search=action(searchPanel,t("搜索选中来源","Search selected source","選択ソースで検索"));
+        resultPageStatus=text(t("尚未搜索作品","No search performed","まだ検索していません"),13);
+        resultPageStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        resultPageStatus.setTag("host.qa.results.page");
+        searchPanel.addView(resultPageStatus);
+        LinearLayout resultPager=new LinearLayout(this);
+        resultPager.setOrientation(LinearLayout.HORIZONTAL);
+        searchPanel.addView(resultPager,new LinearLayout.LayoutParams(-1,dp(48)));
+        previousResults=new Button(this);previousResults.setAllCaps(false);
+        previousResults.setText(t("上一批结果","Previous results","前の検索結果"));
+        resultPager.addView(previousResults,new LinearLayout.LayoutParams(0,-1,1));
+        nextResults=new Button(this);nextResults.setAllCaps(false);
+        nextResults.setText(t("下一批结果","Next results","次の検索結果"));
+        resultPager.addView(nextResults,new LinearLayout.LayoutParams(0,-1,1));
+        query.setOnEditorActionListener((view,action,event)->{
+            if(action==EditorInfo.IME_ACTION_SEARCH){search.performClick();return true;}
+            return false;
+        });
+        results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);
+        searchPanel.addView(results);
         scroller=new ScrollView(this);scroller.setFillViewport(true);scroller.addView(root);
         setContentView(scroller);root.requestApplyInsets();
 

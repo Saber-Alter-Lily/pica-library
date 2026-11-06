@@ -12,7 +12,6 @@ on:
 concurrency:
   group: r2-real-extension-${{ github.ref }}
   cancel-in-progress: true
-
 permissions:
   contents: read
 
@@ -21,6 +20,22 @@ jobs:
     if: github.repository == 'Saber-Alter-Lily/pica-library'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: ehentai
+            file: ehentai.jar
+            url: https://raw.githubusercontent.com/HyperionHXH/Mihon-Extensions/5cb6eff6ea0104ac958993066a011282c38dfd7b/repo/jar/tachiyomi-en.ehentai-v1.6.36.jar
+            digest: 6e120f5a488381d4ae8960be3288e31d4d0a50b51b1e70beb0041bb692a88b74
+          - kind: picacomic
+            file: picacomic.apk
+            url: https://github.com/keiyoushi/extensions/releases/download/4591fbc-2/tachiyomi-zh.picacomic-v1.6.14.apk
+            digest: 9e71cddbfa00309f4f3f2d4f8c301bb532a942740f0c8e8dbcba78e9fb7019eb
+          - kind: jinmantiantang
+            file: jinmantiantang.apk
+            url: https://github.com/keiyoushi/extensions/releases/download/4591fbc-2/tachiyomi-zh.jinmantiantang-v1.6.64.apk
+            digest: 4b705e6f10e59f318a4cabbf4122bacee08b1647a5826036a079eeb26d7265a1
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,7 +47,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Fetch checksum-pinned official Host and third-party E-Hentai JAR
+      - name: Fetch SHA256-pinned official Host and external extension
         shell: bash
         run: |
           set -euo pipefail
@@ -43,16 +58,15 @@ jobs:
             'af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd' \
             "$RUNNER_TEMP/pica-r2-host.jar" | sha256sum --check -
           curl --fail --location --retry 2 --retry-delay 3 --max-time 120 \
-            'https://raw.githubusercontent.com/HyperionHXH/Mihon-Extensions/5cb6eff6ea0104ac958993066a011282c38dfd7b/repo/jar/tachiyomi-en.ehentai-v1.6.36.jar' \
-            --output "$RUNNER_TEMP/pica-r2-eh.jar"
-          printf '%s  %s\n' \
-            '6e120f5a488381d4ae8960be3288e31d4d0a50b51b1e70beb0041bb692a88b74' \
-            "$RUNNER_TEMP/pica-r2-eh.jar" | sha256sum --check -
-      - name: Verify actual extension install, source list and revocation
+            '${{ matrix.url }}' \
+            --output "$RUNNER_TEMP/${{ matrix.file }}"
+          printf '%s  %s\n' '${{ matrix.digest }}' "$RUNNER_TEMP/${{ matrix.file }}" | sha256sum --check -
+      - name: Verify source registration and explicit uninstall
         shell: bash
         env:
           PICA_R2_HOST_JAR: ${{ runner.temp }}/pica-r2-host.jar
-          PICA_R2_EXTENSION_JAR: ${{ runner.temp }}/pica-r2-eh.jar
+          PICA_R2_SOURCE_KIND: ${{ matrix.kind }}
+          PICA_R2_EXTENSION_FILE: ${{ runner.temp }}/${{ matrix.file }}
         run: |
           python3 -m py_compile scripts/r2-real-extension-host-smoke.py
           python3 scripts/r2-real-extension-host-smoke.py

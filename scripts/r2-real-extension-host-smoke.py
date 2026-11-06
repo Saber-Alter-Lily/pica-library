@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test a real published source JAR with official Suwayomi on disposable CI only.
+"""Test a real published source JAR or APK with official Suwayomi on disposable CI only.
 
 No manga-site requests, user accounts, product installation, or private files.
 The extension and official Host are independently SHA256 pinned.
@@ -17,9 +17,23 @@ import uuid
 
 ROOT = Path(__file__).resolve().parent.parent
 HOST_DIGEST = "af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd"
-EXT_DIGEST = "6e120f5a488381d4ae8960be3288e31d4d0a50b51b1e70beb0041bb692a88b74"
-EXT_PACKAGE = "eu.kanade.tachiyomi.extension.en.ehentai"
-EXT_SOURCE = "57122881048805941"
+EXTENSIONS = {
+    "ehentai": {
+        "digest": "6e120f5a488381d4ae8960be3288e31d4d0a50b51b1e70beb0041bb692a88b74",
+        "package": "eu.kanade.tachiyomi.extension.en.ehentai",
+        "source": "57122881048805941", "version": "1.6.36",
+    },
+    "picacomic": {
+        "digest": "9e71cddbfa00309f4f3f2d4f8c301bb532a942740f0c8e8dbcba78e9fb7019eb",
+        "package": "eu.kanade.tachiyomi.extension.zh.picacomic",
+        "source": "5768337869316468367", "version": "1.6.14",
+    },
+    "jinmantiantang": {
+        "digest": "4b705e6f10e59f318a4cabbf4122bacee08b1647a5826036a079eeb26d7265a1",
+        "package": "eu.kanade.tachiyomi.extension.zh.jinmantiantang",
+        "source": "6286738698187452081", "version": "1.6.64",
+    },
+}
 ENDPOINT = "http://127.0.0.1:4567/api/graphql"
 
 
@@ -49,7 +63,7 @@ def graphql(query, variables=None, timeout=30):
     return result["data"]
 
 
-def install_external_jar(jar):
+def install_external_archive(archive):
     # Uses the upstream's standard multipart Upload scalar. Never inject into
     # the Pica Reader or load third-party code into the application itself.
     query = (
@@ -66,9 +80,11 @@ def install_external_jar(jar):
         body.extend(("--" + boundary + "\r\nContent-Disposition: form-data; name=\""
                      + key + "\"\r\n\r\n" + item + "\r\n").encode())
     body.extend(("--" + boundary + "\r\nContent-Disposition: form-data; "
-                 "name=\"0\"; filename=\"" + jar.name + "\"\r\n"
-                 "Content-Type: application/java-archive\r\n\r\n").encode())
-    body.extend(jar.read_bytes())
+                 "name=\"0\"; filename=\"" + archive.name + "\"\r\n"
+                 "Content-Type: " + ("application/vnd.android.package-archive"
+                 if archive.suffix.lower() == ".apk" else "application/java-archive")
+                 + "\r\n\r\n").encode())
+    body.extend(archive.read_bytes())
     body.extend(("\r\n--" + boundary + "--\r\n").encode())
     req = urllib.request.Request(
         ENDPOINT, data=bytes(body),
@@ -77,7 +93,7 @@ def install_external_jar(jar):
     with urllib.request.urlopen(req, timeout=120) as response:
         result = json.loads(response.read(800000).decode())
     if result.get("errors") or not isinstance(result.get("data"), dict):
-        raise AssertionError("Pinned real JAR install failed: " + str(result.get("errors"))[:1000])
+        raise AssertionError("Pinned real extension install failed: " + str(result.get("errors"))[:1000])
     return result["data"]["installExternalExtension"]["extension"]
 
 
@@ -96,7 +112,11 @@ def main():
         os.getenv("GITHUB_REPOSITORY") != "Saber-Alter-Lily/pica-library"):
         raise AssertionError("Only the isolated project CI can execute the external extension")
     host = pinned(os.environ["PICA_R2_HOST_JAR"], HOST_DIGEST, 182952426)
-    extension = pinned(os.environ["PICA_R2_EXTENSION_JAR"], EXT_DIGEST)
+    kind = os.getenv("PICA_R2_SOURCE_KIND")
+    if kind not in EXTENSIONS:
+        raise AssertionError("Unknown pinned extension case")
+    spec = EXTENSIONS[kind]
+    extension = pinned(os.environ["PICA_R2_EXTENSION_FILE"], spec["digest"])
     java = Path(os.environ["JAVA_HOME"]) / "bin" / "java"
     if not java.is_file():
         raise AssertionError("JDK21 missing")
@@ -141,20 +161,20 @@ def main():
                         time.sleep(1)
                 else:
                     raise AssertionError("Official Host startup timed out")
-                if EXT_SOURCE in source_ids():
+                if spec["source"] in source_ids():
                     raise AssertionError("Unexpected external source pre-installed")
-                installed = install_external_jar(extension)
-                if (installed.get("pkgName") != EXT_PACKAGE or
-                    installed.get("versionName") != "1.6.36" or
+                installed = install_external_archive(extension)
+                if (installed.get("pkgName") != spec["package"] or
+                    installed.get("versionName") != spec["version"] or
                     installed.get("isInstalled") is not True):
                     raise AssertionError("Real extension package/version rejected")
-                if EXT_SOURCE not in source_ids():
-                    raise AssertionError("E-Hentai source was not registered")
+                if spec["source"] not in source_ids():
+                    raise AssertionError("The pinned source was not registered")
                 removed = graphql(
                     "mutation Remove($id:String!){"
                     "updateExtension(input:{id:$id,patch:{uninstall:true}})"
                     "{extension{pkgName isInstalled}}}",
-                    {"id": EXT_PACKAGE},
+                    {"id": spec["package"]},
                 )["updateExtension"]
                 # Upstream may DELETE the external extension database row
                 # and return extension:null after a successful uninstall.
@@ -162,14 +182,14 @@ def main():
                 if (removed.get("extension") is not None and
                     removed["extension"].get("isInstalled") is not False):
                     raise AssertionError("External extension still marked installed")
-                if EXT_SOURCE in source_ids():
+                if spec["source"] in source_ids():
                     raise AssertionError("Revoked external source remains registered")
                 print(json.dumps({
-                    "status": "PASS", "gate": "R2-G2-REAL-EXTENSION-LIFECYCLE",
+                    "status": "PASS", "gate": "R2-G2-REAL-EXTENSION-LIFECYCLE", "kind": kind,
                     "officialHost": "Suwayomi 2.4.2366",
-                    "extensionPackage": EXT_PACKAGE,
-                    "extensionVersion": "1.6.36",
-                    "sourceId": EXT_SOURCE,
+                    "extensionPackage": spec["package"],
+                    "extensionVersion": spec["version"],
+                    "sourceId": spec["source"],
                     "installAndUninstallValidated": True,
                     "realMangaSiteAccessed": False,
                     "userCredentialsUsed": False,

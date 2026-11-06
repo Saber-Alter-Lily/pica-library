@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     RuntimeResourceAcquireCancelledError,
+    RuntimeResourceUpdateHandoffError,
     RuntimeResourceCoordinator
 } from '../../src/runtime/resource-coordinator'
 
@@ -39,6 +40,30 @@ describe('runtime resource coordinator', () => {
         first.release()
         second.release()
         expect(coordinator.snapshot().usage['provider-network']).toBe(0)
+    })
+
+    it('waits for both active and queued work before reporting an idle database', async () => {
+        const coordinator = new RuntimeResourceCoordinator({
+            mode: 'enforce', budgets: { 'sqlite-write-heavy': 1 }
+        })
+        const first = await coordinator.acquire({
+            ownerId: 'first', taskType: 'favorites-sync',
+            resources: { 'sqlite-write-heavy': 1 }
+        })
+        const queued = coordinator.acquire({
+            ownerId: 'second', taskType: 'recommendation-build',
+            resources: { 'sqlite-write-heavy': 1 }
+        })
+        let idle = false
+        const waitingForIdle = coordinator.waitForIdle().then(() => { idle = true })
+        first.release()
+        const second = await queued
+        await Promise.resolve()
+        expect(idle).toBe(false)
+        second.release()
+        await waitingForIdle
+        expect(idle).toBe(true)
+        await expect(coordinator.waitForIdle()).resolves.toBeUndefined()
     })
 
     it('acquires multi-resource requests atomically in enforcement mode', async () => {
@@ -206,4 +231,65 @@ describe('runtime resource coordinator', () => {
             })
         ).rejects.toThrow('positive integer')
     })
+    it.each(['observe', 'enforce'] as const)(
+        'refuses a frozen updater handoff with active runtime leases (%s)',
+        async mode => {
+            const coordinator = new RuntimeResourceCoordinator({
+                mode, budgets: { 'sqlite-write-heavy': 1 }
+            })
+            const lease = await coordinator.acquire({
+                ownerId: 'existing',
+                taskType: 'maintenance-update-scan',
+                resources: { 'sqlite-write-heavy': 1 }
+            })
+            expect(() => coordinator.freezeAcquisitionsForUpdate())
+                .toThrow(RuntimeResourceUpdateHandoffError)
+            lease.release()
+            const rollback = coordinator.freezeAcquisitionsForUpdate()
+            await expect(coordinator.acquire({
+                ownerId: 'late',
+                taskType: 'background-update',
+                resources: { 'sqlite-write-heavy': 1 }
+            })).rejects.toThrow(RuntimeResourceUpdateHandoffError)
+            await expect(coordinator.withLease({
+                ownerId: 'late-writer',
+                taskType: 'metadata-write',
+                resources: { 'sqlite-write-heavy': 1 }
+            }, async () => 1)).rejects.toThrow(RuntimeResourceUpdateHandoffError)
+            expect(coordinator.snapshot().active).toHaveLength(0)
+            expect(coordinator.snapshot().waiting).toHaveLength(0)
+            expect(() => coordinator.freezeAcquisitionsForUpdate())
+                .toThrow('Runtime task admission is already frozen')
+            rollback()
+            rollback()
+            const restored = await coordinator.acquire({
+                ownerId: 'after-failed-upgrade',
+                taskType: 'metadata-write',
+                resources: { 'sqlite-write-heavy': 1 }
+            })
+            restored.release()
+        }
+    )
+
+    it('refuses update freeze while a resource task is waiting; preserves waiter until normal release', async () => {
+        const coordinator = new RuntimeResourceCoordinator({
+            mode: 'enforce', budgets: {'cpu-analysis': 1}
+        })
+        const first = await coordinator.acquire({
+            ownerId:'existing', taskType:'analysis', resources:{'cpu-analysis':1}
+        })
+        const waiting = coordinator.acquire({
+            ownerId:'waiting', taskType:'analysis', resources:{'cpu-analysis':1}
+        })
+        expect(coordinator.snapshot().waiting).toHaveLength(1)
+        expect(() => coordinator.freezeAcquisitionsForUpdate())
+            .toThrow(RuntimeResourceUpdateHandoffError)
+        first.release()
+        const second = await waiting
+        second.release()
+        const undo = coordinator.freezeAcquisitionsForUpdate()
+        expect(coordinator.snapshot().active).toHaveLength(0)
+        undo()
+    })
+
 })

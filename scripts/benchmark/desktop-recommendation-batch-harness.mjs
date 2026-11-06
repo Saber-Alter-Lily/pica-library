@@ -4,6 +4,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { performance } from 'node:perf_hooks'
 import { spawnSync } from 'node:child_process'
+import { observeRecommendationBatchNetworkV1, writeRecommendationBatchFailureV1 } from './recommendation-batch-diagnostics.mjs'
 
 function optionValue(name) {
     const prefix = `--${name}=`
@@ -155,6 +156,8 @@ async function managedBatchSnapshot(page, timeoutMs, expectedBatchSize) {
 
 async function runRound(chromium, options, index) {
     const browser = await chromium.launch({ headless: true })
+    let page=null,network=null,before=null,phase='shell'
+    const pageErrors=[]
     try {
         const context = await browser.newContext({
             locale: 'zh-CN',
@@ -178,8 +181,8 @@ async function runRound(chromium, options, index) {
                 })
             )
         })
-        const page = await context.newPage()
-        const pageErrors = []
+        page = await context.newPage()
+        network = observeRecommendationBatchNetworkV1(page)
         page.on('pageerror', (error) =>
             pageErrors.push(String(error?.stack || error))
         )
@@ -189,17 +192,20 @@ async function runRound(chromium, options, index) {
             timeout: options.timeoutMs
         })
         await shellReady(page, options.timeoutMs)
+        phase='navigation'
         await page.locator('nav [data-view="discover"]').click()
         await page.locator('[data-tab="recommend"]').click()
         await page.locator('#recommend-button').click()
 
-        const before = await managedBatchSnapshot(
+        phase='current-batch'
+        before = await managedBatchSnapshot(
             page,
             options.timeoutMs,
             options.fixture.expectedBatchSize
         )
 
         const started = performance.now()
+        phase='next-batch'
         await page.locator('#recommend-next-batch').click()
         await page.waitForFunction(
             ({ previousIds, previousLabel, expectedSize }) => {
@@ -226,6 +232,7 @@ async function runRound(chromium, options, index) {
             { timeout: options.timeoutMs }
         )
         const usableAt = performance.now()
+        phase='postconditions'
         const after = await managedBatchSnapshot(
             page,
             options.timeoutMs,
@@ -249,7 +256,16 @@ async function runRound(chromium, options, index) {
             batchSize: after.ids.length,
             nextBatchClickToUsableMs: round(usableAt - started)
         }
+    } catch(error) {
+        try {
+            await writeRecommendationBatchFailureV1({...options,page,before,phase,round:index+1,sourceSha:commitSha(),error,pageErrorCount:pageErrors.length,network:network?.snapshot()})
+            console.error('J7_FAILURE_DIAGNOSTIC_SAVED')
+        } catch {
+            console.error('J7 failure diagnostics unavailable; original failure retained')
+        }
+        throw error
     } finally {
+        network?.dispose()
         await browser.close()
     }
 }

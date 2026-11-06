@@ -70,6 +70,14 @@ function comic(
 }
 
 describe('Recommendation V5 candidate channel planner', () => {
+    it('never sends a JM favorite seed to the Pica related endpoint', () => {
+        const catalog = [comic('jm:123', { author: 'Writer', tags: ['story'], isFavorite: true })]
+        const policy = defaultPortablePolicyStateV5()
+        const plan = buildCandidateChannelPlanV5({ catalog, policy, timescales: buildPreferenceTimescalesV5([], catalog, policy, { now: NOW }) })
+        const related = plan.channels.filter(channel => channel.family === 'RELATED')
+        expect(related.length).toBeGreaterThan(0)
+        expect(related.flatMap(channel => channel.providerAllocations).filter(allocation => allocation.surface === 'pica').every(allocation => !allocation.eligible && allocation.plannedRequests === 0)).toBe(true)
+    })
     it('plans independent multi-channel retrieval from P2C layers without serving impact', () => {
         const catalog = [
             comic('fav-old', {

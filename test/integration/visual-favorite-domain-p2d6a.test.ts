@@ -10,6 +10,7 @@ import {
     VISUAL_MODEL_VERSION,
     VISUAL_SAMPLING_POLICY_VERSION
 } from '../../src/recommendation-v4/visual-style'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const { DatabaseSync } = createRequire(import.meta.url)(
     'node:sqlite'
@@ -95,7 +96,7 @@ describe('P2 D6A Visual favorite target domain', () => {
             metadata: {}
         })
 
-        const service = new LibraryService(database, root)
+        const service = new LibraryService(database, root, undefined, undefined, undefined, enabledFixtureSources())
         const profile = service.visualPreferenceProfile()
         expect(profile).toMatchObject({
             favoriteEmbeddingCount: 1,

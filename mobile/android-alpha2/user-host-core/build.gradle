@@ -1,0 +1,19 @@
+plugins { id 'com.android.library' }
+
+// Original Android Suwayomi implementation, physically extracted unchanged
+// except for ReaderContent DTO adaptation. No Manga SDK, source bundle,
+// account, WebView, Desktop client, updater, or arbitrary plugin JS engine.
+android {
+    namespace 'com.picalibrary.android.userhost'
+    compileSdk 35
+    defaultConfig { minSdk 28 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Existing source-neutral Reader models and progress identity.
+    implementation project(':local-core')
+}

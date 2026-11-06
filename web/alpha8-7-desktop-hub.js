@@ -404,10 +404,14 @@ function buildSettingsHub() {
     const settingsHeading = settings.querySelector(':scope > .page-heading')
     settingsHeading?.remove()
     const settingsForm = hub$('#settings-form')
+    const sourceChoices = hub$('#settings-source-choices')
+    if (sourceChoices) panels.get('general').appendChild(sourceChoices)
     if (settingsForm) panels.get('general').appendChild(settingsForm)
 
     const ehAccount = hub$('#settings-eh-account')
     if (ehAccount) panels.get('general').appendChild(ehAccount)
+    const jmAccount = hub$('#settings-jm-account')
+    if (jmAccount) panels.get('general').appendChild(jmAccount)
 
     const recommendationV4 = hub$('#settings-recommendation-v4')
     if (recommendationV4) panels.get('recommendations').appendChild(recommendationV4)

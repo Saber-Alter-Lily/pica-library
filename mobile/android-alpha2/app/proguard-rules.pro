@@ -15,3 +15,14 @@
 
 # Never emit verbose shrinker diagnostics into the packaged app.
 -dontnote org.json.**
+
+# The shared SDK's only AWT/ImageIO references are its optional desktop fallback.
+# Android must keep the native SPI provider; JmCatalogIntegrationTest verifies its selection.
+-keep class io.github.jukomu.jmcomic.android.support.AndroidImageProcessor { *; }
+-keep class io.github.jukomu.jmcomic.api.model.** { *; }
+-dontwarn java.awt.Graphics2D
+-dontwarn java.awt.Image
+-dontwarn java.awt.image.BufferedImage
+-dontwarn java.awt.image.ImageObserver
+-dontwarn java.awt.image.RenderedImage
+-dontwarn javax.imageio.ImageIO

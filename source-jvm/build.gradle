@@ -1,0 +1,44 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+repositories { mavenCentral() }
+java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+application { mainClass = 'org.picalibrary.sources.JmProtocolMain' }
+dependencies {
+    implementation 'io.github.jukomu:jmcomic-core:v1.1.12'
+    testImplementation 'junit:junit:4.13.2'
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.register('bundle', Jar) {
+    dependsOn classes
+    archiveFileName = 'pica-jm-source.jar'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    manifest { attributes('Main-Class': application.mainClass.get()) }
+    from sourceSets.main.output
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'module-info.class'
+}
+tasks.register('dependencyNotices') {
+    doLast {
+        def output = layout.buildDirectory.dir('dependency-notices').get().asFile
+        output.mkdirs()
+        project.copy { from '../docs/licenses/JMCOMIC_API_JAVA_MIT.txt'; into output }
+        def receipts = []
+        configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.each { artifact ->
+            def jar = artifact.file
+            project.copy {
+                from zipTree(jar)
+                include '**/*LICENSE*', '**/*NOTICE*', '**/*license*', '**/*notice*', '**/COPYING*'
+                into new File(output, jar.name)
+            }
+            def id = artifact.moduleVersion.id
+            receipts.add([group: id.group, name: id.name, version: id.version, file: jar.name,
+                sha256: java.security.MessageDigest.getInstance('SHA-256').digest(jar.bytes).encodeHex().toString(),
+                pom: "https://repo.maven.apache.org/maven2/${id.group.replace('.', '/')}/${id.name}/${id.version}/${id.name}-${id.version}.pom"])
+        }
+        new File(output, 'DEPENDENCIES.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(receipts)) + '\n'
+    }
+}

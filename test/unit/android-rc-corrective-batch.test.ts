@@ -117,7 +117,8 @@ describe('Android RC corrective batch', () => {
         const style = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationStyleActivity.java'
         )
-        expect(store).toContain('CURRENT_VERSION=2')
+        expect(store).toContain('CURRENT_VERSION=3')
+        expect(store).toContain('completeAdvanced')
         expect(onboarding).toContain('showLibraryWorkflowTour')
         expect(onboarding).toContain('showRecommendationWorkflowTour')
         expect(onboarding).toContain('startRecommendationStyleTour')

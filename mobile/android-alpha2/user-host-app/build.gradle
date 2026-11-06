@@ -1,0 +1,53 @@
+plugins { id 'com.android.application' }
+
+// Reuse the SAME optional preview signing identity as :app when the trusted
+// isolated full-product RC builder supplies it. Ordinary emulator/CI builds
+// retain the established Gradle debug signer; no key is tracked in the repo.
+def previewKeystorePath = System.getenv('ANDROID_PREVIEW_KEYSTORE_PATH')
+def previewKeystorePassword = System.getenv('ANDROID_PREVIEW_KEYSTORE_PASSWORD')
+def previewSigning = previewKeystorePath != null && !previewKeystorePath.isBlank() &&
+    previewKeystorePassword != null && !previewKeystorePassword.isBlank()
+
+// Independent optional source component only. Uses the platform Binder ABI;
+// the real Reader, local storage, shelves and history live exclusively in
+// the physically separate no-INTERNET :local-app.
+android {
+    namespace 'com.picalibrary.android.hostapp'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.picalibrary.android.userhost.qa'
+        minSdk 28
+        targetSdk 35
+        // Two distinct QA package versions exercise Android's real upgrade path.
+        // This does not change any production application ID, signing key or version.
+        versionCode Integer.parseInt((project.findProperty('qaHostVersionCode') ?: '1').toString())
+        versionName '0.5.0-user-host-qa'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    signingConfigs {
+        if (previewSigning) {
+            preview {
+                storeFile file(previewKeystorePath)
+                storePassword previewKeystorePassword
+                keyAlias 'pica-preview'
+                keyPassword previewKeystorePassword
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            if (previewSigning) signingConfig signingConfigs.preview
+        }
+    }
+}
+
+dependencies {
+    implementation project(':local-core')
+    implementation project(':user-host-core')
+    implementation project(':source-bridge')
+}

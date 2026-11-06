@@ -1,0 +1,80 @@
+name: S1 Android isolated emulator visual evidence (no publication)
+
+on:
+  push:
+    branches:
+      - codex/product-recovery-s0-s1-20261027
+    paths:
+      - '.github/workflows/s1-android-visual-evidence.yml'
+      - 'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/S1AndroidVisualSmokeTest.java'
+      - 'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/S1AdditionalSpotlightTest.java'
+      - 'scripts/run-s1-android-visual-emulator.sh'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AdvancedGuideActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AccountSourcesActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsRow.java'
+      - 'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/SettingsRowNarrowLayoutTest.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UpdateActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationStyleActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RemoteStorageActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationProfileActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AndroidOnboarding.java'
+      - 'mobile/android-alpha2/app/src/main/res/**/account_sources_strings.xml'
+      - 'mobile/android-alpha2/app/src/main/res/**/phone_downloads_strings.xml'
+      - 'mobile/android-alpha2/app/src/main/res/**/guide_strings.xml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s1-visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulator-visual:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Require working KVM acceleration on the disposable runner
+        run: |
+          set -euo pipefail
+          test -e /dev/kvm || { echo "::error::No /dev/kvm on runner"; exit 1; }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm || { echo "::error::KVM not usable"; exit 1; }
+          ls -l /dev/kvm
+      - name: Run real Android layout and screenshots on disposable emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          emulator-boot-timeout: 600
+          disable-linux-hw-accel: false
+          script: bash scripts/run-s1-android-visual-emulator.sh
+      - name: Upload fresh-emulator images for visual inspection
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-android-emulator-visual-${{ github.sha }}
+          path: mobile/android-alpha2/s1-visual-evidence/
+          retention-days: 1
+          if-no-files-found: warn

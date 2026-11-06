@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- WebDAV and pairing keep INTERNET. Site SDKs must be removed from final DEX.
+         SOURCE_NEUTRAL_QA blocks all legacy providers even for old local profiles. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove" />
+    <application android:label="Pica Library Clean Source QA"
+        tools:replace="android:label">
+        <activity android:name=".MainActivity" tools:node="remove" />
+        <activity android:name=".PicaBrowseActivity" tools:node="remove" />
+        <activity android:name=".PicaAccountActivity" tools:node="remove" />
+        <activity android:name=".PicaRegisterActivity" tools:node="remove" />
+        <activity android:name=".EhAccountActivity" tools:node="remove" />
+        <activity android:name=".EhSessionActivity" tools:node="remove" />
+        <activity android:name=".EhWebLoginActivity" tools:node="remove" />
+        <activity android:name=".JmSourceActivity" tools:node="remove" />
+        <activity android:name=".HostSourceActivity" tools:node="remove" />
+        <!-- No in-app legacy account screen; optional source-only Host remains. -->
+    </application>
+</manifest>

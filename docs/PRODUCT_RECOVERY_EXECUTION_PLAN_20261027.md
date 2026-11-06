@@ -1,0 +1,615 @@
+# Pica Library 产品恢复与架构主线｜执行计划 V1.0
+
+> **2026-11-02 delivery-priority update:** [R0–R4 unified product integration roadmap](./PRODUCT_INTEGRATION_DELIVERY_20261102.md) controls batch size, integration order, and product delivery. Historical S0–S6 scope and all acceptance gates below remain binding; this is not a pass or a release authorization.
+
+### 2026-11-02｜S3 CORE-HOST-24：完整 Web 原书库统一续读（本地 + 本次授权 Host）
+
+- 接续 #281 纯核心/用户自管 Suwayomi Host 的 **24/24 精确 HEAD CI 通过**，发现原完整 Web 仍存在真实产品缺口：已有 `installReadingLibrary` 续读面板，但纯核心端 `/api/v1/desktop/reading-library/query` 返回 405。此批一次打通**原核心 SQLite 历史 → 同一原书库视图 → 本地续读，以及用户明确选择的 Host 作品/进度 → 同一书库视图 → 原 Host Reader 续读**，不再另建一个 QA 书库页面。
+- **优先复用**项目既有 `ReadingLibrary`、`catalogueReadingPort`、`LibraryDatabase.recentReadingProgress`、`HostedLibraryReader.readingLibraryRows` 和 `web/reading-library.js`。Suwayomi 是用户自管远端（复用现有 Host GraphQL），Mihon 的源/阅读器分离仅作交互架构参照，不复制第三方代码。不引入数据库、推荐模块、另一套 Reader、来源 SDK、额外 HTTP Host 实现或新增依赖。
+- 原 `startOfflineCoreHttp` 仅增加一个与正式原 Desktop 对齐的**只读 POST 查询**，继承已验证的 loopback、QA Cookie、Origin 和 CSRF。普通零 Host 核心只读取本地下载作品的既存页码；只有注入了可信 UserHost 组合且请求包含有效本次会话 ID 时，才把**已选作品**的 Host 投影加入查询。该投影既不 RPC 联网也不扫描/同步来源，不接触其他 Provider/账号。来源停用/旧 session 失效时结果为局部不可用，本地阅读记录不受影响。
+- 继续使用 `web/reading-library.js` 原组件实现搜索、来源过滤、分页、两条阅读入口与错误提示；原 `app.js` 页面激活/阅读位置刷新逻辑保持不变。真正的页面显示由原 Playwright Chromium 用例补一条定位确认；没有新建浏览器框架、runner 或独立 UI。
+- 原 `test/unit/offline-user-host-http.test.ts` 用真实 loopback/原 SQLite/原 Reader/合成 Suwayomi HTTP 答复检查：本地历史先可读、未经同意无法访问 Host、明确选中并记录页码后两个来源同屏投影、历史查询不发网络、停用后本地仍可读；`test/unit/offline-full-web-http.test.ts` 检查普通无 Host 情况；原 `test/e2e/offline-full-web.spec.mjs` 检查渲染与状态。所有外部 HTTP 均为合成响应，不声称实网认证。
+- **当前状态：Draft #282 / IMPLEMENTED_IN_BRANCH / EXACT_HEAD_CI_PENDING / USER_NOT_ACCEPTED / NO_RELEASE。** 必须以最终 SHA 的完整 Android/Web/Desktop/Chromium/专项门禁为准，历史 #281 绿灯不可继承。G1 真机多语言布局、G2 正式可信签名/物理 OS 隔离/Android Binder/第二真实来源、G3 真正 v0.5.0 用户库无痛升级、G4 正式签名发布均 OPEN。不得合并 main、发 Release/OTA 或操作实际私人账号、目录和数据。详见 `docs/S3_CORE_HOST_READING_LIBRARY_20261102.md`。
+
+### 2026-11-01｜S3 CORE-HOST-23：纯核心 Windows + 用户自管 Suwayomi 宿主（独立可选，工程 Draft）
+
+- 在 #280 已完成的受签名 Worker 搜索/原 Reader 接口之外，解决另一条**实际用户所需的可扩展来源路径**：用户已有自行运行的 Suwayomi，可在**独立、无站点 SDK 的完整 Windows Web 核心**中手动输入/保存/启用 Host，单独授权本次连接，选择来源搜索/读章节与图片、保存进度。核心仍负责书库/阅读器，本批不引入官方内容目录、内嵌源 SDK、自动下载扩展或强制 Host。
+- **开源复用**：复用项目已接入的 Suwayomi v2.4 固定 GraphQL 操作、`SourceHostConnections` 权限版本与撤销、`HostedLibraryReader` 原 Reader 接线、`SourceHostInspector`、`PreviewCacheManager`、`sourceHostStore`，以及原 Desktop/Android 已复用的本地 Reader + SQLite。Mihon 的可选来源思想作为 UI 参考，不另造插件执行器、HTTP 解析器、宿主或阅读器；宿主由用户自管，不代表插件经过官方签名审计。
+- 新入口 `desktop-core-host-preview.mjs` 与普通 `desktop-core-preview.mjs` **严格分开**。单独入口仅在显式 `--explicit-user-host-preview` + 标记过的隔离根中启用 Host；默认离线核心不包含 Host 客户端。原完整 Web 模板按两种可审计、固定哈希资源闭包构建；仅用户 Host 入口允许加载已有 `source-hosts.js`、`saved-source-hosts.js`、`host-library.js`，不加载原 Pica/E-H/JM 站点脚本或凭据接口。
+- Host 连接/章节/图片/进度复用旧 `/api/v1/desktop/source-hosts/**`、`/api/v1/desktop/host-reader/**` 语义，由已注入的原 Host 模块实现；进程和 HTTP 默认零网络，所有请求有短期 Cookie、精确 loopback、来源同源/CSRF、用户明确授权。签名来源系统和 Host 是**两条互不相同的机制**，不能互相冒充官方可信安装包。
+- **验收**：隔离完整 Web 实际页面、可选 Host 资源/核心包依赖闭包、真实 localhost HTTP 调用、原 Reader 路由、旧 v0.5.0 空间完全不访问及 Host 禁用后本地已下载不消失；GitHub 原 Android/Web/Desktop CI 和原实机模拟门禁须对最终 HEAD 独立完成。第一个 CI 因原入口导出和被动依赖的校验器误判失败已保留，后续精确源码继续验收。当前不声称已在实体 Windows/UI 或真实远端 Suwayomi 重现。
+- 正式发布者密钥与受保护安装根、Android Service/Binder、第二真实远端 Provider、G1 真机视觉、G3 v0.5.0 数据迁移/回滚、G4 全集中 Release 仍 **OPEN**；main/正式 Release/OTA/真人账号保持不动。细节 `docs/S3_CORE_HOST_STANDALONE_20261101.md`。
+
+### 2026-11-01｜S3 SIGNED-SRC-10：可信来源主动搜索到原阅读器整批接线（未发布 Draft）
+
+- 接续 #279 真实原 Android 书库整合工程验收，选择**来源连接之后用户仍无法搜索/选书**这一真实产品阻断，一批完成：Worker 侧明确搜索能力、受控 IPC、原 Desktop 签名来源指令、原 Web 设置页搜索/作品选择，以及现有 Web Reader 点击跳转和原阅读进度。仅在用户明确连接已签名来源并主动提交关键词时发生搜索；不会因启动、打开设置或被动刷新执行来源扫描/安装/网络流量。
+- **开源复用决策**：Mihon 的扩展/来源与阅读器解耦、Suwayomi 的手动选择来源后搜索的交互流程作为架构参考；实际复用 Pica Library 的 `EhProvider.search`、`TrustedSourceProcess`、`SignedWorkerStore`、`SignedSourceDesktopReader`、`OnlineReaderService` 与 `web/app.js`。不自造爬虫、第二 Reader、第二插件执行器、任意扩展市场、网络抓包/安装服务或新 SDK；不复制开源第三方代码。
+- 首批真实适配范围仅为**匿名 E-H 旧 Provider 解析器**。签名 worker `eh-public-reader` 将用户键入的 2–120 字符查询映射到已有 E-H 公共列表，最多 25 个有归属 work ID 的结果；仅由可信程序身份适配器映射为原有 `eh:<gid>:<token>`，不产生新的书库和推荐 ID。连接/停用/撤销后旧 session 无法继续请求；Web UI 不接受 worker 路径、签名私钥、来源 URL 或可执行扩展数据。
+- **验收**：使用原 `signed-worker-lifecycle`、`signed-source-desktop-http`、`eh-public-worker-ipc`、`eh-public-reader-migration`、`signed-reader-web-routing` 定向回归加仓库原全量 CI 与 Windows/Linux 真实 Node 子进程；外网内容只通过合成 E-H HTTP fixture，不能等同用户真实来源可用。原正式 main、v0.5.0/OTA、个人数据/账号不动。G1 设备 UX、G2 官方可信签名/OS 根与 Android Binder/第二真实源、G3 历史用户迁移及回滚、G4 集中发布仍为 OPEN。
+- 详细本轮范围、测试真实性和后续优先级见 `docs/S3_SIGNED_SOURCE_SEARCH_READER_20261101.md`。当前状态 IMPLEMENTED_IN_DRAFT / CI_PENDING / UNPUBLISHED。
+
+### 2026-11-01｜S3 CORE-ANDROID-22：正式 Android 的本地书库一体化功能批次
+
+- **推进阶段**：继 #278 独立 QA 的本地书库搜索/排序/已读状态/续读/书架操作已完成且修复模拟器操作定位后，将真实用户需要的这些功能全部接回**原 Android `app/LocalComicImportActivity`**，不继续另造 QA 书库产品。原 Android 的读取和 UI 使用原 `Ui`、`LocalizedText`、`ReaderActivity`、`ReadingHistoryStore`、`ShelfStore`、`UnifiedCatalogStore` 与正式数据路径；隔离 QA 仍使用自己的 `ReaderHistoryLedger.localFile` 和 `ShelfLedger.localFile`，**两者不共享或迁移用户数据文件**。
+- **代码复用**：新增唯一 `:local-storage/LocalLibraryBrowse` 只读查询策略；来源无关的原 `LocalComicReaderPort.books` 返回真实已导入 ID、页数和时间；现有 v1 阅读 session 决定已读/最近章节页。正式 app 与原独立 QA App 都实际调用同一筛选排序/历史合并。Mihon 本地书库/阅读状态和 Kavita 筛选排序作为开源交互参考，无第三方源代码复制、无新 SDK/数据库/网络/运行时/Reader。
+- **用户功能一次成批交付**：标题即时搜索（全库筛选后渲染前100条）、最近/标题/页数排序、全部/已读/未读切换、最近已读快捷入口和原 Reader 同章节同页续读、作品卡片长按直接选已存书架或新建书架并加入。书架操作走正式原 `ShelfStore.setMembership` / schema2 tombstone + Catalog 更新；纯 QA 仍走自身隔离 ShelfLedger。原 SAF 导入/导出、确认删除、双客户端旧元数据/缓存、用户默认网络与账号逻辑均不改变。
+- **回归**：保留原 Android `LocalComicImportTest`，只补一项真实合成 SAF 导入→原阅读历史写入→公用已读/未读/标题过滤→原图片字节不变；原 `native-local-export-contract` 随真实 `book.id` API 名调整但不放宽导出/安全要求。#278 的脚本错误经真实证据确认：长按误命中顶部含同标题的“继续阅读”，非压缩器问题。修正测试对实际四页书库行定位后，#278 最终 21/21 CI/workflows 成功，独立 Emulator 包含 CBZ 真保存重导回字节检查。
+- **本批独立门禁**：Draft #279 的完整 Android/Robolectric/lint/release + Web/Desktop/Chromium、独立无源 APK DEX/Manifest + Android35 SAF/Reader/导出均按最终 SHA 单独验收；**不能继承 #278 绿灯**。原正式安装应用真实 UI/真机与多语言窄屏、旧数据实物升级回滚、可信来源签名/Android Binder/第二真实 Provider、用户最终 G1–G4 均 OPEN。暂不合并 main、发布 Release/OTA 或读取生产用户私有资料。
+- 后续重点：针对已冻结的完整用户业务场景，对原正式 Desktop/Android 做功能对照与跨来源/来源关闭后的真实阅读链路；基于明确缺陷再改，不以继续增加工程薄片数量替代正式可用性验收。详见 `docs/S3_ANDROID_PRODUCTION_LOCAL_BROWSE_20261101.md`。
+
+### 2026-11-01 S3 CORE-ANDROID-21｜本地真实书库一批次补齐常用浏览与续读（仍为 Draft）
+
+- 不再拆成五个无关小 PR。本轮在原 `:local-app/LocalLibraryActivity` 一次实现**搜索标题、最近/名称/页数排序、全部/已读/未读筛选、最近继续阅读和作品长按直接加入书架**。全部调用已经抽离的 `LocalComicReaderPort.books()`、`ReaderHistoryLedger`、`ReaderProgressLedger.seedOneShotPosition`、`ShelfLedger.setMembership` 和旧 `ReaderScreenActivity`，不新增数据库、阅读器、来源、专用网络或依赖。
+- 交互参考 [Mihon 的本地书库/分类与阅读状态筛选](https://mihon.app/docs/faq/library) 和 [Kavita 的库过滤/排序](https://wiki.kavitareader.com/guides/features/filtering/)；仅借鉴成熟产品的用户流程，具体实现均复用 Pica Library 旧代码与 Android 系统控件，没有复制第三方源码。Android 唯一原应用原有数据持有者保持不变；独立 QA 的文件仍被 `com.picalibrary.android.localcore.qa` 隔离。
+- 已提交代码 `b563683`：状态过滤只基于本地已存真实 session；列表只渲染不修改目录、书架/历史；列表操作按稳定 local ID；加入书架复活已删除成员应走原 tombstone 逻辑。另扩展**既有** Android35 真实模拟器流程，检查从本地书库直接加书架、强制停止后回到原页，以及读/未读筛选；没有新 runner、测试框架或 UI 截图矩阵。
+- **验收等级**：首次提交属于 IMPLEMENTED_IN_DRAFT/CI_PENDING。原 Android Web/Desktop 全量、独立无源 APK DEX/权限闭包、Android35 QA E2E 均需按最终精确 HEAD 核实；即便通过，只是工程及模拟器验证。全部多语言屏宽、物理 Android 手机、原正式 App 功能对照、第二真实来源/Android Binder、v0.5.0 老资料升级及 G1–G4 均 OPEN。不合并 main、Release、OTA，不读取/修改私人用户资料。
+- 本轮代码与证据索引：`docs/S3_ANDROID_LOCAL_LIBRARY_BROWSE_20261101.md`。下一大批优先完善双端原产品中的一体化本地书库/来源端到端，不反复叠加 QA 空壳界面。
+
+### 2026-11-01 S3 SIGNED-SRC-09｜本机显式安装可信签名来源包
+
+- 在现有签名 Worker、原 Reader/UI/NativePicker 之上，仅补本机原生选择签名 ZIP 的最小安装操作：两个固定成员、签名与哈希验证、独立版本写入。使用已装 `adm-zip`，不引入新插件执行体系或自动来源商店。
+- 浏览器只发起带 consent 的受限 POST，不上传脚本、路径、ZIP、公钥；安装不会自动启用、连接或修改用户库。仅在可信 Desktop 注入签名 Store + 本机 installer 后露出按钮，普通正式版和纯 Core 不开放。
+- 需补正式可信发布者/保护根、OS 级权限、真实来源双端互操作、v0.5.0 用户资料兼容与 G1–G4 门禁，所有代码保留 Draft。
+
+
+### 2026-11-01 S3 SIGNED-SRC-08｜可信来源的原设置界面管理薄片
+
+- 在已有签名 worker 安装/校验/版本回滚、独立 Reader 会话后台之上，优先补用户真正能够操作的界面。无新前端框架；直接复用原来源设置折叠区、中英日文本、CSRF 控制面和 `SignedWorkerStore` 验证，真实列表仅显示**被应用预置并签名验证**的本机版本。
+- 来源版本可由用户明确启用、切换/回滚、连接、停用、断开当前浏览器会话、在确认后卸载非启用版本。默认不连网/不启动来源进程，正常正式 App 未注入可信控制器时不显示面板；Manifest 不能自己授权；纯 Core 安装继续物理无来源。测试以原单元及 HTTP 集成为主，不加替代 Reader/插件市场。
+- 本项仅解决控制入口，发行公钥固定、保护安装根、可信组件安装和真实来源列表/搜索/阅读仍是后续 S3-02/03/05，正式版双方来源真正外置和 Android 服务仍未通过 G2；所有发布验收 G1–G4 仍 OPEN。
+
+
+### 2026-10-31 S3 SIGNED-SRC-07｜现有签名来源允许查看已安装版本与安全卸载
+
+- 在 **S3-03** 已实现的签名工作进程激活/禁用/回滚之上，只补缺失的两段实际生命周期：验证式版本列表、必须先停用当前源才能删除其签名二进制。卸载旧版本时保持当前版本会话、凭据外置、书库与推荐/进度，不能用“删来源”等同“删除用户漫画”。
+- 复用 `SignedWorkerStore`/受控 Desktop CSRF 同源接口和 OS 原生文件 API；浏览器/manifest 仍无法供应文件路径、安装包/公钥或可执行脚本；未来官方签名分发及从设置页开启前不得注册到常规正式应用。无需新插件生态或自造执行宿主。
+- 在原真实子进程与 Desktop HTTP 集成测试补最小可证据验证，精确版本的 GitHub Actions 后续检查。此项不等于来源市场发布/可任意加载第三方代码，G1–G4 依旧未验收。
+
+
+### 2026-10-31 S3 CORE-DESKTOP-20｜直接使用现有原生另存为选择器
+
+- 消除 #274 无源 Windows Reader 导出档案只能显示内部路径的最后一步用户体验缺口：现有正式 `ReaderService` 继续压缩，原 `DesktopNativePicker.chooseSaveFile` 负责用户确定目标，出品经原离线 Full-Web HTTP 控制面复制。仅扩展一个可选受信任 Picker 能力，不引入 Source SDK、任意脚本或第二套 ZIP 处理。
+- 导出请求仍只传 LOCAL 漫画及对应章节，不接收网页指定的 OS 路径；用户取消系统保存选择器时不发布成功或生成多余档案。正式版导出交互不受影响；原 UI 三语使用现有国际化资源。
+- 当前只认可功能源码/原 CI/隔离模拟；必须有最终精确提交的 Android/Web/Desktop CI、无源安装包闭包、保存文件字节证据。实际 Windows 原生弹窗、目标权限/文件系统异常与大章节卡顿以及 G1–G4 均需后续确认。未合并/未发布。
+
+
+### 2026-10-31 S3 CORE-DESKTOP-19｜原 Windows Reader 导出功能在无源本地模式可用
+
+- 在原正式 Web 保留的“导出 ZIP/CBZ”按钮之后复用正式 `ReaderService.exportZip/exportCbz`，补通独立 Full-Web Core 的同名 POST；受 cookie + 同源/CSRF 保护且只接受纯 LOCAL 身份和配套章节。文件仅写入已标记的独立 local profile 内 `exports/archives`，不允许 HTTP 指定任意路径。
+- 未配置可信外部系统打开能力的 source-free 模式直接显示导出绝对路径而不弹出必定失败的“打开文件”询问；原正式 Desktop 路径不变。复用现有开源 AdmZip、原数据库/Reader 与 Web，不另做 ZIP 生成器。
+- 本次只补一条真实本地图片经 HTTP 到 ZIP/CBZ 字节验证，完整 CI/核心无来源闭包须按精确 HEAD 通过。大型导出时事件循环同步处理的性能仍为 OPEN，不能冒充完全异步；G1–G4、真用户迁移和真实来源独立安装仍未完成。Draft 未发布。
+
+
+### 2026-10-31 S3 CORE-ANDROID-18｜无源 Android 共用原正式 CBZ 导出
+
+- **功能薄片而非新备份产品**：把正式 App 原 `LocalComicExports` 适配器移动到 `:local-storage`，由原 app 与 source-free `:local-app` 共用；底层只使用原 `LocalComicExporter`、现有 `LocalComicStore`、Android SAF，不改变标准 CBZ/ZIP 页面文件、不写新 schema、不复制第三方来源代码。
+- 独立本地客户端长按作品可导出 CBZ，来源仍是本 app 已确认的私有导入正文；可取消的后台原流程、私有 staging/lease、SHA256 回执、外部保存器权限隔离保持。导出不包含书架/历史/账号/收藏/标签，也不能替代 v0.5.0 正式数据迁移。
+- 按分支当前精确提交完成 Android 原完整 CI、独立无源六 DEX 与 Android35 系统 SAF 保存、真实 ZIP 页内容核对后才认定工程薄片通过；真实手机/G1、来源生命周期/G2、旧数据回滚/G3、正式发布/G4 均开放。只保留 Draft，不改 main、OTA、Release 或用户真实文件。
+
+
+### 2026-10-31 S1/S2 CORE-ANDROID-17｜原本地导入器真实逐页进度接入双 Android 客户端
+
+- 补齐取消后的状态：单独使用中日英原生资源显示“已取消”而非“导入失败”，不改变取消后的目录清理或真实故障的错误展示；不增加新测试框架。\n
+
+- 接续 Draft #271 `6f112db` 的 **21/21 Actions SUCCESS**、Android35 实际 SAF/书架/阅读/历史/重启模拟器 PASS；本轮直接解决长时间大漫画导入仅显示不透明加载圈的问题，不再重复分拆 Reader/历史/来源接口。
+- **复用而非重造**：`:local-core/LocalComicImporter` 原本已有 `Progress.page(complete,total)` 并在逐页写入/CRC 校验成功后调用，只是普通 folder/CBZ `prepare` 以前固定传空回调。本次在原生产接口新增可选 `Progress` 重载，原四参调用仍能兼容；`:local-storage/LocalComicStore.prepare` 同样保留旧签名并向普通 SAF folder/CBZ 导入透传实际页数。
+- **正式 Android 原界面** `LocalComicImportActivity` 在现有保留态 Session/工作线程中获取拷贝页码，以 Android 原生水平 ProgressBar + 中日英既有资源系统显示 `N / 总页数`，并在真正导入/复制时增加可取消按钮。每8页/首末页才向 UI 发送增量以减少刷屏，不重复渲染整页；提交阶段仍用原加载状态，不修改原预览/确认/原子保存/文件位置。
+- **独立无源 Android** `:local-app/LocalLibraryActivity` 也直接消费同一 `Progress`，将可见页数文字与水平进度条接入原 spinner + 取消入口；保持已有源 SDK 物理隔离和独立数据根。无新依赖、框架、数据库或任务系统，继续复用 Android 原生组件。
+- **本轮验收**：原 `LocalComicImportTest` 只增加一条实际 DocumentsProvider 的 2页逐页回调/取消后无不完整作品定向测试；原 Android/Web/Desktop CI、独立 APK 6 DEX/权限与 S3 真实模拟器端到端回归以新精确 SHA 为准。未发生的真实大书库或物理手机压测不能标 G1/G2；G3/G4 继续 OPEN。Draft 不合并 main、不发布、OTA/用户资料不动。
+
+### 2026-10-31 S1/CORE-ANDROID-16｜原 Reader UI 使用 Android 原生三语资源（叠加 Draft #270）
+
+- 先确认 #270 `a0a1fcd` 已经 **21/21 GitHub Actions 全部 SUCCESS**，Android35 模拟器实际完成 CBZ/文件夹 SAF 导入、书架、原 Reader 图片翻页、历史、强制停止/重启同章节同页恢复及移出不删漫画。人工检查真实截图时发现：英文系统中 QA 书库/历史为英文，但原 Reader 顶部返回/章节及底部翻页按钮仍是中文；这属于 S1 用户可见 UI 缺陷，不能因本地操作功能通过而标 G1 完成。
+- 本次直接修改**唯一**正式版 Reader 实现 `:reader-view/ReaderScreenActivity`，复用系统自带 Android `strings.xml`、`values-en`、`values-ja`（42 组实际 Reader 控件/设置/空状态/诊断文案）。旧 App 既有 `LocaleStore.wrap` 支持用户选择语言；独立无源 QA APK 使用系统语言，底层数据/翻页/ReaderSource/下载/书签与目录业务逻辑全部不变。
+- 将旧 Reader 固定中文按钮、章节切换、设置列表和动态页码/缓存文本改成原生 Android resources；只更新已有的一个源码契约断言和已有 S3 模拟器操作中对英文 Next 按钮的精确点击，**不新增翻译引擎、测试框架、页面或依赖**。该资源模块无漫画源 SDK、无额外许可和帐号权限，继续参考 Mihon（Apache-2.0）“Viewer 自治展示资源”的职责划分，不复制第三方代码。
+- 仅在本新提交完整 Android/Web/Desktop CI、独立 APK 6 DEX/manifest 源闭包和**真实 Android35 英文按钮操作截图**通过之后接受本薄片；尚未单独核验完整英文/日文/中文字号/狭屏排版，G1/G2 物理手机、可选在线来源、G3 旧资料迁移与 G4 发布仍 OPEN。不合并正式 main、不发布/OTA、不读取真实用户资料。
+
+### 2026-10-30 CORE-ANDROID-15｜独立无源 Android APK 真实模拟器操作证据（叠加 Draft #269）
+
+- **首次真实模拟器失败并保留证据**：GitHub Actions run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41170950196) 已用系统 SAF 真实选中 `S3-QA-Comic.cbz`，但原 `LocalComicStore.inside` 的 `getAbsoluteFile()==getCanonicalFile()` 绝对等式将 Android 系统级 `/data/user/0` 别名误判为非法路径，页面明确显示 `Import failed: Unsafe owned comic path`，所以 CBZ 导入失败，后续书架/阅读/历史/文件夹流程**未执行**。修复同时覆盖 `deleteTree`，避免同一系统别名导致合法取消/删除清理失败；只比较 App 自有目录内部相对路径的规范化结果并检查实际下级 symlink。已有 `LocalComicImportTest` 增加唯一一项系统别名可用、目录内部 symlink 仍拒绝且不跟随删除的定向回归；不关闭路径安全规则或新增解析器。
+
+
+- 以 #269 已经 **20/20 Actions SUCCESS** 的 `:local-app` 为基础，**不再造导入、阅读、历史、书架或后台测试框架**；复用仓库既有 `reactivecircus/android-emulator-runner@v2`、Gradle 和 Android 原生 `adb`/UI hierarchy。增加仅一个按 `local-app/local-storage/reader-view` 相关改动触发的 S3 Android 35 模拟器工作流。
+- 每次运行用纯本地标准 Python 随机无关的测试图片，生成四页两章的 CBZ 和两页文件夹；实际操作系统 SAF 文件/目录选择器、原 LocalComicStore 的 staging/confirm、原 ShelfLedger 创建/加入/移出、原 Reader 翻页/页码记录、ReaderHistoryLedger 会话历史、强制停止/重新启动/从历史恢复章节页码，最后核对原 Shelf tombstone 不删除漫画文件。
+- 通过截图、Android UI XML、真正 QA 应用 `run-as` 下的原 `local-comics-v1` manifest、`portable-shelves-v1.json`、`reading-history-v1.json` 校验；保留短期证据包，失败时保留相应屏幕供复核。严禁真实账号/网盘登录/源流量或访问正式 v0.5.0 私人资料。不替代既有独立 APK 六 DEX/权限检查。
+- **此项首次提交状态为待运行**：模拟器 UI PASS 也只表示一次可重复执行的设备仿真验证，不能冒充物理手机/真实用户资料、全部多语言视觉终验或正式版 G1–G4。若失败按真实页面诊断修复功能，避免增加大量断言/防御性实现。继续 Draft，不发布、不合并 main、不更换 OTA 或正式签名。
+
+### 2026-10-30 CORE-ANDROID-14｜原 Android 书架本地状态物理复用（叠加 Draft #268）
+
+- 依据 #268 已核实 **20/20 Actions SUCCESS** 的开发基线推进实际日常功能，不增加第二套书架。原正式 `ShelfStore` 的 `portable-shelves-v1.json` schema 2、Shelf/Item/Snapshot、名称与成员操作、tombstone/日期与序列化逻辑物理迁到 `:local-storage/ShelfLedger`；新 `ShelfStore` 只保留旧 Context 方法和 `MobileStoragePaths`、UnifiedCatalog 元信息/原 Desktop Bridge 双向同步、旧来源兼容。
+- 独立 source-free `:local-app` 继续复用已经分包的 LocalComicStore/Reader/History。新增本地书架页：创建/重命名/删除书架，选择已导入作品加入书架，移出只写原 schema tombstone 而不删除漫画文件，书架条目直达同一 Reader；无源账号/网络或重复数据库。
+- 在既有 Android `LocalComicImportTest` 内仅增加一条真实本地作品 + 原 schema + 创建/加入/移出/改名/删除/正式版路径不变的定向集成测试，不新增测试框架。继续按 OSS-first 优先复用本项目原 Java 和 Android SDK；参考 Mihon（Apache-2.0）模块职责，不复制第三方实现。
+- 验收：新精确 SHA 的完整 Android/Web/Desktop CI、独立 APK 重新编译、Manifest/6 DEX 无来源 SDK 检查；真实手机书架与历史/重启恢复、正式版真实数据迁移、独立来源安装撤销和 G1–G4 仍 OPEN。Draft 不合并 main、不发布、无 OTA、无生产用户数据修改。
+
+### 2026-10-30 CORE-ANDROID-13｜原阅读历史持久化复用进入独立本地 APK（叠加 Draft #267）
+
+- 继续基于已通过 20/20 Workflows 和 6 个 DEX/无来源 SDK 证据的独立 `:local-app`。**物理迁移原有 ReadingHistoryStore 的会话文件格式与行为，不开发第二套历史存储。** 原 `reading-history-v1.json` 的 `schemaVersion=1`、session ID、时间、first/lastPage、chapterOrder、source/provider、legacySnapshot、日期范围和排序逻辑统一由 `:local-storage/ReaderHistoryLedger` 实现。
+- 旧正式 App 仍使用名为 `ReadingHistoryStore` 的薄兼容入口：保持 `MobileStoragePaths.dataFile` 外置数据目录选择、原 API/嵌套类型/日期过滤及 Legacy 导入签名，Pica/E-H/目录元信息与旧 Bookmarks 首次迁移仍只留原 App 适配，不污染无来源共享模块；不移动、不改写、不读取正式用户资料。
+- `LocalReaderActivity` 从 `ReaderProgressLedger` 的空会话回调改为真实共享 `ReaderHistoryLedger.record`，明确只写 `local-app` 自己的 `getFilesDir()/reading-history-v1.json`，书签照旧由原 Ledger 保存。`LocalHistoryActivity` 只提供轻量 QA 查看/今天/7天/30天/全部/点击续读入口，复用原时间与筛选、显式确认本地作品仍可读；不复制原 `HistoryActivity` 的云端、作者封面及高级卡片 UI。
+- 仅扩展已有的 `LocalComicImportTest` 一条真实共享历史 JSON/会话更新/旧版数据路径不修改回归，源位置测试随真实模块位置调整；不新建测试套件、数据库、同步器、UI 框架或平台依赖。开源优先维持本项目原 Java/Android SAF/AndroidX，Mihon（Apache-2.0）只参考职责划分，未复制 Mihon/Kotatsu 源码。
+- 验收边界：本轮新提交的 Android/Web/Desktop CI、正式版旧历史测试、独立 APK 重新编译与 DEX/权限检查必须独立 PASS 才能标工程接受。Android 真机书签/历史/重启与原 v0.5.0 对比，统一完整 HistoryActivity UI、签名/来源生命周期、真实旧资料 G3 回滚和 G1–G4 用户验收仍 OPEN；保持 Draft，不合并/发布/OTA。
+
+### 2026-10-30 CORE-ANDROID-12｜真正独立的 Android 本地书库/阅读 APK（Draft #267）
+
+- 基于已 **20/20 GitHub Actions SUCCESS** 的 #266 `6ca0aec`，新建实际 `:local-app` **com.android.application**，唯一编译依赖为已分包的 `:local-core`、`:local-storage` 和 `:reader-view`，没有引用原 `:app`、在线源/Host/Bridge/JM SDK 或原账号初始化。安装包 ID `com.picalibrary.android.localcore.qa` 与原正式 APK、旧 localdraft 完全隔离；独立 App files/cache/SharedPreferences，不碰正式用户资料。
+- 复用原 `LocalComicStore.prepare/confirm/remove` SAF 文件夹/CBZ、预览/原子目录提交和 `LocalComicReaderPort` 章节/页码/本地页面 ID；最小 `LocalLibraryActivity` 提供实际导入、预览确认、加载态/取消、列表、点击阅读、长按删除。复用原 `:reader-view/ReaderScreenActivity` 全部翻页/连续阅读/缩放/书签/章节/进度 UI，`LocalReaderActivity` 仅把这三份原生产模块连接到同一 Reader。没有再造导入器、Reader、同步、数据库或 plugin loader。
+- 实际 DEX 与 Manifest 门禁嵌入现有 Android CI：编译 `:local-app:assembleDebug`，`aapt` 核对隔离包名/真实 Launcher、缺 INTERNET/CAMERA/INSTALL/BROAD STORAGE，逐个 DEX 检查来源 SDK 类描述符；只保留两天的可下载安装 Debug **QA artifact**，不创建 Release、tag、OTA、签名正式 APK。未通过精确最终 CI 前不能标 PASS。
+- 开源优先：旧 Pica Library 本地导入/文件 Manifest/原 Reader 优先，使用 Android SAF、AndroidX 原版依赖；Mihon (Apache-2.0) 仅作为职责边界参考，没有复制 Mihon/Kotatsu 代码。维持原文书、身份、缓存边界及来源的用户授权模型。真正无源包不是规避版权审查的保证。
+- **局限/后续**：本地独立 QA 首批实现文件夹/CBZ/阅读/书签持久；**完整 HistoryStore 会话历史、正式版所有书架/Visual/同步/三语 Reader 文案尚未移入这个 QA 包**，不得将其宣称为完整用户版。Android 真机读/重启 G1/G2、正式签名/G3 旧用户迁移回滚、来源可选安装撤销与 S6 发布均 OPEN。先以最少实际手测和同源码 CI 闭环，再在原模块物理移植这些功能，不制造第二套业务实现。保持 Draft、不改 main/Release/OTA。
+
+### 2026-10-30 CORE-ANDROID-11｜原完整 ReaderActivity 阅读屏幕物理迁入 reader-view（叠加 Draft #265）
+
+- **本轮真实移入原生产 UI，而非创建第二个阅读器。** 原 `ReaderActivity` 的 ViewPager2/RecyclerView 翻页、连续阅读、图片 Holder/进度页码、章节跳转、失败重试/诊断、预载/取消/销毁、键盘及画面手势回调全部进入 `:reader-view/ReaderScreenActivity`，只用已存在的 AndroidX RecyclerView/ViewPager2 同版依赖。原来源、数据存储、历史合并与章节读取实现不重写。
+- 现有 AndroidManifest 仍指向 `com.picalibrary.android.ReaderActivity`。它现在是原生产 App 的薄继承入口：负责 `ReaderSourceFactory`、原图片缓存与书签适配、WebDAV 显示设置同步、原 `StorageSettings` 和语言/新手引导、原推荐完成写入；Viewer 模块不 import 具体 Pica/E-H/JM、Bridge、远程配置或推荐系统。原 `LocaleAwareActivity` 在 Reader 上的 attachBaseContext/语言变更 recreate/高级引导回调由兼容入口保留。
+- 原有离线 `ReaderChapterSource`、`ReaderImageLoader`、`ReaderProgressLedger`、`ReaderGesturePanel`、`ReaderDisplaySettings` 直接组合使用。旧用户 intent、原 Android 本地资料、书签 key/schema 与同步语义不变，缓存写授权仍在 App 的来源适配器。唯一迁移的是生产 Reader 的代码归属；原测试只校正源文件路径并验证完成证据仍通过 App 适配器异步提交，没有新测试套件。
+- 继续参考 [Mihon](https://github.com/mihonapp/mihon) Apache-2.0 Viewer 与来源分离的设计，实际复制/复用的是本项目旧代码与既有 AndroidX，并未复制 Mihon/Kotatsu 源码。
+- **剩余**：原本地 Draft `:app` APK 仍编译全部来源 SDK；真正干净的独立 `:local-app` 应用/构建变体（Gradle 依赖、最终 DEX、Manifest 无来源 SDK）、手机端实际阅读 G1/G2、签名/授权来源生命周期及 v0.5.0 数据迁移 G3/G4 仍 OPEN。本 Draft 不合并 main、不触碰 Release/OTA 或真实用户数据。必须以本精确提交的完整 Android/Web/Desktop CI 为准，不借用 #265 的通过记录。
+
+### 2026-10-30 CORE-ANDROID-10｜原 Reader 显示设置与手势面板进入来源无关模块（叠加 Draft #264）
+
+- 从原 Android App 的 `ReaderSettingsStore` 中直接移动原有 `reader-display` SharedPreferences、`mode`/`keepOn`/`portableUpdatedAt` 和读写操作到 `:reader-view/ReaderDisplaySettings`；原 `ReaderSettingsStore` 继续保留旧调用形式、原 WebDAV 时间戳 reconcile 和异步同步，仅作为应用层桥接。没有更改键名、模式范围、默认常亮状态或创建新的设置数据。
+- 把原 `ReaderGestureOptions` **实际 UI 控件实现**移到 `:reader-view/ReaderGesturePanel`：原 `ReaderGestureSettings`、Switch、1.5×/2×/3× RadioGroup、即时应用、关闭回调保持一致；薄应用兼容入口将现有 `LocalizedText.ui` 三语文案传给面板，不向通用模块导入应用端语言/Provider/推荐类。
+- OSS 选择：继续借鉴 Mihon Apache-2.0 的 Viewer/业务数据分离职责；本轮只复用既有 Android 组件和原 Pica Library 实现，没有复制 Mihon/Kotatsu 代码、没有增加依赖、没有新阅读器/设置系统或测试框架。通过原 Android/Web/Desktop CI 和已有本地 Draft 构建检查后，再准备将原 `ReaderActivity` 主 UI 物理抽取到 `:reader-view`。
+- **边界**：此步只完成本地阅读设置与手势面板的物理隔离。原 App 的 `ReaderActivity`、来源工厂、远程配置、推荐完成事件仍归应用层，local-only APK 仍包含在线来源 SDK；物理无源 APK、真实手机 G1/G2 和 v0.5.0 迁移 G3/G4 都未完成。Draft 不合并 main、无 Release/OTA、不触及实际用户文件。
+
+### 2026-10-30 CORE-ANDROID-09｜原 Reader 阅读进度、书签与会话历史物理迁移（Draft #264）
+
+- [Draft #264](https://github.com/Saber-Alter-Lily/pica-library/pull/264)：遵照 OSS 优先规则，对比 Mihon ReaderChapter/PageLoader 的状态与数据来源分离方式（Apache-2.0，仅借鉴）；**真正复用原项目的 ReaderProgress/ReadingHistoryStore/UnifiedCatalogStore**，不另建阅读历史数据库、推荐引擎或同步器。
+- 旧 `ReaderProgress` 中的书签键、页码恢复、远端并发 revision/ack、会话分组、进度同步和单个异步 executor，移至 `:reader-view/ReaderProgressLedger` 唯一实现。原应用 `ReaderProgress` 保留旧构造 API，并使用 `ReaderHistoryPort` 把标题/作者/来源的原目录查询和 `ReadingHistoryStore.record` 原有历史持久化交给原应用；不修改本地数据格式、目录、授权或重新发明历史存储。
+- 在既有 `LocalComicImportTest` 中新增仅一项真实 SAF 导入→书签提交→重新实例化恢复→旧历史记录信息核对；旧源码契约同步指向真实模块实现且保留原记录断言。原 CI + 独立本地 APK 已有门禁继续复用，不新建套件。
+- **后续仍需**：实际提取原 `ReaderActivity`、其 `ReaderSettingsStore`/ `ReaderGestureOptions` 等 UI/设置依赖并把完整本地客户端物理编译成不包含漫画源 SDK 的 APK，然后做权限/DEX/gradle 与真机 G1–G4 检查。当前仍不宣称最终 clean APK。保持 Draft，不合并 main/发布/操作旧用户资料。
+
+
+### 2026-10-30 CORE-ANDROID-08｜Reader 通用章节、进度及展示契约进入真正独立模块（Draft #263）
+
+- [Draft #263](https://github.com/Saber-Alter-Lily/pica-library/pull/263) 继续 #262 已验证的旧图片缓存实现：**不是再造 Reader**，而是把原 ReaderSource 中已有的章节、页面、阅读进度、显示名称、可选诊断方法搬到现有 `:reader-view` 中的 `ReaderChapterSource`，依赖已抽出的纯 Java `ReaderContent` 与 `ReaderImageTransport`。通用接口不依赖 Pica/E-H/JM、BridgeClient、账户、来源权限或网盘实现。
+- 原 App 的 `ReaderSource` 继续扩展通用接口，只留 `sourceAccess`、原 `SourceAccess.commit` 缓存写授权和撤销判断；原 `ReaderActivity`、`ReaderProgress` 和 `ReaderImages` 改为消费通用接口，既有所有真实来源类、章节下载、图片读取和书签行为不变。参考 Mihon Reader 模型分离设计（Apache-2.0，仅借鉴架构，无第三方源码复制或新依赖）。
+- 复用旧 CI；该 Draft 另外复用**已有**独立本地 APK `assembleDebug` 与 `aapt` 包名/权限门禁，验证模块重构不影响原离线开发构建。当前仍没有物理剔除完整 Reader UI 与 Pica/E-H/JM SDK 的最终安装包，G1–G4 OPEN，保持 Draft，不合并/发布/操作真实用户资料。
+
+
+### 2026-10-30 CORE-ANDROID-07｜原图片解码/缓存管线迁入来源无关 Reader View（Draft #262）
+
+- [Draft #262](https://github.com/Saber-Alter-Lily/pica-library/pull/262) 遵循已写入 S0–S6 的 OSS 优先复用规则：借鉴 Mihon 的 PageLoader/Viewer 分离设计（Apache-2.0、仅参考），**实际复用本项目原 ReaderImages 一份生产实现**。其网络/文件页面加载、解码、缓存、预载、取消、限额与错误回报移入现有 `:reader-view/ReaderImageLoader`；原 App `ReaderImages` 仅为兼容原 UI/测试/缓存管理的极薄接线。无第二套阅读器、缓存或新外部依赖。
+- 两个小接口 `ReaderImageTransport` 和 `ReaderPageStorage` 只将原权限/缓存配置从图像加载器剥离。原 `ReaderSource` 仍在缓存写入点调用 `SourceAccess.commit(sourceAccess(), ...)`，禁用来源后不得提交新缓存，原已缓存页面、E-H 诊断和本地图片处理行为保留。使用现有 Android 测试和 CI，不创建额外测试框架。
+- 后续实际关口是 `ReaderProgress`/阅读历史与原 `ReaderActivity` 的物理编译拆分，再对真正单独构建的本地 Android APK 进行依赖/DEX/Manifest 检查与真机阅读验收。关闭联网权限不等于物理无源；G1–G4 OPEN，保持 Draft，不合并/发布、不触及原用户资料。
+
+
+### 2026-10-30 CORE-ANDROID-06｜原 Reader Viewer/手势 UI 迁入标准独立模块
+
+- [Draft #261](https://github.com/Saber-Alter-Lily/pica-library/pull/261)：复用 Mihon viewer 与 loader 职责划分的**设计**（仅参考、不拷贝），**实际不重做**本项目 `ZoomImageView`/手势策略。原 4 份源码物理迁入 `:reader-view` Android library 和现有 `:local-core` 纯 Java library；内容 hash 完全不变，原 Android ViewPager2/RecyclerView、书签和阅读 UI 继续复用。用标准 Gradle 依赖替代之前的临时 gesture 编译任务，无新框架或第三方依赖。
+- 下一真实产品关口：逐项拆出原 `ReaderActivity` 所需的图像加载/缓存、ReaderProgress、ReaderSource 源权限适配及通用 UI；最终在**另一个 APK 真实构建的 DEX/Gradle 依赖报告**中核实无 Pica/E-H/JM SDK，并进行真机本地/CBZ/翻页/进度和重启恢复验收。当前 `:reader-view` 通过 CI 后也不能直接视为整包无源，G1–G4 OPEN。
+
+
+### 2026-10-30 CORE-ANDROID-05｜原 Reader UI 通过来源接口获取诊断与推荐应用扩展
+
+- [Draft #260](https://github.com/Saber-Alter-Lily/pica-library/pull/260)：继续 #259 通用 Chapter/Page 数据模型，复用原 Reader/AndroidX，把 E-H 诊断、显示名称等来源差异封装到原 `ReaderSource` 与具体适配器（原 E-H 安全/诊断实现不复制、不弱化），`ReaderImages` 不再强转具体 E-H 来源。推荐完成写入留在原应用 `ReaderSourceFactory`，原 UI 只在已有后台 executor 触发；原 Reader 页面不再直接 import/引用漫画源 SDK 类。仅扩展现有 3 处定向测试，完整 CI 待终态。
+- **下一真实功能切口**：盘点并物理拆出剩余 `ReaderImages` 缓存授权/来源策略、`ReaderProgress` 元信息及原 `ReaderActivity` 所用 UI/图片手势组件，构建直接依赖 `:local-core`+`:local-storage` 的干净 Android Reader 模块/应用，不以关闭网络权限或隐藏在线 UI 冒充“无源”。参考 Mihon Reader/loader/viewer 的职责划分，优先原实现且遵守开源许可证。G1–G4 OPEN。
+
+
+## 全阶段工程硬规则｜开源优先与禁止重复造轮子（2026-10-30 起适用于 S0–S6）
+
+**优先顺序：现有 Pica Library 生产代码与用户兼容性 → 成熟开源项目和标准平台组件 → 最小必要适配 → 仅在确有缺口时新增实现。** 每项新功能/架构拆分先查已有相同或相似功能，不得为“解耦”另造一套 Reader、导入器、数据库、调度器、插件框架、升级器或测试系统。
+
+1. **先调研再决策。** 每个功能/重构 PR 说明记录：可复用原文件/接口，相关 OSS 项目、链接、维护状态与许可证，直接复用/只借鉴/不采用的选择及原因，以及当前缺口。至少核查本仓库；与任务相关才比较外部 OSS，不要求无关任务凑数量。
+2. **优先用现有组件。** Android 优先原 `ReaderActivity`、`ReaderPolicy`、`LocalComicImporter`/`LocalComicStore`、SAF/AndroidX `DocumentFile`、`ViewPager2`、`RecyclerView`；Windows 优先旧 SQLite、Reader、Web UI、Upgrade Assistant。模块化使用标准 Gradle/Java/Android 构建，除非有明确收益，不引入新库或框架。
+3. **开源项目参考基线。** [Mihon](https://github.com/mihonapp/mihon)（Apache-2.0，本地阅读及用户安装来源扩展）、[Mihon 本地文件说明](https://mihon.app/docs/guides/local-source/)（作品/章节/CBZ 结构）、[Mihon 大图组件](https://github.com/mihonapp/subsampling-scale-image-view)（Apache-2.0，必要时评估超大图缩放）；[Kotatsu](https://github.com/KotatsuApp/Kotatsu)（GPL-3.0、已归档）只比较功能和交互思路，**不得直接复制其 GPL 代码进入本项目**。列入参考不代表已引入依赖/已实现功能。
+4. **先核实许可证和可追溯性。** 只有确认授权兼容、维护/安全状况及必要的版权 NOTICE、修改记录、版本固定后，才可实际使用第三方代码和资源。不得把“开源”当作免授权或版权豁免；只借鉴架构时标注“未复制代码”。
+5. **功能优先，验证精简。** 目标是可使用的本地/网盘/可选来源阅读、Windows/Android 布局和老用户无痛更新。优先旧 CI + 实际功能场景，新增测试只针对真正改变的业务和高风险数据兼容性；不连续堆冗余防御层或新框架。
+6. **验收必须对应可核实证据。** 导入/阅读/书签/书架真实可用，纯核心依赖/DEX 中无来源 SDK，真实 Android/Windows 编译与旧用户兼容得到证明；工程 CI 与真机/正式发布验收分别标注，失败不冒充成功。G1–G4 全通过前保持 Draft，禁止自动合并、发布或处理真实用户资料。
+
+**当前 S3 Reader 决策：** 借鉴 Mihon 的 Reader 核心/来源扩展分离思路，但复用本项目原 Java Reader + AndroidX，不迁入 Mihon 的 Kotlin UI，也不复制 Kotatsu GPL 代码。先使 `BridgeClient` 的通用 Chapter/Page/ChapterData 数据类型由源中立 `:local-core` 统一定义，保留旧调用方兼容；后续再把原 Reader UI 和 Android 存储交给独立物理无源构建。每轮 PR 写明“复用/参考/未采用”与 APK 来源 SDK 实际状态。
+
+
+### 2026-10-30 CORE-ANDROID-03｜Reader 接口与具体来源实现分离
+
+- [Draft #258](https://github.com/Saber-Alter-Lily/pica-library/pull/258)：从原 `ReaderSource.java` 移出 Desktop/WebDAV/Pica 具体类，放入 `OnlineReaderSources.java`；核心声明只保留接口，原方法逻辑未变。下一步优先将 ReaderUI 使用的 `BridgeClient` 类型替换为无来源数据模型、抽离原 Reader 页渲染到单独模块，避免重写阅读器。真正干净 Android APK 尚未实现；不合并/发布，G1–G4 OPEN。
+
+
+### 2026-10-30 CORE-ANDROID-02｜来源无关的本地 Reader Port
+
+- [Draft #257](https://github.com/Saber-Alter-Lily/pica-library/pull/257)：在标准 `:local-storage` Android 模块实现可独立消费的 LocalComicReaderPort，从旧 `LocalComicStore` 读取已导入的本地作品、封面、章节、文件页和页 ID 书签。原 `LocalComicReaderSource` 只保留 BridgeClient 数据形状适配，继续供原 ReaderActivity 阅读，避免第二套阅读器。测试复用已有 Android SAF 合成文件/实际导入场景，且不引入额外测试框架。
+- **下一架构切口**：拆开 `ReaderSource` 原接口与 Network/Provider 具体实现，将原 ReaderActivity 依赖的通用阅读模型从 `BridgeClient` 完整移出，并把原 Reader UI/手势/页缓存移入可独立 APK 引用的来源无关组件；随后构建真实无 Pica/E-H/JM SDK 的本地 Android APK，检查 Gradle 依赖/DEX/manifest，再做真机体验 G1/G2。最终版本与 G1–G4 继续保持 OPEN。
+
+
+### 2026-10-30 CORE-ANDROID-01｜本地导入和 Android 存储物理分包
+
+- [Draft #256](https://github.com/Saber-Alter-Lily/pica-library/pull/256) 复用 Gradle 官方 `java-library`/`com.android.library`，将原 `LocalComicImporter` + `LocalComicExporter` + `ReaderPolicy` 文件**物理迁移、保持 blob 完全不变**至 `:local-core/src/main/java`，原 `LocalComicStore` + `DeviceIdentity` 同样迁移至 `:local-storage/src/main/java`，不使用 AGP 不可靠的外部源码目录筛选或自定义复制脚本。两模块不依赖 Pica/E-H/JM；原正式 App 与独立本地 Draft App 依赖同一编译产物，清理旧重复 JavaCompile。首批筛选编译失败已按目录迁移纠正，准确新代码 CI 待核。
+- 下一切口：从 `ReaderSource`/Bridge 数据模型和 UI 的旧 provider 依赖分离出**真正可被独立 APK 编译的本地 Reader + Home + Import**，并在 APK 依赖及 DEX 中确认 Pica/E-H/JM SDK 不存在，而不依赖单纯隐藏页面/禁用网络权限。G1–G4 保持 OPEN。
+
+
+### 2026-10-30｜S3 Android 本地模式功能切口（Draft #255）
+
+- [Draft #255](https://github.com/Saber-Alter-Lily/pica-library/pull/255) 以现有导入、书架、Reader 和 UI 为基础，新增隔离包名 `com.picalibrary.android.localdraft` 的可选离线 Android 构建；保留原免责声明，禁用网络权限、来源入口、Desktop/WebDAV 刷新和后台联网工作。当前保留旧 Java 包和 source SDK 的编译，**不能当成真正物理无源 Android 安装包**。既有 CI 只增加一次实际 APK 编译/manifest 核对，无新框架。
+- 后续优先将 LocalComicImport/LocalComicStore/Reader 等中立组件从原大 Android 编译中独立抽取，剔除 Pica/E-H/JM SDK 依赖，再接独立 Reader/来源扩展装载和真机 G1/G2。Windows #254 已可用独立持久本地库候选，尚未通过用户实装或 v0.5.0 迁移；所有 G1–G4 仍 OPEN。
+
+
+### 2026-10-30 CORE-LIB-04e｜可跨重启的无源 Windows 个人书库
+
+- [Draft #254](https://github.com/Saber-Alter-Lily/pica-library/pull/254)：继续 #253 的本地/CBZ 导入，保留旧 v0.5.0 默认启动，添加用户主动选择的 `--source-free-local` 模式与独立持久 profile `%LOCALAPPDATA%/Pica Library Local`。复用原 SQLite、Reader、书架、文件对话框和完整 Web；原用户凭据、文件及旧目录不参与。自动打开原网页，支持重启续用该新书库。原 Windows QA 完整网页包增加双击启动脚本，无需额外参数。仅新增一个既有套件内持久化测试，不发布。
+- 首次 [CI #41018450901](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41018450901) 因旧临时目录无效输入检查优先级改变造成 1 项 Web/Desktop 失败，Android 通过。现已修改实际启动顺序，旧 QA 模式先验证目录、新持久模式先验证 Web 完整性再创建用户目录；精确新代码和已有 Windows Portable workflow 的结果待终态，不提前标 PASS。
+- **下一产品硬关口**：真实独立 Windows 成品启动/导入/保存/重启验收，以及 Android 纯核心个人书库启动、必要的 trusted source 接入；旧用户 v0.5.0 安全迁移及 G1–G4 仍未完成。已实现的图鉴 BLOCK/LESS 过滤无需重复开发。
+
+
+### 2026-10-29 S3 CORE-LIB-04d｜先实现独立核心的本地导入
+
+- [Draft #253](https://github.com/Saber-Alter-Lily/pica-library/pull/253)：现有 source-free 原网页、原生选择器与原本地文件夹/CBZ 导入器联通。仅增加必需接口接线和 1 项既有套件回归，保持默认正式 v0.5.0 和旧资料完全不动。当前仍是用户显式选择的 OS Temp 隔离预览，并非正式可持久化安装/源外置验收。CI 待核。
+- Issue #199 的 Desktop 图鉴 BLOCK/LESS **显示过滤已经存在于草稿** `web/chronicle-view.js` 及 profile/view 接口，正式 main 尚无该文件，后续应集成/验收而非重复开发。
+- 下一产品功能关口：使真正无源核心可以在保留旧版数据安全的前提下作为双端可安装独立应用运行；补 Android 纯核心启动与可信源适配连接，而非不断增加安全测试。G1–G4 OPEN。
+
+
+### 2026-10-29 CORE-LIB-04c-02c-02b-02c｜真实 Desktop 资源租约收尾
+
+- [Draft #252](https://github.com/Saber-Alter-Lily/pica-library/pull/252) 在 #251 的后台任务取消/等待之上，复用共享 `RuntimeResourceCoordinator`：原 HTTP 停止接新任务后，等待包含前台收藏同步、推荐及下载在内的在途/等待 lease 清空，最后关闭 SQLite；改动原业务，不增加框架，单个顺序测试。#251 原始全 CI 已通过，#252 本身待核实。
+- 下一阶段优先**真正可用的来源独立安装/Reader 双端功能**，仅在有明确数据风险时补最小必要停写逻辑；无真实 v0.5.0 数据迁移/回滚或 G1–G4 用户验收，不合并 main/发布。
+
+
+### 2026-10-29 CORE-LIB-04c-02c-02b-02b｜书库后台任务受控停止
+
+- [Draft #251](https://github.com/Saber-Alter-Lily/pica-library/pull/251) 继续上一轮 WebDAV 写入停机改造：原 `LibraryService` 取消并等待 3 个维护/整理任务和 V5 Shadow/Work Identity 的实际运行 Promise；桌面关闭及重启路径按原有顺序先完成后台任务，再处理本地下载和 SQLite，清理 JM 运行时。源代码 + 1 项现有测试文件内的定向回归，无新增协调器/测试框架。CI 待核。
+- **下一功能切口**：评估尚未进入原资源协调器的前台来源异步请求（尤其网络请求结束后仍会修改 SQLite/媒体的情形）并用原取消/任务 lease 逐项补齐；仍不允许声称全部写入者已冻结或可以迁移真实资料。G1–G4 OPEN，主线保持正式 Windows/Android 纯核心/来源真正外置。
+
+
+### 2026-10-29 CORE-LIB-04c-02c-02b-02a｜WebDAV 共享写任务与停机收尾
+
+- [Draft #250](https://github.com/Saber-Alter-Lily/pica-library/pull/250) 叠加 #249，先修**真实功能缺口**而不继续扩展测试框架：remote-only 删除使用现有资源协调器 lease，Desktop preflight 感知远程同步/删除 busy，停机取消并等待 WebDAV 在途修改，备用端口注入相同 coordinator；仅扩展现有 1 项回归测试。CI 待核实。
+- 下一步处理与 WebDAV 不同的后台任务/独立 Worker 写入来源，完成必要的停写确认，再结合旧版一致性备份/失败回滚。G1–G4 仍 OPEN；本步骤不对真实用户资料或正式更新授权。
+
+
+
+### 2026-10-29 CORE-LIB-04c-02c-02b-01｜Mobile Bridge / Remote API 纳入同一更新交接冻结
+
+- [Draft #249](https://github.com/Saber-Alter-Lily/pica-library/pull/249) 叠加 #248。确认原 Mobile Bridge（含配对）和独立 Remote API 网关是两套真实网络监听器，绕过原本机 HTTP；这轮**只复用已有 `DesktopHttpHandoffFence`**，在原两套业务路由之前登记在途请求，冻结时统一返回有界 503；原 UpdateManager/helper ACK/失败回退与授权保留。外部监听器显式禁止借用仅原桌面使用的健康、apply 例外；手机桥接设置变更加入原活动任务判断。
+- 用真实未完成配对 POST 和被延迟的远程代理 GET 验证更新不能错误接管；原 Mobile/Remote 套件亦保持可用。第一轮 [专项 CI #40986598520](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40986598520) 精确生产代码 `5f7f4698` **Ubuntu 64/64 + Windows 63 PASS/1 POSIX-only SKIP**，但 [全量 CI #40986649175](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40986649175) 的 Web/Desktop **FAIL**：旧 `desktop-mobile-bridge-opt-in` AST+VM 测试未注入新增冻结对象，6项报 ReferenceError。保留安全 guard、修正 VM 夹具并增加冻结启动拒绝测试后，[专项 #40987086618](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40987086618) **双平台 SUCCESS，Linux 83/83 + Windows 82 PASS/1 POSIX-only SKIP**。修复后的 [全量 #40987068615](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40987068615) **Android + Web/Desktop 两 job SUCCESS**；Web/Desktop 2877 PASS/14 SKIP 与真 Chromium 61 PASS，Android TEST/LINT/BUILD SUCCESSFUL。完整 CI 对应 `9c92e976` 生产代码和真实 VM 测试修复，后续 CI YAML 与日志仅作为元数据变更；G1–G4 仍未通过。[安全边界和开源复用审计](S3_MOBILE_REMOTE_SHARED_UPDATE_FENCE_20261029.md) 已记录。
+- 下一 `04c-02c-02b-02`：真正独立后台 writer/Provider Worker/WebDAV/文件下载入口盘点，打通数据库/媒体写入拒绝和 bounded drain/stop+exit receipt；后续才开展受保护一致性备份、真实旧库回滚及新版安装签名验证。三 HTTP ingress 绿灯不等于全文件系统停写或 G3 验收，G1–G4 继续 OPEN，正式 v0.5.0/`main`/OTA 不变。
+
+
+
+### 2026-10-29 CORE-LIB-04c-02c-02a｜原 Desktop HTTP 及 RuntimeResourceCoordinator 升级交接准入冻结
+
+- [Draft #248](https://github.com/Saber-Alter-Lily/pica-library/pull/248) 基于 #247，接入**原 `src/library/server.ts` 所有普通 HTTP 路由**，对实际读写请求采集在途数并在原 `UpdateManager.apply` 启动前阻止新请求；原 Host/Origin/CSRF 检查仍先行。用现有 ResourceCoordinator 冻结新 `acquire/withLease`（含尚未开始的背景任务），并于 helper 启动失败时恢复 HTTP 与资源准入；helper ACK 后由原退出流程接管。没有新调度器/数据库/升级器。
+- 最初 HTTP-only [Linux/Windows #40981591695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981591695) **各79/79 SUCCESS**。经真实 HTTP 在途文件夹选择请求并发检验与冻结期间 GET 白名单收紧，最终精确代码 `ee6722585c6da942d0dd9bbe2dfc4097cd6abea1` 的 [Linux+Windows 专项 #40982432823](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40982432823) **两平台各 89/89 SUCCESS**；[Android/Web/Desktop 全 CI #40982438311](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40982438311) 必须独立等待终态，不能把专项 PASS 写作正式发布或全应用停写。技术审计：[S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md](S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md)。
+- **下一步 04c-02c-02b**：盘点并实际阻断不经过原本机 HTTP/共享 ResourceCoordinator 的写者（Mobile Bridge、独立 source worker、外部 WebDAV、异步任务），需要有界 drain/退出 ACK 才能制作跨 SQLite/媒体/凭据的强一致性备份及真实升级失败回退。G1–G4 全 OPEN；禁用自动发布。
+
+
+
+### 2026-10-29 CORE-LIB-04c-02c-01｜正式 Desktop 更新前防活动任务交接（第一阶段门禁）
+
+#### 新发现的覆盖缺口和更严格的上线门禁
+
+- 仅使用旧 idle-browser 检测结果可能遗漏 `LibraryService` 原任务诊断里的维护扫描、书库整理、V5 shadow、Work Identity refresh 与资源协调器待运行队列。故已将真实 `runtimeTaskDiagnostics` 与 `runtimeResourceProfile` 合并至更新准入，不能再把旧 `eb61cd748` 的 CI 绿色当作最终门禁。
+- 最新可执行测试源码 `572d6758`，独立 [双系统 #40975511400](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975511400) **Ubuntu/Windows 2/2 SUCCESS，各 67/67 tests**；[完整 CI #40975519327](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975519327) **仍排队/NOT_VERIFIED**；仍不能证明临时观测之后无新写入，后续必须实现 source-free/legacy HTTP + worker + WebDAV 真正 write barrier 和可核查停写收据后才考虑生产级无损迁移。
+
+
+
+- [Draft #247](https://github.com/Saber-Alter-Lily/pica-library/pull/247)，基于 #246：复用已有 `InstanceLock`、`activeDesktopWorkLeases`、`applyUpdateAndScheduleShutdown` 和 `UpdateManager`，把非停止/已就绪/真实进程持锁/零运行中或暂停任务检查接到**原 `src/desktop/main.ts`** 的实际更新命令，失败时 helper 和延迟 shutdown 都不能启动。模块仍在 Draft，未合并 main/未发布。
+- 首轮 [#40974599032](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974599032) 实际只有测试夹具断言计数失败；修复后代码+单测 SHA `eb61cd748` 的 [Linux/Windows 专项 #40974706377](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974706377) **双方各 57/57 SUCCESS**。原 Android/Web/Desktop [完整 CI #40974712298](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974712298) 继续独立回读，不借用专项绿灯。
+- **下一步 04c-02c-02**：构造所有修改接口/背景 worker 的可拒绝写入 barrier，更新前禁止新增、再逐个 drain/确认 release，旧 helper 必须验证真正进程退出及数据库/媒体文件一致性。只读门禁不是锁死写入；当前更新助手接线仍不支持真实生产数据迁移授权。不得提前关闭 G1–G4。[技术审计](S3_DESKTOP_UPDATE_QUIESCENCE_GATE_20261029.md)。
+
+
+
+### 2026-10-29｜CORE-LIB-04c-02b-03b-02：真实发布版历史 schema5/11/13 与 QA 媒体检查
+
+- [Draft #246](https://github.com/Saber-Alter-Lily/pica-library/pull/246) 基于 #245，不涉及 main/Release：重用官方发布版迁移代码完成 **5/11/13→14**、原自带升级前备份与业务行持久性检查；本地媒体另外用仅合成 OS Temp 的只读清单核查，不扫描外置用户书库。节点模块 `v050-release-identity` 共用官方 Git SHA/blob 验证，无新增备份/SQLite 引擎。
+- [独立审计](S3_V050_HISTORICAL_SCHEMA_MEDIA_QA_20261029.md) 记录来源与限制。初轮测试暴露未来 schema 表的历史行误期待、合成来源 ID 非法以及 SQLite 迁移备份误算漫画媒体；原失败保留并修正。精确代码 `80ded46b5` 的 [Linux/Windows 专项 #40922700787](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922700787) **2/2 SUCCESS**；两系统均通过官方旧码 5/11/13→14 和原始备份验证、各 28/28 单元/安全回归。完整 Android/Web/Desktop [CI #40922712429](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922712429) 仍按实际终态独立判定。
+- 后续不可跳过的关口仍是 真实外置媒体及 NTFS reparse/硬链接资格、用户显式授权、停止后台任务并冻结跨文件写入、受保护备份/DPAPI/失败回滚、旧版实际升级器及 G1–G4 全部验收。此阶段不是生产迁移许可。
+
+
+
+### 2026-10-29 CORE-LIB-04c-02b-03b-01｜官方 v0.5.0 代码生成历史资料并被新只读 Core 接受
+
+- [Draft #245](https://github.com/Saber-Alter-Lily/pica-library/pull/245) 基于 #244，以固定 SHA 双 checkout 形式执行真实 v0.5.0 `LibraryDatabase` 和 `desktop/config`，原始迁移/路径定义的 Git blob 均锁定；旧代码而非现行代码建立 SQLite 14、收藏、书架、阅读进度及合成下载媒体。仅 OS-temp sentinel 测试，无真实用户/加密凭据/网络访问和资料变更。
+- [#40914858557](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40914858557) **Linux+Windows 2/2 SUCCESS**；扩展 9 种正常/拒绝/复核形态后的 [精确代码 #40915400620](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915400620) **双平台 SUCCESS**；[Android/Web/Desktop 完整 CI #40915411308](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915411308) **Android / Web+Desktop 两 job 均 SUCCESS**，对应精确可执行/测试 SHA `2abcc1f6`；后续仅有文档变更。正式标签未改变，G1–G4 全 OPEN。
+- OSS 参考和决策记录在 [技术审计](S3_V050_OFFICIAL_TAG_FIXTURE_QA_20261029.md)：SQLite 原生 Online Backup + Node 24 重用；Room 的旧库迁移方法借鉴；不引入 Litestream 服务。下一小项 **03b-02** 为官方迁移 5/11/13→14 的仅合成历史路径和外置书库/缺字段/媒体体量分类；真正用户备份、停写、失败恢复、可信独立来源和 Android UX 仍需各自验证。
+
+
+
+### 2026-10-29 CORE-LIB-04c-02b-03a｜v0.5.0 历史结构合成只读门禁
+
+- [Draft PR #244](https://github.com/Saber-Alter-Lily/pica-library/pull/244) 基于 #243：引用真实 v0.5.0 tag 的 migrations/paths Git blob 相同证明，单独记录旧 DesktopConfig 无 source-policy 等新字段；新增只允许带 sentinel、直接 OS Temp 子目录的历史结构 QA，使用原 SQLite 和只读预检，检查14条迁移、11类表/列、完整性，外置路径**未获同意绝不打开**。
+- 测试是暂存的合成 Config/SQLite，不是已保存的真实 v0.5.0 用户资料。首轮 Linux 通过但 Windows 因 temp 原始/8.3/canonical 路径别名被误认为外置库而失败；当前修正只接受已经认证的临时数据目录原写法和真实写法。精确可执行代码 `06ae2c58` 的 [Linux/Windows QA #40909355786](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909355786) **2/2 SUCCESS**，相应 [Android/Web/Desktop 全 CI #40909365635](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909365635) 两 job **SUCCESS**；补充原始/Canonical 路径与同名外部 sibling 单测后的测试-only `079c2fc0` 在 [双系统 #40909909799](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909909799) **2/2 SUCCESS**。正式迁移、真实 v0.5.0 发行 runtime fixture 与 G1–G4 仍无通过证据。
+- 下一 **04c-02b-03b**：从真正正式 v0.5.0 实现构造历史兼容 fixture，扩展外置目录单独授权/媒体体量/停写事务、DPAPI 加密备份、失败回滚，再与旧升级助手受控集成。**没有正式迁移授权，G1–G4 OPEN**。[独立审计](S3_V050_HISTORICAL_FIXTURE_QA_20261029.md)。
+
+
+
+### 2026-10-29 CORE-LIB-04c-02b-02｜双平台备份与回滚最终门禁
+
+- [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 精确可执行/测试代码 `87a20359396f67ba30b54f39c1e8958ee4760569` 的 [Linux/Windows 专项 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) **SUCCESS**、[Android/Web/Desktop 完整 #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471) **SUCCESS**；所有测试仅使用合成 OS Temp profile，没有真实用户数据、发布或 OTA 变更。真实 v0.5.0 Release 中 migrations.ts、desktop/paths.ts blob 与当前一致，其他 Desktop 类型/配置存在演进，不能据此宣布实际历史 profile 迁移通过。
+- 下一切口 **04c-02b-03**：收集官方 v0.5.0 release 的只读、可复现结构证据及用户配置边缘形态，完成 SQLite/媒体完整事务冻结、可信独立备份/加密/签名、恢复失败注入和外置目录选择，再进行升级助手与实际旧版本用户资料隔离验收。G1–G4 仍 OPEN。
+
+## 2026-10-29 S3 CORE-LIB-04c-02b-02｜v0.5.0 WAL 一致性备份/回滚演练（仅合成临时资料）
+
+- [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 只在显式 `OS Temp/pica-v050-rollback-qa-*` sentinel 中运行；新增 `legacy-profile-snapshot-qa.ts`，使用**项目现有 Node 24** `node:sqlite.backup`，使未 checkpoint 的 WAL 提交记录进入独立 SQLite 备份。无 WAL 时 immutable readonly 连接不应新建原始 sidecar。原 DB/WAL 的 SHA 在备份前后核实；目标数据库转 `journal_mode=DELETE` 后执行完整 `PRAGMA integrity_check`。
+- 同一合成测试文件树覆盖旧版配置、书架/阅读状态/下载页、虚拟不透明账号文件、WebDAV、画风/偏好、packs 与缓存。排除运行锁/日志/升级助手；所有备份使用原本地业务文件，不复制实现新 Reader。逐文件 SHA/尺寸、零字节保留、禁止软链接/覆盖或跨源根；校验完 manifest 及全部输入才向全新的 `restored/` 演练回滚，始终保留旧 `profile/`。
+- 首次 CI 发现 Vite5 的 `node:sqlite` import 需要旧项目的 `createRequire` 桥，第二轮发现可能产生空 WAL sidecar，均按严谨门禁修复。基础版本 [双平台 #40895318054](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895318054) 2/2 SUCCESS；硬化后精确 [双平台 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) 和 [全 CI #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471) 写入时仍待最后判定。
+- 明确 `crossFileAtomicityProven:false`：SQLite 备份自身可一致，但用户全部媒体/下载目录与 DB 的统一事务、真实 v0.5.0 Schema、DPAPI 生产密钥、加密备份/恢复、外置书库以及原地升级失败回滚**仍未验收**，不能用合成备份直接升级用户。下一步 04c-02b-03 做真实历史资格/兼容/恢复契约，再决定正式迁移与一键升级、Android 原生核心和可信来源插件。G1–G4 仍 OPEN；禁止 main merge / Release / OTA。[详见审计](S3_V050_WAL_SNAPSHOT_ROLLBACK_QA_20261029.md)。
+
+---
+
+## 2026-10-29 S3 CORE-LIB-04c-02a｜无源 Desktop 独立二进制与原生 Launcher 路由
+
+- [Draft #241](https://github.com/Saber-Alter-Lily/pica-library/pull/241)：用旧 createCoreLocalRuntime/Reader/SQLite/原完整 Web、InstanceLock，独立打包 desktop-core-preview.mjs；静态物理依赖只允许本地服务和原单实例组件，禁止具体漫画源 SDK/Provider/Host。原 C# Launcher 保留默认旧 desktop.js，仅明确 --source-free-preview 才选择独立可执行，且必须使用显式授权、OS Temp owned sentinel 的资料目录。没有修改任何真实旧版本用户数据。
+- [跨系统纯核心可执行 #40881540640](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40881540640) SUCCESS；Windows 双 ZIP 最新 [#40882450092](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40882450092) 和完整 Android/Web/Desktop [#40882462037](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40882462037) 在写入时尚待最终确认。原生初轮清理受控测试 PID 后仍 EPERM，已增加精确 PID 死亡等待与文件释放门禁，不得宣称正式 Windows 安装包通过。
+- 下一硬关口 04c-02b：在不同入口仍物理独立的前提下，增加正式新 profile 和旧 v0.5.0 只读迁移/回滚证据；之后可信来源安装/签名/撤销、Android 核心启动与 Service/Binder、升级助手安全切换及原 42+12 项双端 UX 真机验收。所有 G1–G4 OPEN，未发布。技术审计：[S3_CORE_DESKTOP_ENTRY_20261029.md](S3_CORE_DESKTOP_ENTRY_20261029.md)。
+
+---
+## 2026-10-29 CORE-LIB-04c-01｜真正原 Desktop 与无源 Reader/书库共用运行组合
+
+- 新建 [Draft #240](https://github.com/Saber-Alter-Lily/pica-library/pull/240) 以旧 Desktop 正式 `src/library/server.ts` 和已实体运行的 source-free Core 为共同调用端，提取同一 `createCoreLocalRuntime({database,dataDir,externalFileOpener?})`：真正旧 `LibraryQueryService/ShelfService/ReaderService/LocalLibraryIngestion` 保持同一 SQLite，不再两个启动入口分别创建本地服务。只有 Desktop 可注入可信 `ExternalReaderAdapter`，无源模式默认拒绝 OS 文件打开。新增真实 SQLite、Reader、安全路径和 AST 闭包验收。
+- Windows 8.3 文件别名导致新测试路径文本误判，精确 `d77a422cca1a7c116f80b5821eea2a37f3db0cec` 调整为和旧 Reader 一样以 `fs.realpathSync.native` 判定，**未**放宽读取目录保护。修后 [Linux/Windows 物理 Core #40872173707](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173707) SUCCESS、[原完整 Web Chromium #40872173639](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173639) 3/3 SUCCESS、[Windows Reader/Full-Web 双 Portable #40872173806](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173806) 2/2 SUCCESS。完整 Android/Web/Desktop [#40872182323](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872182323) 尚需核对最终状态。
+- 下一 **CORE-LIB-04c-02** 为最后的正式主程序模块化硬关口：从 `src/desktop/main.ts` / `src/library/server.ts` 中让 `ProviderService/LibraryService` 成为**可选受控来源 runtime**，而非任何本地书库启动的前置条件；保留原网页/API、本地持久化、受限 OS 服务、可靠 WebDAV/下载与变更日志。真正的 Windows APK/installer 依赖图和信任根、v0.5.0 无痛数据/旧账户升级回滚、Android source-free Service/Binder/签名和 G1 实体 UX 全部待做。**G1–G4 全 OPEN**，不可直接发布或合并。[本轮审计](S3_CORE_RUNTIME_COMPOSITION_20261029.md)。
+
+---
+
+## 2026-10-29 S3 CORE-LIB-04b-02/03｜原完整网页 + Windows x64 实体无源 QA
+
+- [Draft PR #239](https://github.com/Saber-Alter-Lily/pica-library/pull/239)：真实旧 `web/index.html`、`app.js`、样式/翻译/Reader 通过 TS AST 真实资源闭包装配，排除独立在线来源登录启动与非必要 AI 模型；仍复用同一 SQLite/书架/Reader/HTTP，并对全部文件做来源白名单/SHA。原 Web 的 `post()` 仅在拥有测试核心随机同源 token 时送 `x-pica-qa-csrf`，不改变旧 Desktop。解决无源核心真实网页所需的原书库最多5000项查询，不能读取任意外源 ID。
+- 实际 [Linux/Windows + 真正 Chromium 原首页 #40869551499](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869551499) **3/3 SUCCESS**，测试原完整首页/书库筛选/书架创建/Reader/设置及无外网请求；完整 Android/Web/Desktop [#40869749947](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869749947) SUCCESS。
+- 旧 Windows x64 官方 Node 24.15.0 SHA 固定 ZIP 构建器/真实 CMD/Node 启动器新增 Full-Web **可选** `--full-web`，Reader-only 原路线依旧测试。[两种真实 Windows Portable ZIP 解压/进程/SQLite重启 #40870550859](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40870550859) **2/2 SUCCESS**。均是 OS Temp disposable QA，不上传任何可执行包、不签名、不装入真实用户目录；最新源码全量 CI 仍按 [#40870561582](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40870561582) 单独核验。技术审计见 [S3_FULL_WEB_WINDOWS_PORTABLE_QA_20261029.md](S3_FULL_WEB_WINDOWS_PORTABLE_QA_20261029.md)。
+- **下一个硬阻断 CORE-LIB-04c**：从真实正式 `src/desktop/main.ts` / `src/library/server.ts` 解除 `LibraryService/ProviderService` 的强制初始化，用同一个完整正式 UI/数据库、模块化来源工厂实现无源启动。然后可信来源签名安装/更新/撤销、Android 纯核心 Service/Binder/APK、既有 v0.5.0 的书库/账号/下载/偏好无痛升级与回滚及用户真机验收。G1/G2/G3/G4 均未完成，原 42+新增12 验收项仍适用；#232/#233 书架方案需选版。
+
+---
+
+### CORE-LIB-04b-01 完整回归纠正（2026-10-29）
+
+- 旧完整 CI [#40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) 暴露原 `reading-library-shell` 失败：有 Desktop status，但 caps 失败时不应通过第二次请求尝试取得权限。精确 `a40d8e82` 修复状态区分，无源 Core 缺失 Desktop host 仍可恢复正确 caps。专项加入该历史安全回归，不削弱原有限制。
+- 新精确代码/门禁 `94a4221aecf01ce7ac1656db2a7e6a055b219dac`，新 [S3 双平台 #40861065013](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861065013)、[全 Android/Web/Desktop CI #40861072267](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861072267) 本段撰写时 **QUEUED，尚未验收**。当前计划不推进 main、Release/OTA。
+- 后续继续 CORE-LIB-04b-02 原完整 `web/index.html` / 全资源 / 真 Chromium 无源启用，而后 CORE-LIB-04c 生产服务强制 Provider 构造拆分。G1–G4 全部 OPEN。
+
+
+## 2026-10-29 CORE-LIB-04b-01｜原正式 Web app 在纯 Core 能力下安全初始化
+
+- [Draft #238](https://github.com/Saber-Alter-Lily/pica-library/pull/238) 真正修原 `web/app.js` `loadDesktop/detect`：无 `desktop/status` 时仍可读已有 source-free `/capabilities`；明确禁用 `recommendationSessions` 的后端，保留原本地漫画列表/作者/分面与 `renderAll`，不再主动获取在线推荐反馈、session 或发起构建；旧有正常 Desktop 不受影响。中英日翻译完善。未创建另一套前端。
+- 实际 AST 提取的**生产函数**正负模式单元运行测试，Linux/Windows 专项首轮 TS2502 测试类型失败已修复，修后 [#40860567748](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860567748) **SUCCESS**；全 Android/Web/Desktop [#40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) 仍待确认。
+- 进入 **CORE-LIB-04b-02**：原正式 `index.html/app.js` 全量资源/import 图核查并受控装配，实际 Core-only 本机 HTTP 加载**完整旧首页**，真实 Chromium/Windows Portable 进行书库、书架、Reader、设置和 WebDAV 适配测试；不可用在线源/推荐 UI 必须显式禁用并保留数据。04c 再从正式 `desktop/main.ts`/server 移除 `LibraryService/ProviderService` 强制构造，后续 Android 纯核心、可信来源签名与升级撤销、v0.5.0 真实迁移和 G1–G4 最终用户验收依旧 OPEN。详见 [完整审计](S3_FULL_WEB_SOURCE_FREE_BOOTSTRAP_20261029.md)。
+
+---
+
+## 2026-10-29 S3 CORE-LIB-04a｜旧正式 Windows UI 启动基础接口开始迁入无源核心
+
+- 新 [Draft #237](https://github.com/Saber-Alter-Lily/pica-library/pull/237)：真实旧 `src/library/server.ts` 的 `GET /status`、`GET /authors`、`GET /capabilities` 三项 API 改为来源无关 `coreBootstrapRead`，**旧生产 Provider 完整状态/历史字段保持不变**；独立无源实体 Core 使用同一 API，但明确关闭根本不存在的站点来源/收藏修改/在线推荐能力，仍需持有本机随机 QA 会话 Cookie 才可访问。
+- 现有 esbuild 的严格无源包实际包含原版本号、appCapabilities、模块契约与该端口，原 `src/version.ts` 的 `package.json` 引用触发首轮严谨门禁 FAIL；修复后仅允许项目根版本元数据，不放宽任意 npm 依赖。Windows 官方 Node x64 实体 ZIP [#40859105359](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859105359) 修后 **SUCCESS**；Linux/Windows/Chromium [#40859128504](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859128504) 与全 Android/Web/Desktop [#40859135753](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859135753) 本条写入时尚未完成，不提前认定。
+- **下一目标 CORE-LIB-04b**：原 Windows **完整 Web 首页+JS 资源**真正接无源 core-only 后端，在缺失具体来源时 UI 提供明确功能不可用状态，不要造第二套迷你 UI，也不能用假接口掩盖缺失。随后 CORE-LIB-04c 才能拆原 Server/Desktop `LibraryService/ProviderService` 强制构造，完成实体无 SDK Windows 应用，再到 Android 服务/Binder、插件可信发行与撤销、老 v0.5.0 无痛升级/回滚和所有实机用户验收。G1–G4 OPEN。[本轮审计](S3_CORE_BOOTSTRAP_20261029.md)。
+
+---
+
+## 2026-10-29 S3 CORE-LIB-03c｜旧 Windows 本地配置及平台目录能力提取
+
+- [Draft #236](https://github.com/Saber-Alter-Lily/pica-library/pull/236) 完成**正式** `src/desktop/config.ts` 的本地目录/profile/Reader 设置/配置原子保存和敏感字段保护抽离，源策略兼容仍由 Desktop 主组合注入；`src/library/server.ts` 的原 `choose-folder/open-directory` 与 `src/desktop/main.ts` 使用来源中立 OS 能力用途接口。只允许旧五种本地目录用途，阻止网页路径/命令注入，沿用原原生选择器、系统打开函数、CSRF 与旧配置文件。
+- Linux/Windows 专项 [#40857679928](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857679928) **SUCCESS**；包含真实 Desktop HTTP、多种旧配置保存/机密与平台/Reader 测试。全量 [CI #40857731995](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857731995) 在文档提交时单独待核，不挪用专项结果。
+- 下一目标 **CORE-LIB-04a**：拆分旧 Windows HTTP 启动及完整用户网页的核心服务 composition，而不是继续创造独立小型 QA Reader。须证明不创建 `LibraryService/ProviderService` 时书库/书架/Reader/设置/WebDAV 真实可用；随后做 Windows 实体 SDK 无源、Android Service/Binder 与核心 APK、可信来源生命周期、老 v0.5.0 一键升级/回滚、物理用户验收。#232/#233 实现分叉仍须消解。G1–G4 不豁免。详见 [技术审计](S3_CORE_LOCAL_PLATFORM_20261029.md)。
+
+---
+
+## 2026-10-29 S3 CORE-LIB-03b｜生产 WebDAV 状态和命令使用来源无关端口
+
+- 新增 [Draft PR #235](https://github.com/Saber-Alter-Lily/pica-library/pull/235)：不重新发明 WebDAV，而是将旧正式 Windows `desktop.save` 的网盘设置/同步/暂停恢复取消/远端删除委托到仅 type-import 原 `RemoteStorageDesktopManager` 的 `coreRemoteStorageDispatch`；旧 status 同样委托，网络和密钥操作只有原业务实现负责，未自动启动在线动作。
+- 真实 Linux/Windows [S3 专项 #40853863903](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853863903) 各29项和类型检查 SUCCESS；最初 TS2322 失败已保留并修复于 `ab4137b4`；完整 Android/Web/Desktop [#40853872527](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853872527) 仍需核对最终状态。
+- 下一优先任务 CORE-LIB-03c 本机设置与原生文件夹/打开目录受控能力 → CORE-LIB-04 完整正式 Windows UI/core-only 进程组合 → 正式 Android Source Service/Binder、插件可信分发/升级撤销 → 真正 v0.5.0 无损升级/回滚与双端用户验收。不可继续用小型 QA 界面冒充 Windows 正式版。G1–G4 继续 OPEN。[审计](S3_CORE_REMOTE_STORAGE_20261029.md)。
+
+---
+
+## 2026-10-29 S3 CORE-LIB-03a｜复用原正式本地文件导入与纯核心
+
+- 在 [Draft PR #234](https://github.com/Saber-Alter-Lily/pica-library/pull/234) 真实抽离原 Desktop `/api/v1/desktop/local-import` 的受信任文件选择器/预览/确认/取消逻辑为来源中立控制器，保留旧文件夹/CBZ `LocalLibraryIngestion`、原 SQLite 和进度，不重造功能。独立无源 CLI 也调用同一端口；物理 QA Core 的源码闭包门禁必须包含它。
+- 新增真实 SQLite、路径注入/来源字段/无原生文件选择器/headless/取消/token 单次/并发测试，连同已有生产 HTTP/CSRF/Reader 回归。Linux/Windows S3、Windows Portable、Android/Web/Desktop CI 均按新的精确 SHA 单独验收；**当前 CI 待检，不宣称全部通过**。
+- 下一段 CORE-LIB-03b：正式 Desktop `choose-folder/open-directory`、无源设置和 WebDAV 能力端口；CORE-LIB-04：完整旧首页/书库/书架/Reader/设置在不启动 `ProviderService/LibraryService` 的 Windows 核心上运行。随后才可能认定实际来源外置和旧 v0.5.0 安全迁移。Android 源服务/Binder、签名可信发布、G1–G4 保持 OPEN。[详细审计](S3_CORE_LOCAL_IMPORT_20261029.md)。
+
+---
+
+## 2026-10-29 S3 续进｜生产书架 API/事件从含源 Server 剥离
+
+- 叠加上一轮完成原 Catalogue API 的 #231，新增 [Draft PR #233](https://github.com/Saber-Alter-Lily/pica-library/pull/233)：生产正式 `src/library/server.ts` 的所有书架 HTTP 动作迁入源中立 `coreShelfRoutes`，继续复用原 `ShelfService`、SQLite 和分面筛选及书架事件事务；不重写书库或推荐。仅在沙箱 QA 子入口运行本地 `local:<id>` 的同一路由，不允许跨源项目、records 或不受控筛选。
+- 实际 [S3 双系统 70/70 #40848142891](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40848142891) 与 [Windows x64 解压包＋.cmd 重启验收 #40848432952](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40848432952) 专项 SUCCESS。旧完整 CI 的事件检查静态定位失效已按新调用路径修订，原事件批量事务保证和生产 HTTP 行为测试未删除；最新完整 CI 需按当前 SHA 重新判定。
+- 下一阶段 **不要继续堆独立 QA 小 UI**：以原 Windows 完整首页/设置/书库/书架/本地文件/WebDAV 为目标逐步解耦其初始化依赖，达到不启动 `LibraryService/ProviderService` 也能完整管理本地作品。仍需发布可信签名插件/受保护 OS 安装根、Android 纯核心 APK + Service/Binder、v0.5.0 无痛升级/回滚和真机验收。G1–G4 均 OPEN。
+- [本轮 CORE-SHELF 技术及验收文档](S3_CORE_SHELF_20261029.md)。
+
+---
+## 2026-10-29 S3 推进｜从独立 QA 小阅读器进入正式 Desktop 书库 API 抽离
+
+- [Draft PR #231](https://github.com/Saber-Alter-Lily/pica-library/pull/231) 首次把**真实正式 Windows/Desktop HTTP 服务中的书库主路径**抽成共用的来源无关业务端口：漫画列表、单本详情、下载列表与原 `LibraryQueryService` 分面查询。同时让既有已验证纯核心/Windows Portable QA 复用它，仅施加 local-only 保护，绝不重复实现 SQLite、书库筛选或 Reader。
+- 精确源码 `e698f66a` 的 [S3 Linux/Windows+Chromium #40842187533](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842187533) **51/51 + 51/51 + Chromium 1/1 SUCCESS**；[Windows Portable 官方 Node ZIP #40842196837](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842196837) **SUCCESS**，严格拒绝非本地 Provider 访问。全量 CI 结果单独以实际作业状态为准。
+- 下一切口固定为**旧 ShelfService CRUD/批量操作与行为事件解耦**、无源设置/本地导入/WebDAV 端口、完整 Web UI 接线，之后才是 Windows/Android 真正主程序 SDK 剥离与生产信任根、v0.5.0 数据保护升级。纯 Core QA 已能从 ZIP 启动，不能再重复做小型演示当作 G2 完成。详见 [本轮端口审计](S3_CORE_LIBRARY_READ_20261029.md)。
+- G1（Android UX/引导）、G2（真实来源外置）、G3（正式无痛升级/回滚）、G4（发布）全部 OPEN，原42+新增12个用例不豁免。
+
+---
+## 2026-10-29 S3 续进｜Windows x64 官方 Node＋纯核心 ZIP 实体打包验收
+
+- [Draft PR #230](https://github.com/Saber-Alter-Lily/pica-library/pull/230)：首次把独立 `core.mjs` + 10 Reader 资源和 **Node 24.15.0 Windows x64 官方运行时**组装成临时完整 Portable ZIP，附 Node/AdmZip/project 许可证、21 条目闭包、逐文件 SHA-256 和明确的 QA 启动器；真实下载运行时 ZIP 并按官方 SHASUMS256 + 额外固定 SHA256 `cc5149...` 双重确认。
+- 精确源码 `0ca6f6e8` 的 [Windows 实际 ZIP＋CMD 启动 #40838638638](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838638638) **SUCCESS**：从 ZIP 解压包启动随包 Node/`.cmd`，HTTP 会话与 CSRF、图片读取、本地导入、进度在临时子进程树退出后重启恢复；完整 ZIP 在 CI 删除，只上传 1 天元数据，非正式用户安装包。
+- **G2/G3/G4 仍 OPEN**：QA 包只含本地阅读，而不是完整版 Windows 首页、推荐、书库管理和升级器；旧正式 Windows/Android 主程序仍含来源 SDK。生产签名/OS 保护目录、真实旧 v0.5.0 数据迁移、Android Binder、终端 UI/升级全验收均未做。下一阶段必须围绕**正式完整 Web/Windows UI 与来源业务服务解耦**，不能继续以 QA 小功能包代替正式主线。见 [完整 Windows Portable 审计](S3_WINDOWS_OFFLINE_PORTABLE_QA_20261029.md)。
+
+---
+## 2026-10-28 S3 续进｜QA Reader 资产不再依赖 Git 工作目录
+
+- [Draft PR #229](https://github.com/Saber-Alter-Lily/pica-library/pull/229) 实现从现有正式 Web DOM 提取原 Reader 片段、9 个已审计 JS/CSS/图片资源的独立临时装配，拒绝复制整个首页、账号/来源和推荐脚本，计算 SHA-256 并可回读；纯 Core HTTP 和 Chromium 改从 `core.mjs` 旁的资源运行，不再要求源码仓库作为运行 CWD。
+- 精确源码 `8ed7d80c` 的 [S3 Linux/Windows+Chromium #40827250488](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40827250488) **SUCCESS：33/33 + 33/33 + 真浏览器 1/1**，涵盖一次性数据库隔离、源代码禁入、目录覆盖拒绝及翻页/进度/刷新。第一轮 Windows Temp realpath 失败已修复，记录保留。
+- **G2 仍 OPEN**：当前仅测试目录内 Node ESM+Reader 静态资源，正式 Windows 主程序/完整 Web UI 及 Android APK 依旧编入旧来源 SDK；没有可信独立来源签名/安装根/正式 Launcher、老版本用户数据迁移/无痛升级与回滚。下一切口优先构建**不发布**的 Windows x64 Portable 安装候选并核对 Node 许可证、文件闭包和启动器，再改造完整桌面 UI 及 Android 服务隔离。
+- 详细记录见 [Reader 资源装配证据](S3_OFFLINE_READER_ASSET_STAGE_20261028.md)。既定 S0–S6 和原42+新12验收不变；完整 CI 精确源码最终结果需另外核查。
+
+---
+## 2026-10-28 S3 新进展｜纯核心独立 HTTP + 原 Reader Chromium 真实操作
+
+- 在 [Draft PR #228](https://github.com/Saber-Alter-Lily/pica-library/pull/228) 中，已将纯本地 Node Core QA 候选提供为受控 `127.0.0.1` HTTP 服务，仍通过同一 `localReaderGet`/`ReaderService` 读取原 `/api/v1/reader` API。直接复用旧 Reader DOM、CSS、翻页/视口/进度和设置模块，不载入具体站点 SDK。
+- [S3 Linux/Windows + Chromium #40826346306](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40826346306) 对精确代码 `87f142b3` **SUCCESS：31/31 + 31/31 + 真实 Chromium 1/1**。实际展示合成本地 PNG、翻页、保存/刷新后恢复，验证跨站请求与 Host/CSRF 拒绝，无 user data。
+- **严格限定**：这只是专用 QA 浏览器入口，不是完整 Windows GUI。主要 G2 阻断已经从“能否无来源读取漫画”收敛到“如何让完整多功能 Windows HTTP/Web UI 真正脱离 `LibraryService/ProviderService`，且不破坏旧书库”。完整 Windows 发行 ZIP 与 Android APK 仍含来源代码，不能说已完成 G2 或可以发布。
+- 下一切口：沿新 `localReaderGet` 和隔离 core 启动根继续去耦合真正的 Desktop Web 组合与生产安装/更新，再做 Android 对等机制和老用户无痛迁移。详细核查见 [S3 实际浏览器验收](S3_OFFLINE_CORE_HTTP_UI_20261028.md)。
+
+---
+## 2026-10-28 S3 新进展｜Windows/Linux 无来源独立本地阅读核心 QA
+
+- **不覆盖既定发布关口**：新增 Draft [PR #226](https://github.com/Saber-Alter-Lily/pica-library/pull/226)，以 v0.5.0 现有 Reader/导入/数据库为原件，实际 esbuild 构建一个独立本地 Node ESM QA 候选，所有具体来源 SDK 不在这个打包图中。
+- [S3 Linux/Windows 专项 #40821030082](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821030082) 对精确源码 bc153951 **26/26 + 26/26 SUCCESS**，实际独立进程操作文件夹和 CBZ、保存和重启恢复阅读进度；用户旧目录完全拒绝访问。仅输出可读源码依赖/哈希 JSON，不上传可执行件。
+- **G2 仍 OPEN**：现有 Desktop main/HTTP Server、Windows 正式发行包和 Android APK 仍依赖旧 Pica/E-H/JM 代码；尚未抽出同一 Web Reader 的零来源 HTTP 组合，未做 Windows/Android 物理主程序替换或生产信任根。下一任务是共享本地 Reader HTTP 路由的受控提取与跨包可用性测试，不造第二套 Reader。
+- 详细进度和边界：[S3 离线核心实体 QA](S3_OFFLINE_CORE_PHYSICAL_QA_20261028.md)。完整 CI 以精确结果为准，所有原42+新增12案例与 G1–G4 不豁免。
+
+---
+## 2026-10-28 S3 阶段关口｜真实 Windows/Linux 进程原型
+
+- 开发分支：[S2 Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) → [S3 Draft PR #220](https://github.com/Saber-Alter-Lily/pica-library/pull/220)。基于 v0.5.0 正式版继续做未发布隔离开发，不触碰 main、签名包、OTA 或用户数据。
+- **S2 代码边界**已经完成本轮完整 [CI #40689775058](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40689775058) SUCCESS；S2 不是全项目模块化完成声明，历史 G1 和其余 G2–G4 保持 OPEN。
+- **S3 原型里程碑**：固定 SHA-256 的 Node 受控工作进程、随机会话握手、受限协议/DTO、及时撤销/超时处理、媒体大小约束和环境隔离。使用真实 `fork` 和 synthetic worker，无来源帐号或联网。
+- **精确系统测试**：[Linux + Windows 双平台 S3 CI #40690767200](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40690767200) 对代码 `a785af6f` SUCCESS：Windows 8/8、Linux 31/31 分别执行，并非同一个平台的模拟。后续增补 Reader 闭包防倒灌门禁为更新代码，**其自己的完整 CI 尚需独立核查**。
+- **S3 余下工作按阻断顺序**：真实受信任发布清单及完整可执行依赖链、Windows 私有安装目录与签名/原子更新/撤销和完整包对照；Android Service/Binder 和权限隔离；迁移 Pica/E-H/JM 的实际来源协议，保证来源可以真正独立启停/升级；最后纯核心 Windows/APK 无在线源 SDK 的实体证明与 v0.5.0 老库回滚。
+- **禁止错误验收**：独立测试进程不等于 OS 沙箱，签名固定测试工件不等于用户可安装任意插件，核心仍编译具体平台来源 SDK，不可提前将 NEW-SRC-01、G2/G3/G4 标为 PASS。S3 详细证据与边界：`docs/S3_TRUSTED_PROCESS_PROTOTYPE_20261028.md`。
+
+---
+
+
+## 2026-10-28 开发优先级调整（用户已授权；S1 验收不豁免）
+
+- 本轮停止围绕模拟器截图测试反复优化；已通过自动视觉矩阵不等于 G1 用户/设备验收。S1 残余问题继续登记为发布阻断，但**不再阻断独立 Draft 中 S2/S3 的受控架构研发**。
+- 新增 [Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219)，从 PR #218 冻结头 `6e5c1a4a` 分支，仅从 Android/UI 主线隔离来源依赖研发；当前正式 `v0.5.0`、`main`、OTA 与真实用户数据不变。
+- S2-01 开始使用已有 TypeScript AST 来导出项目真实 import 图及 runtime SCC，CI 阻止核心 Reader 反向依赖具体 SDK；S2-02 使用原有 `OnlineReaderService` 插入可撤销的来源中立 transport，先以 synthetic Reader 实际章节/媒体/进度链作为原型。
+- 以上只是 **IMPLEMENTED_IN_DRAFT / CI_PENDING**。核心 Android/Windows 安装包仍包含具体来源 SDK，S3 来源签名/安装/撤销/运行隔离尚未完成；无源安装和正式迁移未验证，G2/G3/G4 仍 OPEN。
+- 执行和验收资料：`docs/S2_SOURCE_BOUNDARY_20261028.md`、现有 `docs/PRODUCT_RECOVERY_S2_S3_SOURCE_DEPENDENCY_AUDIT_20261027.md`、旧42+新增12 验收表。接续先核 CI，后推 composition root 与真正 IPC，不改变用户书库/模型/身份语义。
+
+---
+
+
+日期：2026-10-27。**最新执行状态：S0 IN_PROGRESS；S1 IN_PROGRESS；S2 IN_PROGRESS（有限来源归属端口）；S3–S6 PLANNED。G1/G2/G3/G4 尚未验收。** 本文件是工作计划，实际完成证据以当前分支日志与精确 Actions 结果为准。
+
+## 2026-10-27 执行检查点（以后续成功/失败证据为准）
+
+- **正式版与边界**：对照仍为 v0.5.0，生产 main `095d6910c34e00824e03b08a30af0ce4e708137e`。主开发 Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 从冻结 Dev89 #217 继承，不合并正式分支、不触碰 Release/OTA/用户数据。
+- **S1-04 有效实证**：Android 35 模拟器 [#40620663666](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666) 源码 `cab5067c` **SUCCESS**，10 次独立 Instrumentation PASS；100% 和 150% 字体各 9 张 PNG，共 18 张；已验证章节 0 来源、3 配对、5 下载、7 更新的真实 VSpot 与跳过不记已读。更新章保持只读预览。原始截图/日志 [#12787147081](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666/artifacts/12787147081) 短期保存。不能据此认定另外四章、多语言/深色/实体手机或用户满意。
+- **S1-03 已提交候选**：设置行窄宽度、选中栏两行、标签标题、下载界面中英日资源与有界按钮、账户来源三语、指南默认聚光优先。回归中保留曾经失败的第0章旧截图测试；新 UI 仍需完整真机交互和正式版功能对照。
+- **CI**：`079b9e37` Web/Desktop 曾 2638PASS/3FAIL/14SKIP；修复 `34ffaa1` 保留原 Host 冻结哈希、动态 QA 后缀与本地化断言，`34ffaa1` 与 `cab5067` Web/Desktop 作业经 GitHub 重新核实 SUCCESS，但不等于两作业组成的整套 CI PASS。Android 全量作业仍在运行；为区别卡住与真实失败添加限时定向 [S1 Robolectric workflow](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/s1-android-focused-unit.yml)，源码 `b44b9f97`，最新运行结论需回查，不提前填 PASS。
+- **S0 风险**：`PhoneDownloadStore.load()` 读错返回空索引、`save()` 删除旧文件再替换，存在**潜在**索引持久性问题，需隔离错误注入与 AtomicFile/回滚兼容设计；不是实测用户数据丢失，也未修改真实索引。
+- **S2/S3 状态**：已添加来源身份绑定的图片路由并要求 cache hit 前校验归属；Pica/E-H/JM SDK/协议尚未从全部核心发行物真正外置，G2 不通过。
+- **下一步**：先看新 Android 全量与定向测试结果，纠正真实失败；继续 S1-04 章节 1/2/4/6 实控件聚光，补 360/393/480dp × 字体100/130/150% × 中英日 × 浅深代表性截图，再执行真实手机/Windows 功能对照。之后以 S2→S3 主线拆来源，S4 标签/推荐/同步，S5 升级/数据回滚，S6 集中验收为序。旧 42 + 新 12 案例全保留；未经逐项执行不重判。
+
+## S1 追加执行检查点（2026-10-27）
+
+- 当前已获得 `eea0db58` 的7/8章真实 VSpot 验收：[#40621769915](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915) 16/16 Instrumentation 成功、30张真实 PNG，仅限 Android35/中文/浅色/360dp/100-150%字号；用户 G1 不通过。
+- 大字号窄屏和画像技术卡片的实际截图问题已按 `ff37b77` / `116244b` 做有限源码修复；第2章五步画风 `b5e134f` 已提交但需要对应源码的模拟器运行确认。总八章不得提前写为 PASS。
+- Android Robolectric 单次聚焦运行 #40621041603 在测试阶段超时取消，`8efe395` 改为五类单独有界诊断；需看原始运行与 XML 结果，不把取消当软件失败或完成。
+- 正式 v0.5.0、main、OTA、生产数据与旧42 + 新12项验收不变；继续 S1 后才可转向来源真实外置和数据升级。
+
+## 新增执行回执：八章聚光完成 / 原子索引候选（2026-10-27）
+
+- 真实 [Android35 #40622970105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105) 源码 `b5e134f` 已通过八章18/18 Instrumentation，生成40张实际截图；范围仍只中文浅色360dp、字体100/150%，并未涵盖全语言、字号、主题及真实手机。G1=NOT_ACCEPTED。
+- `7b5cbcc` 解决了聚光动画与 Robolectric 生命周期测试混用造成的测试停滞；[#40629290421](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629290421) 5/5定向测试 SUCCESS；完整 Android CI 仍有单独门禁。
+- `a0f2d9a`+`061b2c1` 新建九个语言×宽度×主题×字体代表性组合的六页真模拟器截图门禁，预计54张；`8e581ea` 修复下载索引写入前删除旧文件的潜在 P0 持久性风险并添加合成回归，仍待新源码测试与 v0.5.0 迁移保护验收。
+- 进入 S3 前必须证明纯核心无来源SDK；进入 S5/G3 前必须完成真实旧库/失败注入、签名迁移回滚，均不能由此次提交替代。旧42+新12案例保留。
+
+## 最新 S1 G1 状态校准：自动测试与视觉质量分开（2026-10-27）
+
+- `d8b7f4c` 的 Android35 九组七页模拟器9/9自动 PASS、63张截图，但人工检查确认多张空白转场图、WebDAV 深色下拉对比度和英日中文残留、标签页加载态，因此 S1视觉质量继续 **FAIL/OPEN**，不能当用户 G1 验收。
+- `8eb0c11`~`e44de731` 的 UI-only 三语与主题下拉修复、新截图必须完成真实绘制的门禁已提交 Draft，精确 HEAD 测试与再审阅 **NOT_VERIFIED**；即使取得自动绿灯仍需逐图审阅和 Android 实机验收。
+- `8e581ea` 的下载索引 AtomicFile/失效闭锁只通过合成 Robolectric；S5 真正老库、可回滚升级、失效注入不因此解除。S2/S3 纯 Reader 移走全部来源 SDK 也未完成。
+- 历史42项和新增12条继续保留，正式 main/Release/OTA 不变。
+
+## 权威基线与产品定位
+
+- **正式产品和功能/视觉对照**：v0.5.0。**未发布工程候选**：PR #217 源码 `af42b4d3ecafd1d51b3c2ef8aee7339c56c75921`。**生产 main**：`095d6910c34e00824e03b08a30af0ce4e708137e`。本工作独立分支 `codex/product-recovery-s0-s1-20261027`，不修改历史 Draft/正式 Release/OTA。
+- Pica Library 是**本地优先的漫画阅读器与个人书库**，不经营漫画平台或托管漫画正文、官方内容目录。无需账号/Host/网络即可导入、浏览、阅读本地文件和管理个人书库。
+- 来源是用户显式选用的外部能力：本地/文件夹/CBZ、WebDAV 及有实际适配的网盘、Pica、E-H/ExH、JM，以及用户选择的兼容 Host。**Suwayomi 不能变成强制依赖**。
+- 核心与具体来源**真正分离**是目标：最终纯核心包不内置 Pica/E-H/JM 可执行协议、账号 SDK、专属运行时或漫画正文；禁用开关、不带 JVM、抽出 TypeScript 文件不等于完成。历史身份映射和旧资料读取仍须兼容。
+- 版权合规是设计、分发和运营审查问题；来源外置与用户自行接入不能提供自动法律豁免。
+- 保留 v0.5.0 用户可见功能和已验证的 Dev89 纯模块/数据隔离成果；不因为重构减少导航、阅读、收藏、推荐、Visual、下载、配对或同步能力。
+- 自动化与真实设备、用户验收分开；用户已报告 Dev89 Android 多处排版缺陷和高级引导仅为文字目录：**当前 USER_ACCEPTANCE=NOT_ACCEPTED**，不得被 CI 通过覆盖。
+- 未获单独授权不得触及生产账号/资料、正式安装、merge main、Release/tag、稳定 OTA、下载私钥或自动部署。所有测试数据隔离并最小化敏感输出。
+
+## 状态与任务约定
+
+每项工作记录：S-ID、依赖、平台、源 SHA、实施文件、故障风险、测试执行范围、失败历史、证据、下一动作。字段：
+- implementation: PLANNED / IN_PROGRESS / IMPLEMENTED / BLOCKED
+- ci: NOT_RUN / FAIL / PASS（精确源码）
+- package: NOT_RUN / FAIL / PASS
+- device: NOT_RUN / FAIL / PASS / N_A_WITH_REASON
+- user_acceptance: PENDING / NOT_ACCEPTED / ACCEPTED
+- release: UNPUBLISHED / RELEASED
+
+严格区分：源码完成、单元测试、实际编译签名、真实模拟器/Chromium、真实手机、用户验收与正式发布。**跳过、未执行、失败不得计入通过**。阻断缺陷：P0 数据/凭据/身份越权或无法回退；P1 常用流程不可用、严重排版、卡死或升级失败。发布前 P0/P1 均为零。
+
+原 P0–P6/42 验收案例保留原编号、描述和历史证据，新 S0–S6 仅重新排列顺序；精确逐项映射在 [验收映射与新标准](PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。详细旧记录仍见 `docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md` 和 `DEVELOPMENT_TASK_LOG.md`，不能删掉。
+
+## S0｜基线冻结、事实核对与风险登记（优先进行）
+
+| 工作单 | 内容 | 交付/硬验收 |
+|---|---|---|
+| S0-01 | 固定正式 v0.5.0 Windows/Android、main、Dev89 SHA、PR203/205–217 和来源成品真实性 | 每条版本有可读源/Release/证据；不把草稿或旧 CI 认作正式版本 |
+| S0-02 | 清点正式版 Windows/Android 所有页面及能力：书库、书架、在线、详情、阅读、下载、历史、推荐/Visual、标签、同步、设置、更新、语言和引导 | 对每项标“新版保留/变更/缺失/证据不足”；实际安装才能标设备已验证 |
+| S0-03 | 识别核心模块和来源依赖；检查 Android APK/Desktop 核心产物是否仍包含来源 SDK、默认自动请求、专属 UI 与共享状态 | 明确每条残余耦合的文件、入口、迁移前置和风险 |
+| S0-04 | 登记用户已报告的 Android 排版问题、文字型高级指南；创建逐页测试矩阵，不推断没有给出的具体页面缺陷 | 可复现的静态问题有源文件定位；其他标 DEVICE_PENDING |
+| S0-05 | 设计隔离合成测试库（小型漫画/CBZ、约 1500 部、长下载队列、离线/跨端冲突/故障注入） | 样本与预期可复核，不用真实个人数据做自动突变 |
+| S0-06 | 完整映射原 42 案例至 S 阶段；补新增 UI/模块隔离/源外置验收且不偷偷缩小原范围 | 数量精确 42；原状态和历史失败不被改写 |
+
+**出口**：功能差异表、依赖清单、42 案例映射、阻断风险清单。S0 核查不足不得宣称“无回退”。
+
+## S1｜Android 优先 UI 与交互恢复（G1）
+
+| 工作单 | 内容 | 硬验收 |
+|---|---|---|
+| S1-01 | 统一现有 UI 规范：标题栏/设置行/折叠层级/按钮/底部操作栏/安全确认/状态反馈 | 采用 v0.5.0 视觉身份，常用动作层级无恶化 |
+| S1-02 | Android 页面级测试：360/393/480dp，字体 100/130/150%，中英日，深/浅主题，键盘/insets/返回 | 核心页面 0 关键遮挡、越界、重叠和错误截断；附实际渲染证据 |
+| S1-03 | 优先修复来源/设置通用行的长文字、状态区拥挤以及已报告界面异常；桌面端对应回归 | 缺陷复现→有限修复→设备/真实渲染复验；不用源码测试冒充视觉结果 |
+| S1-04 | Android 高级引导改为**真实页面内的聚光控件引导**，复用现有 VSpotView/AndroidOnboarding；文字说明只作手册 | 8 章全部定位真实控件；无目标则说明真实原因，绝不假完成；跳过/返回/恢复/重看可用且不触发业务行为 |
+| S1-05 | Web/Desktop Driver.js 的高级引导三语言真实页面定位与状态还原 | 浏览器真实步骤和截图复验 |
+| S1-06 | 导航/推荐/书库/下载/同步/画风任务的双端体验回归 | 无黑屏、无限等待、业务控制假状态；真实手机确认 |
+
+**G1 规则**：当前 Dev89 不具备 G1。完成源码和 CI 只是 ENGINEERING_VERIFIED；必须有真实手机/视觉验收和用户确认才可 ACCEPTED。后续新 UI 也需持续回归。
+
+## S2｜核心维护隔离
+
+| 工作单 | 内容 | 验收 |
+|---|---|---|
+| S2-01 | 核心模块依赖/所有权/API、导入方向、循环依赖守卫及真实调用图 | 违规跨层引用在 CI 失败 |
+| S2-02 | Reader/Library/进度/缓存与 Pica/EH/JM 认证和 SDK 脱钩，复用已有代码 | 无任何来源的实际离线 Reader 完整闭环；mock 源替换不更改核心 Reader |
+| S2-03 | 下载任务管理、取消/暂停/恢复和 last-known-good 统一事务 | 长任务不阻塞导航；取消/错误不发布假完成 |
+| S2-04 | Tags/WorkIdentity/Recommendation/Visual 以端口连接，保持旧算法/权重/数据语义 | 冻结 oracle 和 golden case 证明未暗改模型/同一作品规则 |
+| S2-05 | Sync/Update 边界、版本化模块 API、schema 兼容规则 | 不同模块更新的影响清楚，不创建多套不兼容 updater |
+
+**出口**：更换一个来源不修改 Reader 核心，调整标签规则不更改认证、下载或个人数据持有者。
+
+## S3｜来源可选接入、可维护、真正外置（G2）
+
+| 工作单 | 内容 | 验收 |
+|---|---|---|
+| S3-01 | 优先复用/评估 Mihon、Suwayomi、JM SDK/现有 ProviderRegistry 与许可；验证 Android 受控服务/IPC、Windows 独立适配器或非执行连接器的安全/维护代价 | 原型有具体性能、权限、升级兼容与信任成本；不照搬任意第三方扩展代码 |
+| S3-02 | 统一 SourceAdapter：ID 命名空间、能力、搜索/详情/章节/页媒体/收藏/下载/错误/取消及版本 | 一个真实来源经同一接口在对应双端验证；未知 ID 不转译成 Pica |
+| S3-03 | 安装/启用/禁用/撤销/卸载/回滚独立组件；来源私密数据与缓存有界，任何默认网络探测需明确授权 | 一个来源失败、过期或被移除不破坏本地资料、其他源或核心 |
+| S3-04 | 从纯核心发行包移除历史 Pica/EH/ExH/JM 可执行协议、凭据 SDK 和运行环境，保留老数据的显式兼容迁移 | 核心 APK/Windows 清单、依赖闭包和离线运行均通过，关开关不算剥离 |
+| S3-05 | 既有 Pica/EH/ExH/JM 的实际能力回归；Suwayomi 为可选用户 Host、非唯一必经服务器 | 每个受支持适配方式有来源/双端真链路，第二真实提供者不以模拟 ID 代替 |
+| S3-06 | 许可证、权限、品牌、来源信誉、信任/撤销与法律边界审查 | 未满足信任前不引入任意可执行来源市场；不能宣传为免责保证 |
+
+**G2 规则**：纯核心无源也可读；接入/退出来源不更改核心；本地下载不丢；用户不必自行部署 Host。
+
+## S4｜完整用户业务流程与既有 Issue 回归
+
+| 工作单 | 内容 | 验收 |
+|---|---|---|
+| S4-01 | 本地、WebDAV、可选 Host/来源 → 搜索/导入 → 详情/章节 → 同一个 Reader → 进度 | 身份、页数、返回位置、章节状态准确 |
+| S4-02 | 下载、缓存、Host 书目引用、持久离线正文区分 | 前台保存不冒充后台任务；中止、重启、失败不污染有效内容 |
+| S4-03 | Canonical Work Identity / Work/Edition/Upload，保持 KEEP_SEPARATE | 未确认的重复内容不自动归并 |
+| S4-04 | Issue #199 BLOCK/LESS 只影响客观显示；#200 搜索低频、私人标签、原始键、解释与调整负担 | 真正复现 Issue 场景，原始收藏和偏好不被视图修改 |
+| S4-05 | 推荐批次、显式控制、Visual 独立开关、已收藏排除/作者多样性、离线缓存重排 | 与冻结推荐 oracle 一致；旧推荐不冒充新规则生效 |
+| S4-06 | LAN、WebDAV、手机离线、规则冲突/双向同步 | 断网仅影响需要网络能力；不复制不相关来源秘密，旧 ACK 不覆盖新状态 |
+
+## S5｜安全升级与性能（G3）
+
+| 工作单 | 内容 | 验收 |
+|---|---|---|
+| S5-01 | Windows 旧 v0.5.0 走用户同意的独立首次过渡；Android 使用合法相同签名/递增版本覆盖 | 未授权不动生产；迁移前后数据库/收藏/阅读进度/下载/偏好逐项对照 |
+| S5-02 | 兼容增量 / 不兼容整体替换 / 可选来源运行时切换复用一个现有事务引擎 | 选择正确、来源/数据/程序隔离、状态与错误有真实反馈 |
+| S5-03 | 哈希错、磁盘满、取消、网络断开、升级启动失败、健康失败、占用/并发/断电模拟 | 旧应用可启动并恢复旧状态；旧失败保留为失败，不能用合成结果声称实体断电通过 |
+| S5-04 | 代表性 1500 部书库、重任务并行、多端离线/重连、启动/页面切换/滚动与内存 | 先做 v0.5.0 同设备基线；拟定常用操作 p95 不劣于基线 >10%，任务反馈 250ms 内可见；基于实际硬件调整最终阈值 |
+
+## S6｜统一候选的真实安装与发布前核验（G4）
+
+| 工作单 | 内容 | 验收 |
+|---|---|---|
+| S6-01 | 同源码 Windows/APK 可安装产物：SHA/签名/许可/版本/隔离数据根 | 确切产物与 CI 对齐，原候选不替换正式安装 |
+| S6-02 | 核心日常使用（首次安装、无源导入、阅读、导航、保存、恢复、引导） | 真实手机 + Windows 可用，无高优先级阻断 |
+| S6-03 | 来源/下载/标签/推荐/同步/升级完整场景及新 UI 矩阵 | 旧 42 案例与新增案例逐条有 PASS/FAIL/NOT_RUN 等独立记录 |
+| S6-04 | 隐私、许可证、真实合规边界、发布公告、简易用户说明和更新路线 | 未决范围如实列明，P0/P1=0；用户**另行明确批准**后才发布 |
+
+## 执行顺序与并行许可
+
+1. **现在**：S0 静态核对 + S1 可复现布局缺陷与互动引导首个薄片。S2 允许仅作依赖盘点。
+2. S1 通过 G1 后，可在不破坏核心交互前提下推进 S2 真实拆分。
+3. S2 接口固定后，S3 双端适配原型与 S4 独立标签回归可以并行；不能对同一数据库语义分叉开发。
+4. S3 的 G2 结束后 S4 统一端到端；S5 可提前做旧版只读差异预检，实际迁移须候选冻结。
+5. S6 停止新功能，集中验证，阻断缺陷需修复后整体相关回归。
+
+**下一次更新规则**：每次 PR 修改本计划对应任务状态、实际证据和风险；正式版产品线不随本任务自动发布。只报告真实执行，不用大规模测试通过掩盖手机版 UI 的明显缺陷。

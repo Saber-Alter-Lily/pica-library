@@ -1,0 +1,174 @@
+name: Runtime choice transaction (unpublished tests only)
+
+on:
+  push:
+    branches: [codex/reader-runtime-transaction-gate-20261026]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-choice-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Full source gates, no signing or publication
+        run: |
+          set -euo pipefail
+          pnpm type:check
+          pnpm web:check
+          pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/runtime-choice-linux-unit.json
+          pnpm build
+          bash scripts/run-web-browser-smoke.sh
+      - name: Preserve raw source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Runtime-Choice-Source-Evidence
+          path: |
+            artifacts/runtime-choice-linux-unit.json
+            test-results/
+          retention-days: 3
+          if-no-files-found: warn
+
+  windows-unit:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    env:
+      PICA_REQUIRE_JM_RUNTIME: '1'
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_WINDOWS_LAUNCHER_BASE_VERSION: '0.5.0'
+      PICA_WINDOWS_LAUNCHER_BASE_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/runtime-choice-windows-unit.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve full Windows unit result even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Runtime-Choice-Windows-Unit-Evidence
+          path: artifacts/runtime-choice-windows-unit.json
+          retention-days: 3
+          if-no-files-found: warn
+
+  fixtures:
+    needs: source
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build actual marked pair; never create a Release/installable candidate
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/build-windows-jm-runtime.ps1 -JdkDirectory $env:JAVA_HOME -GradleExecutable (Get-Command gradle.bat).Source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
+          $baseline = 'artifacts/release-base/Pica-Library-v0.5.0-windows-x64.zip'
+          Invoke-WebRequest -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.0/Pica-Library-v0.5.0-windows-x64.zip' -OutFile $baseline
+          if ((Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash.ToLowerInvariant() -ne '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf') { throw 'Exact released launcher baseline mismatch' }
+          ./scripts/build-windows-runtime-choice-fixtures.ps1 -ExpectedSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain only synthetic pair, explicitly not for installation
+        uses: actions/upload-artifact@v4
+        with:
+          name: Runtime-Choice-SYNTHETIC-NOT-FOR-INSTALLATION
+          path: artifacts/runtime-choice-fixtures/
+          retention-days: 1
+          if-no-files-found: error
+
+  transaction:
+    needs: fixtures
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [roundtrip, guardrails, request-abort, hash-mismatch, health-rollback, launch-rollback]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: Runtime-Choice-SYNTHETIC-NOT-FOR-INSTALLATION
+          path: artifacts/runtime-choice-fixtures/
+      - name: Actual UI/HTTP/installed-helper transaction in owned synthetic profile
+        shell: pwsh
+        env:
+          RUNTIME_CHOICE_SCENARIO: ${{ matrix.scenario }}
+        run: |
+          $toolRoot = Join-Path $env:RUNNER_TEMP ('pica-runtime-choice-playwright-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $toolRoot | Out-Null
+          [IO.File]::WriteAllText((Join-Path $toolRoot 'package.json'), '{"private":true}', [Text.UTF8Encoding]::new($false))
+          $env:PICA_PLAYWRIGHT_TOOL_ROOT = $toolRoot
+          $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $toolRoot 'browsers'
+          pnpm --dir $toolRoot add --save-dev '@playwright/test@1.63.0'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm --dir $toolRoot exec playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-runtime-choice.mjs artifacts/runtime-choice-fixtures $env:GITHUB_SHA $env:RUNTIME_CHOICE_SCENARIO
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve every actual scenario result, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Runtime-Choice-Evidence-${{ matrix.scenario }}
+          path: artifacts/runtime-choice-evidence/${{ matrix.scenario }}/
+          retention-days: 3
+          if-no-files-found: warn

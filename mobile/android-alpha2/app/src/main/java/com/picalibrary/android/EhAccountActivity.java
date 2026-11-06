@@ -21,7 +21,7 @@ public final class EhAccountActivity extends LocaleAwareActivity {
     private void renderContent(){
         if(content==null)return;
         probeSerial++;
-        content.removeAllViews();
+        content.removeAllViews();SourceAccessUi.entry(this,content);
         EhAccountStore.Session session=EhAccountStore.load(this);
         boolean local=session.configured();
         boolean desktop=BridgeStore.paired(this)&&DesktopAccountStatusStore.load(this).ehConfigured;

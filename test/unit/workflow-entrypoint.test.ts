@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { RecommendationService } from '../../src/services/recommendation-service'
 
 const root = path.resolve(import.meta.dirname, '../..')
 const read = (relativePath: string) =>
@@ -40,8 +41,10 @@ describe('built CLI entrypoint contract', () => {
         const app = read('web/app.js')
         expect(app).toContain("post('/api/v1/recommendation-sessions', {})")
         const service = read('src/services/recommendation-service.ts')
-        expect(service).toContain('static readonly sessionSize = 60')
-        expect(service).toContain('static readonly batchSize = 12')
+        expect(service).toContain('extends LegacyRecommendationSessions')
+        expect(RecommendationService.sessionSize).toBe(60)
+        expect(RecommendationService.batchSize).toBe(12)
+        expect(RecommendationService.candidateDepth).toBe(500)
         expect(read('src/library/server.ts')).toContain(
             'seedCount: Number(input.seedCount ?? 12)'
         )
@@ -89,7 +92,14 @@ describe('built CLI entrypoint contract', () => {
                 /jobs:\s*[\s\S]*?runs-on:[^\n]*\n\s+env:\s*\n\s+PICA_(ACCOUNT|PASSWORD):/
             )
             if (content.includes('upload-artifact@')) {
-                expect(content, name).toContain('retention-days: 1')
+                // The explicitly authorized concentrated handoff retains its
+                // public binaries/synthetic evidence for seven days so the user
+                // can download them. Keep every other recipe's one-day policy;
+                // concentrated-acceptance-build checks EACH upload is exactly 7.
+                const days = name === 'user-host-acceptance.yml' ? 7 :
+                    (name === 'post-stable-rc-packages.yml' ||
+                     name === 'r3-android-clean-source-qa.yml') ? 3 : 1
+                expect(content, name).toContain('retention-days: ' + days)
                 if (name === 'windows-package.yml') {
                     expect(content, name).not.toMatch(
                         /secrets\.PICA_(ACCOUNT|PASSWORD)/

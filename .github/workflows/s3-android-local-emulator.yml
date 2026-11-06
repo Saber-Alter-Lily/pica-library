@@ -1,0 +1,106 @@
+name: S3 Android local Reader real emulator flow (unpublished)
+
+on:
+  push:
+    branches: [codex/product-integration-r1-20261102]
+    paths:
+      - '.github/workflows/s3-android-local-emulator.yml'
+      - 'mobile/android-alpha2/local-app/**'
+      - 'mobile/android-alpha2/user-host-core/**'
+      - 'mobile/android-alpha2/source-bridge/**'
+      - 'mobile/android-alpha2/user-host-app/**'
+      - 'mobile/android-alpha2/local-storage/**'
+      - 'mobile/android-alpha2/reader-view/**'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/LocalComicImportActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
+      - 'mobile/android-alpha2/app/src/cleanSourceQa/**'
+      - 'mobile/android-alpha2/app/build.gradle'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HostSourceActivity.java'
+      - 'scripts/run-s3-android-local-emulator.sh'
+      - 'scripts/s3-android-local-emulator-flow.py'
+      - 'docs/R1_LOCAL_CORE_DUAL_PLATFORM_CANDIDATE_20261102.md'
+  pull_request:
+    paths:
+      - '.github/workflows/s3-android-local-emulator.yml'
+      - 'scripts/run-s3-android-local-emulator.sh'
+      - 'scripts/s3-android-local-emulator-flow.py'
+      - 'mobile/android-alpha2/local-app/**'
+      - 'mobile/android-alpha2/user-host-core/**'
+      - 'mobile/android-alpha2/source-bridge/**'
+      - 'mobile/android-alpha2/user-host-app/**'
+      - 'mobile/android-alpha2/local-storage/**'
+      - 'mobile/android-alpha2/reader-view/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # Only deduplicate the ongoing R1/R2 integration branch; never cancel main.
+  cancel-in-progress: ${{ github.head_ref == 'codex/product-integration-r1-20261102' || github.ref == 'refs/heads/codex/product-integration-r1-20261102' }}
+permissions:
+  contents: read
+
+jobs:
+  local-ui-flow:
+    if: github.repository == 'Saber-Alter-Lily/pica-library' && (github.event_name != 'pull_request' || github.head_ref != 'codex/product-integration-r1-20261102')
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      # Real Suwayomi needs Java 21. Keep Java 17 as the default for
+      # the existing Android Gradle build; never ship Java or the Host in APKs.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fetch pinned official Suwayomi for user-Host integration
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --retry-delay 3 --max-time 180 \
+            'https://github.com/Suwayomi/Suwayomi-Server/releases/download/v2.4.2366/Suwayomi-Server-v2.4.2366.jar' \
+            --output "$RUNNER_TEMP/pica-r2-official-host.jar"
+          printf '%s  %s\n' \
+            'af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd' \
+            "$RUNNER_TEMP/pica-r2-official-host.jar" | sha256sum --check -
+          test "$(stat --format=%s "$RUNNER_TEMP/pica-r2-official-host.jar")" = '182952426'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Require real KVM acceleration
+        run: |
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Use Android 35 system picker, source-only Host, and official Suwayomi on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          PICA_R2_REAL_HOST_JAR: ${{ runner.temp }}/pica-r2-official-host.jar
+        with:
+          api-level: 35
+          arch: x86_64
+          target: default
+          profile: pixel_2
+          ram-size: 3072M
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          emulator-boot-timeout: 600
+          disable-linux-hw-accel: false
+          script: bash scripts/run-s3-android-local-emulator.sh
+      - name: Preserve actual app screenshots, UI trees, ledgers and failures
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-local-emulator-${{ github.sha }}
+          path: mobile/android-alpha2/s3-local-emulator-evidence/
+          retention-days: 1
+          if-no-files-found: warn

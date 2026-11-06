@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
+const readCycleImplementation = () => read('src/recommendation/cycle-commands.ts') + read('src/recommendation/queries.ts')
+
 describe('Recommendation V5 portable product contract', () => {
     it('keeps Desktop heavy compute portable without replacing Android runtime cycles', () => {
         const bridge = read('src/mobile/bridge-server.ts')
@@ -57,7 +59,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).toContain('已记录不喜欢')
         expect(web).toContain('v5-feedback-dislike')
         expect(service).toContain('resolveTagV3(')
-        expect(service).toContain("phase: 'providers'")
+        expect(service).toContain('recommendationBuildPortsV3(')
+        expect(read('src/recommendation/build-pipeline.ts')).toContain("ports.progress('providers')")
         expect(theme).toContain('下方仍显示上一轮结果')
         expect(theme).toContain('新一轮推荐已更新')
     })
@@ -83,7 +86,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).toContain(
             '/api/v1/recommendation-v5/taste-exclusion'
         )
-        expect(service).toContain('tasteExcludedIds')
+        expect(read('src/recommendation/build-pipeline.ts')).toContain('tasteExcludedIds')
         expect(service).toContain('tasteExcluded.has(comicId)')
         expect(service).toContain('.favoriteIds()')
         expect(portable).toContain('tasteExcludedComicIds')
@@ -106,7 +109,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).toContain(
             '/api/v1/recommendation-v5/work-identity/audit'
         )
-        expect(service).toContain('automaticBinding: false')
+        expect(read('src/identity/queries-v5.ts')).toContain('automaticBinding: false')
     })
 
     it('persists work-identity evidence without promoting work bindings', () => {
@@ -115,8 +118,9 @@ describe('Recommendation V5 portable product contract', () => {
         const server = read('src/library/server.ts')
         expect(database).toContain('saveWorkIdentityEvidence')
         expect(database).toContain('listWorkIdentityEvidence')
-        expect(service).toContain("'EVIDENCE_ONLY' as const")
-        expect(service).toContain('automaticBinding: false')
+        const commands = read('src/identity/commands-v5.ts')
+        expect(commands).toContain("'EVIDENCE_ONLY' as const")
+        expect(commands).toContain('automaticBinding: false')
         expect(server).toContain(
             '/api/v1/recommendation-v5/work-identity/evidence/refresh'
         )
@@ -133,7 +137,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(database).toContain('clearWorkIdentityDecision')
         expect(policy).toContain('setExplicitDistinctPair')
         expect(service).toContain('recommendationV5WorkIdentityReview')
-        expect(service).toContain('decision === \'KEEP_SEPARATE\'')
+        expect(read('src/identity/commands-v5.ts')).toContain('decision === \'KEEP_SEPARATE\'')
         expect(server).toContain(
             '/api/v1/recommendation-v5/work-identity/decision'
         )
@@ -141,7 +145,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).toContain('不同版本')
         expect(web).toContain('保持分离')
         expect(web).toContain('不会自动创建 Work/Edition 绑定')
-        expect(service).toContain('materializationPreview')
+        expect(read('src/identity/queries-v5.ts')).toContain('materializationPreview')
         expect(web).toContain('Work 物化预览')
         expect(web).toContain('仅预览，不写入 Work/Edition binding')
     })
@@ -190,10 +194,11 @@ describe('Recommendation V5 portable product contract', () => {
         expect(service).toContain(
             'WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION'
         )
-        expect(service).toContain("createHash('sha256')")
-        expect(service).toContain("mode: 'PREPARED_ONLY'")
-        expect(service).toContain('executionEnabled: false')
-        expect(service).toContain('applyEndpoint: null')
+        expect(read('src/services/work-identity-adapter.ts')).toContain("createHash('sha256')")
+        const commands = read('src/identity/commands-v5.ts')
+        expect(commands).toContain("mode: 'PREPARED_ONLY'")
+        expect(commands).toContain('executionEnabled: false')
+        expect(commands).toContain('applyEndpoint: null')
         expect(server).toContain(
             '/api/v1/desktop/recommendation-v5/work-identity/materialization/prepare'
         )
@@ -212,9 +217,7 @@ describe('Recommendation V5 portable product contract', () => {
         const ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(evidence).toContain(
             "BEHAVIOR_EVIDENCE_VERSION = 'behavior-evidence-v1'"
         )
@@ -239,9 +242,7 @@ describe('Recommendation V5 portable product contract', () => {
         const ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(timescales).toContain(
             "PREFERENCE_TIMESCALE_VERSION ="
         )
@@ -273,9 +274,7 @@ describe('Recommendation V5 portable product contract', () => {
         const retriever = read(
             'src/recommendation-v3/retriever-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(channels).toContain(
             "CANDIDATE_CHANNEL_PLANNER_VERSION ="
         )
@@ -303,9 +302,7 @@ describe('Recommendation V5 portable product contract', () => {
         const retriever = read(
             'src/recommendation-v3/retriever-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(compiler).toContain(
             "PROVIDER_QUERY_COMPILER_V5_VERSION ="
         )
@@ -337,13 +334,13 @@ describe('Recommendation V5 portable product contract', () => {
         )
         const provider = read('src/services/provider-service.ts')
         const service = read('src/library/service.ts')
+        const ports = read('src/recommendation/shadow-ports-v5.ts')
+        const adapter = read('src/services/recommendation-shadow-adapter.ts')
         const server = read('src/library/server.ts')
         const retriever = read(
             'src/recommendation-v3/retriever-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(shadow).toContain(
             "SHADOW_RETRIEVAL_V5_VERSION ="
         )
@@ -355,10 +352,10 @@ describe('Recommendation V5 portable product contract', () => {
         expect(service).toContain(
             'RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION'
         )
-        expect(service).toContain(
+        expect(ports).toContain(
             "RUN_RECOMMENDATION_V5_SHADOW_RETRIEVAL"
         )
-        expect(service).toContain('{ persist: false }')
+        expect(adapter).toContain('persist: false')
         expect(server).toContain(
             '/api/v1/desktop/recommendation-v5/shadow-retrieval'
         )
@@ -371,6 +368,8 @@ describe('Recommendation V5 portable product contract', () => {
         const database = read('src/library/database.ts')
         const service = read('src/library/service.ts')
         const server = read('src/library/server.ts')
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
+        const adapter = read('src/services/recommendation-shadow-adapter.ts')
         const shadow = read(
             'src/recommendation-v5/shadow-retrieval.ts'
         )
@@ -381,10 +380,10 @@ describe('Recommendation V5 portable product contract', () => {
             'listCandidatePoolsByModelVersionPrefix'
         )
         expect(database).toContain('modelVersion:')
-        expect(service).toContain("cycleId = `v5-shadow:")
+        expect(service).toContain('createCycleId: () => `v5-shadow:')
         expect(pipeline).toContain("'v5-shadow'")
-        expect(service).toContain('saveV3CandidatePool')
-        expect(service).toContain('candidateIds: ranking.rows.map')
+        expect(adapter).toContain('database.saveV3CandidatePool(value)')
+        expect(execution).toContain('candidateIds: ranking.rows.map')
         expect(service).toContain(
             'recommendationV5ShadowRuns'
         )
@@ -392,20 +391,18 @@ describe('Recommendation V5 portable product contract', () => {
             '/api/v1/desktop/recommendation-v5/shadow-runs'
         )
         expect(shadow).toContain('persistCandidates: false')
-        expect(service).toContain('{ persist: false }')
+        expect(adapter).toContain('persist: false')
     })
 
     it('adds deterministic candidate hygiene before any relevance ranking', () => {
         const hygiene = read(
             'src/recommendation-v5/candidate-hygiene.ts'
         )
-        const service = read('src/library/service.ts')
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
         const ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(hygiene).toContain(
             "CANDIDATE_HYGIENE_V5_VERSION ="
         )
@@ -417,8 +414,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(hygiene).toContain("'OWNED_WORK'")
         expect(hygiene).toContain("'ALREADY_SEEN'")
         expect(hygiene).toContain("'BLOCK_CONTROL'")
-        expect(service).toContain('applyCandidateHygieneV5')
-        expect(service).toContain('hygieneTelemetry')
+        expect(execution).toContain('applyCandidateHygieneV5')
+        expect(execution).toContain('hygieneTelemetry')
         expect(ranker).not.toContain('candidate-hygiene')
         expect(coordinator).not.toContain('candidate-hygiene')
     })
@@ -427,13 +424,11 @@ describe('Recommendation V5 portable product contract', () => {
         const ranker = read(
             'src/recommendation-v5/relevance-ranker.ts'
         )
-        const service = read('src/library/service.ts')
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
         const v3Ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(ranker).toContain(
             "RELEVANCE_RANKER_V5_VERSION ="
         )
@@ -447,8 +442,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(ranker).toContain('exactItemEvidence')
         expect(ranker).toContain('sessionAffinity')
         expect(ranker).toContain('explicitAdjustment')
-        expect(service).toContain('rankShadowCandidatesV5')
-        expect(service).toContain('rankingTelemetry')
+        expect(execution).toContain('rankShadowCandidatesV5')
+        expect(execution).toContain('rankingTelemetry')
         expect(v3Ranker).not.toContain('relevance-ranker')
         expect(coordinator).not.toContain('relevance-ranker')
     })
@@ -457,10 +452,8 @@ describe('Recommendation V5 portable product contract', () => {
         const diversity = read(
             'src/recommendation-v5/batch-diversity.ts'
         )
-        const service = read('src/library/service.ts')
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
+        const coordinator = readCycleImplementation()
         expect(diversity).toContain(
             "BATCH_DIVERSITY_V5_VERSION ="
         )
@@ -476,9 +469,9 @@ describe('Recommendation V5 portable product contract', () => {
         expect(diversity).toContain('FANDOM_SATURATION')
         expect(diversity).toContain('TAG_SATURATION')
         expect(diversity).toContain('PROVIDER_BALANCE')
-        expect(service).toContain('diversifyShadowBatchV5')
-        expect(service).toContain('diversityTelemetry')
-        expect(service).toContain('diversifiedBatch')
+        expect(execution).toContain('diversifyShadowBatchV5')
+        expect(execution).toContain('diversityTelemetry')
+        expect(execution).toContain('diversifiedBatch')
         expect(coordinator).not.toContain('batch-diversity')
     })
 
@@ -529,7 +522,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(service).toContain(
             'recommendationV5P3PromotionGate'
         )
-        expect(service).toContain(
+        expect(read('src/recommendation/audit-queries-v5.ts')).toContain(
             'shadowPipelineModelVersionV5()'
         )
         expect(server).toContain(
@@ -545,7 +538,7 @@ describe('Recommendation V5 portable product contract', () => {
 
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
-        const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')
+        const coordinator = readCycleImplementation()
         expect(service).toContain('filterCandidatesAgainstOwnedV5')
         expect(coordinator).toContain('filterCandidatesAgainstOwnedV5')
         expect(coordinator).toContain('servingFilteredCount')
@@ -653,7 +646,7 @@ describe('Recommendation V5 portable product contract', () => {
         const coverage = read(
             'src/recommendation-v5/visual-candidate-coverage.ts'
         )
-        const service = read('src/library/service.ts')
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
         expect(coverage).toContain(
             "VISUAL_CANDIDATE_COVERAGE_V5_VERSION ="
         )
@@ -669,12 +662,12 @@ describe('Recommendation V5 portable product contract', () => {
             "'SHADOW_CANDIDATE_NOT_PERSISTED'"
         )
         expect(coverage).toContain("'DIVERSIFIED_BATCH'")
-        expect(service).toContain(
+        expect(execution).toContain(
             'buildVisualCandidateCoverageV5'
         )
-        expect(service).toContain('visualCandidateCoverage')
-        expect(service).toContain('visualCoverage')
-        expect(service).not.toContain(
+        expect(execution).toContain('visualCandidateCoverage')
+        expect(execution).toContain('visualCoverage')
+        expect(execution).not.toContain(
             'visualCoverage.selectedForAnalysis.forEach'
         )
     })
@@ -919,7 +912,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).toContain('relay: true')
         expect(server).not.toContain('pica_password')
         expect(client).toContain(
-            'private boolean useDesktopRelay(){return !localConfigured()&&desktopRelayConfigured();}'
+            'private boolean useDesktopRelay(){access.check();return !localConfigured()&&desktopRelayConfigured();}'
         )
         expect(client).toContain(
             'static boolean available(Context context)'

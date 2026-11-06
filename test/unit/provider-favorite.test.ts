@@ -6,6 +6,7 @@ import { LibraryDatabase } from '../../src/library/database'
 import { ProviderService } from '../../src/services/provider-service'
 import type { Pica } from '../../src/sdk'
 import type { Comic } from '../../src/types'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const directories: string[] = []
 
@@ -43,7 +44,7 @@ function fixture(provider: Partial<Pica>) {
     ])
     return {
         database,
-        service: new ProviderService(async () => provider as Pica, database)
+        service: new ProviderService(async () => provider as Pica, database, undefined, undefined, enabledFixtureSources())
     }
 }
 

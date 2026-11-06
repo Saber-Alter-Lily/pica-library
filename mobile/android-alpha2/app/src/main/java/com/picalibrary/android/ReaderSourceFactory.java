@@ -1,0 +1,59 @@
+package com.picalibrary.android;
+
+import android.content.Context;
+
+/** Preserve legacy Desktop intents, but never route an unknown explicit source to Desktop. */
+final class ReaderSourceFactory {
+    static String kind(String value) {
+        if (value == null || value.isEmpty()) return "desktop";
+        switch (value) {
+            case "desktop": case "phone": case "remote": case "pica": case "eh": case "jm": case "local": case "host": return value;
+            default: throw new IllegalArgumentException("不支持的阅读来源 / Unsupported reader source");
+        }
+    }
+    static ReaderSource create(Context context, String value) {
+        if(BuildConfig.LOCAL_ONLY_DRAFT){
+            if(!"local".equals(value))
+                throw new IllegalArgumentException("This local-only build opens imported comics only");
+            return new LocalComicReaderSource(context);
+        }
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            // This exhaustive source-neutral path is important: no path in a
+            // clean build can ever instantiate the legacy source adapters.
+            // Simply rejecting legacy names before falling into the old switch
+            // kept Pica/E-H/JM reader classes reachable in the *actual APK*.
+            switch(kind(value)){
+                case "local": return new LocalComicReaderSource(context);
+                case "phone": return new PhoneDownloadReaderSource(context);
+                case "remote": return new RemoteReaderSource(context);
+                case "desktop": return new DesktopReaderSource(context);
+                default: throw new IllegalArgumentException(
+                    "Use the optional signed external Host for online sources");
+            }
+        }
+        switch (kind(value)) {
+            case "host": return new HostReaderSource(context);
+            case "local": return new LocalComicReaderSource(context);
+            case "phone": return new PhoneDownloadReaderSource(context);
+            case "remote": return new RemoteReaderSource(context);
+            case "pica": return new PicaReaderSource(context);
+            case "eh": return new EhReaderSource(context);
+            case "jm": return new JmReaderSource(context);
+            default: return new DesktopReaderSource(context);
+        }
+    }
+    // App-owned recommendation hook. The shared Reader UI invokes it on its
+    // existing metadata executor, never synchronously on the render thread.
+    static void recordReaderComplete(Context context,String comicId) {
+        UnifiedCatalogStore.Entry entry=
+                UnifiedCatalogStore.load(context).byId.get(comicId);
+        RecommendationEvidenceStore.recordReaderComplete(
+                context,
+                comicId,
+                entry==null?"":entry.displayAuthor(),
+                entry==null?java.util.Collections.emptyList():entry.tags,
+                entry==null?java.util.Collections.emptyList():entry.categories
+        );
+    }
+    private ReaderSourceFactory() {}
+}

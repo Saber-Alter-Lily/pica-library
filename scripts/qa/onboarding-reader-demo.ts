@@ -7,6 +7,7 @@ import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
 import { Pica } from '../../src/sdk'
+import { enabledFixtureSources } from "../../test/helpers/source-runtime-fixture"
 
 const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), 'pica-onboarding-demo-')
@@ -109,7 +110,7 @@ const pica = new Pica({
         headers: new AxiosHeaders({ 'content-type': 'image/png' })
     })
 })
-const service = new LibraryService(database, directory)
+const service = new LibraryService(database, directory, undefined, undefined, undefined, enabledFixtureSources())
 service.connect = async () => pica
 service.recommendations = async () => {
     throw new Error('Demo: recommendation generation disabled')

@@ -4,6 +4,7 @@ import java.util.*;
 
 /** Native E-H favorite snapshot. Category names/slots are organization metadata, not semantic preference labels. */
 final class EhFavoriteSync {
+    com.picalibrary.android.sources.SourceAccessPolicy.Permit sourceAccess;
     static final class Item {
         final String comicId;final int slot;final String note;
         Item(String comicId,int slot,String note){this.comicId=comicId;this.slot=slot>=0&&slot<=9?slot:-1;this.note=note==null?"":note;}

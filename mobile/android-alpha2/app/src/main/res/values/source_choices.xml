@@ -1,0 +1,13 @@
+<resources>
+    <string name="source_choices_title">Sources on this phone</string>
+    <string name="source_choices_summary">Choose Pica / E-H / JM independently of Desktop</string>
+    <string name="source_choices_help">Choose which external providers this phone may access, then save. Disabling keeps accounts, downloads, favorites and reading history. Local reading, files already on Desktop, and remote storage have separate access.</string>
+    <string name="source_choices_reload">Read current choices</string>
+    <string name="source_choices_save">Save source choices</string>
+    <string name="source_choices_unsaved">Unsaved changes</string>
+    <string name="source_choices_current">Currently saved source choices</string>
+    <string name="source_choices_saved">Saved and active now. Reopen enabled source pages; paused downloads need manual resume.</string>
+    <string name="source_choices_stale">Another page changed these settings. Read current choices first.</string>
+    <string name="source_choices_storage_error">Source settings could not be read or saved safely. No new source was enabled. Keep your data and report this error.</string>
+    <string name="source_disabled">This source is disabled. Enable it under Accounts and sources → Sources on this phone.</string>
+</resources>

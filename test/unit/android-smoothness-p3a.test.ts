@@ -23,7 +23,7 @@ describe('Android smoothness P3A', () => {
         expect(load).not.toContain('BitmapFactory.decodeFile')
     })
 
-    it('prevents overlapping Task Center polls and includes E-H downloads', () => {
+    it('prevents overlapping Task Center polls and dispatches Pica, E-H and JM downloads', () => {
         const task = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/TaskCenterActivity.java'
         )
@@ -33,9 +33,14 @@ describe('Android smoothness P3A', () => {
         expect(task).toContain('getWorkInfosByTag("pica-download")')
         expect(task).toContain('getWorkInfosByTag("eh-download")')
         expect(task).toContain('tags.contains("eh-download")')
-        expect(task).toContain('EhDownloadJobs.pause(this,comic)')
-        expect(task).toContain('EhDownloadJobs.resume(this,comic)')
-        expect(task).toContain('EhDownloadJobs.cancel(this,comic)')
+        expect(task).toContain('getWorkInfosByTag("jm-download")')
+        expect(task).toContain('tags.contains("jm-download")')
+        for (const action of ['pause', 'resume', 'cancel']) {
+            expect(task).toContain(`${action}Download(ref)`)
+            expect(task).toContain(`EhDownloadJobs.${action}(this,ref.comicId)`)
+            expect(task).toContain(`JmDownloadJobs.${action}(this,ref.comicId`)
+            expect(task).toContain(`PicaDownloadJobs.${action}(this,ref.comicId,ref.episodeId)`)
+        }
     })
 
     it('gives E-H downloads persistent pause/resume state just like Pica downloads', () => {

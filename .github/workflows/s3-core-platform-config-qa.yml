@@ -1,0 +1,49 @@
+name: S3 production local platform and config core QA (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s3-core-local-platform-20261029
+    paths:
+      - '.github/workflows/s3-core-platform-config-qa.yml'
+      - 'src/library/core-local-platform.ts'
+      - 'src/library/core-local-config.ts'
+      - 'src/desktop/main.ts'
+      - 'src/desktop/config.ts'
+      - 'src/library/server.ts'
+      - 'test/unit/core-local-platform.test.ts'
+      - 'test/unit/core-local-config.test.ts'
+      - 'test/unit/local-library-http.test.ts'
+      - 'test/unit/desktop-config.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-core-platform-config-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-production-config-and-folder-routes:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck complete original Desktop and newly extracted core
+        run: pnpm type:check
+      - name: Exercise production HTTP, secure config read/write, real SQLite and native picker
+        run: pnpm exec vitest run test/unit/core-local-platform.test.ts test/unit/core-local-config.test.ts test/unit/local-library-http.test.ts test/unit/desktop-config.test.ts test/unit/desktop-native-pickers-p4b2.test.ts test/unit/module-dag-policy.test.ts

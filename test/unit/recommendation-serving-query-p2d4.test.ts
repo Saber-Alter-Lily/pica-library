@@ -94,22 +94,22 @@ describe('P2 D4 serving query discipline', () => {
 
     it('keeps Final V3 serving and portable paths off 10000-row catalog materialization', () => {
         const coordinator = fs.readFileSync(
-            'src/recommendation-v3/cycle-coordinator-v3.ts',
+            'src/recommendation/queries.ts',
             'utf8'
         )
         const servingStart = coordinator.indexOf(
-            'private servingSnapshot('
+            'servingSnapshot('
         )
         const servingEnd = coordinator.indexOf(
-            '\n    private async completeBuild(',
+            '\n    status() {',
             servingStart
         )
         const serving = coordinator.slice(servingStart, servingEnd)
         expect(serving).toContain('recommendationOwnershipState()')
-        expect(serving).toContain('this.database.getComicsByIds([')
-        expect(serving).toContain('this.database.favoriteIds()')
+        expect(serving).toContain('this.store.getComicsByIds([')
+        expect(serving).toContain('this.store.favoriteIds()')
         expect(serving).not.toContain(
-            'this.database.listComics({ limit: 10000 })'
+            'this.store.listComics({ limit: 10000 })'
         )
 
         const portableStart = coordinator.indexOf('    portable(')
@@ -118,10 +118,9 @@ describe('P2 D4 serving query discipline', () => {
             portableStart
         )
         const portable = coordinator.slice(portableStart, portableEnd)
-        expect(portable).toContain('recommendationOwnershipState()')
-        expect(portable).toContain('this.database.getComicsByIds([')
+        expect(portable).toContain('this.servingSnapshot(state.activeCycleId, pool)')
         expect(portable).not.toContain(
-            'this.database.listComics({ limit: 10000 })'
+            'this.store.listComics({ limit: 10000 })'
         )
     })
 

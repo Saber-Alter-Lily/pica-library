@@ -1,0 +1,44 @@
+name: S3 v0.5 WAL-aware synthetic snapshot and rollback QA (no production migration)
+
+on:
+  push:
+    branches:
+      - codex/s3-v050-snapshot-rollback-qa-20261029
+    paths:
+      - '.github/workflows/s3-v050-snapshot-rollback-qa.yml'
+      - 'src/desktop/legacy-profile-snapshot-qa.ts'
+      - 'src/desktop/legacy-profile-preflight.ts'
+      - 'test/unit/legacy-profile-snapshot-qa.test.ts'
+      - 'test/unit/legacy-profile-preflight.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-v050-rollback-rehearsal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-legacy-profile-consistency:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck entire existing Desktop and snapshot tooling
+        run: pnpm type:check
+      - name: Prove native sqlite online backup (including uncheckpointed WAL), exact rollback and fail-closed profile admission
+        run: pnpm exec vitest run test/unit/legacy-profile-snapshot-qa.test.ts test/unit/legacy-profile-preflight.test.ts test/unit/local-library-ingestion.test.ts test/unit/desktop-instance-ownership.test.ts test/unit/sqlite-filename.test.ts

@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { guideCatalog } from '../../web/guide-catalog.js'
 
 const read = (path: string) => fs.readFileSync(path, 'utf8')
 
@@ -33,9 +34,11 @@ describe('Windows/Web RC connection and onboarding corrective batch', () => {
         expect(eh).toContain("new CustomEvent('pica-eh-login-complete')")
     })
 
-    it('promotes Web onboarding to version 2 with task-oriented shelf, sync, recommendation and visual steps', () => {
+    it('separates v3 daily onboarding and optional task-oriented advanced chapters', () => {
         const onboarding = read('web/onboarding-v1.js')
-        expect(onboarding).toContain('const TOUR_VERSION = 2')
+        const catalog = read('web/guide-catalog.js')
+        expect(onboarding).toContain('const TOUR_VERSION = GUIDE_VERSION')
+        expect(read('web/onboarding-state.js')).toContain('GUIDE_VERSION = 3')
         for (const target of [
             "'library-sync'",
             "'shelves-nav'",
@@ -46,10 +49,15 @@ describe('Windows/Web RC connection and onboarding corrective batch', () => {
             "'connection-status'",
             "'eh-account'"
         ]) expect(onboarding).toContain(target)
-        expect(onboarding).toContain('先同步收藏')
-        expect(onboarding).toContain('建立书架')
-        expect(onboarding).toContain('一个推荐周期会提前生成多批结果')
-        expect(onboarding).toContain('OFF 表示完全不影响常规推荐')
-        expect(onboarding).toContain('推荐的“网页登录并自动回传”')
+        const guide = guideCatalog((zh: string) => zh)
+        expect(guide.daily[0].view).toBe('library')
+        expect(guide.daily[0].selector).toBe('nav [data-view="library"]')
+        expect(guide.daily[0].body).toContain('无需登录也能阅读本地漫画')
+        expect(guide.daily[0].body).toContain('已有漫画直接打开')
+        expect(guide.daily.find((step) => step.selector === 'nav [data-view="discover"]')!.body)
+            .toMatch(/(?:不必|不需要)每次重新生成/)
+        expect(catalog).toContain('OFF 不参与排序')
+        expect(catalog).toContain('普通官网登录链接不会自动回传')
+        expect(onboarding).toContain('showAdvancedGuide')
     })
 })

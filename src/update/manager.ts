@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
-import { spawn } from 'node:child_process'
+import type { SpawnOptions } from 'node:child_process'
+import { startUpgradeHelper, UpgradeHelperStopError, type HelperReadiness, type UpgradeHelperKind } from './helper-startup'
 import AdmZip from 'adm-zip'
 import {
     APP_API_VERSION,
@@ -9,12 +10,23 @@ import {
     UPDATE_MANIFEST_VERSION
 } from '../app-capabilities'
 import { sanitizedChildEnv } from '../desktop/child-process'
+import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import { applicationFetch } from './application-fetch'
 import { classifyUpdateCompatibility } from './compatibility'
-import { normalizeUpdatePath, updaterSelfReplacement } from './path-safety'
+import { MODULE_CONTRACT_PATH, normalizeModuleContracts, parseModuleContracts, runtimeModuleContracts, sameModuleContracts } from '../modules/contracts'
+import { normalizeUpdatePath, updaterSelfReplacement, forbiddenUpdatePayload as forbiddenPayload } from './path-safety'
+import { normalizeRuntimeComposition, RUNTIME_COMPOSITION_PATH, sameRuntimeComposition, type RuntimeComposition } from '../modules/runtime-composition'
+import { validateFullApplicationArchive } from './full-archive'
+import { extractValidatedFullApplication } from './full-application-staging'
+import { installedRuntimeComposition, requireInstalledRuntimeComposition } from '../runtime/installed-runtime-composition'
+import { validateAutomaticFullRuntimeComposition, validateIncrementalRuntimeComposition } from './runtime-composition'
+import { RUNTIME_CHOICE_TTL_MS, runtimeChoiceComposition, validateRuntimeChoiceReceipt, validateRuntimeChoiceVersion, type RuntimeChoiceReceipt } from './runtime-choice'
+import { discoverRuntimeChoiceRelease, type RuntimeChoiceRelease } from './runtime-choice-release'
+import type { UpdatePackageDownload } from './download-task'
 import {
     selectReleaseUpdateAsset,
-    updateAssetNamesForChecksums
+    updateAssetNamesForChecksums,
+    fullApplicationAssetName
 } from './release-assets'
 import {
     LEGACY_GENERIC_UPDATE_TARGET,
@@ -35,77 +47,13 @@ import type {
 } from './types'
 
 const officialRepository = 'Saber-Alter-Lily/pica-library'
-const forbiddenPayload =
-    /(^|\/)(data|cache|downloads?|previews?|logs?|browser-lite)(\/|$)|\.(?:db|sqlite)(?:-|$)|(^|\/)\.env/i
-
-const forbiddenFullPackageRoot =
-    /^(?:config|data|cache|downloads?|logs?|runtime-state|packs)(?:\/|$)|\.(?:db|sqlite)(?:-|$)/i
-
-function normalizeFullPackagePath(value: string) {
-    const raw = String(value ?? '').replaceAll('\\', '/')
-    if (
-        !raw ||
-        raw.startsWith('/') ||
-        raw.startsWith('//') ||
-        /^[a-z]:/i.test(raw) ||
-        raw.includes(':')
-    )
-        throw new Error('Full application package path is unsafe')
-    const segments = raw.split('/')
-    if (
-        segments.some(
-            (segment) =>
-                !segment ||
-                segment === '.' ||
-                segment === '..' ||
-                /[. ]$/.test(segment)
-        )
-    )
-        throw new Error('Full application package path is unsafe')
-    return segments.join('/')
-}
-
-function validateFullApplicationArchive(zip: AdmZip) {
-    const entries = zip.getEntries().filter((entry) => !entry.isDirectory)
-    const declared = new Map<string, (typeof entries)[number]>()
-    for (const entry of entries) {
-        const safe = normalizeFullPackagePath(entry.entryName)
-        if (forbiddenFullPackageRoot.test(safe))
-            throw new Error(
-                `User data is forbidden in full application packages: ${safe}`
-            )
-        if (declared.has(safe))
-            throw new Error(`Duplicate full application path: ${safe}`)
-        declared.set(safe, entry)
-    }
-    for (const required of [
-        'Pica Library.exe',
-        'runtime/node.exe',
-        'app/desktop.js',
-        'app/updater.js',
-        'app/full-upgrader.js',
-        'SOURCE_SHA.txt'
-    ])
-        if (!declared.has(required))
-            throw new Error(
-                `Full application package is incomplete: ${required}`
-            )
-    const sourceSha = declared
-        .get('SOURCE_SHA.txt')!
-        .getData()
-        .toString('utf8')
-        .trim()
-    if (!/^[0-9a-f]{40}$/.test(sourceSha))
-        throw new Error('Full application SOURCE_SHA.txt is invalid')
-    return { declared, sourceSha }
-}
 
 function sha256(value: Buffer | string) {
     return createHash('sha256').update(value).digest('hex')
 }
 
 function prerelease(version: string) {
-    return /(?:^|[-.])(dev|alpha|beta|rc)(?:[.-]|\d|$)/i.test(version)
+    return /(?:^|[-.])(dev|alpha|beta|rc|postrc)(?:[.-]|\d|$)/i.test(version)
 }
 
 function stableVersionParts(version: string) {
@@ -182,8 +130,28 @@ function readManifest(zip: AdmZip): UpdateManifest {
         throw new Error('Invalid databaseSchemaVersion')
     if (!Array.isArray(manifest.files) || !Array.isArray(manifest.deletions))
         throw new Error('Update manifest file lists are invalid')
+    if (manifest.moduleContracts !== undefined)
+        manifest.moduleContracts = normalizeModuleContracts(manifest.moduleContracts)
+    if (manifest.runtimeComposition !== undefined)
+        manifest.runtimeComposition = normalizeRuntimeComposition(manifest.runtimeComposition)
     manifestUpdateTarget(manifest)
     return manifest
+}
+
+function validateModulePayload(zip: AdmZip, manifest: UpdateManifest) {
+    const moduleEntries = zip.getEntries().filter(entry => !entry.isDirectory && entry.entryName.replaceAll('\\', '/').toLowerCase() === MODULE_CONTRACT_PATH)
+    if (moduleEntries.length > 1 || moduleEntries.some(entry => entry.entryName !== MODULE_CONTRACT_PATH))
+        throw new Error('Runtime module payload must use the canonical path case')
+    if (manifest.deletions.some(name => name.replaceAll('\\', '/').toLowerCase() === MODULE_CONTRACT_PATH))
+        throw new Error('Module contracts cannot be removed by an incremental update')
+    const entry = zip.getEntry(MODULE_CONTRACT_PATH)
+    if (!manifest.moduleContracts) {
+        if (entry) throw new Error('Module contract payload is not declared in the update manifest')
+        return // Legacy manifests remain readable, but cannot silently replace the new metadata.
+    }
+    const target = entry ? parseModuleContracts(entry.getData().toString('utf8')) : runtimeModuleContracts()
+    if (!sameModuleContracts(manifest.moduleContracts, target))
+        throw new Error('Update module contracts do not match the target payload')
 }
 
 function validateFileList(zip: AdmZip, manifest: UpdateManifest) {
@@ -192,29 +160,31 @@ function validateFileList(zip: AdmZip, manifest: UpdateManifest) {
         .filter((entry) => !entry.isDirectory)
         .map((entry) => entry.entryName.replaceAll('\\', '/'))
     const declared = new Map<string, UpdateManifestFile>()
+    const declaredIdentities = new Set<string>()
     for (const item of manifest.files) {
         const safe = normalizeUpdatePath(String(item.path ?? ''))
         if (forbiddenPayload.test(safe))
             throw new Error(
                 `User data is forbidden in update packages: ${safe}`
             )
-        if (declared.has(safe))
+        if (declaredIdentities.has(safe.toUpperCase()))
             throw new Error(`Duplicate update path: ${safe}`)
         if (!/^[0-9a-f]{64}$/.test(item.sha256))
             throw new Error(`Invalid SHA-256 for ${safe}`)
         if (!Number.isSafeInteger(item.size) || item.size < 0)
             throw new Error(`Invalid size for ${safe}`)
         declared.set(safe, item)
+        declaredIdentities.add(safe.toUpperCase())
     }
     const deletions = new Set(manifest.deletions.map(normalizeUpdatePath))
-    if (deletions.size !== manifest.deletions.length)
+    if (new Set([...deletions].map(name=>name.toUpperCase())).size !== manifest.deletions.length)
         throw new Error('Duplicate deletion path')
     for (const deletion of deletions) {
         if (forbiddenPayload.test(deletion))
             throw new Error(
                 `User data is forbidden in update packages: ${deletion}`
             )
-        if (declared.has(deletion))
+        if (declaredIdentities.has(deletion.toUpperCase()))
             throw new Error(`Path cannot be replaced and deleted: ${deletion}`)
     }
     const payloadEntries = entries.filter(
@@ -264,9 +234,18 @@ export interface UpdateManagerOptions {
     fetchImplementation?: typeof fetch
 }
 
+interface RuntimeChoicePlan {
+    id:string; from:RuntimeComposition; to:RuntimeComposition; sourceSha:string
+    release:RuntimeChoiceRelease; validUntil:number
+}
+
 export class UpdateManager {
     private staged: StagedUpdate | null = null
     private stagedFull: StagedFullApplicationUpdate | null = null
+    private activeApply: {id:string;promise:Promise<{accepted:true;mode:UpgradeHelperKind;targetVersion:string}>}|null=null
+    private preparationEpoch=0
+    private runtimePlanRevision=0
+    private runtimeChoicePlan:RuntimeChoicePlan|null=null
     readonly progressFile: string
 
     constructor(private readonly options: UpdateManagerOptions) {
@@ -486,6 +465,49 @@ export class UpdateManager {
         )
     }
 
+    private requirePreparation(epoch:number) {
+        if(this.activeApply || epoch!==this.preparationEpoch) throw Error('Update preparation was superseded; select the intended update again')
+    }
+
+    private installedChoiceSource() {
+        const sha=fs.readFileSync(path.join(this.options.applicationRoot,'SOURCE_SHA.txt'),'utf8').trim()
+        if(!/^[a-f0-9]{40}$/.test(sha) || this.options.currentSourceSha!==undefined && sha!==this.options.currentSourceSha) throw Error('Installed application source changed; restart before selecting components')
+        return sha
+    }
+
+    async planRuntimeChoice(choice:unknown,signal?:AbortSignal) {
+        if(this.activeApply)throw Error('An update is already being applied')
+        const target=this.updateTarget()
+        if(!target || updateTargetKey(target)!=='windows-x64')throw Error('Optional runtime replacement is currently supported only on Windows x64')
+        validateRuntimeChoiceVersion(this.options.currentVersion,this.options.currentVersion)
+        const from=requireInstalledRuntimeComposition(this.options.applicationRoot),to=runtimeChoiceComposition(choice)
+        const revision=++this.runtimePlanRevision;this.runtimeChoicePlan=null
+        if(sameRuntimeComposition(from,to))return{status:'unchanged' as const,composition:from}
+        const sourceSha=this.installedChoiceSource()
+        const release=await discoverRuntimeChoiceRelease(to,this.options.fetchImplementation??applicationFetch,signal)
+        if(signal?.aborted || this.activeApply || revision!==this.runtimePlanRevision)throw Error('Runtime component preview was cancelled or superseded')
+        validateRuntimeChoiceVersion(this.options.currentVersion,release.version)
+        const plan:RuntimeChoicePlan={id:randomUUID(),from,to,sourceSha,release,validUntil:Date.now()+RUNTIME_CHOICE_TTL_MS}
+        this.runtimeChoicePlan=plan
+        return{status:'preview' as const,id:plan.id,from:normalizeRuntimeComposition(from),to:normalizeRuntimeComposition(to),
+            version:release.version,archiveName:release.archiveName,archiveSha256:release.sha256,bytes:release.bytes,validUntil:plan.validUntil,
+            replacement:'complete-application',sourceEnablement:'unchanged',accountsAndData:'retained',restartRequired:true}
+    }
+
+    async prepareRuntimeChoice(id:string,download:UpdatePackageDownload,signal?:AbortSignal) {
+        if(this.activeApply)throw Error('An update is already being applied')
+        const plan=this.runtimeChoicePlan
+        if(!plan || plan.id!==id || plan.validUntil<=Date.now() || signal?.aborted)throw Error('Runtime component preview expired; preview and confirm again')
+        this.runtimeChoicePlan=null // Consume once, before any asynchronous download.
+        if(this.installedChoiceSource()!==plan.sourceSha || !sameRuntimeComposition(requireInstalledRuntimeComposition(this.options.applicationRoot),plan.from))throw Error('Installed runtime changed after preview')
+        const epoch=++this.preparationEpoch
+        const bytes=await download(plan.release.url,plan.release.version)
+        if(signal?.aborted)throw Error('Runtime component selection was cancelled')
+        this.requirePreparation(epoch)
+        if(sha256(bytes)!==plan.release.sha256)throw Error('Runtime package changed after preview; preview and confirm again')
+        return this.stageCompleteApplication(plan.release.version,plan.release.archiveName,bytes,epoch,plan,signal)
+    }
+
     private async verifyOfficialArchive(
         version: string,
         archiveName: string,
@@ -630,6 +652,8 @@ export class UpdateManager {
 
     async checkForUpdate() {
         this.writeProgress({ phase: 'idle' })
+        // Invalid installed packaging facts must not be mislabeled as a network outage.
+        const composition = requireInstalledRuntimeComposition(this.options.applicationRoot)
         const request = this.options.fetchImplementation ?? applicationFetch
         try {
             const response = await request(
@@ -664,13 +688,14 @@ export class UpdateManager {
                               release.assets,
                               version,
                               this.options.currentVersion,
-                              target
+                              target,
+                              composition
                           )
                         : null
                     const fullAssetName =
                         target &&
                         updateTargetKey(target) === 'windows-x64'
-                            ? `Pica-Library-v${version}-windows-x64.zip`
+                            ? fullApplicationAssetName(version, target, composition)
                             : undefined
                     const fullAsset = fullAssetName
                         ? release.assets?.find(
@@ -710,14 +735,15 @@ export class UpdateManager {
                 ? updateAssetNamesForChecksums(
                       version,
                       this.options.currentVersion,
-                      target
+                      target,
+                      composition
                   ).find((name) => this.shaFromSums(sums, name))
                 : undefined
             const releaseUrl = `https://github.com/${officialRepository}/releases/tag/v${version}`
             const fullAssetName =
                 target &&
                 updateTargetKey(target) === 'windows-x64'
-                    ? `Pica-Library-v${version}-windows-x64.zip`
+                    ? fullApplicationAssetName(version, target, composition)
                     : undefined
             const verifiedFullAssetName =
                 fullAssetName && this.shaFromSums(sums, fullAssetName)
@@ -744,11 +770,14 @@ export class UpdateManager {
     }
 
     async stage(archiveName: string, buffer: Buffer) {
+        if(this.activeApply)throw new Error('An update is already being applied')
+        const epoch=++this.preparationEpoch
         this.writeProgress({ phase: 'validating' })
         try {
             const archiveHash = sha256(buffer)
         const zip = new AdmZip(buffer)
         const manifest = readManifest(zip)
+        const composition = requireInstalledRuntimeComposition(this.options.applicationRoot)
         const installedTarget = this.updateTarget()
         if (!installedTarget)
             throw new Error(
@@ -770,6 +799,10 @@ export class UpdateManager {
             currentDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION,
             targetAppApiVersion: manifest.appApiVersion,
             targetDatabaseSchemaVersion: manifest.databaseSchemaVersion,
+            currentModuleContracts: runtimeModuleContracts(),
+            targetModuleContracts: manifest.moduleContracts,
+            currentRuntimeComposition: composition,
+            targetRuntimeComposition: manifest.runtimeComposition,
             updaterHelperChanged: updaterSelfReplacement([
                 ...manifest.files.map((item) => String(item.path ?? '')),
                 ...manifest.deletions
@@ -838,6 +871,11 @@ export class UpdateManager {
             }
         }
         const declared = validateFileList(zip, manifest)
+        validateModulePayload(zip, manifest)
+        validateIncrementalRuntimeComposition({ current: composition, target: manifest.runtimeComposition,
+            files: manifest.files.map(file => file.path), deletions: manifest.deletions,
+            descriptor: zip.getEntry(RUNTIME_COMPOSITION_PATH)?.getData().toString('utf8') })
+        this.requirePreparation(epoch)
         const id = randomUUID()
         const directory = path.join(this.options.stateRoot, `staged-${id}`)
         fs.mkdirSync(directory, { recursive: true })
@@ -894,7 +932,7 @@ export class UpdateManager {
         }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            this.writeProgress({ phase: 'failed', message })
+            if(epoch===this.preparationEpoch&&!this.activeApply)this.writeProgress({ phase: 'failed', message })
             throw error
         }
     }
@@ -904,6 +942,12 @@ export class UpdateManager {
         archiveName: string,
         buffer: Buffer
     ) {
+        if(this.activeApply)throw new Error('An update is already being applied')
+        return this.stageCompleteApplication(version,archiveName,buffer,++this.preparationEpoch)
+    }
+
+    private async stageCompleteApplication(version:string,archiveName:string,buffer:Buffer,epoch:number,choice?:RuntimeChoicePlan,signal?:AbortSignal) {
+        if(this.activeApply)throw new Error('An update is already being applied')
         this.writeProgress({ phase: 'validating' })
         try {
             const target = this.updateTarget()
@@ -911,15 +955,16 @@ export class UpdateManager {
                 throw new Error(
                     'One-click full application upgrade is currently supported only on Windows x64'
                 )
-            if (
+            if (choice) validateRuntimeChoiceVersion(this.options.currentVersion,version)
+            else if (
                 !stableVersionParts(version) ||
                 !isNewerStable(version, this.options.currentVersion)
             )
                 throw new Error(
                     'Full application upgrade requires a newer stable version'
                 )
-            const expectedName =
-                `Pica-Library-v${version}-windows-x64.zip`
+            const composition = requireInstalledRuntimeComposition(this.options.applicationRoot)
+            const expectedName = fullApplicationAssetName(version, target, choice?.to??composition)
             if (archiveName !== expectedName)
                 throw new Error(
                     'Unexpected full application package name'
@@ -932,37 +977,31 @@ export class UpdateManager {
             )
             const zip = new AdmZip(buffer)
             const validated = validateFullApplicationArchive(zip)
+            if(signal?.aborted)throw Error('Runtime component selection was cancelled')
+            let runtimeChoice:RuntimeChoiceReceipt|undefined
+            if(choice){
+                if(!validated.declared.has(RUNTIME_COMPOSITION_PATH))throw Error('Explicit runtime replacement requires declared target composition')
+                runtimeChoice={kind:'user-selected-runtime-composition',id:choice.id,from:choice.from,to:choice.to,sourceSha:choice.sourceSha,
+                    sourceVersion:this.options.currentVersion,targetSourceSha:validated.sourceSha,targetVersion:version,archiveName,archiveSha256:archiveHash,validUntil:choice.validUntil}
+                validateRuntimeChoiceReceipt(runtimeChoice,{current:composition,staged:validated.composition,sourceSha:this.installedChoiceSource(),targetSourceSha:validated.sourceSha,targetVersion:version,
+                    expectedArchiveName:choice.release.archiveName,expectedArchiveSha256:choice.release.sha256})
+            }else validateAutomaticFullRuntimeComposition(composition, validated.composition)
+            this.requirePreparation(epoch)
             const id = randomUUID()
             const directory = path.join(
                 this.options.stateRoot,
                 `full-staged-${id}`,
                 'application'
             )
-            fs.mkdirSync(directory, { recursive: true })
-            this.writeProgress({
-                phase: 'extracting',
-                current: 0,
-                total: validated.declared.size,
-                targetVersion: version
-            })
-            let current = 0
-            for (const [safe, entry] of validated.declared) {
-                const destination = path.join(
-                    directory,
-                    ...safe.split('/')
-                )
-                fs.mkdirSync(path.dirname(destination), {
-                    recursive: true
-                })
-                fs.writeFileSync(destination, entry.getData())
-                current += 1
+            fs.mkdirSync(path.dirname(directory), { recursive: true })
+            extractValidatedFullApplication(validated, directory, (current, total) => {
                 this.writeProgress({
                     phase: 'extracting',
                     current,
-                    total: validated.declared.size,
+                    total,
                     targetVersion: version
                 })
-            }
+            })
             this.staged = null
             this.stagedFull = {
                 id,
@@ -971,6 +1010,8 @@ export class UpdateManager {
                 directory,
                 targetVersion: version,
                 targetSourceSha: validated.sourceSha,
+                runtimeComposition: validated.composition,
+                ...(runtimeChoice?{runtimeChoice}:{}),
                 stagedAt: new Date().toISOString()
             }
             this.writeProgress({
@@ -989,14 +1030,28 @@ export class UpdateManager {
                 fileCount: validated.declared.size,
                 deletionCount: 0,
                 requiresFullInstall: true,
-                oneClick: true
+                oneClick: true,
+                ...(runtimeChoice?{expectedRuntimeComposition:normalizeRuntimeComposition(validated.composition)}:{})
             }
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : String(error)
-            this.writeProgress({ phase: 'failed', message })
+            if(epoch===this.preparationEpoch&&!this.activeApply)this.writeProgress({ phase: 'failed', message })
             throw error
         }
+    }
+
+    private launchApply(id:string,kind:UpgradeHelperKind,targetVersion:string,executable:string,args:string[],options:Pick<SpawnOptions,'cwd'|'env'>,instruction:HelperReadiness){
+        const promise=startUpgradeHelper(executable,args,options,instruction,kind)
+            .then(()=>({accepted:true as const,mode:kind,targetVersion}))
+            .catch(error=>{
+                // A failed helper must not close the current app or hide the original failure.
+                try{this.writeProgress({phase:'failed',targetVersion,message:error instanceof Error?error.message:String(error)})}catch{/* App remains running even if its status store is unavailable. */}
+                if(!(error instanceof UpgradeHelperStopError)&&this.activeApply?.id===id)this.activeApply=null
+                throw error
+            })
+        this.activeApply={id,promise}
+        return promise
     }
 
     apply(
@@ -1007,12 +1062,25 @@ export class UpdateManager {
             currentUrl?: string
         }
     ) {
+        if(this.activeApply){
+            if(this.activeApply.id!==id)throw new Error('An update is already being applied')
+            return this.activeApply.promise
+        }
         if (this.stagedFull?.id === id) {
             if (!context)
                 throw new Error(
                     'Full application upgrade context is unavailable'
                 )
+            // Fail before preparing a helper or asking the live app to exit.
+            sqliteDiskFilename(path.resolve(context.libraryDirectory, 'library.db'))
             const full = this.stagedFull
+            if(full.runtimeChoice && installedRuntimeComposition(full.directory).status!=='declared')throw Error('Explicit runtime target declaration changed after staging')
+            if(full.runtimeChoice)validateRuntimeChoiceReceipt(full.runtimeChoice,{
+                current:requireInstalledRuntimeComposition(this.options.applicationRoot),staged:requireInstalledRuntimeComposition(full.directory),sourceSha:this.installedChoiceSource(),
+                targetSourceSha:fs.readFileSync(path.join(full.directory,'SOURCE_SHA.txt'),'utf8').trim(),targetVersion:full.targetVersion,expectedArchiveName:full.archiveName,expectedArchiveSha256:full.archiveSha256
+            })
+            else validateAutomaticFullRuntimeComposition(requireInstalledRuntimeComposition(this.options.applicationRoot),requireInstalledRuntimeComposition(full.directory),full.runtimeComposition)
+            ++this.preparationEpoch
             const persistentAssistant =
                 this.preparePersistentUpgradeAssistant({
                     verifyExisting: true
@@ -1065,7 +1133,10 @@ export class UpdateManager {
                     this.options.applicationRoot
                 )}.backup-before-v${full.targetVersion}-${stamp}`
             )
+            const readyNonce=randomUUID()
             const instruction: FullApplicationUpdaterInstruction = {
+                readyNonce,
+                readyFile:path.join(bootstrapRoot,`helper-ready-${readyNonce}.json`),
                 parentPid: process.pid,
                 applicationRoot: this.options.applicationRoot,
                 stagedApplicationRoot: full.directory,
@@ -1077,6 +1148,8 @@ export class UpdateManager {
                 progressFile: this.progressFile,
                 targetVersion: full.targetVersion,
                 targetSourceSha: full.targetSourceSha,
+                runtimeComposition: full.runtimeComposition,
+                ...(full.runtimeChoice?{runtimeChoice:full.runtimeChoice}:{}),
                 previousUrl: context.currentUrl,
                 healthTimeoutMs: 60_000
             }
@@ -1093,23 +1166,14 @@ export class UpdateManager {
                 phase: 'waiting-for-exit',
                 targetVersion: full.targetVersion
             })
-            const child = spawn(
+            return this.launchApply(id,'full-application',full.targetVersion,
                 bootstrapRuntime,
                 [bootstrapHelper, instructionFile],
                 {
-                    detached: true,
-                    stdio: 'ignore',
-                    windowsHide: true,
                     cwd: bootstrapRoot,
                     env: sanitizedChildEnv()
-                }
+                },instruction
             )
-            child.unref()
-            return {
-                accepted: true,
-                mode: 'full-application' as const,
-                targetVersion: full.targetVersion
-            }
         }
 
         if (!this.staged || this.staged.id !== id)
@@ -1120,7 +1184,15 @@ export class UpdateManager {
             throw new Error(
                 'This update requires the full application upgrade path'
             )
+        if(!context)throw new Error('Incremental application upgrade context is unavailable')
+        ++this.preparationEpoch
+        sqliteDiskFilename(path.resolve(context.libraryDirectory,'library.db'))
+        const readyNonce=randomUUID()
         const instruction: UpdaterInstruction = {
+            desktopHomeRoot:context.desktopHomeRoot,
+            libraryDirectory:context.libraryDirectory,
+            readyNonce,
+            readyFile:path.join(this.options.stateRoot,`helper-ready-${readyNonce}.json`),
             parentPid: process.pid,
             applicationRoot: this.options.applicationRoot,
             stagingRoot: this.staged.directory,
@@ -1156,22 +1228,14 @@ export class UpdateManager {
             phase: 'waiting-for-exit',
             targetVersion: this.staged.manifest.targetVersion
         })
-        const child = spawn(
+        return this.launchApply(id,'incremental',this.staged.manifest.targetVersion,
             this.options.runtimePath,
             [updater, instructionFile],
             {
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: true,
+                cwd:this.options.applicationRoot,
                 env: sanitizedChildEnv()
-            }
+            },instruction
         )
-        child.unref()
-        return {
-            accepted: true,
-            mode: 'incremental' as const,
-            targetVersion: this.staged.manifest.targetVersion
-        }
     }
 }
 
@@ -1184,5 +1248,6 @@ export const updateInternals = {
     readManifest,
     manifestUpdateTarget,
     validateFileList,
+    validateModulePayload,
     sha256
 }

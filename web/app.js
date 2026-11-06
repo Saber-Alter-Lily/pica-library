@@ -8,9 +8,19 @@ import {
 } from './lite-state.js'
 import { deriveLiteAuthors } from './author-state.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
+import { installRuntimeChoice } from './runtime-choice.js'
 import { installAccountOnboarding } from './account-onboarding.js'
+import { installLocalImport } from './local-import.js'
+import { installReadingLibrary } from './reading-library.js'
+import { isSignedReaderComicId } from './signed-reader-route.js'
+import { currentHostedLibrarySession, resumeHostedLibraryComic, currentHostedDownloadSession, queryHostedLocalDownloads, cancelHostedLocalDownload } from './host-library.js'
+import { installHostedDownloadProjection } from './host-downloads.js'
+import { readerKeyboardAction, readerPageIndex } from './reader-input.js'
+import { createReaderViewportTracker } from './reader-viewport.js'
+import { normalizeReaderSettings, loadReaderSettings, cacheReaderSettings, createReaderSettingsWriter } from './reader-settings.js'
+import { recordReaderProgress, captureReaderProgress, acknowledgeReaderProgress } from './reader-progress.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
-import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
+import { createChronicleView } from './chronicle-view.js'
 import {
     applyTranslations,
     localizeAuthorEvidence,
@@ -87,6 +97,7 @@ const state = {
     recommendationExhausted: false,
     updateProgress: null,
     chronicleSnapshot: null,
+    chronicleView: null,
     downloadRunnerRunning: false,
     downloadRecoveryNotified: false,
     reader: {
@@ -100,6 +111,8 @@ const state = {
 }
 window.picaAppSessionId = state.appSessionId
 let desktop = null
+let readingLibraryPanel = null
+let hostedDownloadsPanel = null
 let language = resolveLanguage(
     localStorage,
     navigator.languages || [navigator.language]
@@ -163,6 +176,22 @@ installDialogScrollRestoration()
 const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
+let readerSettingsEditVersion = 0
+const readerSettingsWriter = createReaderSettingsWriter(settings => desktop?.csrfToken
+    ? desktopPost('/api/v1/desktop/settings', { readerSettingsAction: 'save', readerSettings: settings })
+    : undefined)
+function applyReaderSettingsControls(value) {
+    const settings = normalizeReaderSettings(value)
+    for (const key of ['mode', 'direction', 'fit']) $(`#reader-${key}`).value = settings[key]
+    cacheReaderSettings(localStorage, settings)
+}
+function persistReaderSettings() {
+    readerSettingsEditVersion++
+    const settings = { schemaVersion: 1, mode: $('#reader-mode').value, direction: $('#reader-direction').value, fit: $('#reader-fit').value }
+    cacheReaderSettings(localStorage, settings)
+    void readerSettingsWriter.save(settings).catch(error => showOperationToast(t('reader.settingsSaveFailed') + ' ' + localizeError(language, error), 'error'))
+}
+applyReaderSettingsControls(loadReaderSettings(localStorage))
 
 const VISUAL_SETTINGS_CACHE_KEY = 'pica-visual-settings-confirmed-v1'
 const AUTO_UPDATE_PROMPT_KEY = 'pica-auto-update-prompt-v1'
@@ -418,6 +447,28 @@ $('#mobile-bridge-copy-code')?.addEventListener('click', () =>
 $('#mobile-bridge-copy-link')?.addEventListener('click', () =>
     void copyMobileBridgeValue('#mobile-bridge-pair-link', 'mobile.copiedLink')
 )
+let mobileBridgeUiBusy = false
+async function changeMobileBridge(enabled) {
+    if (mobileBridgeUiBusy || !desktop?.csrfToken) return
+    mobileBridgeUiBusy = true
+    renderMobileBridge()
+    let failure = null, attempted = false
+    try {
+        if (enabled && !(await askConfirm(t('mobile.enableConfirm')))) return
+        attempted = true
+        await desktopPost('/api/v1/desktop/settings', { mobileBridgeAction: 'set-enabled', enabled })
+    } catch (error) { failure = localizeError(language, error) }
+    finally {
+        // A disable can close the listener even if persisting the choice failed.
+        // Re-read actual status on both success and failure, not the old QR state.
+        if (attempted) await loadDesktop()
+        mobileBridgeUiBusy = false
+        renderMobileBridge()
+        if (failure) $('#mobile-bridge-state').textContent = failure
+    }
+}
+$('#mobile-bridge-enable')?.addEventListener('click', () => void changeMobileBridge(true))
+$('#mobile-bridge-disable')?.addEventListener('click', () => void changeMobileBridge(false))
 applyLanguage(language)
 
 async function api(path, options) {
@@ -442,12 +493,21 @@ async function ensureConnectedEngine(forceProbe = false) {
     }
 }
 
-const post = (path, value) =>
-    api(path, {
+const post = (path, value) => {
+    // An explicit, disposable source-free QA full Web entry sets this token.
+    // Production Desktop stays on its original POST contract unchanged.
+    const qaToken = document.querySelector(
+        'meta[name="pica-core-qa-csrf"]'
+    )?.content
+    return api(path, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+            'content-type': 'application/json',
+            ...(qaToken ? { 'x-pica-qa-csrf': qaToken } : {})
+        },
         body: JSON.stringify(value)
     })
+}
 // Legacy V2 contract remains intentionally discoverable:
 // post('/api/v1/recommendation-sessions', {})
 // api('/api/v1/recommendation-sessions/status')
@@ -463,6 +523,14 @@ function recordRecommendationEvent(eventType, payload = {}) {
         recommendationCycleId: state.recommendationCycleId,
         ...payload
     }
+    // Rendering an empty/local-only page is not a managed recommendation batch.
+    // Keep the server's context requirement; do not submit a fabricated event.
+    if (eventType === 'recommend_batch_presented' && (
+        typeof value.recommendationCycleId !== 'string' || !value.recommendationCycleId.trim() ||
+        typeof value.recommendationBatchId !== 'string' || !value.recommendationBatchId.trim() ||
+        !Number.isSafeInteger(value.recommendationBatchIndex) || value.recommendationBatchIndex < 0 ||
+        !Array.isArray(value.metadata?.itemIds) || value.metadata.itemIds.length === 0
+    )) return
     void post('/api/v1/recommendation-events', {
         ...value,
         contextId: payload.contextId || value.recommendationContextId || null
@@ -562,11 +630,19 @@ function setupValue(prefix) {
 
 function activateView(id) {
     const previousView = activeView
+    if (previousView === 'reader' && id !== 'reader') {
+        readerComicRequest++
+        readerChapterRequest++
+        resetReaderViewportTracking()
+        void flushReaderProgress()
+    }
     if (previousView && previousView !== 'reader')
         viewScrollPositions.set(previousView, Math.max(0, window.scrollY))
     if (id === 'reader' && previousView !== 'reader')
         state.reader.originView = previousView
     activeView = id
+    if (id === 'library') void readingLibraryPanel?.refresh()
+    void hostedDownloadsPanel?.refresh()
     document.querySelectorAll('.view').forEach((view) =>
         view.classList.toggle('active', view.id === id)
     )
@@ -575,6 +651,7 @@ function activateView(id) {
     )
     document.body.classList.toggle('reader-active', id === 'reader')
     requestAnimationFrame(() => {
+        if (activeView !== id) return
         if (id === 'reader') window.scrollTo(0, 0)
         else window.scrollTo(0, viewScrollPositions.get(id) ?? 0)
     })
@@ -643,9 +720,23 @@ function renderMobileBridge() {
     const stateLabel = $('#mobile-bridge-state')
     if (!panel || !stateLabel) return
     const mobile = desktop?.mobileBridge
+    const enable = $('#mobile-bridge-enable'), disable = $('#mobile-bridge-disable')
+    if (enable) {
+        enable.hidden = Boolean(mobile?.enabled)
+        enable.disabled = mobileBridgeUiBusy || !desktop?.configured || !desktop?.startupReady
+        enable.textContent = t(desktop?.mobileBridgePreference ? 'mobile.retry' : 'mobile.enable')
+    }
+    if (disable) {
+        disable.hidden = !mobile?.enabled && !desktop?.mobileBridgePreference
+        disable.disabled = mobileBridgeUiBusy
+        disable.textContent = t('mobile.disable')
+    }
     if (!mobile?.enabled) {
         panel.hidden = true
-        stateLabel.textContent = t('mobile.bridgeStopped')
+        stateLabel.textContent = t(desktop?.mobileBridgePreference ? 'mobile.bridgeUnavailable' : 'mobile.bridgeStopped')
+        for (const id of ['mobile-bridge-code', 'mobile-bridge-address', 'mobile-bridge-pair-link', 'mobile-bridge-devices', 'mobile-bridge-expiry'])
+            if ($('#' + id)) $('#' + id).textContent = ''
+        $('#mobile-bridge-qr')?.replaceChildren()
         return
     }
     panel.hidden = false
@@ -727,16 +818,24 @@ function closeDesktopBrowserSession() {
 }
 
 async function loadDesktop() {
+    const settingsVersion = readerSettingsEditVersion
+    let desktopHostReached = false
     try {
         desktop = await api('/api/v1/desktop/status')
+        desktopHostReached = true
         state.capabilities = await api('/api/v1/capabilities')
+        document.dispatchEvent(new Event('pica-local-import-refresh'))
         $('#settings-nav').hidden = false
         $('#settings-version').textContent = `Pica Library ${desktop.version}`
         $('#update-current-version').textContent = `v${desktop.version}`
+        $('#signed-source-manager').hidden =
+            !(desktop.configured && desktop.signedSourceManagement?.available === true)
         $('#settings-directory').value = desktop.libraryDirectory || ''
         $('#settings-profile').value = desktop.profile || 'balanced'
         $('#settings-proxy').value = desktop.proxyUrl || ''
         $('#setup-directory').value = desktop.libraryDirectory || ''
+        if (desktop.readerSettings && settingsVersion === readerSettingsEditVersion && !readerSettingsWriter.pending && activeView !== 'reader')
+            applyReaderSettingsControls(desktop.readerSettings)
         applyDesktopPlatformCapabilities()
         renderTimestamps()
         renderMobileBridge()
@@ -752,7 +851,24 @@ async function loadDesktop() {
             document.querySelector('nav').hidden = false
         }
     } catch {
+        // Standalone source-free bootstrap also calls this function without
+        // a browser DOM. Never let an optional source UI break core startup.
+        if (typeof document !== 'undefined' &&
+            typeof document.getElementById === 'function')
+            document.getElementById('signed-source-manager')?.setAttribute('hidden', '')
         desktop = null
+        // An existing Desktop host with a failed capabilities request must
+        // stay fail-closed and must not retry or partially advertise features.
+        // Only a missing Desktop host can fall back to the source-free core's
+        // independent capabilities endpoint.
+        state.capabilities = null
+        if (!desktopHostReached) {
+            try {
+                state.capabilities = await api('/api/v1/capabilities')
+            } catch {
+                state.capabilities = null
+            }
+        }
     }
 }
 
@@ -800,7 +916,7 @@ function renderStagedUpdate(value) {
         {
             files: Number(value.fileCount),
             deletions: Number(value.deletionCount),
-            schema: Number(value.databaseSchemaVersion),
+            schema: Number.isSafeInteger(value.databaseSchemaVersion) ? value.databaseSchemaVersion : '—',
             full: value.requiresFullInstall
                 ? t('update.fullRequiredInline')
                 : ''
@@ -848,9 +964,10 @@ async function stageUpdateFile(file) {
 
 async function reconnectAfterUpdate(
     targetVersion,
-    timeoutMs = 90_000
+    timeoutMs = 90_000,
+    readiness = {}
 ) {
-    const ready = await waitForUpdateReconnect(targetVersion, { timeoutMs })
+    const ready = await waitForUpdateReconnect(targetVersion, { timeoutMs, ...readiness })
     if (!ready) throw new Error(t('update.reconnectFailed'))
     window.location.reload()
 }
@@ -867,6 +984,7 @@ async function applyStagedUpdate(
         ))
     )
         return
+    const readiness = value.expectedRuntimeComposition ? { expectedRuntimeComposition: value.expectedRuntimeComposition, previousCsrfToken: desktop.csrfToken } : {}
     const result = await desktopPost('/api/v1/update/apply', {
         id: value.id
     })
@@ -877,7 +995,7 @@ async function applyStagedUpdate(
         phase: 'waiting-for-exit',
         targetVersion
     })
-    await reconnectAfterUpdate(targetVersion)
+    await reconnectAfterUpdate(targetVersion, undefined, readiness)
 }
 
 function fullInstallDownloadUrl(version) {
@@ -1031,6 +1149,10 @@ $('#update-apply').onclick = async () => {
         renderUpdateProgress({ phase: 'failed' })
     }
 }
+
+installRuntimeChoice({post:desktopPost,confirm:askConfirm,isDesktop:()=>Boolean(desktop),
+    isUpdateBusy:()=>$('#update-one-click').disabled || $('#update-check').disabled,
+    staged:renderStagedUpdate,apply:applyStagedUpdate})
 
 function readAutoUpdatePromptState() {
     try {
@@ -1208,6 +1330,26 @@ async function testDesktop(prefix) {
 $('#setup-folder').onclick = () => chooseFolder('setup')
 $('#settings-folder').onclick = () => chooseFolder('settings')
 installAccountOnboarding({ post: desktopPost, getDesktop: () => desktop, getLanguage: () => language })
+readingLibraryPanel = installReadingLibrary({
+    target: $('#reading-library'),
+    canQuery: () => state.mode === 'connected' && Boolean(desktop?.configured && desktop?.csrfToken) && desktop?.startupReady !== false,
+    isVisible: () => activeView === 'library',
+    query: (value, signal) => api('/api/v1/desktop/reading-library/query', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': desktop?.csrfToken || '' }, body: JSON.stringify(value), signal }),
+    hostSession: currentHostedLibrarySession,
+    openReader: (comicId, online) => openReaderComic(comicId, online),
+    openHosted: resumeHostedLibraryComic,
+    openSigned: (comicId, sessionId) =>
+        openReaderComic(comicId, true, null, {
+            sessionId, csrfToken: desktop?.csrfToken || ''
+        })
+})
+hostedDownloadsPanel = installHostedDownloadProjection({
+    target: $('#host-downloads'), boundaryNote: $('#downloads .info-tip'),
+    canQuery: () => state.mode === 'connected' && Boolean(desktop?.configured && desktop?.csrfToken) && desktop?.startupReady !== false,
+    isVisible: () => activeView === 'downloads' && !document.hidden && !document.getElementById('host-library-dialog')?.open,
+    hostSession: currentHostedDownloadSession, query: queryHostedLocalDownloads, cancel: cancelHostedLocalDownload,
+    openReader: (comicId, online) => openReaderComic(comicId, online)
+})
 $('#setup-open-settings').onclick = () => activateView('settings')
 $('#setup-open-eh').onclick = () => {
     activateView('settings')
@@ -1218,6 +1360,17 @@ $('#setup-open-eh').onclick = () => {
 const downloadedCloud = createDownloadedCloud({ post: desktopPost, getDesktop: () => desktop, getLanguage: () => language })
 $('#setup-test').onclick = () => testDesktop('setup')
 $('#settings-test').onclick = () => testDesktop('settings')
+$('#setup-local').onclick = async () => {
+    const message = $('#setup-message')
+    await withBusyButton($('#setup-local'), async () => {
+        try {
+            await desktopPost('/api/v1/desktop/settings', { setupMode: 'local', libraryDirectory: $('#setup-directory').value, profile: $('#setup-profile').value })
+            message.textContent = t('setup.localSaved')
+            await waitForDesktopHealth()
+            location.assign('/')
+        } catch (error) { message.textContent = localizeError(language, error) }
+    })
+}
 $('#setup-form').onsubmit = async (event) => {
     event.preventDefault()
     const button =
@@ -1571,7 +1724,7 @@ function mountOnlineReadButtons(container) {
         const button = document.createElement('button')
         button.type = 'button'
         button.dataset.onlineComic = selector.dataset.comicId
-        button.textContent = t('reader.online')
+        button.textContent = selector.dataset.comicId.startsWith('local:') ? t('downloaded.read') : t('reader.online')
         target.append(button)
     }
 }
@@ -1610,7 +1763,9 @@ document.addEventListener('pica-open-comic-detail', (event) => {
 })
 
 function librarySourceBindings(comic) {
+    if (providerIdForComic(comic) === 'local') return []
     const values = []
+    if (providerIdForComic(comic) === 'jm') values.push('JM')
     if ((comic?.providerId || '').toLowerCase() === 'pica' || (!comic?.providerId && !String(comic?.comicId || '').startsWith('eh:'))) values.push('Pica')
     const known = Array.isArray(comic?.providerMetadata?.knownSurfaces) ? comic.providerMetadata.knownSurfaces : []
     if ((comic?.providerId === 'eh' || String(comic?.comicId || '').startsWith('eh:')) && !known.length) values.push('E-H')
@@ -1769,15 +1924,17 @@ function renderAuthors() {
 }
 
 function providerIdForComic(comic) {
+    if (String(comic?.comicId || '').startsWith('local:')) return 'local'
     return comic?.providerId ||
-        (String(comic?.comicId || '').startsWith('eh:') ? 'eh' : 'pica')
+        (String(comic?.comicId || '').startsWith('eh:') ? 'eh' : String(comic?.comicId || '').startsWith('jm:') ? 'jm' : 'pica')
 }
 
 function providerLabelForComic(comic) {
-    return providerIdForComic(comic) === 'eh' ? 'E-H' : 'Pica'
+    return providerIdForComic(comic) === 'eh' ? 'E-H' : providerIdForComic(comic) === 'jm' ? 'JM' : 'Pica'
 }
 
 function providerPopularityForComic(comic) {
+    if (providerIdForComic(comic) === 'jm') return t('provider.publicMetadata')
     if (providerIdForComic(comic) === 'eh') {
         const rating = Number(comic?.rating)
         return Number.isFinite(rating) && rating > 0
@@ -1791,7 +1948,7 @@ function providerPopularityForComic(comic) {
 }
 
 function providerFavoriteLabel(comic) {
-    return providerIdForComic(comic) === 'eh' ? t('provider.localFavorite') : t('result.favorite')
+    return providerIdForComic(comic) !== 'pica' ? t('provider.localFavorite') : t('result.favorite')
 }
 
 function renderResultCards(records, target, recommendation = false) {
@@ -2695,10 +2852,14 @@ function openRecommendationDetail(comicId, context = 'recommendation', comicOver
         : ''
     $('#recommend-detail-content').innerHTML =
         `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${favoriteButton}<button data-detail-download="true">${t('action.download')}</button></div><details id="work-variants-panel" class="work-variants-panel"><summary>${escapeHtml(t('workVariants.loading'))}</summary><div data-work-variants-list></div></details>`
+    if (comicId.startsWith('local:')) {
+        $('#recommend-detail-content [data-detail-download]')?.remove()
+        $('#recommend-detail-content [data-detail-preview]')?.remove()
+    }
     if (state.mode === 'connected') {
         const button = document.createElement('button')
         button.dataset.detailOnline = 'true'
-        button.textContent = t('reader.online')
+        button.textContent = comicId.startsWith('local:') ? t('downloaded.read') : t('reader.online')
         $('#recommend-detail-content .detail-actions').prepend(button)
     }
     if (state.mode === 'connected') {
@@ -2857,11 +3018,12 @@ $('#recommend-detail-dialog').onclick = async (event) => {
 }
 
 let readerProgressTimer = null
-let readerScrollHandler = null
-let readerPageObserver = null
 let readerChapterRequest = 0
 let readerComicRequest = 0
+const readerViewportTracker = createReaderViewportTracker({ window, document, onPage: queueReaderProgress })
 function readerApiRoot() {
+    if (state.reader.signedSessionId) return '/api/v1/desktop/signed-reader/' + state.reader.signedSessionId
+    if (state.reader.hostedSessionId) return '/api/v1/desktop/host-reader/' + state.reader.hostedSessionId
     return state.reader.online ? '/api/v1/online-reader' : '/api/v1/reader'
 }
 
@@ -2894,90 +3056,24 @@ function scrollReaderViewportToTop() {
 }
 
 function resetReaderViewportTracking() {
-    readerPageObserver?.disconnect()
-    readerPageObserver = null
-    if (readerScrollHandler)
-        window.removeEventListener('scroll', readerScrollHandler)
-    readerScrollHandler = null
-}
-
-function queueReaderProgressFromViewport(target) {
-    const bounds = target.getBoundingClientRect()
-    const centerY = window.innerHeight / 2
-    const sampleXs = [
-        bounds.left + bounds.width / 2,
-        bounds.left + bounds.width * 0.35,
-        bounds.left + bounds.width * 0.65
-    ]
-    const sampleYs = [
-        centerY,
-        Math.max(0, centerY - window.innerHeight * 0.08),
-        Math.min(window.innerHeight - 1, centerY + window.innerHeight * 0.08)
-    ]
-    for (const y of sampleYs) {
-        for (const x of sampleXs) {
-            const element = document.elementFromPoint(x, y)
-            const image = element?.closest?.('[data-reader-page]')
-            if (image && target.contains(image)) {
-                queueReaderProgress(Number(image.dataset.readerPage))
-                return
-            }
-        }
-    }
+    readerViewportTracker.stop()
 }
 
 function observeVerticalReaderProgress(target, resumePage) {
-    requestAnimationFrame(() => {
-        target
-            .querySelector(`[data-reader-page="${resumePage}"]`)
-            ?.scrollIntoView({ block: 'center' })
-        requestAnimationFrame(() => {
-            if ('IntersectionObserver' in window) {
-                readerPageObserver = new IntersectionObserver(
-                    (entries) => {
-                        const center = window.innerHeight / 2
-                        const nearest = entries
-                            .filter((entry) => entry.isIntersecting)
-                            .map((entry) => ({
-                                pageIndex: Number(
-                                    entry.target.dataset.readerPage
-                                ),
-                                distance: Math.abs(
-                                    entry.boundingClientRect.top +
-                                        entry.boundingClientRect.height / 2 -
-                                        center
-                                )
-                            }))
-                            .sort((a, b) => a.distance - b.distance)[0]
-                        if (nearest) queueReaderProgress(nearest.pageIndex)
-                    },
-                    {
-                        root: null,
-                        rootMargin: '-45% 0px -45% 0px',
-                        threshold: [0, 0.01]
-                    }
-                )
-                target
-                    .querySelectorAll('[data-reader-page]')
-                    .forEach((image) => readerPageObserver.observe(image))
-                queueReaderProgress(resumePage)
-                return
-            }
+    const reader = state.reader, chapter = reader.chapter, episodeId = reader.episodeId
+    readerViewportTracker.start({
+        target, resumePage, pageCount: chapter.pages.length,
+        isCurrent: () => activeView === 'reader' && state.reader === reader &&
+            reader.chapter === chapter && reader.episodeId === episodeId &&
+            $('#reader-mode').value === 'vertical'
+    })
+}
 
-            let queued = false
-            readerScrollHandler = () => {
-                if (queued) return
-                queued = true
-                requestAnimationFrame(() => {
-                    queued = false
-                    queueReaderProgressFromViewport(target)
-                })
-            }
-            window.addEventListener('scroll', readerScrollHandler, {
-                passive: true
-            })
-            readerScrollHandler()
-        })
+function queueReaderViewportTop() {
+    const reader = state.reader, chapter = reader.chapter
+    requestAnimationFrame(() => {
+        if (activeView === 'reader' && state.reader === reader && reader.chapter === chapter && $('#reader-mode').value !== 'vertical')
+            scrollReaderViewportToTop()
     })
 }
 
@@ -3019,8 +3115,7 @@ function renderReaderPages() {
 }
 
 function queueReaderProgress(pageIndex) {
-    state.reader.pageIndex = pageIndex
-    state.reader.dirty = state.reader.progressSaved !== pageIndex
+    if (activeView !== 'reader' || !recordReaderProgress(state.reader, pageIndex)) return
     clearTimeout(readerProgressTimer)
     readerProgressTimer = setTimeout(() => void flushReaderProgress(), 400)
 }
@@ -3028,30 +3123,28 @@ function queueReaderProgress(pageIndex) {
 async function flushReaderProgress(keepalive = false) {
     clearTimeout(readerProgressTimer)
     readerProgressTimer = null
-    if (!state.reader.dirty || !state.reader.comicId || !state.reader.episodeId)
-        return true
-    const payload = {
-        comicId: state.reader.comicId,
-        episodeId: state.reader.episodeId,
-        pageIndex: state.reader.pageIndex
-    }
-    const reader = state.reader
+    const snapshot = captureReaderProgress(state.reader)
+    if (!snapshot) return true
+    const { payload, owner: reader } = snapshot
     const root = readerApiRoot()
+    const scoped = Boolean(reader.hostedSessionId || reader.signedSessionId)
+    const scopedToken = reader.hostedSessionId
+        ? reader.hostedCsrfToken || desktop?.csrfToken || ''
+        : reader.signedCsrfToken || desktop?.csrfToken || ''
     try {
         if (keepalive) {
             const response = await fetch(`${root}/progress`, {
                 method: 'POST',
-                headers: { 'content-type': 'application/json' },
+                headers: { 'content-type': 'application/json', ...(scoped ? { 'x-pica-csrf': scopedToken } : {}) },
                 body: JSON.stringify(payload),
                 keepalive: true
             })
             if (!response.ok) throw new Error('Progress not saved')
         }
+        else if (scoped) await api(`${root}/progress`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': scopedToken }, body: JSON.stringify(payload) })
         else await post(`${root}/progress`, payload)
-        if (state.reader === reader && reader.episodeId === payload.episodeId && reader.pageIndex === payload.pageIndex) {
-            reader.progressSaved = payload.pageIndex
-            reader.dirty = false
-        }
+        acknowledgeReaderProgress(state.reader, snapshot)
+        if (activeView === 'library') void readingLibraryPanel?.refresh()
         return true
     } catch {
         // Reader remains usable if progress persistence briefly fails.
@@ -3064,10 +3157,14 @@ async function openReaderChapter(episodeId) {
     resetReaderViewportTracking()
     if (state.reader.episodeId && state.reader.episodeId !== episodeId)
         await flushReaderProgress()
+    if (requestId !== readerChapterRequest) return
     $('#reader-message').textContent = t('reader.loadingChapter')
     try {
     const chapter = await api(
-        `${readerApiRoot()}/comics/${encodeURIComponent(state.reader.comicId)}/chapters/${encodeURIComponent(episodeId)}`
+        `${readerApiRoot()}/comics/${encodeURIComponent(state.reader.comicId)}/chapters/${encodeURIComponent(episodeId)}`,
+        state.reader.signedSessionId ? { headers: {
+            'x-pica-csrf': state.reader.signedCsrfToken || desktop?.csrfToken || ''
+        } } : undefined
     )
     if (requestId !== readerChapterRequest) return
     state.reader.episodeId = episodeId
@@ -3082,8 +3179,8 @@ async function openReaderChapter(episodeId) {
     renderReaderPages()
     updateReaderChapterNavigation()
     if ($('#reader-mode').value !== 'vertical')
-        requestAnimationFrame(() => scrollReaderViewportToTop())
-    $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.online ? t('reader.onlineNotice') : ''
+        queueReaderViewportTop()
+    $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.hostedSessionId ? t('reader.hostedNotice') : state.reader.online ? t('reader.onlineNotice') : ''
     } catch (error) {
         if (requestId === readerChapterRequest)
             $('#reader-message').textContent = localizeError(language, error)
@@ -3103,15 +3200,31 @@ function renderReaderChapterHeading() {
             : '')
 }
 
-async function openReaderComic(comicId, online = false) {
+async function openReaderComic(comicId, online = false, hosted = null, signed = null) {
+    if (hosted && signed) return
+    if (hosted && (!/^[0-9a-f-]{36}$/.test(hosted.sessionId || '') || !/^hosted:[0-9a-f-]{36}:[0-9a-f]{64}$/.test(comicId))) return
+    // The UI does not decide work ownership. It only rejects unsafe route
+    // syntax; the signed Desktop session and its trusted identity bridge do
+    // the authoritative validation. Legacy catalogue IDs may have 2 colons.
+    if (signed && (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(signed.sessionId || '') ||
+        !isSignedReaderComicId(comicId)))
+        throw new Error('Invalid signed reading route')
+    if (!hosted && !signed && String(comicId).startsWith('hosted:')) return
+    const hostedSessionId = hosted?.sessionId || null
+    const hostedCsrfToken = hosted?.csrfToken || null
+    const signedSessionId = signed?.sessionId || null
+    const signedCsrfToken = signed?.csrfToken || null
+    if (hostedSessionId || signedSessionId) online = true
+    online = online && !String(comicId).startsWith('local:')
     const requestId = ++readerComicRequest
     readerChapterRequest++
+    resetReaderViewportTracking()
     try {
         await flushReaderProgress()
         if (requestId !== readerComicRequest) return
         resetReaderViewportTracking()
         const originView = activeView === 'reader' ? state.reader.originView : activeView
-        state.reader = { comicId, online, episodeId: null, dirty: false, originView }
+        state.reader = { comicId, online, hostedSessionId, hostedCsrfToken, signedSessionId, signedCsrfToken, episodeId: null, dirty: false, originView }
         const root = readerApiRoot()
         activateView('reader')
         document.body.classList.add('reader-active')
@@ -3121,11 +3234,15 @@ async function openReaderComic(comicId, online = false) {
         $('#reader-message').textContent = t('reader.loadingChapters')
         $('#reader-export-zip').hidden = online
         $('#reader-export-cbz').hidden = online
+        const signedReadOptions = signedSessionId ? { headers: {
+            'x-pica-csrf': signedCsrfToken || desktop?.csrfToken || ''
+        } } : undefined
         const [chapters, recentProgress] = await Promise.all([
             api(
-                `${root}/comics/${encodeURIComponent(comicId)}/chapters`
+                `${root}/comics/${encodeURIComponent(comicId)}/chapters`,
+                signedReadOptions
             ),
-            api(`${root}/progress`)
+            api(`${root}/progress`, signedReadOptions)
         ])
         if (requestId !== readerComicRequest) return
         const readable = chapters.filter((item) => online || item.downloadedPictures > 0)
@@ -3138,6 +3255,10 @@ async function openReaderComic(comicId, online = false) {
         state.reader = {
             comicId,
             online,
+            hostedSessionId,
+            hostedCsrfToken,
+            signedSessionId,
+            signedCsrfToken,
             episodeId: null,
             pageIndex: 0,
             chapters,
@@ -3146,7 +3267,7 @@ async function openReaderComic(comicId, online = false) {
             dirty: false
         }
         const comic = state.records.find((item) => item.comicId === comicId)
-        $('#reader-title').textContent = comic?.title || t('reader.title')
+        $('#reader-title').textContent = hosted?.title || signed?.title || comic?.title || t('reader.title')
         $('#reader-chapters').innerHTML = chapters
             .map(
                 (chapter) =>
@@ -3167,16 +3288,30 @@ document.addEventListener('pica-open-reader', (event) => {
     if (!comicId) return
     void openReaderComic(comicId, detail?.online !== false)
 })
+document.addEventListener('pica-open-hosted-reader', event => {
+    const detail = event instanceof CustomEvent ? event.detail : null
+    if (detail) void openReaderComic(String(detail.comicId || ''), true, { sessionId: String(detail.sessionId || ''), title: String(detail.title || ''), csrfToken: String(detail.csrfToken || '') })
+})
+document.addEventListener('pica-open-signed-reader', event => {
+    const detail = event instanceof CustomEvent ? event.detail : null
+    if (!detail || desktop?.signedSourceManagement?.available !== true ||
+        !desktop?.csrfToken || detail.csrfToken !== desktop.csrfToken) return
+    void openReaderComic(String(detail.comicId || ''), true, null, {
+        sessionId: String(detail.sessionId || ''),
+        title: String(detail.title || ''),
+        csrfToken: desktop.csrfToken
+    })
+})
 
 function moveReader(delta) {
-    const total = state.reader.chapter?.pages?.length || 0
-    if (!total || $('#reader-mode').value === 'vertical') return
-    const step = $('#reader-mode').value === 'double' ? 2 : 1
-    const direction = $('#reader-direction').value === 'rtl' ? -1 : 1
-    state.reader.pageIndex = Math.max(
-        0,
-        Math.min(total - 1, state.reader.pageIndex + delta * step * direction)
-    )
+    const next = readerPageIndex({
+        pageIndex: state.reader.pageIndex,
+        total: state.reader.chapter?.pages?.length || 0,
+        mode: $('#reader-mode').value,
+        direction: $('#reader-direction').value
+    }, delta)
+    if (next === null || next === state.reader.pageIndex) return
+    state.reader.pageIndex = next
     renderReaderPages()
 }
 
@@ -3200,72 +3335,90 @@ $('#reader-next-chapter').onclick = () => {
         void openReaderChapter(readable[index + 1].id)
 }
 $('#reader-mode').onchange = () => {
+    persistReaderSettings()
     renderReaderPages()
     updateReaderChapterNavigation()
     if ($('#reader-mode').value !== 'vertical')
-        requestAnimationFrame(() => scrollReaderViewportToTop())
+        queueReaderViewportTop()
 }
-$('#reader-direction').onchange = renderReaderPages
-$('#reader-fit').onchange = renderReaderPages
+$('#reader-direction').onchange = () => { persistReaderSettings(); renderReaderPages() }
+$('#reader-fit').onchange = () => { persistReaderSettings(); renderReaderPages() }
 $('#reader-fullscreen').onclick = () =>
     document.fullscreenElement
         ? document.exitFullscreen()
         : $('#reader').requestFullscreen()
 async function exitReader() {
-    readerComicRequest++
-    readerChapterRequest++
+    const requestId = ++readerComicRequest, chapterRequest = ++readerChapterRequest
+    const reader = state.reader
+    const current = () => activeView === 'reader' && state.reader === reader &&
+        requestId === readerComicRequest && chapterRequest === readerChapterRequest
+    resetReaderViewportTracking()
     await flushReaderProgress()
+    if (!current()) return
     if (document.fullscreenElement)
         await document.exitFullscreen().catch(() => undefined)
-    resetReaderViewportTracking()
+    if (!current()) return
     activateView(state.reader.originView || 'downloaded')
 }
 $('#reader-exit').onclick = () => void exitReader()
 document.addEventListener('keydown', (event) => {
     if (activeView !== 'reader') return
-    const target = event.target
-    if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLSelectElement ||
-        target instanceof HTMLTextAreaElement
-    )
-        return
-    if (event.key === 'Escape' && !document.fullscreenElement) {
-        event.preventDefault()
-        void exitReader()
-        return
-    }
-    if ($('#reader-mode').value === 'vertical') return
-    if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-        event.preventDefault()
-        moveReader(-1)
-    } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
-        event.preventDefault()
-        moveReader(1)
-    }
+    const targets = event.composedPath?.() || [event.target]
+    const editing = targets.some((target) => target instanceof Element && (
+        target.isContentEditable || target.closest(
+            'input, select, textarea, [role="textbox"], [role="combobox"], [role="slider"], [role="spinbutton"], [role="listbox"], [role="menu"], [role="tree"], [role="grid"], [role="tablist"]'
+        )
+    ))
+    const action = readerKeyboardAction(event, {
+        active: true,
+        mode: $('#reader-mode').value,
+        fullscreen: Boolean(document.fullscreenElement),
+        blocked: editing || Boolean(document.querySelector('dialog[open]')) ||
+            document.body.classList.contains('driver-active')
+    })
+    if (action === null) return
+    event.preventDefault()
+    if (action === 'exit') void exitReader()
+    else moveReader(action)
 })
+let readerArchiveExportBusy = false
 async function exportReaderArchive(format) {
+    if (readerArchiveExportBusy) return
+    readerArchiveExportBusy = true
+    const controls = [$('#reader-export-zip'), $('#reader-export-cbz')]
+    for (const control of controls) control.disabled = true
+    $('#reader-message').textContent = t('reader.exportWorking')
     try {
         const value = await post(`/api/v1/reader/export-${format}`, {
             comicId: state.reader.comicId,
             episodeId: state.reader.episodeId
         })
+        if (value.cancelled === true) {
+            $('#reader-message').textContent = t('reader.exportCancelled')
+            return
+        }
         const name = value.path.split(/[\\/]/).pop()
+        const coreOnly = desktop?.coreOnly === true
         $('#reader-message').textContent = t('reader.exported', {
             name,
             pages: value.pages,
             bytes: formatBytes(value.bytes)
-        })
-        if (
+        }) + (coreOnly ? ' · ' + value.path : '')
+        // The isolated local-only runtime has no OS-shell opener.
+        // Show the exact saved path instead of offering a nonfunctional action.
+        if (!coreOnly && (
             await askConfirm(
                 t('reader.openExport', {
                     format: format.toUpperCase()
                 })
             )
-        )
+        ))
             await post('/api/v1/reader/open-default', { path: value.path })
     } catch (error) {
         $('#reader-message').textContent = localizeError(language, error)
+    } finally {
+        readerArchiveExportBusy = false
+        for (const control of controls) control.disabled = false
     }
 }
 $('#reader-export-zip').onclick = () => void exportReaderArchive('zip')
@@ -3455,11 +3608,17 @@ $('#cover-toggle').onchange = (event) => {
     localStorage.setItem('pica-covers-enabled', String(state.coversEnabled))
     renderAll()
 }
+function setRecommendationPending(pending) {
+    state.recommendationPending = pending
+    for (const id of ['#recommend-button', '#recommend-next-batch', '#recommend-restart']) {
+        const button = $(id)
+        if (button) button.disabled = pending
+    }
+}
 $('#recommend-next-batch').onclick = async () => {
     if (state.mode === 'connected' && state.recommendationManagedV3) {
         if (state.recommendationPending) return
-        state.recommendationPending = true
-        $('#recommend-next-batch').disabled = true
+        setRecommendationPending(true)
         try {
             const value = await post('/api/v1/recommendations', {
                 action: 'next',
@@ -3473,8 +3632,7 @@ $('#recommend-next-batch').onclick = async () => {
         } catch (error) {
             $('#recommend-message').textContent = localizeError(language, error)
         } finally {
-            state.recommendationPending = false
-            $('#recommend-next-batch').disabled = false
+            setRecommendationPending(false)
         }
         return
     }
@@ -3939,7 +4097,9 @@ $('#search-button').onclick = async () => {
             keyword: $('#search-keyword').value,
             tags: splitList($('#search-tags').value),
             providers:
-                providerChoice === 'pica'
+                providerChoice === 'jm'
+                    ? ['jm']
+                    : providerChoice === 'pica'
                     ? ['pica']
                     : providerChoice === 'eh'
                       ? ['eh']
@@ -3968,10 +4128,10 @@ $('#search-button').onclick = async () => {
     }
 }
 $('#recommend-button').onclick = async () => {
+    if (state.recommendationPending) return
     try {
         if (state.mode === 'connected') {
-            state.recommendationPending = true
-            $('#recommend-button').disabled = true
+            setRecommendationPending(true)
             const started = await post('/api/v1/recommendation-sessions', {
                 engine: 'v3',
                 action: 'resume_or_create',
@@ -3999,16 +4159,14 @@ $('#recommend-button').onclick = async () => {
     } catch (error) {
         $('#recommend-message').textContent = localizeError(language, error)
     } finally {
-        state.recommendationPending = false
-        $('#recommend-button').disabled = false
+        setRecommendationPending(false)
     }
 }
 $('#recommend-restart').onclick = async () => {
     if (!(await askConfirm(t('recommend.restartConfirm')))) return
     try {
         if (state.recommendationPending) return
-        state.recommendationPending = true
-        $('#recommend-restart').disabled = true
+        setRecommendationPending(true)
         const previousCycleId = state.recommendationCycleId
         await post('/api/v1/recommendation-sessions', {
             action: 'force_new',
@@ -4028,8 +4186,7 @@ $('#recommend-restart').onclick = async () => {
     } catch (error) {
         $('#recommend-message').textContent = localizeError(language, error)
     } finally {
-        state.recommendationPending = false
-        $('#recommend-restart').disabled = false
+        setRecommendationPending(false)
     }
 }
 ;['#search-results', '#recommend-results'].forEach((selector) => {
@@ -4267,6 +4424,10 @@ async function buildVisualIndex() {
                 if (state.visualIndexStopRequested) break
                 visualController = new AbortController()
                 state.visualIndexAbortController = visualController
+                // The visual foundation is an optional, on-demand module.
+                // A source-free local Reader never fetches a model or starts
+                // a visual Worker during ordinary library/browser startup.
+                const { analyzeVisualSamples } = await import('./visual-runtime.js')
                 const result = await analyzeVisualSamples(
                     prepared.samples,
                     (progress) => {
@@ -4408,7 +4569,7 @@ $('#recommend-feedback-reasons-toggle').onchange = (event) => {
     )
 }
 
-$('#refresh-jobs').onclick = loadJobs
+$('#refresh-jobs').onclick = () => { void loadJobs(); void hostedDownloadsPanel?.refresh() }
 $('#performance-profile').onchange = () => {
     $('#custom-performance').hidden =
         $('#performance-profile').value !== 'custom'
@@ -4820,6 +4981,7 @@ function renderChronicleUniverse(snapshot) {
 
 function renderChronicleV2(snapshot) {
     const content = $('#chronicle-content')
+    const filteredView = state.chronicleView?.mode === 'FILTERED_COLLECTION'
     const metric = (label, value) =>
         `<div class="chronicle-metric"><strong>${chronicleEscape(value)}</strong><span>${chronicleEscape(label)}</span></div>`
     const bands = snapshot.facetBands || []
@@ -4929,20 +5091,37 @@ function renderChronicleV2(snapshot) {
         )
         .join('')
 
-    content.innerHTML = `<article class="chronicle-hero atlas-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.heroV2')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div><small>${t('chronicle.localV2')}</small></article>
+    // Narrative counts belong to the objective cached snapshot, not this projection.
+    const summary = filteredView
+        ? t('chronicle.filteredSummary')
+        : snapshot.reportNarratives.summary
+
+    content.innerHTML = `<article class="chronicle-hero atlas-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.heroV2')}</h2><p>${chronicleEscape(summary)}</p><div class="chronicle-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div><small>${t('chronicle.localV2')}</small></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">01</p><h2>${t('chronicle.keywordsV2')}</h2></div></div><div class="atlas-keyword-groups">${keywordGroups}</div></article>
-    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">02</p><h2>${t('chronicle.themes')}</h2></div><p>${t('chronicle.themesNote')}</p></div><div class="atlas-themes">${themes}</div></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">02</p><h2>${t('chronicle.themes')}</h2></div><p>${t('chronicle.themesNote')}</p></div><div class="atlas-themes">${themes || `<div class="atlas-empty">${t('chronicle.noThemes')}</div>`}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">03</p><h2>${t('chronicle.universe')}</h2></div><p>${t('chronicle.universeNoteV2')}</p></div>${renderChronicleUniverse(snapshot)}</article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">04</p><h2>${t('chronicle.preferenceMap')}</h2></div><p>${t('chronicle.preferenceMapNote')}</p></div><div class="atlas-heatmap">${heatmap}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">05</p><h2>${t('chronicle.familiarV2')}</h2></div></div><div class="chronicle-preference-grid atlas-preference-grid"><section><h3>${t('chronicle.fandoms')}</h3>${preferenceList(snapshot.fandomPreferences)}</section><section><h3>${t('chronicle.authors')}</h3>${preferenceList(snapshot.authorPreferences)}</section><section><h3>${t('chronicle.circles')}</h3>${preferenceList(snapshot.circlePreferences)}</section></div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">06</p><h2>${t('chronicle.combinationsV2')}</h2></div><p>${t('chronicle.combinationsNoteV2')}</p></div><div class="atlas-combinations">${combinations || `<div class="atlas-empty">${t('chronicle.noCombinations')}</div>`}</div></article>
-    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">07</p><h2>${t('chronicle.styleV2')}</h2></div></div><div class="atlas-style-grid">${style}</div></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">07</p><h2>${t('chronicle.styleV2')}</h2></div></div><div class="atlas-style-grid">${filteredView ? t('chronicle.filteredStyleNote') : style}</div></article>
     <article class="chronicle-section chronicle-page atlas-about"><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · ${t('chronicle.generatedLocally')}</small></article>`
 }
 
-function renderChronicle(snapshot) {
+const chronicleView = createChronicleView({
+    request: api,
+    isConnected: () => state.mode === 'connected',
+    render: renderChronicle,
+    onError: (error) => {
+        $('#chronicle-content').replaceChildren()
+        $('#chronicle-status').textContent = localizeError(language, error)
+    }
+})
+
+function renderChronicle(snapshot, view = null) {
     if (!snapshot) return
     state.chronicleSnapshot = snapshot
+    state.chronicleView = view
+    $('#chronicle-status').textContent = ''
     if (Number(snapshot.snapshotVersion || 0) >= 2 && snapshot.facetBands) {
         renderChronicleV2(snapshot)
         return
@@ -4952,12 +5131,12 @@ function renderChronicle(snapshot) {
 
 async function loadChronicle() {
     if (state.mode !== 'connected') {
+        chronicleView.paint()
         $('#chronicle-status').textContent = t('chronicle.lite')
         return
     }
     try {
-        const value = await api('/api/v1/recommendation/profile')
-        renderChronicle(value.snapshot)
+        await chronicleView.load()
     } catch {
         $('#chronicle-status').textContent = t('chronicle.needSync')
     }
@@ -4967,8 +5146,8 @@ async function rebuildChronicle() {
     $('#chronicle-status').textContent = t('chronicle.building')
     try {
         const value = await post('/api/v1/recommendation/profile/rebuild', {})
-        renderChronicle(value.snapshot)
-        $('#chronicle-status').textContent = t('chronicle.ready')
+        if (value.snapshot && await chronicleView.load())
+            $('#chronicle-status').textContent = t('chronicle.ready')
     } catch (error) {
         $('#chronicle-status').textContent = localizeError(language, error)
     }
@@ -5178,6 +5357,7 @@ async function waitForChroniclePrintImages(root) {
 }
 
 $('#chronicle-print').onclick = async () => {
+    if (!chronicleView.canPrint()) return
     const previousTitle = document.title
     const day = new Date().toISOString().slice(0, 10).replaceAll('-', '')
     document.title = `${t('chronicle.filename')}-${day}`
@@ -5211,7 +5391,13 @@ async function detect() {
     try {
         const status = await api('/api/v1/status')
         state.mode = 'connected'
-        await loadRecommendationFeedback()
+        // An explicit false capability is authoritative: do not request
+        // provider recommendation feedback from a source-free core. Unknown
+        // legacy capabilities preserve the existing Desktop behavior.
+        const recommendationSessionsAvailable =
+            state.capabilities?.features?.recommendationSessions !== false
+        if (recommendationSessionsAvailable)
+            await loadRecommendationFeedback()
         $('#mode').textContent = t('mode.connected')
         state.records = await api('/api/v1/comics?limit=5000')
         state.authors = await api('/api/v1/authors')
@@ -5224,26 +5410,34 @@ async function detect() {
             offset: 0
         })
         renderAll(status.summary)
-        let recommendation = await api(
-            '/api/v1/recommendation-sessions/status?mode=final'
-        )
-        if (!recommendation.activeCycleId && !recommendation.buildingCycleId) {
-            recommendation = await post('/api/v1/recommendation-sessions', {
-                engine: 'v3',
-                action: 'resume_or_create',
-                requestId: recommendationRequestId('initial'),
-                appSessionId: state.appSessionId
-            })
-        }
-        if (recommendation.activeCycleId) {
-            const current = await post('/api/v1/recommendations', {
-                action: 'current',
-                appSessionId: state.appSessionId
-            })
-            applyManagedRecommendationBatch(current)
-            if (state.recommendations.length) renderPreparedRecommendations()
-        } else if (recommendation.buildingCycleId) {
-            $('#recommend-message').textContent = t('recommend.preparing')
+        if (!recommendationSessionsAvailable) {
+            // The same production UI can display an owned local catalogue,
+            // authors and shelves without manufacturing a recommendation
+            // session or showing a spurious "optional module failed" warning.
+            $('#recommend-message').textContent = t('message.coreOnlyRecommendations')
+        } else {
+            let recommendation = await api(
+                '/api/v1/recommendation-sessions/status?mode=final'
+            )
+            const autoOnlineRecommendation = !desktop || desktop.picaAccount?.configured !== false || desktop.ehAccount?.configured === true
+            if (!recommendation.activeCycleId && !recommendation.buildingCycleId && autoOnlineRecommendation) {
+                recommendation = await post('/api/v1/recommendation-sessions', {
+                    engine: 'v3',
+                    action: 'resume_or_create',
+                    requestId: recommendationRequestId('initial'),
+                    appSessionId: state.appSessionId
+                })
+            }
+            if (recommendation.activeCycleId) {
+                const current = await post('/api/v1/recommendations', {
+                    action: 'current',
+                    appSessionId: state.appSessionId
+                })
+                applyManagedRecommendationBatch(current)
+                if (state.recommendations.length) renderPreparedRecommendations()
+            } else if (recommendation.buildingCycleId) {
+                $('#recommend-message').textContent = t('recommend.preparing')
+            }
         }
     } catch (error) {
         if (await ensureConnectedEngine(true)) {
@@ -5273,6 +5467,15 @@ async function detect() {
     }
 }
 
+installLocalImport({
+    available: () => state.mode === 'connected' && state.capabilities?.features?.localFileImport === true,
+    language: () => language,
+    request: (operation, input) => desktopPost('/api/v1/desktop/local-import' + operation, input),
+    refresh: async () => { state.records = await api('/api/v1/comics?limit=5000'); await loadLibraryQuery() },
+    read: comicId => openReaderComic(comicId)
+})
+
 void detect().then(() => {
+    document.dispatchEvent(new Event('pica-local-import-refresh'))
     setTimeout(() => void maybePromptForUpdate(), 1400)
 })

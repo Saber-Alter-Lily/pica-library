@@ -15,6 +15,7 @@ export interface RetrievalRouteV3 {
     anchorKey: string
     anchorFacet?: string
     expectedPrecisionTier: string
+    allowedProviders?: Array<'pica' | 'eh' | 'jm'>
 }
 
 export function translateIntentToRoutesV3(
@@ -54,6 +55,7 @@ export function translateIntentToRoutesV3(
                 sort: 'loved' as const,
                 anchorKey: anchor.canonicalKey,
                 anchorFacet: anchor.facet,
+                ...(anchor.allowedProviders ? { allowedProviders: anchor.allowedProviders } : {}),
                 expectedPrecisionTier: intent.retrieval.utilityTier
             }
         ]

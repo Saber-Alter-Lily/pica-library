@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { deriveLiteAuthors } from '../../web/author-state.js'
 import {
+    applyTranslations,
     detectLanguage,
     domTranslations,
     languageStorageKey,
@@ -52,6 +53,23 @@ describe('Web localization', () => {
         expect(translate('zh-CN', 'nav.library')).toBe('漫画库')
         expect(translate('ja', 'nav.library')).toBe('ライブラリ')
         expect(translate('en', 'nav.library')).toBe('Library')
+    })
+
+    it('localizes LAN controls even when no Desktop status renderer has run', () => {
+        const enable = { textContent: '启用局域网手机连接' }
+        const disable = { textContent: '停用手机连接' }
+        const nodes = new Map([
+            ['#mobile-bridge-enable', enable],
+            ['#mobile-bridge-disable', disable]
+        ])
+        const root = {
+            querySelectorAll: (selector: string) => nodes.has(selector) ? [nodes.get(selector)] : []
+        } as unknown as Document
+        for (const language of ['en', 'ja', 'zh-CN'] as const) {
+            applyTranslations(language, root)
+            expect(enable.textContent).toBe(translate(language, 'mobile.enable'))
+            expect(disable.textContent).toBe(translate(language, 'mobile.disable'))
+        }
     })
 
     it('has complete Simplified Chinese and Japanese coverage for ordinary UI keys', () => {

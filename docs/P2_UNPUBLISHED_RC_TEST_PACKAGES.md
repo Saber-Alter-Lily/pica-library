@@ -1,6 +1,8 @@
 # P2 Unpublished RC Test Packages
 
-Status: **SOURCE/ARTIFACT_ACCEPTED — PR #195 / final-head validation pending / stable release unchanged**
+Status: **HISTORICAL — v0.4.11 P2 RC packaging contract; not the current post-v0.5.0 generator**
+
+As of 2026-10-06, stable v0.5.0 / Android v55 has been published. The statements below describe the earlier PR #195 packaging stage. Its builder intentionally rejects current 0.5.0 metadata without the new explicit mode. Use [Post-stable RC readiness](POST_STABLE_RC_READINESS.md) for current-baseline isolated candidates; do not confuse a green contract-only workflow with generated installables.
 
 ## Purpose
 

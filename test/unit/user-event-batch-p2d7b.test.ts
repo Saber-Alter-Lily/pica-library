@@ -85,22 +85,30 @@ describe('P2 D7B transactional user-event batching', () => {
         database.close()
     })
 
-    it('keeps shelf add/remove event granularity while removing route-level loops', () => {
+    it('keeps the original shelf add/remove event granularity after moving the HTTP routes to a source-neutral core', () => {
         const server = fs.readFileSync('src/library/server.ts', 'utf8')
-        const start = server.indexOf('const shelfItemsRoute =')
+        const core = fs.readFileSync('src/library/core-shelf-routes.ts', 'utf8')
+        const start = server.indexOf('const shelfMatch = coreShelfMatch(')
         const end = server.indexOf(
             "\n            if (\n                url.pathname === '/api/v1/recommendation-sessions'",
             start
         )
         const shelfRoutes = server.slice(start, end)
 
-        expect(shelfRoutes).toContain('recordUserEvents(')
-        expect(shelfRoutes).toContain("eventType: 'shelf_add'")
-        expect(shelfRoutes).toContain("eventType: 'shelf_remove'")
-        expect(shelfRoutes).toContain('comicIds.map(')
-        expect(shelfRoutes).not.toContain(
-            'options.database.recordUserEvent({'
-        )
+        // Production Desktop still batches the same event objects into the
+        // transactional SQLite recorder, now through the shared shelf port.
+        expect(start).toBeGreaterThan(0)
+        expect(end).toBeGreaterThan(start)
+        expect(shelfRoutes).toContain('coreShelfExecute(')
+        expect(shelfRoutes).toContain('options.database.recordUserEvents(events)')
+        expect(shelfRoutes).toContain("request.headers['x-pica-app-session']")
+        expect(shelfRoutes).toContain("request.headers['x-pica-context-id']")
+        expect(core).toContain("emit('shelf_add', shelfId, ids, options)")
+        expect(core).toContain("emit('shelf_remove', shelfId, ids, options)")
+        expect(core).toContain('options.recordUserEvents(comicIds.map(')
+        expect(core).toContain("source: 'shelf'")
+        expect(core).toContain('metadata: { shelfId }')
+        expect(shelfRoutes).not.toContain('options.database.recordUserEvent({')
     })
 
     it('uses one explicit SQLite transaction around the existing event recorder', () => {

@@ -8,10 +8,58 @@ def previewSigningConfigured = previewKeystorePath != null && !previewKeystorePa
         previewKeystorePassword != null && !previewKeystorePassword.isBlank()
 def buildVersionCode = Integer.parseInt(System.getenv('PICA_ANDROID_VERSION_CODE') ?: '55')
 def buildVersionName = System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.5.0'
+// Each disposable manual-QA snapshot has a distinct Android identity. Never
+// replace an earlier Dev install with a different ephemeral Debug key.
+def isolatedQaSuffix = System.getenv('PICA_ANDROID_QA_PACKAGE_SUFFIX') ?: ''
+if (isolatedQaSuffix && !(isolatedQaSuffix ==~ /^\.s1qa[1-9][0-9]{0,2}$/)) {
+    throw new GradleException('Invalid S1 QA application suffix')
+}
+// Optional, separately installed LOCAL workflow. The existing Gradle tasks and
+// default Android app remain unchanged when this flag is absent.
+def localOnlyDraft = System.getenv('PICA_ANDROID_LOCAL_ONLY_DRAFT') == '1'
+// Explicit unshipped QA variant of the ORIGINAL four-tab product, not a
+// replacement app or a way to override its production signing identity.
+def sourceNeutralQa = project.findProperty('sourceNeutralQa') == 'true'
+if (localOnlyDraft && isolatedQaSuffix)
+    throw new GradleException('Local-only draft and S1 snapshot identity cannot be combined')
+def debugAppSuffix = isolatedQaSuffix ? isolatedQaSuffix : '.dev'
+def debugAppLabel = isolatedQaSuffix ? "Pica Library S1 QA${isolatedQaSuffix.substring(5)}" : 'Pica Library Dev'
+if (localOnlyDraft) {
+    debugAppSuffix = '.localdraft'
+    debugAppLabel = 'Pica Library Local Draft'
+}
+def debugPairScheme = isolatedQaSuffix ? "picalibrary-${isolatedQaSuffix.substring(1)}" : 'picalibrary'
 
 android {
     namespace 'com.picalibrary.android'
     compileSdk 35
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main.java {
+        srcDir '../../../source-jvm/src/main/java'
+        exclude '**/JmProtocolMain.java'
+    }
+    // One tracked fixture is consumed by both Vitest and the Android JSON adapter tests.
+    sourceSets.test.resources.srcDir '../../../test/fixtures/tag-policy'
+    if (localOnlyDraft) {
+        // Overlay disables internet/pairing and launches only the local shell.
+        sourceSets.debug.manifest.srcFile 'src/localOnly/AndroidManifest.xml'
+    }
+    if (sourceNeutralQa) {
+        // Same original app sources, one isolated source-neutral build type.
+        // Manifest removes historic provider Activity entrypoints.
+        sourceSets.maybeCreate('cleanSourceQa').manifest.srcFile 'src/cleanSourceQa/AndroidManifest.xml'
+        // Same clean original-app manifest, but retain the *old Dev identity*
+        // for a disposable legacy-to-clean in-place upgrade rehearsal.
+        sourceSets.maybeCreate('cleanCompatQa').manifest.srcFile 'src/cleanSourceQa/AndroidManifest.xml'
+        // Not a distributable flavor. The real v0.5.0 package identity is
+        // reserved for a non-debuggable, short-lived, same-signer emulator gate.
+        sourceSets.maybeCreate('cleanProductionUpgradeQa').manifest.srcFile 'src/cleanSourceQa/AndroidManifest.xml'
+    }
+    buildFeatures { buildConfig true }
 
     defaultConfig {
         applicationId 'com.picalibrary.android'
@@ -20,6 +68,7 @@ android {
         versionCode buildVersionCode
         versionName buildVersionName
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        buildConfigField 'boolean', 'SOURCE_NEUTRAL_QA', 'false'
         manifestPlaceholders = [
                 appLabel  : 'Pica Library',
                 pairScheme: 'picalibrary'
@@ -46,12 +95,14 @@ android {
     buildTypes {
         debug {
             // Side-by-side manual QA build. It must never replace the formal app.
-            applicationIdSuffix '.dev'
+            applicationIdSuffix debugAppSuffix
             versionNameSuffix '-dev-pr35'
+            if (localOnlyDraft) versionNameSuffix '-local-draft'
             debuggable true
+            buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', localOnlyDraft ? 'true' : 'false'
             manifestPlaceholders = [
-                    appLabel  : 'Pica Library Dev',
-                    pairScheme: 'picalibrary'
+                    appLabel  : debugAppLabel,
+                    pairScheme: debugPairScheme
             ]
             // CI candidate builds reuse the fixed official signing identity when configured so future Dev APKs
             // can upgrade the previous Dev installation without shipping a private key.
@@ -59,7 +110,52 @@ android {
                 signingConfig signingConfigs.preview
             }
         }
+        if (sourceNeutralQa) {
+            cleanSourceQa {
+                initWith debug
+                applicationIdSuffix '.cleanqa'
+                versionNameSuffix '-clean-source-qa'
+                buildConfigField 'boolean', 'SOURCE_NEUTRAL_QA', 'true'
+                buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', 'false'
+                debuggable true
+                minifyEnabled true
+                shrinkResources true
+                // The clean candidate must not inherit keep rules for legacy
+                // JM runtime classes that are only needed by the old product.
+                proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-clean-source-qa.pro'
+                matchingFallbacks = ['debug']
+                manifestPlaceholders = [
+                    appLabel : 'Pica Library Clean Source QA',
+                    pairScheme: 'picalibrary-cleanqa'
+                ]
+            }
+            cleanCompatQa {
+                initWith cleanSourceQa
+                // Never reuse the actual production applicationId or signer.
+                // Overlay the historically provider-enabled *.dev QA build.
+                applicationIdSuffix '.dev'
+                versionNameSuffix '-clean-compat-qa'
+                manifestPlaceholders = [
+                    appLabel : 'Pica Library Clean Compat QA',
+                    pairScheme: 'picalibrary'
+                ]
+            }
+            cleanProductionUpgradeQa {
+                initWith cleanSourceQa
+                // Only the isolated G3 emulator workflow may assemble this
+                // temporary production-identity candidate. No release/OTA
+                // workflow references this variant or publishes its APK.
+                applicationIdSuffix ''
+                versionNameSuffix '-upgrade-qa'
+                debuggable false
+                manifestPlaceholders = [
+                    appLabel : 'Pica Library Upgrade QA',
+                    pairScheme: 'picalibrary'
+                ]
+            }
+        }
         release {
+            buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', 'false'
             minifyEnabled true
             shrinkResources true
             debuggable false
@@ -74,6 +170,7 @@ android {
         }
         benchmark {
             initWith release
+            buildConfigField 'boolean', 'LOCAL_ONLY_DRAFT', 'false'
             // Release-like code path, signed locally so Macrobenchmark can install it on QA devices.
             signingConfig signingConfigs.debug
             debuggable false
@@ -87,6 +184,47 @@ android {
 }
 
 dependencies {
+    implementation project(':local-core')
+    implementation project(':local-storage')
+    implementation project(':reader-view')
+    // Shared signature-bound Reader and explicit chapter importer, also used by :local-app.
+    implementation project(':signed-reader')
+    // Verified Suwayomi Host protocol/IO/state lives in a reusable library.
+    // No Pica/E-H/JM or provider SDK is a dependency of this module.
+    implementation project(':user-host-core')
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    // Compile-time compatibility while retiring the old provider model.
+    // The clean original app does NOT redistribute the JM source binary.
+    // Regular Debug/Release/benchmark builds retain their existing dependency.
+    if (sourceNeutralQa) {
+        // A Gradle invocation may assemble BOTH the historical Dev product
+        // and the physically clean full product. Keep JM available only for
+        // legacy build types; the clean variant sees its API as compileOnly
+        // and the R8/DEX audit must still prove zero packaged JM runtime.
+        ['debugImplementation', 'releaseImplementation', 'benchmarkImplementation'].each { bucket ->
+            add(bucket, 'io.github.jukomu:jmcomic-core:v1.1.12') {
+                exclude group: 'io.github.darkxanter', module: 'webp-imageio'
+            }
+            add(bucket, 'io.github.jukomu:jmcomic-android-support:v1.1.12')
+        }
+        cleanSourceQaCompileOnly('io.github.jukomu:jmcomic-core:v1.1.12') {
+            exclude group: 'io.github.darkxanter', module: 'webp-imageio'
+        }
+        cleanSourceQaCompileOnly 'io.github.jukomu:jmcomic-android-support:v1.1.12'
+        cleanCompatQaCompileOnly('io.github.jukomu:jmcomic-core:v1.1.12') {
+            exclude group: 'io.github.darkxanter', module: 'webp-imageio'
+        }
+        cleanCompatQaCompileOnly 'io.github.jukomu:jmcomic-android-support:v1.1.12'
+        cleanProductionUpgradeQaCompileOnly('io.github.jukomu:jmcomic-core:v1.1.12') {
+            exclude group: 'io.github.darkxanter', module: 'webp-imageio'
+        }
+        cleanProductionUpgradeQaCompileOnly 'io.github.jukomu:jmcomic-android-support:v1.1.12'
+    } else {
+        implementation('io.github.jukomu:jmcomic-core:v1.1.12') {
+            exclude group: 'io.github.darkxanter', module: 'webp-imageio'
+        }
+        implementation 'io.github.jukomu:jmcomic-android-support:v1.1.12'
+    }
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.documentfile:documentfile:1.0.1'
     implementation 'androidx.viewpager2:viewpager2:1.1.0'
@@ -100,3 +238,24 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.7.0'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
 }
+
+// Android uses the SDK's native image processor, not the desktop ImageIO SPI/native binaries.
+configurations.configureEach {
+    exclude group: 'io.github.darkxanter', module: 'webp-imageio'
+}
+
+// Gesture decisions compile in the existing :local-core dependency, and
+// original ZoomImageView/ReaderGestureSettings compile in :reader-view.
+def tagBoundary = tasks.register('compileTagPolicyBoundary', JavaCompile) {
+    source fileTree('src/main/java/com/picalibrary/android/tags') { include '**/*.java' }
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('tag-policy-boundary')
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+tasks.configureEach {
+    if (name == 'testDebugUnitTest') dependsOn tagBoundary
+}
+
+// The same original importer is now built by the standard :local-core Java
+// module, not by a bespoke ad-hoc compile task.

@@ -9,11 +9,12 @@ import { startLibraryServer } from '../../src/library/server'
 import { Pica } from '../../src/sdk'
 import { PRODUCT_VERSION } from '../../src/version'
 import { DATABASE_SCHEMA_VERSION } from '../../src/app-capabilities'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 describe('local web server', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-server-'))
     const database = new LibraryDatabase(path.join(dir, 'library.db'))
-    const service = new LibraryService(database, dir)
+    const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
     let server: Server
     let url: string
 
@@ -62,6 +63,26 @@ describe('local web server', () => {
             databaseSchemaVersion: DATABASE_SCHEMA_VERSION,
             updateManifestVersion: 1
         })
+    })
+
+    it('serves bounded preference search and atlas views through read-only GET routes', async () => {
+        const search = vi.spyOn(service, 'recommendationV5SearchPreferences').mockReturnValue({
+            query: '双马尾', items: [], total: 0, truncated: false, limit: 100,
+            registryAvailable: true, source: 'full-local-collection-and-explicit-controls'
+        })
+        const view = vi.spyOn(service, 'tasteChronicleView').mockReturnValue({ available: false, snapshot: null, view: null })
+        try {
+            const response = await fetch(`${url}/api/v1/recommendation-v5/preferences/search?q=${encodeURIComponent('双马尾')}`)
+            expect(response.status).toBe(200)
+            expect(search).toHaveBeenCalledWith('双马尾', 100)
+            expect((await response.json()).source).toBe('full-local-collection-and-explicit-controls')
+            const tooLong = await fetch(`${url}/api/v1/recommendation-v5/preferences/search?q=${'x'.repeat(161)}`)
+            expect(tooLong.status).toBe(400)
+            expect(search).toHaveBeenCalledTimes(1)
+            const absent = await fetch(`${url}/api/v1/recommendation/profile/view?hideBlocked=true&hideLess=false`)
+            expect(absent.status).toBe(404)
+            expect(view).toHaveBeenCalledWith({ hideBlocked: true, hideLess: false })
+        } finally { search.mockRestore(); view.mockRestore() }
     })
 
     it('imports records through the local API', async () => {
@@ -213,7 +234,7 @@ describe('local web server', () => {
                     contentType: 'image/jpeg'
                 }
             }
-        } as unknown as Pica)
+        } as unknown as Pica, undefined, undefined, enabledFixtureSources())
         database.importCatalog([
             {
                 comicId: 'cover-comic',
@@ -343,7 +364,7 @@ describe('server binding security', () => {
     it('rejects unauthenticated remote binding even if the legacy bypass variable is present', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-bind-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
-        const service = new LibraryService(database, dir)
+        const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
         const previous = process.env.PICA_LIBRARY_ALLOW_REMOTE
         process.env.PICA_LIBRARY_ALLOW_REMOTE = 'true'
         try {
@@ -369,7 +390,7 @@ describe('desktop shutdown lifecycle', () => {
     it('ends the success response and invokes the Desktop shutdown callback', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-shutdown-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
-        const service = new LibraryService(database, dir)
+        const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
         let resolveShutdown!: () => void
         const shutdownCalled = new Promise<void>((resolve) => {
             resolveShutdown = resolve
@@ -431,7 +452,7 @@ describe('desktop mutation security', () => {
     it('requires a local host, same origin and the current CSRF nonce', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-desktop-api-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
-        const service = new LibraryService(database, dir)
+        const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
         const save = vi.fn(async () => ({ success: true }))
         const started = await startLibraryServer({
             database,

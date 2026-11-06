@@ -2,40 +2,32 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
-import type {
-    FullApplicationUpdaterInstruction,
-    UpdateProgress
-} from './types'
+import { sqliteDiskFilename } from '../storage/sqlite/filename'
+import type { FullApplicationUpdaterInstruction, UpdateProgress } from './types'
+import {
+    writeProgress,
+    reportRecoveryProgress,
+    waitForExit,
+    launchApplication,
+    readInstance,
+    safeLoopbackUrl,
+    health,
+    stopPublishedInstance
+} from './process-lifecycle'
+import {
+    copyTree,
+    snapshotUserState,
+    restoreUserState
+} from './user-state-snapshot'
+import { prepareHelperStartup } from './helper-startup'
+import { installedRuntimeComposition, requireInstalledRuntimeComposition } from '../runtime/installed-runtime-composition'
+import { validateAutomaticFullRuntimeComposition } from './runtime-composition'
+import { validateRuntimeChoiceReceipt } from './runtime-choice'
+import { sameRuntimeComposition } from '../modules/runtime-composition'
+import { assertLegacyTransitionPreApply } from './legacy-transition-guard'
+import { releaseLegacyTransitionLock } from './legacy-transition-lock'
 
-function writeProgress(
-    file: string,
-    value: Omit<UpdateProgress, 'updatedAt'>
-) {
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(
-        file,
-        JSON.stringify({ ...value, updatedAt: new Date().toISOString() }),
-        'utf8'
-    )
-}
-
-function alive(pid: number) {
-    try {
-        process.kill(pid, 0)
-        return true
-    } catch {
-        return false
-    }
-}
-
-async function waitForExit(pid: number, timeoutMs = 30_000) {
-    const started = Date.now()
-    while (Date.now() - started < timeoutMs) {
-        if (!alive(pid)) return
-        await new Promise((resolve) => setTimeout(resolve, 100))
-    }
-    throw new Error('Pica Library did not exit before the full-upgrade timeout')
-}
+/** Status storage must never prevent recovery of the application or user state. */
 
 function normalized(value: string) {
     return path.resolve(value)
@@ -65,6 +57,23 @@ function requiredApplicationFiles(root: string) {
     ].map((item) => path.join(root, item))
 }
 
+function validateRuntimeComposition(instruction: FullApplicationUpdaterInstruction) {
+    if(instruction.runtimeChoice){
+        if(installedRuntimeComposition(instruction.stagedApplicationRoot).status!=='declared')throw Error('Explicit runtime target declaration changed after staging')
+        if(!instruction.runtimeComposition || !sameRuntimeComposition(instruction.runtimeComposition,instruction.runtimeChoice.to))throw Error('Explicit runtime choice does not match the instruction composition')
+        validateRuntimeChoiceReceipt(instruction.runtimeChoice,{
+            current:requireInstalledRuntimeComposition(instruction.applicationRoot),staged:requireInstalledRuntimeComposition(instruction.stagedApplicationRoot),
+            sourceSha:fs.readFileSync(path.join(instruction.applicationRoot,'SOURCE_SHA.txt'),'utf8').trim(),targetSourceSha:instruction.targetSourceSha,targetVersion:instruction.targetVersion
+        })
+        return
+    }
+    validateAutomaticFullRuntimeComposition(
+        requireInstalledRuntimeComposition(instruction.applicationRoot),
+        requireInstalledRuntimeComposition(instruction.stagedApplicationRoot),
+        instruction.runtimeComposition
+    )
+}
+
 function validateStagedApplication(
     instruction: FullApplicationUpdaterInstruction
 ) {
@@ -72,6 +81,7 @@ function validateStagedApplication(
         throw new Error(
             'Universal full-application upgrade is currently supported on Windows only'
         )
+    sqliteDiskFilename(path.resolve(instruction.libraryDirectory, 'library.db'))
     assertOutside(
         instruction.bootstrapRoot,
         instruction.applicationRoot,
@@ -97,6 +107,11 @@ function validateStagedApplication(
         instruction.applicationRoot,
         'Application backup directory'
     )
+    if (fs.existsSync(instruction.backupRoot))
+        throw new Error(
+            'Application backup directory already exists: ' +
+                instruction.backupRoot
+        )
     for (const file of requiredApplicationFiles(
         instruction.stagedApplicationRoot
     ))
@@ -113,150 +128,33 @@ function validateStagedApplication(
         .trim()
     if (sourceSha !== instruction.targetSourceSha)
         throw new Error('Staged full application source SHA does not match')
+    validateRuntimeComposition(instruction)
 }
 
-function copyTree(source: string, destination: string) {
-    fs.mkdirSync(path.dirname(destination), { recursive: true })
-    fs.cpSync(source, destination, {
+function removeApplicationTree(root: string) {
+    // Node's bounded retry handles Windows launcher/child/antivirus lock release.
+    fs.rmSync(root, {
         recursive: true,
         force: true,
-        errorOnExist: false
+        maxRetries: 10,
+        retryDelay: 100
     })
 }
 
-function snapshotUserState(instruction: FullApplicationUpdaterInstruction) {
-    const snapshot = path.join(instruction.bootstrapRoot, 'user-state-snapshot')
-    fs.rmSync(snapshot, { recursive: true, force: true })
-    fs.mkdirSync(snapshot, { recursive: true })
-
-    const config = path.join(instruction.desktopHomeRoot, 'config')
-    if (fs.existsSync(config))
-        copyTree(config, path.join(snapshot, 'config'))
-
-    const database = path.join(instruction.libraryDirectory, 'library.db')
-    const databaseSnapshot = path.join(snapshot, 'database')
-    fs.mkdirSync(databaseSnapshot, { recursive: true })
-    for (const suffix of ['', '-wal', '-shm']) {
-        const source = database + suffix
-        if (fs.existsSync(source))
-            fs.copyFileSync(
-                source,
-                path.join(databaseSnapshot, 'library.db' + suffix)
-            )
-    }
-    return snapshot
-}
-
-function restoreUserState(
+function cleanupHealthyRecovery(
     instruction: FullApplicationUpdaterInstruction,
     snapshot: string
 ) {
-    const savedConfig = path.join(snapshot, 'config')
-    const config = path.join(instruction.desktopHomeRoot, 'config')
-    if (fs.existsSync(savedConfig)) {
-        fs.rmSync(config, { recursive: true, force: true })
-        copyTree(savedConfig, config)
-    }
-
-    const database = path.join(instruction.libraryDirectory, 'library.db')
-    const savedDatabase = path.join(snapshot, 'database')
-    for (const suffix of ['', '-wal', '-shm']) {
-        const target = database + suffix
-        fs.rmSync(target, { force: true })
-        const source = path.join(savedDatabase, 'library.db' + suffix)
-        if (fs.existsSync(source)) {
-            fs.mkdirSync(path.dirname(target), { recursive: true })
-            fs.copyFileSync(source, target)
-        }
-    }
-}
-
-function launchApplication(root: string) {
-    const launcher = path.join(root, 'Pica Library.exe')
-    if (!fs.existsSync(launcher))
-        throw new Error('Pica Library launcher is missing after replacement')
-    const child = spawn(launcher, ['--no-open'], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-        cwd: root
-    })
-    child.unref()
-}
-
-function readInstance(file: string) {
     try {
-        return JSON.parse(fs.readFileSync(file, 'utf8')) as {
-            pid?: number
-            url?: string
-        }
+        removeApplicationTree(instruction.backupRoot)
+        removeApplicationTree(snapshot)
     } catch {
-        return null
-    }
-}
-
-function safeLoopbackUrl(value: unknown) {
-    try {
-        const url = new URL(String(value ?? ''))
-        if (
-            url.protocol !== 'http:' ||
-            !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
-        )
-            return null
-        return url
-    } catch {
-        return null
-    }
-}
-
-async function health(instruction: FullApplicationUpdaterInstruction) {
-    const started = Date.now()
-    while (Date.now() - started < instruction.healthTimeoutMs) {
-        try {
-            const instance = readInstance(instruction.instanceFile)
-            const url = safeLoopbackUrl(instance?.url)
-            if (url) {
-                const response = await fetch(
-                    new URL('/api/v1/capabilities', url),
-                    { signal: AbortSignal.timeout(1500) }
-                )
-                const value = (await response.json()) as {
-                    appVersion?: string
-                }
-                if (
-                    response.ok &&
-                    value.appVersion === instruction.targetVersion
-                )
-                    return {
-                        ok: true as const,
-                        url: url.origin
-                    }
-            }
-        } catch {
-            // Expected while the replacement application starts/migrates.
-        }
-        await new Promise((resolve) => setTimeout(resolve, 250))
-    }
-    return { ok: false as const, url: null }
-}
-
-async function stopPublishedInstance(instanceFile: string) {
-    const instance = readInstance(instanceFile)
-    const pid = Number(instance?.pid ?? 0)
-    if (!Number.isInteger(pid) || pid <= 0 || !alive(pid)) return
-    try {
-        process.kill(pid)
-    } catch {
-        return
-    }
-    try {
-        await waitForExit(pid, 8_000)
-    } catch {
-        try {
-            process.kill(pid, 'SIGKILL')
-        } catch {
-            // Best-effort cleanup before rollback.
-        }
+        writeProgress(instruction.progressFile, {
+            phase: 'complete',
+            targetVersion: instruction.targetVersion,
+            message:
+                'Update completed; temporary recovery files were retained for later cleanup.'
+        })
     }
 }
 
@@ -269,42 +167,50 @@ function openBrowserFallback(value: string | null) {
         ['url.dll,FileProtocolHandler', url.origin],
         { detached: true, stdio: 'ignore', windowsHide: true }
     )
+    child.once('error', () => {
+        // Browser opening is a convenience after proven health, not a commit gate.
+    })
     child.unref()
 }
 
-function replaceApplication(
-    instruction: FullApplicationUpdaterInstruction
+async function replaceApplication(
+    instruction: FullApplicationUpdaterInstruction,
+    backedUp: () => void
 ) {
-    if (fs.existsSync(instruction.backupRoot))
-        throw new Error(
-            'Application backup directory already exists: ' +
-                instruction.backupRoot
-        )
-    fs.renameSync(instruction.applicationRoot, instruction.backupRoot)
-    try {
-        copyTree(
-            instruction.stagedApplicationRoot,
-            instruction.applicationRoot
-        )
-    } catch (error) {
-        fs.rmSync(instruction.applicationRoot, {
-            recursive: true,
-            force: true
-        })
-        fs.renameSync(instruction.backupRoot, instruction.applicationRoot)
-        throw error
+    for (let attempt = 0; ; attempt++) {
+        if (fs.existsSync(instruction.backupRoot))
+            throw new Error(
+                'Application backup directory already exists: ' +
+                    instruction.backupRoot
+            )
+        try {
+            fs.renameSync(instruction.applicationRoot, instruction.backupRoot)
+        } catch (error) {
+            const code = (error as NodeJS.ErrnoException).code
+            // The parent has exited, but Windows can release a launcher/image
+            // handle slightly later. Never retry arbitrary errors or wait forever.
+            if (
+                process.platform !== 'win32' ||
+                !['EPERM', 'EACCES', 'EBUSY'].includes(code ?? '') ||
+                attempt >= 10
+            )
+                throw error
+            await new Promise((resolve) =>
+                setTimeout(resolve, 100 * (attempt + 1))
+            )
+            continue
+        }
+        // Record ownership in the same turn as successful rename, before copy/await.
+        backedUp()
+        break
     }
+    copyTree(instruction.stagedApplicationRoot, instruction.applicationRoot)
 }
 
-function rollbackApplication(
-    instruction: FullApplicationUpdaterInstruction
-) {
-    fs.rmSync(instruction.applicationRoot, {
-        recursive: true,
-        force: true
-    })
+function rollbackApplication(instruction: FullApplicationUpdaterInstruction) {
     if (!fs.existsSync(instruction.backupRoot))
         throw new Error('Application backup is unavailable for rollback')
+    removeApplicationTree(instruction.applicationRoot)
     fs.renameSync(instruction.backupRoot, instruction.applicationRoot)
 }
 
@@ -315,12 +221,22 @@ export async function runFullApplicationUpgrade(
     validateStagedApplication(instruction)
     let snapshot = ''
     let replaced = false
+    let committed = false
+    let parentExited = false
+    let replacementStarted = false
+    let recoveryCompleted = false
     try {
         writeProgress(instruction.progressFile, {
             phase: 'waiting-for-exit',
             targetVersion: instruction.targetVersion
         })
+        await prepareHelperStartup(instruction, 'full-application')
         await waitForExit(instruction.parentPid)
+        // Refusal here is pre-transaction: do not restore files/DB or launch an
+        // old app whose current process ownership is unknown.
+        assertLegacyTransitionPreApply(instruction)
+        parentExited = true
+        validateRuntimeComposition(instruction)
         fs.rmSync(instruction.instanceFile, { force: true })
 
         writeProgress(instruction.progressFile, {
@@ -333,8 +249,9 @@ export async function runFullApplicationUpgrade(
             phase: 'replacing-files',
             targetVersion: instruction.targetVersion
         })
-        replaceApplication(instruction)
-        replaced = true
+        await replaceApplication(instruction, () => {
+            replaced = true
+        })
 
         const installedSource = fs
             .readFileSync(
@@ -344,12 +261,16 @@ export async function runFullApplicationUpgrade(
             .trim()
         if (installedSource !== instruction.targetSourceSha)
             throw new Error('Installed application source SHA does not match')
+        const installedComposition=installedRuntimeComposition(instruction.applicationRoot)
+        if(installedComposition.status==='invalid' || !sameRuntimeComposition(installedComposition.composition,requireInstalledRuntimeComposition(instruction.stagedApplicationRoot)) ||
+            instruction.runtimeChoice && installedComposition.status!=='declared')throw Error('Installed runtime composition does not match the verified target')
 
         writeProgress(instruction.progressFile, {
             phase: 'starting',
             targetVersion: instruction.targetVersion
         })
-        launchApplication(instruction.applicationRoot)
+        await launchApplication(instruction.applicationRoot)
+        replacementStarted = true
 
         writeProgress(instruction.progressFile, {
             phase: 'health-check',
@@ -360,6 +281,8 @@ export async function runFullApplicationUpgrade(
             throw new Error(
                 'Updated application failed its startup/migration health check'
             )
+
+        committed = true
 
         writeProgress(instruction.progressFile, {
             phase: 'complete',
@@ -373,25 +296,50 @@ export async function runFullApplicationUpgrade(
         )
             openBrowserFallback(healthy.url)
 
-        fs.rmSync(instruction.backupRoot, {
-            recursive: true,
-            force: true
-        })
-        fs.rmSync(snapshot, { recursive: true, force: true })
+        cleanupHealthyRecovery(instruction, snapshot)
     } catch (error) {
-        writeProgress(instruction.progressFile, {
+        if (committed) {
+            // Reporting/cleanup failure after proven health must not undo a good installation.
+            try {
+                writeProgress(instruction.progressFile, {
+                    phase: 'complete',
+                    targetVersion: instruction.targetVersion,
+                    message:
+                        'Update completed; recovery/report cleanup is pending.'
+                })
+            } catch {
+                /* Preserve the healthy application and recovery files. */
+            }
+            return
+        }
+        if (!parentExited) {
+            reportRecoveryProgress(instruction.progressFile, {
+                phase: 'failed',
+                targetVersion: instruction.targetVersion,
+                message: error instanceof Error ? error.message : String(error)
+            })
+            throw error
+        }
+        reportRecoveryProgress(instruction.progressFile, {
             phase: 'rollback',
             targetVersion: instruction.targetVersion,
             message: error instanceof Error ? error.message : String(error)
         })
         try {
-            await stopPublishedInstance(instruction.instanceFile)
+            if (
+                replacementStarted &&
+                !(await stopPublishedInstance(instruction.instanceFile))
+            )
+                throw new Error(
+                    'Replacement exit cannot be verified; application and user-state backups retained'
+                )
             fs.rmSync(instruction.instanceFile, { force: true })
             if (replaced) rollbackApplication(instruction)
             if (snapshot) restoreUserState(instruction, snapshot)
-            launchApplication(instruction.applicationRoot)
+            await launchApplication(instruction.applicationRoot)
+            recoveryCompleted = true
         } catch (rollbackError) {
-            writeProgress(instruction.progressFile, {
+            reportRecoveryProgress(instruction.progressFile, {
                 phase: 'failed',
                 targetVersion: instruction.targetVersion,
                 message:
@@ -402,13 +350,24 @@ export async function runFullApplicationUpgrade(
             })
             throw rollbackError
         }
-        writeProgress(instruction.progressFile, {
+        reportRecoveryProgress(instruction.progressFile, {
             phase: 'failed',
             targetVersion: instruction.targetVersion,
             message: error instanceof Error ? error.message : String(error)
         })
         throw error
+    } finally {
+        if (instruction.legacyTransition && (committed || !parentExited || recoveryCompleted) &&
+            !releaseLegacyTransitionLock(instruction.legacyTransition.lock, instruction.applicationRoot))
+            console.error('Legacy transition ownership lock retained for review.')
     }
+}
+
+export const fullUpgradeInternals = {
+    stopPublishedInstance,
+    removeApplicationTree,
+    rollbackApplication,
+    cleanupHealthyRecovery
 }
 
 async function main() {

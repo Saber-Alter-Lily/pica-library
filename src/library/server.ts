@@ -8,10 +8,7 @@ import { LibraryService } from './service'
 import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
 import { PRODUCT_VERSION } from '../version'
-import { appCapabilities } from '../app-capabilities'
 import { ProviderService } from '../services/provider-service'
-import { LibraryQueryService } from '../services/library-query-service'
-import { ShelfService } from '../services/shelf-service'
 import { RecommendationService } from '../services/recommendation-service'
 import { AdaptiveRecommendationSession } from '../recommendation-v3/adaptive-session'
 import { PreviewCacheManager } from '../services/preview-cache-manager'
@@ -23,8 +20,15 @@ import {
     VISUAL_SAMPLING_POLICY_VERSION,
     type VisualSamplingMode
 } from '../recommendation-v4/visual-style'
-import { ReaderService } from '../services/reader-service'
+import { localReaderGet } from '../reader/local-http-read'
+import { coreCatalogueGet, coreCatalogueQuery } from './core-catalog-read'
+import { coreBootstrapStatus, coreBootstrapAuthors, coreBootstrapCapabilities } from './core-bootstrap-read'
+import { coreShelfMatch, coreShelfExecute } from './core-shelf-routes'
+import { coreLocalPlatformMatch, coreLocalPlatformExecute } from './core-local-platform'
+import { ExternalReaderAdapter } from '../services/external-reader-adapter'
 import { OnlineReaderService } from '../services/online-reader-service'
+import type { SignedSourceDesktopReader } from '../desktop/signed-source-reader'
+import { SignedReaderInputError } from '../source-extensions/signed-reader-errors'
 import type { UserEventInput, V3EventType } from '../recommendation-v3/types'
 import { CycleCoordinatorV3 } from '../recommendation-v3/cycle-coordinator-v3'
 import { FINAL_PROFILE_VERSION } from '../recommendation-v3/final-profile'
@@ -32,9 +36,24 @@ import { RANKER_ADAPTER_VERSION } from '../recommendation-v3/ranker-adapter-v3'
 import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 import { LocalHttpLatencyRegistry } from '../runtime/http-latency'
+import { coreLocalImportMatch, coreLocalImportReady } from './core-local-import'
+import { createCoreLocalRuntime } from './core-runtime-composition'
+import { SourceDisabledError } from '../sources/source-policy'
+import { SourceHostError, type SourceHostInspection } from '../source-hosts/contract'
+import type { HostedLibraryReader } from '../source-hosts/library-reader'
+import { ReadingLibrary, ReadingLibraryInputError, type ReadingLibraryPort } from './reading-library'
+import { catalogueReadingPort } from '../services/reading-library-adapters'
+import { UpdateDownloadTask, type UpdatePackageDownload } from '../update/download-task'
+import { RUNTIME_CHOICE_ROUTES, runtimeChoiceAuthority, runtimeChoiceCommand } from '../update/runtime-choice-http'
 
 export interface DesktopServerController {
     csrfToken: string
+    hostedReader?: HostedLibraryReader
+    /** Signed worker QA integration is absent in production without a pinned publisher. */
+    signedSourceReader?: SignedSourceDesktopReader
+    inspectSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
+    sourceHostConnections?: (input: Record<string, unknown>) => unknown
+    inspectSavedSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
     registerAccount?: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
     configured: () => boolean
     status: () => Record<string, unknown>
@@ -50,6 +69,7 @@ export interface DesktopServerController {
         input: Record<string, unknown>
     ) => Promise<Record<string, unknown>>
     chooseFolder: () => Promise<string | null>
+    chooseLocalComic?: (kind: 'folder' | 'cbz') => Promise<string | null>
     exportBrowserLitePackage: () => Promise<Record<string, unknown>>
     exportRecommendationAudit?: (
         input?: Record<string, unknown>
@@ -59,6 +79,8 @@ export interface DesktopServerController {
     openDirectory: (kind: string) => Promise<void>
     ecosystemPackInventory?: () => unknown
     checkForUpdate?: () => Promise<Record<string, unknown>>
+    planRuntimeChoice?: (choice:'core'|'jm',signal:AbortSignal)=>Promise<Record<string,unknown>>
+    prepareRuntimeChoice?: (id:string,download:UpdatePackageDownload,signal:AbortSignal)=>Promise<Record<string,unknown>>
     stageUpdate?: (
         name: string,
         value: Buffer
@@ -84,13 +106,14 @@ function json(response: ServerResponse, status: number, value: unknown) {
     response.end(JSON.stringify(value))
 }
 
-async function body(request: IncomingMessage) {
+async function body(request: IncomingMessage, limit = 10 * 1024 * 1024, preserveForErrorReply = false) {
     const chunks: Buffer[] = []
     let size = 0
-    for await (const chunk of request) {
+    const input = preserveForErrorReply ? request.iterator({ destroyOnReturn: false }) : request
+    for await (const chunk of input) {
         const buffer = Buffer.from(chunk)
         size += buffer.byteLength
-        if (size > 10 * 1024 * 1024)
+        if (size > limit)
             throw new Error('Request body is too large')
         chunks.push(buffer)
     }
@@ -234,13 +257,27 @@ export async function startLibraryServer(options: {
     port?: number
     desktop?: DesktopServerController
     cacheDir?: string
+    /**
+     * Optional original Desktop in-process request admission. The source-free
+     * local core does not receive a fence and keeps its existing behavior.
+     */
+    requestAdmission?: {
+        enter(method: string, pathname: string): (() => void) | null
+    }
 }) {
     const root = webRoot()
+    // The existing Desktop and the physical no-source Core now instantiate
+    // the SAME original local library, shelf, Reader and import services.
+    // Only the trusted Desktop passes the native external-file opener.
+    const { localImport, libraryQueries, shelfService, readerService } =
+        createCoreLocalRuntime({
+            database: options.database,
+            dataDir: options.service.dataDir,
+            externalFileOpener: new ExternalReaderAdapter()
+        })
     const host = options.host ?? '127.0.0.1'
     const port = options.port ?? 4789
     const providerService = options.service.providerService()
-    const libraryQueries = new LibraryQueryService(options.database)
-    const shelfService = new ShelfService(options.database, libraryQueries)
     const recommendationService = new RecommendationService(
         options.database,
         (limit) => options.service.recommendations({ limit })
@@ -259,20 +296,15 @@ export async function startLibraryServer(options: {
             rankerModelVersion: RANKER_ADAPTER_VERSION,
             candidatePoolVersion: RETRIEVER_VERSION,
             allocatorVersion: BATCH_ALLOCATOR_VERSION
-        }
+        },
+        (cycleId,state,error) => options.service.recommendationBuildCommitState(cycleId,state,error)
     )
-    void recommendationService.ensureInitialPrepared().catch(() => {
-        // Connected startup must remain available while provider preparation
-        // waits for credentials/network. The status endpoint exposes preparing.
-    })
+    // Recommendation preparation belongs to explicit commands. Opening a local
+    // library/server must not start the legacy provider recall pipeline.
     const previewCache = new PreviewCacheManager(
         path.join(options.cacheDir ?? options.service.dataDir, 'previews')
     )
-    let updateDownloadController: AbortController | null = null
-    let updateDownloadProgress: Record<string, unknown> | null = null
-    const writeUpdateDownloadProgress = (value: Record<string, unknown>) => {
-        updateDownloadProgress = { ...value, updatedAt: new Date().toISOString() }
-    }
+    const updateDownloads = new UpdateDownloadTask(downloadUpdateAsset)
     const previewService = new PreviewService(
         options.database,
         providerService,
@@ -288,10 +320,6 @@ export async function startLibraryServer(options: {
             ),
             { maxBytes: 192 * 1024 * 1024, ttlMs: 6 * 60 * 60 * 1000 }
         )
-    )
-    const readerService = new ReaderService(
-        options.database,
-        options.service.dataDir
     )
     const onlineReader = new OnlineReaderService(options.database, providerService,
         new PreviewCacheManager(path.join(options.cacheDir ?? options.service.dataDir, 'online-reader'), {
@@ -355,6 +383,26 @@ export async function startLibraryServer(options: {
                     error: 'This local request could not be verified'
                 })
             }
+            // One admission point for the ORIGINAL local HTTP surface,
+            // including GET endpoints that may indirectly schedule work.
+            // The in-flight lease ends at response finish/close, even on a
+            // client disconnect. Unknown routes are refused after freeze.
+            const releaseRequest = options.requestAdmission?.enter(
+                request.method ?? 'GET', url.pathname
+            )
+            if (releaseRequest === null) {
+                response.setHeader('retry-after', '2')
+                response.setHeader('connection', 'close')
+                return json(response, 503, {
+                    code: 'DESKTOP_UPDATE_HANDOFF_FROZEN',
+                    error: 'The desktop is preparing to update. Try again later.'
+                })
+            }
+            if (releaseRequest) {
+                response.once('finish', releaseRequest)
+                response.once('close', releaseRequest)
+            }
+
             if (
                 url.pathname === '/api/v1/desktop/status' &&
                 request.method === 'GET' &&
@@ -365,8 +413,243 @@ export async function startLibraryServer(options: {
                     version: PRODUCT_VERSION,
                     configured: options.desktop.configured(),
                     csrfToken: options.desktop.csrfToken,
-                    ...options.desktop.status()
+                    ...options.desktop.status(),
+                    // Only a trusted application composition can inject this.
+                    // A source manifest or ordinary Desktop settings cannot.
+                    signedSourceManagement: {
+                        available: Boolean(options.desktop.signedSourceReader)
+                    }
                 })
+            }
+            if (url.pathname === '/api/v1/desktop/reading-library/query') {
+                if (request.method !== 'POST') return json(response, 405, { error: 'Explicit reading-library query required' })
+                const peer = request.socket.remoteAddress ?? '', expectedOrigin = `http://${request.headers.host}`
+                if (!options.desktop?.configured() || options.desktop.status().startupReady === false || origin !== expectedOrigin || request.headers['x-pica-csrf'] !== options.desktop.csrfToken || !/^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer)) return json(response, 403, { error: 'Local Desktop Reader authority required' })
+                try {
+                    if (url.search || !/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) throw new ReadingLibraryInputError()
+                    const deadline = setTimeout(() => request.destroy(), 5000)
+                    let input: Record<string, unknown>
+                    try { input = await body(request, 4096, true) } finally { clearTimeout(deadline) }
+                    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !['query', 'hostSessionId'].includes(key)) || input.hostSessionId !== undefined && (typeof input.hostSessionId !== 'string' || !/^[0-9a-f-]{36}$/.test(input.hostSessionId))) throw new ReadingLibraryInputError()
+                    const ports: ReadingLibraryPort[] = [
+                        catalogueReadingPort('local', () => options.database.recentReadingProgress(100), options.database, id => options.service.sources.isEnabled(id)),
+                        catalogueReadingPort('online', () => onlineReader.recentProgress(), options.database, id => options.service.sources.isEnabled(id))
+                    ]
+                    if (options.desktop.signedSourceReader) {
+                        const signed = options.desktop.signedSourceReader
+                        ports.push({
+                            id: 'signed-source-reader',
+                            snapshot: () => signed.readingLibraryRows()
+                        })
+                    }
+                    if (typeof input.hostSessionId === 'string') {
+                        const sessionId = input.hostSessionId
+                        ports.push({ id: 'selected-host', snapshot: () => {
+                            if (!options.desktop?.hostedReader) throw new Error('Hosted reading unavailable')
+                            return options.desktop.hostedReader.readingLibraryRows(sessionId)
+                        } })
+                    }
+                    return json(response, 200, new ReadingLibrary(ports).query(input.query === undefined ? {} : input.query))
+                } catch {
+                    response.setHeader('connection', 'close')
+                    return json(response, 400, { error: 'Invalid reading library query' })
+                }
+            }
+            if (url.pathname === '/api/v1/desktop/signed-reader' ||
+                url.pathname.startsWith('/api/v1/desktop/signed-reader/')) {
+                // This optional app-supplied port cannot be enabled by a
+                // manifest or browser. Management and JSON require CSRF.
+                // Session-owned image tags additionally have a tightly scoped
+                // same-origin, image-only allowance; no install/upload route.
+                const peer = request.socket.remoteAddress ?? ''
+                // Do not trust arbitrary Host as the origin authority. A
+                // browser on a DNS-rebinding domain can be same-origin with
+                // its own forged Host/Referer while connecting to loopback.
+                // Keep this image-only CSRF exception on the actual local
+                // listener, never on attacker-controlled hostnames.
+                const port = request.socket.localPort
+                const hostHeader = request.headers.host?.toLowerCase() ?? ''
+                const trustedHost = port !== undefined && [
+                    `127.0.0.1:${port}`,
+                    `localhost:${port}`,
+                    `[::1]:${port}`
+                ].includes(hostHeader)
+                const expectedOrigin = trustedHost ? `http://${hostHeader}` : ''
+                let referrerOrigin = ''
+                try {
+                    referrerOrigin = new URL(
+                        String(request.headers.referer ?? '')
+                    ).origin
+                } catch { /* no referrer is not same-origin proof */ }
+                // Browsers do not reliably send an Origin header on GET.
+                // Accept only a same-origin fetch with matching referrer,
+                // or an explicitly originating trusted Desktop client.
+                const sameOriginRead = request.method === 'GET' &&
+                    request.headers['sec-fetch-site'] === 'same-origin' &&
+                    referrerOrigin === expectedOrigin
+                const csrfAuthorized =
+                    (origin === expectedOrigin || sameOriginRead) &&
+                    request.headers['x-pica-csrf'] === options.desktop?.csrfToken
+                // <img> cannot attach x-pica-csrf. This narrow exception
+                // never authorizes metadata, progress or mutation requests.
+                const nativeSignedImage =
+                    request.method === 'GET' &&
+                    /^\/api\/v1\/desktop\/signed-reader\/[0-9a-f-]{36}\/comics\/[^/]+\/chapters\/[^/]+\/pages\/\d+$/.test(url.pathname) &&
+                    !origin &&
+                    request.headers['sec-fetch-site'] === 'same-origin' &&
+                    request.headers['sec-fetch-dest'] === 'image' &&
+                    referrerOrigin === expectedOrigin
+                const authorized =
+                    trustedHost &&
+                    Boolean(options.desktop?.signedSourceReader) &&
+                    Boolean(options.desktop?.configured()) &&
+                    options.desktop?.status().startupReady !== false &&
+                    /^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) &&
+                    (csrfAuthorized || nativeSignedImage)
+                if (!authorized)
+                    return json(response, 403, { error: 'Signed source Desktop authority required' })
+                if (url.search || !['GET', 'POST'].includes(request.method ?? ''))
+                    return json(response, 400, { error: 'INVALID_SIGNED_READER' })
+                const controller = options.desktop!.signedSourceReader!
+                try {
+                    const readCommand = async () => {
+                        if (!/^application\/json(?:\s*;|$)/i.test(
+                            request.headers['content-type'] ?? ''
+                        )) throw new SignedReaderInputError()
+                        const deadline = setTimeout(() => request.destroy(), 5000)
+                        try {
+                            try { return await body(request, 2048) }
+                            catch { throw new SignedReaderInputError() }
+                        } finally { clearTimeout(deadline) }
+                    }
+                    if (url.pathname === '/api/v1/desktop/signed-reader') {
+                        if (request.method !== 'POST')
+                            return json(response, 405, { error: 'Explicit signed reader command required' })
+                        return json(response, 200,
+                            await controller.command(await readCommand()))
+                    }
+                    const match = url.pathname.match(
+                        /^\/api\/v1\/desktop\/signed-reader\/([0-9a-f-]{36})\/(?:progress|comics\/([^/]+)\/chapters(?:\/([^/]+)(?:\/pages\/(\d+))?)?)$/
+                    )
+                    if (!match) throw new SignedReaderInputError()
+                    const [, sessionId, rawComic, rawChapter, page] = match
+                    if (!rawComic) {
+                        if (request.method === 'GET')
+                            return json(response, 200,
+                                await controller.read(sessionId, 'progress', {}))
+                        const input = await readCommand()
+                        if (!input || Array.isArray(input) ||
+                            Object.keys(input).sort().join(',') !==
+                            'comicId,episodeId,pageIndex')
+                            throw new SignedReaderInputError()
+                        return json(response, 200, await controller.read(
+                            sessionId, 'save-progress', {
+                                comicId: String(input.comicId ?? ''),
+                                episodeId: String(input.episodeId ?? ''),
+                                pageIndex: input.pageIndex as number
+                            }
+                        ))
+                    }
+                    if (request.method !== 'GET')
+                        return json(response, 405, { error: 'Signed reader pages are read-only' })
+                    const comicId = decodeURIComponent(rawComic)
+                    if (!rawChapter)
+                        return json(response, 200, await controller.read(
+                            sessionId, 'chapters', { comicId }
+                        ))
+                    const episodeId = decodeURIComponent(rawChapter)
+                    if (page === undefined)
+                        return json(response, 200, await controller.read(
+                            sessionId, 'chapter', { comicId, episodeId }
+                        ))
+                    const image = await controller.read(sessionId, 'picture', {
+                        comicId, episodeId, pageIndex: Number(page)
+                    }) as { data: Buffer; contentType: string }
+                    if (!response.destroyed) {
+                        response.writeHead(200, {
+                            'content-type': image.contentType,
+                            'cache-control': 'private, no-store',
+                            'x-content-type-options': 'nosniff',
+                            'cross-origin-resource-policy': 'same-origin',
+                            'referrer-policy': 'no-referrer'
+                        })
+                        response.end(image.data)
+                    }
+                    return
+                } catch (error) {
+                    const code = error instanceof SignedReaderInputError ||
+                        error instanceof URIError
+                        ? 'INVALID_SIGNED_READER'
+                        : 'SIGNED_SOURCE_UNAVAILABLE'
+                    if (!response.destroyed) return json(response,
+                        code === 'INVALID_SIGNED_READER' ? 400 : 409,
+                        { error: code })
+                }
+                return
+            }
+            if (url.pathname === '/api/v1/desktop/host-reader' || url.pathname.startsWith('/api/v1/desktop/host-reader/')) {
+                const peer = request.socket.remoteAddress ?? '', expectedOrigin = `http://${request.headers.host}`
+                let referrerOrigin = ''; try { referrerOrigin = new URL(String(request.headers.referer ?? '')).origin } catch { /* absent/invalid means no same-origin proof */ }
+                const sameOriginRead = request.headers['sec-fetch-site'] === 'same-origin' && referrerOrigin === expectedOrigin && ['empty', 'image'].includes(String(request.headers['sec-fetch-dest']))
+                const verifiedCommand = origin === expectedOrigin && request.headers['x-pica-csrf'] === options.desktop?.csrfToken
+                if (!options.desktop?.hostedReader || !options.desktop.configured() || options.desktop.status().startupReady === false || !/^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) || (request.method === 'GET' ? !sameOriginRead && !verifiedCommand : !verifiedCommand)) return json(response, 403, { error: 'Local Desktop Reader authority required' })
+                if (url.search || !['GET', 'POST'].includes(request.method ?? '')) return json(response, 400, { error: 'INVALID_SOURCE_HOST' })
+                const abort = new AbortController(), disconnected = () => { if (!response.writableEnded) abort.abort() }
+                response.once('close', disconnected)
+                try {
+                    let input: Record<string, unknown> = {}
+                    if (request.method === 'POST') {
+                        if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) throw new SourceHostError('INVALID_SOURCE_HOST')
+                        const deadline = setTimeout(() => request.destroy(), 5000)
+                        try { input = await body(request, 16384) } catch { throw new SourceHostError('INVALID_SOURCE_HOST') } finally { clearTimeout(deadline) }
+                    }
+                    if (url.pathname === '/api/v1/desktop/host-reader' && request.method === 'POST') return json(response, 200, await options.desktop.hostedReader.command(input, abort.signal))
+                    const match = url.pathname.match(/^\/api\/v1\/desktop\/host-reader\/([0-9a-f-]{36})\/(?:progress|comics\/([^/]+)\/chapters(?:\/([^/]+)(?:\/pages\/(\d+))?)?)$/)
+                    if (!match) throw new SourceHostError('INVALID_SOURCE_HOST')
+                    const [, sessionId, rawComic, rawEpisode, page] = match
+                    const comicId = rawComic ? decodeURIComponent(rawComic) : undefined, episodeId = rawEpisode ? decodeURIComponent(rawEpisode) : undefined
+                    if (!rawComic) {
+                        if (request.method === 'POST' && Object.keys(input).some(key => !['comicId', 'episodeId', 'pageIndex'].includes(key))) throw new SourceHostError('INVALID_SOURCE_HOST')
+                        return json(response, 200, await options.desktop.hostedReader.read(sessionId, request.method === 'GET' ? 'progress' : 'save-progress', input, abort.signal))
+                    }
+                    if (request.method !== 'GET') throw new SourceHostError('INVALID_SOURCE_HOST')
+                    if (page !== undefined) {
+                        const image = await options.desktop.hostedReader.picture(sessionId, comicId!, episodeId!, Number(page), abort.signal)
+                        if (!response.destroyed) { response.writeHead(200, { 'content-type': image.contentType, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'cross-origin-resource-policy': 'same-origin', 'referrer-policy': 'no-referrer' }); response.end(image.data) }
+                        return
+                    }
+                    return json(response, 200, await options.desktop.hostedReader.read(sessionId, episodeId ? 'chapter' : 'chapters', { comicId, episodeId }, abort.signal))
+                } catch (error) {
+                    const code = error instanceof SourceHostError ? error.code : 'SOURCE_HOST_UNAVAILABLE'
+                    if (!response.destroyed) json(response, code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401 : code === 'SOURCE_HOST_SCOPE_REQUIRED' ? 403 : ['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_STALE', 'SOURCE_HOST_DISABLED', 'SOURCE_HOST_BUSY'].includes(code) ? 409 : code === 'SOURCE_HOST_TIMEOUT' ? 504 : ['INVALID_SOURCE_HOST', 'SOURCE_HOST_CONSENT_REQUIRED', 'SOURCE_HOST_READER_CONSENT_REQUIRED', 'SOURCE_HOST_SOURCE_SELECTION_REQUIRED', 'SOURCE_HOST_DOWNLOAD_CONSENT_REQUIRED'].includes(code) ? 400 : 502, { error: code, code })
+                } finally { response.removeListener('close', disconnected) }
+                return
+            }
+            if (['/api/v1/desktop/source-hosts/inspect', '/api/v1/desktop/source-hosts/connections', '/api/v1/desktop/source-hosts/inspect-saved'].includes(url.pathname)) {
+                const peer = request.socket.remoteAddress ?? ''
+                if (request.method !== 'POST') return json(response, 405, { error: 'Source-host inspection requires an explicit local POST' })
+                const sourceHostAction = url.pathname.endsWith('/connections') ? options.desktop?.sourceHostConnections : url.pathname.endsWith('/inspect-saved') ? options.desktop?.inspectSavedSourceHost : options.desktop?.inspectSourceHost
+                if (!sourceHostAction || !options.desktop?.configured() || !/^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) || !origin || request.headers['x-pica-csrf'] !== options.desktop.csrfToken)
+                    return json(response, 403, { error: 'Source-host inspection requires the configured local Desktop UI' })
+                if (url.search || !/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? ''))
+                    return json(response, 400, { error: 'INVALID_SOURCE_HOST', code: 'INVALID_SOURCE_HOST' })
+                const abort = new AbortController()
+                const disconnected = () => { if (!response.writableEnded) abort.abort() }
+                response.once('close', disconnected)
+                try {
+                    let input: Record<string, unknown>
+                    const bodyDeadline = setTimeout(() => request.destroy(), 5000)
+                    try { input = await body(request, 16384) }
+                    catch { if (!response.destroyed) json(response, 400, { error: 'INVALID_SOURCE_HOST', code: 'INVALID_SOURCE_HOST' }); return }
+                    finally { clearTimeout(bodyDeadline) }
+                    const result = await sourceHostAction(input, abort.signal)
+                    if (!response.destroyed) json(response, 200, result)
+                } catch (error) {
+                    const code = error instanceof SourceHostError ? error.code : 'SOURCE_HOST_UNAVAILABLE'
+                    const status = ['INVALID_SOURCE_HOST', 'SOURCE_HOST_CONSENT_REQUIRED', 'SOURCE_HOST_INSECURE'].includes(code) ? 400 : ['SOURCE_HOST_BUSY', 'SOURCE_HOST_CANCELLED', 'SOURCE_HOST_DUPLICATE', 'SOURCE_HOST_STALE', 'SOURCE_HOST_DISABLED'].includes(code) ? 409 : code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401 : code === 'SOURCE_HOST_UNSUPPORTED' ? 422 : code === 'SOURCE_HOST_TIMEOUT' ? 504 : code === 'SOURCE_HOST_STORAGE' ? 503 : 502
+                    if (!response.destroyed) json(response, status, { error: code, code })
+                } finally { response.removeListener('close', disconnected) }
+                return
             }
             if (
                 url.pathname === '/api/v1/capabilities' &&
@@ -378,21 +661,114 @@ export async function startLibraryServer(options: {
                         error: 'Desktop startup is not ready',
                         startupReady: false
                     })
-                return json(response, 200, {
-                    ...appCapabilities(
-                        providerService.capabilities.favoriteMutation,
-                        process.platform,
-                        process.arch,
-                        desktopStatus
-                    ),
-                    providers: providerService.providerStatus()
-                })
+                return json(response, 200, coreBootstrapCapabilities({
+                    kind: 'provider-enabled',
+                    desktopStatus,
+                    favoriteMutation: providerService.capabilities.favoriteMutation,
+                    providers: providerService.providerStatus(),
+                    sourceModules: providerService.sourceModuleStatus(),
+                    externalSources: options.service.sources.snapshot()
+                }))
             }
             if (
                 url.pathname === '/api/v1/recommendation-v5' &&
                 request.method === 'GET'
             )
                 return json(response, 200, options.service.recommendationV5Snapshot())
+
+            if (url.pathname.startsWith('/api/v1/desktop/sources/jm/') && options.desktop) {
+                const action = url.pathname.slice('/api/v1/desktop/sources/jm/'.length)
+                if (action === 'status' && request.method === 'GET')
+                    return json(response, 200, { available: options.service.jmRuntimeAvailable(), ...await options.service.jmAccountStatus() })
+                if (request.method === 'POST') {
+                    if (action === 'connect') {
+                        if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) {
+                            response.setHeader('connection', 'close')
+                            return json(response, 400, { error: 'JM connect requires an empty JSON object' })
+                        }
+                        let input: Record<string, unknown>
+                        try { input = await body(request, 4096, true) }
+                        catch {
+                            response.setHeader('connection', 'close')
+                            return json(response, 400, { error: 'JM connect requires an empty JSON object within 4096 bytes' })
+                        }
+                        if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length) return json(response, 400, { error: 'JM connect accepts no credential or source-choice fields' })
+                        return json(response, 200, await options.service.jmConnectAccount())
+                    }
+                    const input = await body(request)
+                    if (action === 'login' || action === 'logout') return json(response, 200, await options.desktop.save({ ...input, jmAccountAction: action }))
+                    if (action === 'preview') return json(response, 200, await options.service.jmPreviewFavorites(Number(input.folderId ?? 0), async () => { if (response.destroyed) throw new Error('收藏扫描已取消') }))
+                    if (action === 'confirm') return json(response, 200, await options.service.jmConfirmFavorites(String(input.token ?? '')))
+                    if (action === 'cancel') { options.service.jmCancelFavorites(); return json(response, 200, { cancelled: true }) }
+                    if (action === 'enrich') return json(response, 200, await options.service.jmEnrichFavorites(async () => { if (response.destroyed) throw new Error('资料补全已取消') }))
+                }
+                return json(response, 404, { error: 'Source action not found' })
+            }
+
+            if (url.pathname.startsWith('/api/v1/desktop/recommendation-v5/tag-profile/')) {
+                if (!options.desktop) return json(response, 403, { error: 'Tag-profile exchange requires the local Desktop host' })
+                const action = url.pathname.slice('/api/v1/desktop/recommendation-v5/tag-profile/'.length)
+                if (action === 'status' && request.method === 'GET') return json(response, 200, options.service.tagProfileExchangeV1().status())
+                if (request.method !== 'POST') return json(response, 405, { error: 'POST required' })
+                try {
+                    const input = await body(request, action === 'preview' ? 1100 * 1024 : 4096)
+                    const allowed = action === 'export' ? ['includeFavoriteCounts', 'includeManualBindings'] : action === 'preview' ? ['text'] : action === 'apply' ? ['previewId', 'apply'] : action === 'undo' ? ['apply'] : null
+                    if (!allowed) return json(response, 404, { error: 'Tag-profile action not found' })
+                    if (Object.keys(input).some(key => !allowed.includes(key)) || (input.apply !== undefined && typeof input.apply !== 'boolean')) return json(response, 400, { error: 'TAG_EXCHANGE_UNKNOWN_OR_INVALID_FIELD' })
+                    const exchange = options.service.tagProfileExchangeV1()
+                    if (action === 'export') {
+                        const result = exchange.exportPackage(input)
+                        response.writeHead(200, { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="${result.filename}"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' })
+                        return response.end(result.buffer)
+                    }
+                    if (action === 'preview') return json(response, 200, exchange.preview(input.text))
+                    const result = action === 'apply' ? exchange.apply(input.previewId) : exchange.undo()
+                    let recommendationRefresh: Record<string, unknown> | null = null
+                    if (input.apply === true && !('alreadyApplied' in result && result.alreadyApplied)) {
+                        try { recommendationRefresh = { requested: true, started: true, status: finalRecommendationCoordinator.forceNew(`tag-profile:${result.revision}`) } }
+                        catch (error) { recommendationRefresh = { requested: true, started: false, error: error instanceof Error ? error.message : String(error) } }
+                    }
+                    return json(response, 200, { ...result, recommendationRefresh })
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error)
+                    return json(response, message.startsWith('TAG_EXCHANGE_CONFLICT_') || message.startsWith('TAG_POLICY_REVISION_CONFLICT') ? 409 : 400, { error: message })
+                }
+            }
+
+            if (url.pathname === '/api/v1/recommendation-v5/tag-policy') {
+                if (request.method === 'GET') return json(response, 200, options.service.recommendationTagPolicyV1())
+                if (request.method === 'POST') {
+                    const input = await body(request, 160 * 1024)
+                    try {
+                        const result = options.service.updateRecommendationTagPolicyV1(input)
+                        let recommendationRefresh: Record<string, unknown> | null = null
+                        if (input.apply === true) {
+                            try { recommendationRefresh = { requested: true, started: true, status: finalRecommendationCoordinator.forceNew(`tag-policy:${result.revision}`) } }
+                            catch (error) { recommendationRefresh = { requested: true, started: false, error: error instanceof Error ? error.message : String(error) } }
+                        }
+                        // Saving and starting a build are separate outcomes. A busy builder
+                        // must not turn an already committed save into a false HTTP failure.
+                        return json(response, 200, { ...result, recommendationRefresh })
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : String(error)
+                        return json(response, message.startsWith('TAG_POLICY_REVISION_CONFLICT') ? 409 : 400, { error: message })
+                    }
+                }
+            }
+
+            if (
+                url.pathname === '/api/v1/recommendation-v5/preferences/search' &&
+                request.method === 'GET'
+            ) {
+                const query = url.searchParams.get('q') ?? ''
+                if (query.length > 160)
+                    return json(response, 400, {
+                        error: 'Preference search is limited to 160 characters'
+                    })
+                return json(response, 200, options.service.recommendationV5SearchPreferences(
+                    query, Number(url.searchParams.get('limit') ?? 100)
+                ))
+            }
 
             if (
                 url.pathname ===
@@ -1366,7 +1742,7 @@ export async function startLibraryServer(options: {
                 return json(
                     response,
                     200,
-                    updateDownloadProgress ?? options.desktop.updateProgress()
+                    updateDownloads.progress() ?? options.desktop.updateProgress()
                 )
             }
             if (
@@ -1380,9 +1756,7 @@ export async function startLibraryServer(options: {
                     return json(response, 403, {
                         error: 'This local request could not be verified'
                     })
-                if (updateDownloadController) updateDownloadController.abort()
-                updateDownloadController = null
-                writeUpdateDownloadProgress({ phase: 'cancelled' })
+                updateDownloads.cancel()
                 return json(response, 200, { success: true })
             }
             if (
@@ -1427,66 +1801,58 @@ export async function startLibraryServer(options: {
                     throw new Error(
                         'Official update asset is missing'
                     )
-                if (updateDownloadController)
-                    throw new Error('An update download is already running')
-
-                updateDownloadController = new AbortController()
-                writeUpdateDownloadProgress({
-                    phase: 'downloading',
-                    current: 0,
-                    total: 0,
-                    targetVersion: version
-                })
                 try {
-                    const archive = await downloadUpdateAsset(
-                        assetUrl,
-                        status === 'full-install'
-                            ? 512 * 1024 * 1024
-                            : 128 * 1024 * 1024,
-                        (current, total) =>
-                            writeUpdateDownloadProgress({
-                                phase: 'downloading',
-                                current,
-                                total: total ?? 0,
-                                targetVersion: version
-                            }),
-                        updateDownloadController.signal
+                    const staged = await updateDownloads.run(
+                        async download => {
+                            const archive = await download(assetUrl,version)
+                            return status === 'full-install'
+                                ? options.desktop!.stageFullUpdate!(version,assetName,archive)
+                                : options.desktop!.stageUpdate!(assetName,archive)
+                        },
+                        status === 'full-install' ? 512 * 1024 * 1024 : 128 * 1024 * 1024,
+                        version
                     )
-                    updateDownloadController = null
-                    updateDownloadProgress = null
-                    const staged =
-                        status === 'full-install'
-                            ? await options.desktop.stageFullUpdate!(
-                                  version,
-                                  assetName,
-                                  archive
-                              )
-                            : await options.desktop.stageUpdate!(
-                                  assetName,
-                                  archive
-                              )
                     return json(response, 200, staged)
                 } catch (error) {
                     const cancelled =
                         error instanceof Error &&
                         (error.name === 'AbortError' ||
                             /abort/i.test(error.message))
-                    updateDownloadController = null
-                    writeUpdateDownloadProgress({
-                        phase: cancelled ? 'cancelled' : 'failed',
-                        error: cancelled
-                            ? 'Update download was cancelled'
-                            : error instanceof Error
-                              ? error.message
-                              : String(error),
-                        targetVersion: version
-                    })
                     if (cancelled)
                         return json(response, 409, {
                             error: 'Update download was cancelled'
                         })
                     throw error
                 }
+            }
+            if ((RUNTIME_CHOICE_ROUTES as readonly string[]).includes(url.pathname)) {
+                if(!runtimeChoiceAuthority({method:request.method,search:url.search,peer:request.socket.remoteAddress??'',host:request.headers.host??'',origin:request.headers.origin,
+                    token:request.headers['x-pica-csrf'],expectedToken:options.desktop?.csrfToken}))return json(response,403,{error:'Explicit local Desktop runtime choice required'})
+                if(!options.desktop?.planRuntimeChoice || !options.desktop.prepareRuntimeChoice)return json(response,409,{error:'Runtime component replacement is unavailable in this mode'})
+                const abort=new AbortController(),disconnected=()=>{if(!response.writableEnded)abort.abort()}
+                response.once('close',disconnected)
+                try{
+                    if(!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type']??''))throw Error('JSON runtime component command required')
+                    const deadline=setTimeout(()=>request.destroy(),5000)
+                    let input:unknown
+                    try{input=await body(request,4096,true)}
+                    catch{throw Error('Runtime component command must be valid JSON within 4096 bytes')}
+                    finally{clearTimeout(deadline)}
+                    const command=runtimeChoiceCommand(url.pathname,input)
+                    if(command.action==='plan')return json(response,200,await options.desktop.planRuntimeChoice(command.choice,abort.signal))
+                    const staged=await updateDownloads.run(
+                        (download,signal)=>options.desktop!.prepareRuntimeChoice!(command.id,download,signal),
+                        512*1024*1024,
+                        undefined,
+                        abort.signal
+                    )
+                    return json(response,200,staged)
+                }catch(error){
+                    // Keep a bounded rejection writable; close the connection after
+                    // replying instead of destroying the request before the JSON error.
+                    response.setHeader('connection','close')
+                    return json(response,abort.signal.aborted || error instanceof Error&&error.name==='AbortError'?409:400,{error:error instanceof Error?error.message:'Runtime component selection failed'})
+                }finally{response.off('close',disconnected)}
             }
             if (
                 url.pathname === '/api/v1/update/stage' &&
@@ -1616,14 +1982,27 @@ export async function startLibraryServer(options: {
                     await options.desktop.detectProxy(await body(request))
                 )
             }
-            if (
-                url.pathname === '/api/v1/desktop/choose-folder' &&
-                request.method === 'POST' &&
-                options.desktop
-            ) {
-                return json(response, 200, {
-                    path: await options.desktop.chooseFolder()
-                })
+            const localImportRoute = coreLocalImportMatch(
+                request.method ?? '', url.pathname
+            )
+            if (localImportRoute) {
+                if (!coreLocalImportReady(options.desktop))
+                    return json(response, 409, {
+                        error: 'Local import requires the interactive Desktop file picker'
+                    })
+                const reply = await localImport.http(
+                    localImportRoute, await body(request, 4096), options.desktop
+                )
+                return json(response, reply.status, reply.value)
+            }
+            const localPlatformAction = coreLocalPlatformMatch(
+                request.method ?? '', url.pathname
+            )
+            if (localPlatformAction === 'choose-folder' && options.desktop) {
+                const reply = await coreLocalPlatformExecute(
+                    localPlatformAction, options.desktop
+                )
+                return json(response, reply.status, reply.value)
             }
             if (
                 url.pathname ===
@@ -1674,14 +2053,11 @@ export async function startLibraryServer(options: {
                 await options.desktop.openBrowserLite()
                 return json(response, 200, { success: true })
             }
-            if (
-                url.pathname === '/api/v1/desktop/open-directory' &&
-                request.method === 'POST' &&
-                options.desktop
-            ) {
-                const input = await body(request)
-                await options.desktop.openDirectory(String(input.kind ?? ''))
-                return json(response, 200, { success: true })
+            if (localPlatformAction === 'open-directory' && options.desktop) {
+                const reply = await coreLocalPlatformExecute(
+                    localPlatformAction, options.desktop, await body(request, 4096)
+                )
+                return json(response, reply.status, reply.value)
             }
             if (
                 url.pathname === '/api/v1/desktop/browser-session' &&
@@ -1714,16 +2090,9 @@ export async function startLibraryServer(options: {
                 return
             }
             if (url.pathname === '/api/v1/status' && request.method === 'GET') {
-                return json(response, 200, {
-                    application: 'Pica Library',
-                    mode: 'connected',
-                    version: PRODUCT_VERSION,
-                    database: options.database.file,
-                    summary: options.database.summary(),
-                    reconciliation: options.database.reconcileLibraryCounts(),
-                    favoritesSyncProgress:
-                        options.service.favoritesSyncProgress()
-                })
+                return json(response, 200, coreBootstrapStatus(
+                    options.database, options.service.favoritesSyncProgress()
+                ))
             }
             if (
                 url.pathname === '/api/v1/sync/progress' &&
@@ -1735,155 +2104,39 @@ export async function startLibraryServer(options: {
                     options.service.favoritesSyncProgress()
                 )
             }
-            if (
-                url.pathname === '/api/v1/downloaded' &&
-                request.method === 'GET'
-            ) {
-                return json(
-                    response,
-                    200,
-                    options.database.listDownloadedComics()
-                )
-            }
+            // Shared with the physically source-free local core; the normal
+            // Desktop still exposes the exact original catalogue and facets.
+            const catalogueRead = request.method === 'GET'
+                ? coreCatalogueGet(url, options.database) : null
+            if (catalogueRead)
+                return json(response, catalogueRead.status, catalogueRead.value)
             if (
                 url.pathname === '/api/v1/library/query' &&
                 request.method === 'POST'
-            ) {
-                return json(
-                    response,
-                    200,
-                    libraryQueries.query(
-                        (await body(request)) as LibraryFacetQuery
-                    )
-                )
-            }
-            if (url.pathname === '/api/v1/shelves' && request.method === 'GET')
-                return json(response, 200, shelfService.list())
-            if (
-                url.pathname === '/api/v1/shelves' &&
-                request.method === 'POST'
-            ) {
-                const input = await body(request)
-                return json(
-                    response,
-                    200,
-                    shelfService.create(String(input.name ?? ''))
-                )
-            }
-            const shelfRoute = url.pathname.match(
-                /^\/api\/v1\/shelves\/([^/]+)$/
             )
-            if (shelfRoute && request.method === 'GET') {
-                const shelfId = decodeURIComponent(shelfRoute[1])
-                return json(response, 200, {
-                    shelf: shelfService
-                        .list()
-                        .find((item) => item.id === shelfId),
-                    items: shelfService.contents(shelfId)
-                })
-            }
-            if (shelfRoute && request.method === 'PATCH') {
-                const input = await body(request)
-                return json(
-                    response,
-                    200,
-                    shelfService.rename(
-                        decodeURIComponent(shelfRoute[1]),
-                        String(input.name ?? '')
-                    )
-                )
-            }
-            if (shelfRoute && request.method === 'DELETE')
-                return json(
-                    response,
-                    200,
-                    shelfService.delete(decodeURIComponent(shelfRoute[1]))
-                )
-            const shelfItemsRoute = url.pathname.match(
-                /^\/api\/v1\/shelves\/([^/]+)\/(items|remove|add-filtered)$/
+                return json(response, 200, coreCatalogueQuery(
+                    (await body(request)) as LibraryFacetQuery,
+                    libraryQueries
+                ))
+            const shelfMatch = coreShelfMatch(
+                request.method ?? '', url.pathname
             )
-            if (shelfItemsRoute && request.method === 'POST') {
-                const shelfId = decodeURIComponent(shelfItemsRoute[1])
-                const input = await body(request)
-                if (shelfItemsRoute[2] === 'add-filtered')
-                    return json(
-                        response,
-                        200,
-                        shelfService.addFiltered(
-                            shelfId,
-                            (input.query ?? {}) as LibraryFacetQuery
-                        )
-                    )
-                if (shelfItemsRoute[2] === 'remove') {
-                    const comicIds = stringList(input.comicIds)
-                    const result = shelfService.remove(shelfId, comicIds)
-                    options.database.recordUserEvents(
-                        comicIds.map(
-                            (comicId) =>
-                                ({
-                                    eventType: 'shelf_remove',
-                                    comicId,
-                                    source: 'shelf',
-                                    appSessionId: request.headers[
-                                        'x-pica-app-session'
-                                    ]
-                                        ? String(
-                                              request.headers[
-                                                  'x-pica-app-session'
-                                              ]
-                                          )
-                                        : null,
-                                    contextId: request.headers[
-                                        'x-pica-context-id'
-                                    ]
-                                        ? String(
-                                              request.headers[
-                                                  'x-pica-context-id'
-                                              ]
-                                          )
-                                        : null,
-                                    metadata: { shelfId }
-                                }) satisfies UserEventInput
-                        )
-                    )
-                    return json(response, 200, result)
-                }
-                const comicIds = stringList(input.comicIds)
-                const result = shelfService.add(
-                    shelfId,
-                    comicIds,
-                    Array.isArray(input.records)
-                        ? (input.records as FavoriteRecord[])
-                        : []
-                )
-                options.database.recordUserEvents(
-                    comicIds.map(
-                        (comicId) =>
-                            ({
-                                eventType: 'shelf_add',
-                                comicId,
-                                source: 'shelf',
-                                appSessionId: request.headers[
-                                    'x-pica-app-session'
-                                ]
-                                    ? String(
-                                          request.headers[
-                                              'x-pica-app-session'
-                                          ]
-                                      )
-                                    : null,
-                                contextId: request.headers['x-pica-context-id']
-                                    ? String(
-                                          request.headers[
-                                              'x-pica-context-id'
-                                          ]
-                                      )
-                                    : null,
-                                metadata: { shelfId }
-                            }) satisfies UserEventInput
-                    )
-                )
-                return json(response, 200, result)
+            if (shelfMatch) {
+                const input = shelfMatch.needsBody ? await body(request) : {}
+                return json(response, 200, coreShelfExecute(
+                    shelfMatch, shelfService, input, {
+                        // Keep the original Desktop event attribution and
+                        // recorded ID order, including duplicates, intact.
+                        appSessionId: request.headers['x-pica-app-session']
+                            ? String(request.headers['x-pica-app-session'])
+                            : null,
+                        contextId: request.headers['x-pica-context-id']
+                            ? String(request.headers['x-pica-context-id'])
+                            : null,
+                        recordUserEvents: events =>
+                            options.database.recordUserEvents(events)
+                    }
+                ))
             }
             if (
                 url.pathname === '/api/v1/recommendation-sessions' &&
@@ -2088,50 +2341,21 @@ export async function startLibraryServer(options: {
                     return json(response, 200, await onlineReader.saveProgress(String(input.comicId ?? ''), String(input.episodeId ?? ''), Number(input.pageIndex)))
                 }
             }
-            const readerChapters = url.pathname.match(
-                /^\/api\/v1\/reader\/comics\/([^/]+)\/chapters$/
-            )
-            if (readerChapters && request.method === 'GET')
-                return json(
-                    response,
-                    200,
-                    readerService.chapters(
-                        decodeURIComponent(readerChapters[1])
-                    )
-                )
-            const readerChapter = url.pathname.match(
-                /^\/api\/v1\/reader\/comics\/([^/]+)\/chapters\/([^/]+)$/
-            )
-            if (readerChapter && request.method === 'GET')
-                return json(
-                    response,
-                    200,
-                    readerService.chapter(
-                        decodeURIComponent(readerChapter[1]),
-                        decodeURIComponent(readerChapter[2])
-                    )
-                )
-            const readerPicture = url.pathname.match(
-                /^\/api\/v1\/reader\/pictures\/([^/]+)$/
-            )
-            if (readerPicture && request.method === 'GET') {
-                const image = readerService.picture(
-                    decodeURIComponent(readerPicture[1])
-                )
-                response.writeHead(200, {
-                    'content-type': image.contentType,
-                    'content-length': String(image.data.byteLength),
-                    'cache-control': 'private, max-age=3600',
-                    'x-content-type-options': 'nosniff'
-                })
-                response.end(image.data)
-                return
+            const offlineRead = request.method === 'GET'
+                ? localReaderGet(url.pathname, readerService) : null
+            if (offlineRead) {
+                if (offlineRead.kind === 'image') {
+                    response.writeHead(200, {
+                        'content-type': offlineRead.contentType,
+                        'content-length': String(offlineRead.data.byteLength),
+                        'cache-control': offlineRead.cacheControl,
+                        'x-content-type-options': 'nosniff'
+                    })
+                    response.end(offlineRead.data)
+                    return
+                }
+                return json(response, 200, offlineRead.value)
             }
-            if (
-                url.pathname === '/api/v1/reader/progress' &&
-                request.method === 'GET'
-            )
-                return json(response, 200, readerService.recentProgress())
             if (
                 url.pathname === '/api/v1/reader/progress' &&
                 request.method === 'POST'
@@ -2198,41 +2422,6 @@ export async function startLibraryServer(options: {
                     readerService.openDefault(String(input.path ?? ''))
                 )
             }
-            if (url.pathname === '/api/v1/comics' && request.method === 'GET') {
-                return json(
-                    response,
-                    200,
-                    options.database.listComics({
-                        text: url.searchParams.get('q') ?? undefined,
-                        author: url.searchParams.get('author') ?? undefined,
-                        tags: stringList(url.searchParams.get('tags')),
-                        categories: stringList(
-                            url.searchParams.get('categories')
-                        ),
-                        finished: url.searchParams.has('finished')
-                            ? url.searchParams.get('finished') === 'true'
-                            : undefined,
-                        sort: (url.searchParams.get('sort') ??
-                            'latest') as SortMode,
-                        limit: Number(url.searchParams.get('limit') ?? 100),
-                        offset: Number(url.searchParams.get('offset') ?? 0)
-                    })
-                )
-            }
-            const comicDetailRequest = url.pathname.match(
-                /^\/api\/v1\/comics\/([^/]+)$/
-            )
-            if (comicDetailRequest && request.method === 'GET') {
-                const comic = options.database.getComic(
-                    decodeURIComponent(comicDetailRequest[1])
-                )
-                return json(
-                    response,
-                    comic ? 200 : 404,
-                    comic ?? { error: 'Comic not found' }
-                )
-            }
-
             const workVariantsRequest = url.pathname.match(
                 /^\/api\/v1\/comics\/([^/]+)\/work-variants$/
             )
@@ -2256,7 +2445,7 @@ export async function startLibraryServer(options: {
                 response.writeHead(200, {
                     'content-type': cover.contentType,
                     'content-length': String(cover.data.byteLength),
-                    'cache-control': 'private, max-age=86400',
+                    'cache-control': 'private, no-store',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(cover.data)
@@ -2272,7 +2461,7 @@ export async function startLibraryServer(options: {
                 response.writeHead(200, {
                     'content-type': cover.contentType,
                     'content-length': String(cover.data.byteLength),
-                    'cache-control': 'private, max-age=86400',
+                    'cache-control': 'private, no-store',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(cover.data)
@@ -2282,7 +2471,7 @@ export async function startLibraryServer(options: {
                 url.pathname === '/api/v1/authors' &&
                 request.method === 'GET'
             ) {
-                return json(response, 200, options.database.listAuthors())
+                return json(response, 200, coreBootstrapAuthors(options.database))
             }
             const authorRefresh = url.pathname.match(
                 /^\/api\/v1\/authors\/([^/]+)\/refresh$/
@@ -2400,6 +2589,8 @@ export async function startLibraryServer(options: {
                 request.method === 'POST'
             ) {
                 const input = await body(request)
+                if (stringList(input.providers).some((source) => !['pica', 'eh', 'exh', 'jm'].includes(source)))
+                    return json(response, 400, { error: 'Unrecognized online source' })
                 options.database.recordUserEvent({
                     eventType: 'search',
                     source: 'search',
@@ -2437,8 +2628,8 @@ export async function startLibraryServer(options: {
                             : 'likes') as SortMode,
                         limit: Number(input.limit ?? 100),
                         providers: stringList(input.providers).filter(
-                            (value): value is 'pica' | 'eh' | 'exh' =>
-                                value === 'pica' || value === 'eh' || value === 'exh'
+                            (value): value is 'pica' | 'eh' | 'exh' | 'jm' =>
+                                value === 'pica' || value === 'eh' || value === 'exh' || value === 'jm'
                         )
                     })
                 )
@@ -2452,6 +2643,16 @@ export async function startLibraryServer(options: {
                     available: Boolean(snapshot),
                     snapshot
                 })
+            }
+            if (
+                url.pathname === '/api/v1/recommendation/profile/view' &&
+                request.method === 'GET'
+            ) {
+                const value = options.service.tasteChronicleView({
+                    hideBlocked: url.searchParams.get('hideBlocked') === 'true',
+                    hideLess: url.searchParams.get('hideLess') === 'true'
+                })
+                return json(response, value.available ? 200 : 404, value)
             }
             if (
                 url.pathname === '/api/v1/recommendation/profile/rebuild' &&
@@ -2779,11 +2980,13 @@ export async function startLibraryServer(options: {
                 serveAsset(response, root, '/index.html')
             else serveAsset(response, root, url.pathname)
         } catch (error) {
-            json(response, 500, {
-                error: error instanceof Error ? error.message : String(error)
+            json(response, error instanceof SourceDisabledError ? 409 : 500, {
+                error: error instanceof Error ? error.message : String(error),
+                ...(error instanceof SourceDisabledError ? {code:error.code,sourceId:error.sourceId} : {})
             })
         }
     })
+    server.on('close', () => options.service.closeSources?.())
     await new Promise<void>((resolve, reject) => {
         server.once('error', reject)
         server.listen(port, host, resolve)

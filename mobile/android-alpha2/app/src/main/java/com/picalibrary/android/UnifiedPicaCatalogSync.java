@@ -9,9 +9,9 @@ final class UnifiedPicaCatalogSync {
     private UnifiedPicaCatalogSync(){}
 
     static UnifiedCatalogStore.Entry merge(Context context,PicaClient.Comic comic){
-        UnifiedCatalogStore.Snapshot snapshot=UnifiedCatalogStore.load(context);UnifiedCatalogStore.Entry entry=apply(snapshot,comic);UnifiedCatalogStore.save(context,snapshot);return entry;
+        return SourceAccess.commit(comic.sourceAccess,()->{synchronized(UnifiedCatalogStore.class){UnifiedCatalogStore.Snapshot snapshot=UnifiedCatalogStore.load(context);UnifiedCatalogStore.Entry entry=apply(snapshot,comic);UnifiedCatalogStore.save(context,snapshot);return entry;}});
     }
-    static void mergeAll(Context context,List<PicaClient.Comic> comics){UnifiedCatalogStore.Snapshot snapshot=UnifiedCatalogStore.load(context);for(PicaClient.Comic comic:comics)apply(snapshot,comic);UnifiedCatalogStore.save(context,snapshot);}
+    static void mergeAll(Context context,List<PicaClient.Comic> comics){if(comics.isEmpty())return;SourceAccess.commit(comics.get(0).sourceAccess,()->{synchronized(UnifiedCatalogStore.class){UnifiedCatalogStore.Snapshot snapshot=UnifiedCatalogStore.load(context);for(PicaClient.Comic comic:comics){if(comic.sourceAccess!=null)comic.sourceAccess.check();apply(snapshot,comic);}UnifiedCatalogStore.save(context,snapshot);return null;}});}
     static void clearAvailability(Context context){UnifiedCatalogStore.Snapshot snapshot=UnifiedCatalogStore.load(context);for(UnifiedCatalogStore.Entry entry:snapshot.byId.values())entry.picaAvailable=false;UnifiedCatalogStore.save(context,snapshot);NativeRecommendationStore.invalidateForFavoriteChange(context);}
 
     private static UnifiedCatalogStore.Entry apply(UnifiedCatalogStore.Snapshot snapshot,PicaClient.Comic comic){

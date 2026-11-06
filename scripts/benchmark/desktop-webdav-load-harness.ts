@@ -13,6 +13,7 @@ import {
     runHttpLatencyScenario,
     type ScenarioOptions
 } from './http-latency-scenario'
+import { enabledFixtureSources } from "../../test/helpers/source-runtime-fixture"
 
 interface J9Options {
     rounds: number
@@ -217,7 +218,7 @@ async function main() {
         root,
         undefined,
         undefined,
-        coordinator
+        coordinator, enabledFixtureSources()
     )
     seedDownloadedComic(database, root, config.pages, config.bytesPerPage)
 

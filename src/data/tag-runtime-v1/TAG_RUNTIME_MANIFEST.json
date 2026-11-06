@@ -1,0 +1,32 @@
+{
+  "formatVersion": 1,
+  "kind": "legacy-tag-rules-compatibility",
+  "semanticAuthoritySha256": "ef28fda608510bf4ce91307d71af5d76af3bce07950e107b0b02a71a21517ffb",
+  "semanticContentSha256": "ff375402b9e39fa0a636af4533badbedc363fee4238eec6a300944827551e899",
+  "files": {
+    "aliases-v2.json": {
+      "bytes": 2097,
+      "sha256": "bbb2429cc812dd2f91d84c37d665e5f2bae8cf4e8cc5aaefa9609d71fadf61e5"
+    },
+    "aliases-v3.json": {
+      "bytes": 1275,
+      "sha256": "3e94ca89088b17ce42d787d57ede331348946f01cda3f71a9e5918cd96f703b8"
+    },
+    "entities-v3.csv": {
+      "bytes": 23439,
+      "sha256": "efa3b436c490955d17ba1a6c3dfa42d4e53bf2e38370ceda03368e8fc1978ad2"
+    },
+    "semantic-v2.csv": {
+      "bytes": 45696,
+      "sha256": "37736cea381ac707225bc8a17bc6373cea158e3159c867bbfdb2e72c5e5fda35"
+    },
+    "semantic-v3.csv": {
+      "bytes": 3832,
+      "sha256": "875230a79ee61e6a625e16b6fa75d3e7326a35622bd8fdb399b926818c57c9e2"
+    },
+    "unresolved-v3.csv": {
+      "bytes": 5018,
+      "sha256": "7c93cc019d1a68647f03ad019de0d09435acad765509e1ecff13c9db0c5a5926"
+    }
+  }
+}

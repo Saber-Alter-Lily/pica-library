@@ -44,6 +44,8 @@ export class RemoteStorageDesktopManager {
     private credentials: StoredCredentials | null
     private readonly query: LibraryQueryService
     private mutationInFlight = false
+    private shuttingDown = false
+    private readonly mutationWaiters = new Set<() => void>()
     private syncTaskState:
         | 'idle'
         | 'running'
@@ -82,6 +84,29 @@ export class RemoteStorageDesktopManager {
         this.query = new LibraryQueryService(database)
         for (const target of this.registry.targets)
             this.scopeIds.set(target.id, randomUUID())
+    }
+
+    get busy() {
+        return this.mutationInFlight
+    }
+
+    /** Stop accepting new operations and wait for actual remote writes to finish. */
+    async quiesce() {
+        this.shuttingDown = true
+        this.syncControl('cancel')
+        if (this.mutationInFlight)
+            await new Promise<void>((resolve) => this.mutationWaiters.add(resolve))
+    }
+
+    private assertOpen() {
+        if (this.shuttingDown)
+            throw new Error('Remote storage is shutting down')
+    }
+
+    private finishMutation() {
+        this.mutationInFlight = false
+        for (const resolve of this.mutationWaiters) resolve()
+        this.mutationWaiters.clear()
     }
 
     private scopeId(targetId: string) {
@@ -258,6 +283,7 @@ export class RemoteStorageDesktopManager {
     }
 
     async test(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+        this.assertOpen()
         const { selected, provider } = this.provider(input)
         const result = await provider.test()
         return {
@@ -272,6 +298,7 @@ export class RemoteStorageDesktopManager {
     }
 
     syncControl(action: 'pause' | 'resume' | 'cancel') {
+        if (this.shuttingDown && action !== 'cancel') this.assertOpen()
         if (action === 'pause') {
             if (this.syncTaskState === 'running') {
                 this.syncPauseRequested = true
@@ -368,6 +395,7 @@ export class RemoteStorageDesktopManager {
     }
 
     async plan(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+        this.assertOpen()
         const selected = this.selection(input)
         await this.providerFrom(selected).test()
         return (await this.syncService(selected).plan(
@@ -376,6 +404,7 @@ export class RemoteStorageDesktopManager {
     }
 
     save(input: Record<string, unknown>) {
+        this.assertOpen()
         if (this.mutationInFlight)
             throw new Error('网盘操作期间不能更改存储配置')
         if (!input.remoteStorage || typeof input.remoteStorage !== 'object')
@@ -426,6 +455,7 @@ export class RemoteStorageDesktopManager {
     }
 
     removeTarget(input: Record<string, unknown>) {
+        this.assertOpen()
         if (this.mutationInFlight)
             throw new Error('网盘操作期间不能更改存储配置')
         const target = this.target(input)
@@ -461,6 +491,7 @@ export class RemoteStorageDesktopManager {
     }
 
     async inventory(input: Record<string, unknown>) {
+        this.assertOpen()
         if (input.remoteStorage)
             throw new Error('请先保存网盘配置，再核验漫画副本状态')
         if (this.mutationInFlight)
@@ -491,6 +522,7 @@ export class RemoteStorageDesktopManager {
     }
 
     async deleteCopies(input: Record<string, unknown>) {
+        this.assertOpen()
         if (this.mutationInFlight) throw new Error('已有网盘操作进行中')
         if (input.confirmation !== 'DELETE_REMOTE_ONLY')
             throw new Error('必须明确确认仅删除网盘副本')
@@ -504,7 +536,20 @@ export class RemoteStorageDesktopManager {
         if (ids.some((id) => !this.database.getComic(id)))
             throw new Error('所选漫画不在本地书库中')
         this.mutationInFlight = true
+        let releaseResources: () => void = () => undefined
         try {
+            // Remote deletion can outlive its HTTP response. Count the real
+            // operation in the same coordinator used by the Desktop updater.
+            const lease = await this.runtimeResources.acquire({
+                ownerId: 'remote-storage-delete',
+                taskType: 'remote-storage-delete',
+                priority: 'user',
+                resources: {
+                    'remote-storage-network': 1,
+                    'sqlite-write-heavy': 1
+                }
+            })
+            releaseResources = () => lease.release()
             const provider = this.providerFrom(selected)
             const key = this.exclusionsKey(selected)
             const pendingKey = `${key}:pending`
@@ -532,7 +577,8 @@ export class RemoteStorageDesktopManager {
             )
             return { ...result, targetId: selected.targetId }
         } finally {
-            this.mutationInFlight = false
+            releaseResources()
+            this.finishMutation()
         }
     }
 
@@ -658,6 +704,7 @@ export class RemoteStorageDesktopManager {
     }
 
     async sync(input: Record<string, unknown>) {
+        this.assertOpen()
         if (this.mutationInFlight) throw new Error('已有网盘操作进行中')
         if (input.remoteStorage)
             throw new Error('上传只能选择已保存的网盘配置，请先保存设置')
@@ -717,7 +764,7 @@ export class RemoteStorageDesktopManager {
         } finally {
             releaseResources()
             this.finishSyncControl()
-            this.mutationInFlight = false
+            this.finishMutation()
         }
     }
 

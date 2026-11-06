@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { RecommendationPolicyStoreV5 } from '../../src/recommendation-v5/policy-store'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 describe('Recommendation V5 serving composition', () => {
     it('reads the persisted current batch without allocating and summarizes only currently eligible items', () => {
@@ -131,7 +132,7 @@ describe('Recommendation V5 serving composition', () => {
             })
 
             const beforeBatches = database.listV3Batches(pool.id)
-            const service = new LibraryService(database, dir)
+            const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
             const result = service.recommendationServingCompositionV3()
             const afterBatches = database.listV3Batches(pool.id)
 

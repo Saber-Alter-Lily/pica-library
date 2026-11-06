@@ -1,0 +1,72 @@
+name: R2 Real Suwayomi external extension lifecycle (unpublished)
+
+on:
+  push:
+    branches: [codex/product-integration-r1-20261102]
+    paths:
+      - '.github/workflows/r2-real-extension-host-smoke.yml'
+      - 'scripts/r2-real-extension-host-smoke.py'
+      - 'scripts/lib/source-host-interop-fixture.mjs'
+  workflow_dispatch:
+
+concurrency:
+  group: r2-real-extension-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+
+jobs:
+  isolated-real-source:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: ehentai
+            file: ehentai.jar
+            url: https://raw.githubusercontent.com/HyperionHXH/Mihon-Extensions/5cb6eff6ea0104ac958993066a011282c38dfd7b/repo/jar/tachiyomi-en.ehentai-v1.6.36.jar
+            digest: 6e120f5a488381d4ae8960be3288e31d4d0a50b51b1e70beb0041bb692a88b74
+          - kind: picacomic
+            file: picacomic.jar
+            url: https://github.com/keiyoushi/extensions/releases/download/4591fbc-2/tachiyomi-zh.picacomic-v1.6.14.jar
+            digest: c62a89ce82e67640ef6de0feff3c76030622066d185530fd576264e98f40cb0a
+          - kind: jinmantiantang
+            file: jinmantiantang.jar
+            url: https://github.com/keiyoushi/extensions/releases/download/4591fbc-2/tachiyomi-zh.jinmantiantang-v1.6.64.jar
+            digest: 5eebd0bae530be491fe1cae32d1940c3914b224c46e7b9d6dd596415ef2c8be7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fetch SHA256-pinned official Host and external extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --retry-delay 3 --max-time 180 \
+            'https://github.com/Suwayomi/Suwayomi-Server/releases/download/v2.4.2366/Suwayomi-Server-v2.4.2366.jar' \
+            --output "$RUNNER_TEMP/pica-r2-host.jar"
+          printf '%s  %s\n' \
+            'af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd' \
+            "$RUNNER_TEMP/pica-r2-host.jar" | sha256sum --check -
+          curl --fail --location --retry 2 --retry-delay 3 --max-time 120 \
+            '${{ matrix.url }}' \
+            --output "$RUNNER_TEMP/${{ matrix.file }}"
+          printf '%s  %s\n' '${{ matrix.digest }}' "$RUNNER_TEMP/${{ matrix.file }}" | sha256sum --check -
+      - name: Verify source registration and explicit uninstall
+        shell: bash
+        env:
+          PICA_R2_HOST_JAR: ${{ runner.temp }}/pica-r2-host.jar
+          PICA_R2_SOURCE_KIND: ${{ matrix.kind }}
+          PICA_R2_EXTENSION_FILE: ${{ runner.temp }}/${{ matrix.file }}
+        run: |
+          python3 -m py_compile scripts/r2-real-extension-host-smoke.py
+          python3 scripts/r2-real-extension-host-smoke.py

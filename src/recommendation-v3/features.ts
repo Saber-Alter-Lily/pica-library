@@ -1,4 +1,4 @@
-import { normalizeAuthorKey } from '../library/author'
+import { normalizeAuthorKey } from '../library/author-normalization'
 import type { StoredComic } from '../library/types'
 import type { ItemFeature } from './types'
 import { recommendationTags } from './semantic-core'

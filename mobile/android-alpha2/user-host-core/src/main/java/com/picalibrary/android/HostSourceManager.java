@@ -69,6 +69,40 @@ final class HostSourceManager {
     }
     void removeSavedBook(String comicId,boolean consent)throws Exception {if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");savedBooks.remove(comicId);}
     synchronized boolean canResumeSaved(HostSavedBooks.Book saved){try{Session session=requireSession();return saved.connectionId.equals(session.host.id)&&saved.principal.equals(session.principal)&&saved.sourceId.equals(session.sourceId);}catch(RuntimeException unavailable){return false;}}
+    /** Existing user-owned Host and identity only. Never connect or install a source implicitly. */
+    synchronized boolean canLocateSaved(HostSavedBooks.Book saved){
+        try{
+            Session session=requireSession();
+            return saved.connectionId.equals(session.host.id)&&
+                saved.principal.equals(session.principal)&&
+                (session.sourceId==null||saved.sourceId.equals(session.sourceId));
+        }catch(RuntimeException unavailable){return false;}
+    }
+    /**
+     * User-initiated shortcut for a previously saved source. Reuse the existing
+     * validated 25-item Host listing and bind() instead of creating a new
+     * extension API. A bounded eight-page scan avoids unbounded requests.
+     */
+    void locateAndResumeSavedBook(String comicId,boolean consent)throws Exception {
+        if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");
+        HostSavedBooks.Book saved=null;
+        for(HostSavedBooks.Book row:savedBooks.load())
+            if(row.comicId.equals(comicId)){saved=row;break;}
+        if(saved==null||!canLocateSaved(saved))throw error("SOURCE_HOST_SCOPE_REQUIRED");
+        if(selectedSource().isEmpty()){
+            boolean present=false;
+            for(int offset=0;offset<200;offset+=25){
+                HostProtocol.Sources page=sources(offset);
+                for(HostProtocol.Source source:page.rows)
+                    if(saved.sourceId.equals(source.id)){present=true;break;}
+                if(present)break;
+                if(!page.next)break;
+            }
+            if(!present)throw error("SOURCE_HOST_SOURCE_SELECTION_REQUIRED");
+            bind(saved.sourceId,true);
+        }
+        resumeSavedBook(comicId,true);
+    }
     void resumeSavedBook(String comicId,boolean consent)throws Exception {
         if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");Session session=requireSession();HostSavedBooks.Book saved=null;for(HostSavedBooks.Book row:savedBooks.load())if(row.comicId.equals(comicId)){saved=row;break;}
         if(saved==null||!canResumeSaved(saved))throw error("SOURCE_HOST_SCOPE_REQUIRED");Book book=new Book(saved);

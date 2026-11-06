@@ -927,12 +927,14 @@ def source_free_user_host_flow():
         wait(("Online bookmarks 1","在线书签 1",
               "オンラインブックマーク 1"),seconds=30)
         record("saved online metadata is visible on a newly launched upgraded Host with no session")
+        tap_scrolling(("Connect to resume bookmarks","连接 Host 以继续书签",
+                       "Host に接続して再開"),direction="down",only_class="Button")
         tap_scrolling(("Authorize this Host session","我授权本次连接自己的 Host",
                        "この接続を許可します"),direction="down",only_class="CheckBox")
         tap_scrolling(("Connect and list sources","连接并读取来源",
                        "接続してソースを表示"),direction="down",only_class="Button")
-        wait(("Installed sources 1","已安装来源 1",
-              "導入済みソース 1"),seconds=40)
+        wait(("Online bookmarks 1","在线书签 1",
+              "オンラインブックマーク 1"),seconds=40)
         # This is an explicit bookmark action. The existing manager locates
         # the saved source through its standard bounded 25-row listing, so
         # the user does not manually traverse the source picker after upgrade.

@@ -37,7 +37,7 @@ public final class HostBrowserActivity extends Activity {
     private ScrollView scroller;
     private TextView status,savedStatus;
     private Button save,enable,start,disconnect,refresh,select,search,previousSources,nextSources,previousResults,nextResults,savedToggle,savedPrevious,savedNext,manageHost,changeSource;
-    private boolean busy,destroyed;
+    private boolean busy,destroyed,reopenSavedOnConnect;
     private int generation,sourceOffset,searchPage,savedOffset;
     private boolean sourceHasNext,searchHasNext;
     private String searchQuery="";
@@ -356,7 +356,16 @@ public final class HostBrowserActivity extends Activity {
                 manager.start(user,secret,true);
                 HostProtocol.Sources available=manager.sources(0);
                 return ()->{showSources(available,0);
-                    status.setText(t("请选择来源","Select a source","ソースを選択"));};
+                    if(reopenSavedOnConnect){
+                        reopenSavedOnConnect=false;
+                        savedPanel.setVisibility(View.VISIBLE);
+                        renderSaved();
+                        scroller.post(()->scroller.smoothScrollTo(0,savedPanel.getTop()));
+                        status.setText(t("Host 已连接，可以从在线书签继续阅读。",
+                            "Host connected. You can now resume an online bookmark.",
+                            "Host に接続しました。ブックマークから再開できます。"));
+                    }else status.setText(t("请选择来源","Select a source","ソースを選択"));
+                };
             });
         });
         disconnect.setOnClickListener(v->{
@@ -387,6 +396,7 @@ public final class HostBrowserActivity extends Activity {
         nextResults.setOnClickListener(v->loadResults(searchQuery,searchPage+1));
         savedToggle.setOnClickListener(v->{
             if(savedPanel.getVisibility()==View.VISIBLE){
+                reopenSavedOnConnect=false;
                 savedPanel.setVisibility(View.GONE);controls();
             }else loadSaved(0);
         });
@@ -516,11 +526,20 @@ public final class HostBrowserActivity extends Activity {
             savedResults.addView(text(t("还没有在线书签。可在搜索结果中单独保存。",
                 "No online bookmarks. Save one from a search result.",
                 "保存済みの作品はありません。検索結果から追加できます。"),14));
-        else if(!manager.hasSession())
+        else if(!manager.hasSession()){
             savedResults.addView(text(t(
-                "请先在下方授权并连接原 Host，再从书签继续阅读。不会自动登录、安装或下载来源。",
-                "Authorize and connect to the original Host below before resuming. No automatic login, source installation or download.",
-                "下で元の Host への接続を許可してください。自動ログイン・拡張のインストール・ダウンロードは行いません。"),14));
+                "需要先授权连接原 Host。不会自动登录、安装扩展或下载漫画。",
+                "First authorize the original Host. No automatic login, extension install or download.",
+                "まず元の Host への接続を許可してください。自動ログイン・ダウンロードは行いません。"),14));
+            Button reconnect=action(savedResults,t(
+                "连接 Host 以继续书签","Connect to resume bookmarks","Host に接続して再開"));
+            reconnect.setOnClickListener(v->{
+                reopenSavedOnConnect=true;
+                savedPanel.setVisibility(View.GONE);
+                controls();
+                scroller.post(()->scroller.smoothScrollTo(0,connectionPanel.getTop()));
+            });
+        }
         else if(manager.selectedSource().isEmpty())
             savedResults.addView(text(t(
                 "继续阅读将检查当前 Host 最多前 200 个已安装来源，定位该书签对应的来源后打开原阅读器。",

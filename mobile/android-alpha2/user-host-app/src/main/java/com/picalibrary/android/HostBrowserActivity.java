@@ -3,6 +3,7 @@ package com.picalibrary.android;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.inputmethod.EditorInfo;
@@ -35,7 +36,7 @@ public final class HostBrowserActivity extends Activity {
     private Button toggleSetup;
     private ScrollView scroller;
     private TextView status,savedStatus;
-    private Button save,enable,start,disconnect,refresh,select,search,previousSources,nextSources,previousResults,nextResults,savedToggle,savedPrevious,savedNext;
+    private Button save,enable,start,disconnect,refresh,select,search,previousSources,nextSources,previousResults,nextResults,savedToggle,savedPrevious,savedNext,manageHost,changeSource;
     private boolean busy,destroyed;
     private int generation,sourceOffset,searchPage,savedOffset;
     private boolean sourceHasNext,searchHasNext;
@@ -122,6 +123,8 @@ public final class HostBrowserActivity extends Activity {
         nextSources.setEnabled(!busy&&session&&manager.selectedSource().isEmpty()&&sourceHasNext&&sourceOffset<5000);
         previousResults.setEnabled(!busy&&session&&!manager.selectedSource().isEmpty()&&searchPage>1);
         nextResults.setEnabled(!busy&&session&&!manager.selectedSource().isEmpty()&&searchHasNext&&searchPage<200);
+        manageHost.setEnabled(!busy&&manager.config().configured());
+        changeSource.setEnabled(!busy&&bound);
         savedToggle.setEnabled(!busy);
         savedPrevious.setEnabled(!busy&&savedOffset>=20);
         savedNext.setEnabled(!busy&&savedOffset+20<savedRows.size());
@@ -156,6 +159,8 @@ public final class HostBrowserActivity extends Activity {
         root.addView(status);
         Button back=action(root,t("返回阅读器","Back to Reader","Reader に戻る"));
         back.setOnClickListener(v->finish());
+        manageHost=action(root,t("在浏览器管理我的 Host 来源",
+            "Manage sources in my Host browser","ブラウザで Host のソースを管理"));
         savedToggle=action(root,t("已保存的在线作品","Saved online works","保存済みオンライン作品"));
         savedPanel=new LinearLayout(this);savedPanel.setOrientation(LinearLayout.VERTICAL);
         root.addView(savedPanel);
@@ -233,6 +238,8 @@ public final class HostBrowserActivity extends Activity {
         searchPanel=new LinearLayout(this);searchPanel.setOrientation(LinearLayout.VERTICAL);
         root.addView(searchPanel);
         searchPanel.addView(text(t("搜索当前来源","Search selected source","選択ソースを検索"),16));
+        changeSource=action(searchPanel,t("更换来源（结束当前会话）",
+            "Change source (end session)","ソース変更（接続を終了）"));
         query=field(searchPanel,t("搜索作品","Search works","作品を検索"),false);
         query.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         search=action(searchPanel,t("搜索选中来源","Search selected source","選択ソースで検索"));
@@ -257,6 +264,48 @@ public final class HostBrowserActivity extends Activity {
         searchPanel.addView(results);
         scroller=new ScrollView(this);scroller.setFillViewport(true);scroller.addView(root);
         setContentView(scroller);root.requestApplyInsets();
+
+        manageHost.setOnClickListener(v->{
+            HostConfigStore.Config config=manager.config();
+            if(!config.configured())return;
+            new android.app.AlertDialog.Builder(this)
+                .setTitle(t("打开我自己的 Host","Open my own Host","自分の Host を開く"))
+                .setMessage(t(
+                    "将在外部浏览器打开你已保存的 Host 地址。请在 Host 自己的 WebUI 管理扩展和更新；Pica 不会安装漫画源，也不会向浏览器传递账号密码。",
+                    "Open your saved Host in an external browser. Manage extensions and updates in its own WebUI; Pica neither installs sources nor passes credentials.",
+                    "保存済み Host を外部ブラウザで開きます。拡張機能の管理は Host 側で行い、Pica は認証情報を渡しません。"))
+                .setNegativeButton(t("取消","Cancel","キャンセル"),null)
+                .setPositiveButton(t("打开","Open","開く"),(dialog,which)->{
+                    try{
+                        Intent browser=new Intent(Intent.ACTION_VIEW,Uri.parse(config.endpoint));
+                        browser.addCategory(Intent.CATEGORY_BROWSABLE);
+                        startActivity(browser);
+                    }catch(android.content.ActivityNotFoundException|SecurityException error){
+                        status.setText(t("无法打开外部浏览器，请手动访问保存的 Host 地址。",
+                            "Cannot open a browser. Visit your saved Host address manually.",
+                            "外部ブラウザを開けません。Host の URL を手動で開いてください。"));
+                    }
+                }).show();
+        });
+        changeSource.setOnClickListener(v->
+            new android.app.AlertDialog.Builder(this)
+                .setTitle(t("更换来源？","Change source?","ソースを変更しますか？"))
+                .setMessage(t(
+                    "将结束当前来源会话并撤销其在线阅读权限。已保存的本地章节和在线书签保留；需要重新授权连接 Host 后选择其他来源。",
+                    "This ends the current source session and revokes online reading. Local chapters and online bookmarks remain. Reconnect explicitly before choosing another source.",
+                    "現在の接続を終了しオンライン閲覧を無効にします。ローカル作品とブックマークは保持します。"))
+                .setNegativeButton(t("取消","Cancel","キャンセル"),null)
+                .setPositiveButton(t("结束并更换","End and change","終了して変更"),
+                    (dialog,which)->{
+                        manager.end();clearSources();clearResults();
+                        permission.setChecked(false);
+                        if(savedPanel.getVisibility()==View.VISIBLE)renderSaved();
+                        status.setText(t("已结束当前会话，请重新授权后选择来源。",
+                            "Session ended. Authorize and reconnect to choose a source.",
+                            "接続を終了しました。再認証してソースを選択してください。"));
+                        controls();scroller.post(()->scroller.smoothScrollTo(0,0));
+                    }).show()
+        );
 
         save.setOnClickListener(v->{
             String name=label.getText().toString().trim();

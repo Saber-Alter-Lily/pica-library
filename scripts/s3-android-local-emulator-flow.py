@@ -798,8 +798,8 @@ def source_free_user_host_flow():
                        "保存済みオンライン作品"),direction="up",only_class="Button")
         wait(("Online bookmarks 1","在线书签 1",
               "オンラインブックマーク 1"),seconds=30)
-        tap_scrolling(("Resume online (same source required)",
-                       "继续在线阅读（需连接同一来源）","オンライン読書を再開"),
+        tap_scrolling(("Resume online (find saved source)",
+                       "继续在线阅读（自动定位原来源）","オンライン読書を再開（ソースを探す）"),
                       direction="down",only_class="Button")
         wait_page_counter("1 / 2",seconds=45)
         record("persistent source-only bookmark opens existing original Reader without repeating search")
@@ -928,20 +928,24 @@ def source_free_user_host_flow():
               "オンラインブックマーク 1"),seconds=30)
         record("saved online metadata is visible on a newly launched upgraded Host with no session")
         tap_scrolling(("Authorize this Host session","我授权本次连接自己的 Host",
-                       "この接続を許可します"),direction="up",only_class="CheckBox")
+                       "この接続を許可します"),direction="down",only_class="CheckBox")
         tap_scrolling(("Connect and list sources","连接并读取来源",
                        "接続してソースを表示"),direction="down",only_class="Button")
         wait(("Installed sources 1","已安装来源 1",
               "導入済みソース 1"),seconds=40)
-        tap_scrolling(("Next sources","下一页来源","次のソース"),only_class="Button")
-        wait(("Installed sources 26","已安装来源 26",
-              "導入済みソース 26"),seconds=30)
-        tap_scrolling(("Use selected source","选择此来源","ソースを選択"),
-                      only_class="Button")
-        tap_scrolling(("Resume online (same source required)",
-                       "继续在线阅读（需连接同一来源）","オンライン読書を再開"),
+        # This is an explicit bookmark action. The existing manager locates
+        # the saved source through its standard bounded 25-row listing, so
+        # the user does not manually traverse the source picker after upgrade.
+        source_queries=operations.count("PicaSourceHostSources")
+        searches=operations.count("PicaHostSourceSearch")
+        tap_scrolling(("Resume online (find saved source)",
+                       "继续在线阅读（自动定位原来源）","オンライン読書を再開（ソースを探す）"),
                       direction="up",only_class="Button")
         wait_page_counter("2 / 2",seconds=50)
+        assert operations.count("PicaSourceHostSources")>=source_queries+2, (
+            "Saved-source resume did not locate the page-2 installed extension")
+        assert operations.count("PicaHostSourceSearch")==searches, (
+            "Saved-source resume unexpectedly repeated manga search")
         page("29a-bookmark-resume-after-v2-host-restart")
         record("versioned Host install preserves source-only bookmark and original Reader page-2 resume")
         adb("shell","input","keyevent","KEYCODE_BACK")
@@ -949,7 +953,7 @@ def source_free_user_host_flow():
         # reuse of live credentials or a hidden source change in the Reader.
         STEP="signed-host-user-changes-source"
         tap_scrolling(("Change source (end session)","更换来源（结束当前会话）",
-                       "ソース変更（接続を終了）"),direction="up",only_class="Button")
+                       "ソース変更（接続を終了）"),direction="down",only_class="Button")
         tap(("End and change","结束并更换","終了して変更"),
             exact=True,only_class="Button",seconds=25)
         wait(("Session ended. Authorize and reconnect to choose a source.",

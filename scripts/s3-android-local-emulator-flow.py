@@ -756,15 +756,15 @@ def source_free_user_host_flow():
         tap_scrolling(("Connect and list sources","连接并读取来源","接続してソースを表示"),
                       only_class="Button")
         wait_host_operation(operations,"PicaSourceHostSources")
-        tap_scrolling(("Next","下一页","次へ"),only_class="Button")
+        tap_scrolling(("Next sources","下一页来源","次のソース"),only_class="Button")
         wait(("Installed sources 26", "已安装来源 26", "導入済みソース 26"),
              seconds=30)
         assert operations.count("PicaSourceHostSources")>=2, (
             "Host did not request second installed-source page")
-        tap_scrolling(("Previous","上一页","前へ"),only_class="Button")
+        tap_scrolling(("Prev sources","上一页来源","前のソース"),only_class="Button")
         wait(("Installed sources 1", "已安装来源 1", "導入済みソース 1"),
              seconds=30)
-        tap_scrolling(("Next","下一页","次へ"),only_class="Button")
+        tap_scrolling(("Next sources","下一页来源","次のソース"),only_class="Button")
         wait(("Installed sources 26", "已安装来源 26", "導入済みソース 26"),
              seconds=30)
         record("Android signed Host can browse a 26-source catalogue and select from page 2")
@@ -933,7 +933,7 @@ def source_free_user_host_flow():
                        "接続してソースを表示"),direction="down",only_class="Button")
         wait(("Installed sources 1","已安装来源 1",
               "導入済みソース 1"),seconds=40)
-        tap_scrolling(("Next","下一页","次へ"),only_class="Button")
+        tap_scrolling(("Next sources","下一页来源","次のソース"),only_class="Button")
         wait(("Installed sources 26","已安装来源 26",
               "導入済みソース 26"),seconds=30)
         tap_scrolling(("Use selected source","选择此来源","ソースを選択"),

@@ -201,7 +201,15 @@ def synthetic_user_host():
                                   "hasPreviousPage":offset>0},
                       "totalCount":len(listed)}}
             elif name=="PicaHostSourceSearch":
-                data={"fetchSourceManga":{"mangas":[book],"hasNextPage":False}}
+                search_page=int(request.get("variables",{}).get("input",{}).get("page",0))
+                if search_page==1:
+                    other=dict(book,id=8,url="/synthetic/first-page",
+                               title="S3-QA-First-Page-Only")
+                    data={"fetchSourceManga":{"mangas":[other],"hasNextPage":True}}
+                elif search_page==2:
+                    data={"fetchSourceManga":{"mangas":[book],"hasNextPage":False}}
+                else:
+                    data={"fetchSourceManga":{"mangas":[],"hasNextPage":False}}
             elif name=="PicaHostManga":
                 data={"manga":dict(book,chapters={"nodes":[chapter]})}
             elif name=="PicaHostPrepareManga":
@@ -766,6 +774,19 @@ def source_free_user_host_flow():
         tap_scrolling(("Search selected source","搜索选中来源","選択ソースで検索"),
                       only_class="Button")
         wait_host_operation(operations,"PicaHostSourceSearch")
+        wait(("Search page 1","搜索第 1 页","検索 1 ページ"),seconds=30)
+        tap_scrolling(("Next results","下一批结果","次の検索結果"),
+                      only_class="Button")
+        wait(("Search page 2","搜索第 2 页","検索 2 ページ"),seconds=30)
+        tap_scrolling(("Previous results","上一批结果","前の検索結果"),
+                      only_class="Button")
+        wait(("Search page 1","搜索第 1 页","検索 1 ページ"),seconds=30)
+        tap_scrolling(("Next results","下一批结果","次の検索結果"),
+                      only_class="Button")
+        wait(("Search page 2","搜索第 2 页","検索 2 ページ"),seconds=30)
+        assert operations.count("PicaHostSourceSearch")>=4, (
+            "Host did not request search pages 1→2→1→2")
+        record("Android Host browses multiple search pages and chooses a page-2 work")
         tap_scrolling("S3-QA-Hosted-Comic",direction="down",only_class="Button")
         wait_page_counter("1 / 2",seconds=45)
         # The Host app must open the separately installed no-INTERNET Reader,

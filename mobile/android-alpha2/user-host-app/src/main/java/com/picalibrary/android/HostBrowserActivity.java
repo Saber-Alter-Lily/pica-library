@@ -307,11 +307,15 @@ public final class HostBrowserActivity extends Activity {
                     (dialog,which)->{
                         manager.end();clearSources();clearResults();
                         permission.setChecked(false);
-                        if(savedPanel.getVisibility()==View.VISIBLE)renderSaved();
+                        reopenSavedOnConnect=false;
+                        // Revealing consent is intentional; the user still
+                        // decides whether to establish a new Host session.
+                        savedPanel.setVisibility(View.GONE);
                         status.setText(t("已结束当前会话，请重新授权后选择来源。",
                             "Session ended. Authorize and reconnect to choose a source.",
                             "接続を終了しました。再認証してソースを選択してください。"));
-                        controls();scroller.post(()->scroller.smoothScrollTo(0,0));
+                        controls();
+                        scroller.post(()->scroller.smoothScrollTo(0,connectionPanel.getTop()));
                     }).show()
         );
 

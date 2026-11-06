@@ -116,6 +116,8 @@ def main():
             ["node", "--input-type=module", "-e", cmd, str(root), str(host)],
             cwd=ROOT, text=True,
         ))
+        # This test needs GraphQL only, not WebUI asset downloads.
+        args.insert(-2, "-Dsuwayomi.tachidesk.config.server.webUIEnabled=false")
         logpath = root / "host.log"
         with logpath.open("wb") as logfile:
             server = subprocess.Popen(
@@ -154,8 +156,12 @@ def main():
                     "{extension{pkgName isInstalled}}}",
                     {"id": EXT_PACKAGE},
                 )["updateExtension"]
-                if removed["extension"]["isInstalled"] is not False:
-                    raise AssertionError("External extension uninstall not acknowledged")
+                # Upstream may DELETE the external extension database row
+                # and return extension:null after a successful uninstall.
+                # A stale registered source must still cause a hard failure.
+                if (removed.get("extension") is not None and
+                    removed["extension"].get("isInstalled") is not False):
+                    raise AssertionError("External extension still marked installed")
                 if EXT_SOURCE in source_ids():
                     raise AssertionError("Revoked external source remains registered")
                 print(json.dumps({

@@ -9,7 +9,10 @@ import android.view.inputmethod.EditorInfo;
 import android.view.View;
 import android.widget.*;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -21,18 +24,20 @@ import java.util.concurrent.Executors;
 public final class HostBrowserActivity extends Activity {
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
     private final List<HostProtocol.Source> sources=new ArrayList<>();
+    private final List<HostSavedBooks.Book> savedRows=new ArrayList<>();
+    private final Map<Button,HostSavedBooks.Book> savedResumeButtons=new LinkedHashMap<>();
     private HostSourceManager manager;
     private EditText label,endpoint,username,password,query;
     private CheckBox allowLan,permission,basicAuth;
     private Spinner sourceChoices;
     private TextView sourcePageStatus,resultPageStatus;
-    private LinearLayout results,setupPanel;
+    private LinearLayout results,setupPanel,savedPanel,savedResults;
     private Button toggleSetup;
     private ScrollView scroller;
-    private TextView status;
-    private Button save,enable,start,disconnect,refresh,select,search,previousSources,nextSources,previousResults,nextResults;
+    private TextView status,savedStatus;
+    private Button save,enable,start,disconnect,refresh,select,search,previousSources,nextSources,previousResults,nextResults,savedToggle,savedPrevious,savedNext;
     private boolean busy,destroyed;
-    private int generation,sourceOffset,searchPage;
+    private int generation,sourceOffset,searchPage,savedOffset;
     private boolean sourceHasNext,searchHasNext;
     private String searchQuery="";
     // Default stays the physically source-free QA Reader; only an explicitly
@@ -112,6 +117,11 @@ public final class HostBrowserActivity extends Activity {
         nextSources.setEnabled(!busy&&session&&manager.selectedSource().isEmpty()&&sourceHasNext&&sourceOffset<5000);
         previousResults.setEnabled(!busy&&session&&!manager.selectedSource().isEmpty()&&searchPage>1);
         nextResults.setEnabled(!busy&&session&&!manager.selectedSource().isEmpty()&&searchHasNext&&searchPage<200);
+        savedToggle.setEnabled(!busy);
+        savedPrevious.setEnabled(!busy&&savedOffset>=20);
+        savedNext.setEnabled(!busy&&savedOffset+20<savedRows.size());
+        for(Map.Entry<Button,HostSavedBooks.Book> entry:savedResumeButtons.entrySet())
+            entry.getKey().setEnabled(!busy&&manager.canResumeSaved(entry.getValue()));
     }
 
     @Override public void onCreate(Bundle saved){
@@ -216,6 +226,22 @@ public final class HostBrowserActivity extends Activity {
         });
         results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);
         root.addView(results);
+        savedToggle=action(root,t("已保存的在线作品","Saved online works","保存済みオンライン作品"));
+        savedPanel=new LinearLayout(this);savedPanel.setOrientation(LinearLayout.VERTICAL);
+        root.addView(savedPanel);
+        savedStatus=text("",13);savedStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        savedPanel.addView(savedStatus);
+        LinearLayout savedPager=new LinearLayout(this);
+        savedPager.setOrientation(LinearLayout.HORIZONTAL);
+        savedPanel.addView(savedPager,new LinearLayout.LayoutParams(-1,dp(48)));
+        savedPrevious=new Button(this);savedPrevious.setAllCaps(false);
+        savedPrevious.setText(t("上一页书签","Previous bookmarks","前のブックマーク"));
+        savedPager.addView(savedPrevious,new LinearLayout.LayoutParams(0,-1,1));
+        savedNext=new Button(this);savedNext.setAllCaps(false);
+        savedNext.setText(t("下一页书签","Next bookmarks","次のブックマーク"));
+        savedPager.addView(savedNext,new LinearLayout.LayoutParams(0,-1,1));
+        savedResults=new LinearLayout(this);savedResults.setOrientation(LinearLayout.VERTICAL);
+        savedPanel.addView(savedResults);savedPanel.setVisibility(View.GONE);
         scroller=new ScrollView(this);scroller.setFillViewport(true);scroller.addView(root);
         setContentView(scroller);root.requestApplyInsets();
 
@@ -229,6 +255,7 @@ public final class HostBrowserActivity extends Activity {
             task(t("保存中…","Saving…","保存中…"),()->{
                 manager.configure(revision,name,url,mode,allow);
                 return ()->{clearSources();clearResults();
+                    if(savedPanel.getVisibility()==View.VISIBLE)renderSaved();
                     setupPanel.setVisibility(View.GONE);
                     scroller.smoothScrollTo(0,0);
                     status.setText(t("已保存；没有自动连接","Saved; no connection started",
@@ -264,6 +291,7 @@ public final class HostBrowserActivity extends Activity {
         });
         disconnect.setOnClickListener(v->{
             manager.end();clearSources();clearResults();
+            if(savedPanel.getVisibility()==View.VISIBLE)renderSaved();
             permission.setChecked(false);
             status.setText(t("已断开","Disconnected","切断しました"));controls();
         });
@@ -276,7 +304,9 @@ public final class HostBrowserActivity extends Activity {
             String id=sources.get(chosen).id;
             task(t("正在绑定来源…","Selecting source…","ソース選択中…"),()->{
                 manager.bind(id,true);
-                return ()->{clearResults();status.setText(t("来源已就绪，可搜索","Source ready to search",
+                return ()->{clearResults();
+                    if(savedPanel.getVisibility()==View.VISIBLE)renderSaved();
+                    status.setText(t("来源已就绪，可搜索","Source ready to search",
                     "検索できます"));
                     query.requestFocus();
                     scroller.post(()->scroller.smoothScrollTo(0,query.getTop()));};
@@ -285,6 +315,13 @@ public final class HostBrowserActivity extends Activity {
         search.setOnClickListener(v->loadResults(query.getText().toString().trim(),1));
         previousResults.setOnClickListener(v->loadResults(searchQuery,searchPage-1));
         nextResults.setOnClickListener(v->loadResults(searchQuery,searchPage+1));
+        savedToggle.setOnClickListener(v->{
+            if(savedPanel.getVisibility()==View.VISIBLE){
+                savedPanel.setVisibility(View.GONE);controls();
+            }else loadSaved(0);
+        });
+        savedPrevious.setOnClickListener(v->loadSaved(savedOffset-20));
+        savedNext.setOnClickListener(v->loadSaved(savedOffset+20));
         HostConfigStore.Config config=manager.config();
         label.setText(config.label);endpoint.setText(config.endpoint);
         allowLan.setChecked(config.allowLan);
@@ -361,7 +398,86 @@ public final class HostBrowserActivity extends Activity {
             Button save=action(results,t("保存到阅读器书库",
                 "Save to Reader library","Reader 書庫に保存"));
             save.setOnClickListener(v->openOwnedReader(book,true));
+            Button bookmark=action(results,t("保存在线书签（不下载）",
+                "Save online bookmark (no download)","オンラインブックマークを保存"));
+            bookmark.setOnClickListener(v->task(t("保存在线书签…",
+                "Saving online bookmark…","ブックマークを保存中…"),()->{
+                manager.select(book.id);
+                manager.saveBook(book.id,true);
+                List<HostSavedBooks.Book> list=manager.savedBooks();
+                return ()->{
+                    bookmark.setText(t("在线书签已保存","Online bookmark saved","保存しました"));
+                    bookmark.setEnabled(false);
+                    status.setText(t("仅保存作品索引，未下载漫画。",
+                        "Saved the online locator only; no comic downloaded.",
+                        "作品情報のみ保存しました。ダウンロードしていません。"));
+                    if(savedPanel.getVisibility()==View.VISIBLE)showSaved(list,0);
+                };
+            }));
         }
+    }
+    private void loadSaved(int offset){
+        if(offset<0)return;
+        task(t("读取我的在线书签…","Loading online bookmarks…",
+            "ブックマークを読み込み中…"),()->{
+            List<HostSavedBooks.Book> list=manager.savedBooks();
+            return ()->showSaved(list,offset);
+        });
+    }
+    private void showSaved(List<HostSavedBooks.Book> rows,int offset){
+        savedRows.clear();savedRows.addAll(rows);
+        Collections.reverse(savedRows);
+        int maximum=savedRows.isEmpty()?0:((savedRows.size()-1)/20)*20;
+        savedOffset=Math.min(Math.max(0,offset),maximum);
+        savedPanel.setVisibility(View.VISIBLE);
+        renderSaved();
+    }
+    private void renderSaved(){
+        savedResults.removeAllViews();savedResumeButtons.clear();
+        int end=Math.min(savedOffset+20,savedRows.size());
+        savedStatus.setText(t(
+            "在线书签 "+savedRows.size()+" 部 · 显示 "+(savedRows.isEmpty()?0:savedOffset+1)+"–"+end+" · 非离线副本",
+            "Online bookmarks "+savedRows.size()+" · showing "+(savedRows.isEmpty()?0:savedOffset+1)+"–"+end+" · not offline copies",
+            "オンラインブックマーク "+savedRows.size()+" 件 · "+(savedRows.isEmpty()?0:savedOffset+1)+"–"+end+" · オフライン保存ではありません"));
+        if(savedRows.isEmpty())
+            savedResults.addView(text(t("还没有在线书签。可在搜索结果中单独保存。",
+                "No online bookmarks. Save one from a search result.",
+                "保存済みの作品はありません。検索結果から追加できます。"),14));
+        for(int i=savedOffset;i<end;i++){
+            HostSavedBooks.Book book=savedRows.get(i);
+            savedResults.addView(text(book.title+" · "+book.hostLabel,16));
+            Button resume=action(savedResults,t("继续在线阅读（需连接同一来源）",
+                "Resume online (same source required)","オンライン読書を再開"));
+            savedResumeButtons.put(resume,book);
+            resume.setOnClickListener(v->resumeSaved(book));
+            Button remove=action(savedResults,t("移除此在线书签",
+                "Remove online bookmark","ブックマークを削除"));
+            remove.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
+                .setTitle(t("移除在线书签？","Remove online bookmark?","ブックマークを削除しますか？"))
+                .setMessage(t("只移除外接来源的作品索引，不删除已下载的本地漫画。",
+                    "Removes only the online bookmark, never locally saved pages.",
+                    "オンラインの作品情報のみ削除します。保存済みのページは削除しません。"))
+                .setNegativeButton(t("取消","Cancel","キャンセル"),(dialog,which)->{})
+                .setPositiveButton(t("移除","Remove","削除"),(dialog,which)->task(
+                    t("移除书签…","Removing bookmark…","削除中…"),()->{
+                        manager.removeSavedBook(book.comicId,true);
+                        List<HostSavedBooks.Book> list=manager.savedBooks();
+                        return ()->showSaved(list,savedOffset);
+                    })).show());
+        }
+        controls();
+    }
+    private void resumeSaved(HostSavedBooks.Book book){
+        if(!trustedReader()){
+            status.setText(t("未找到同签名的阅读器，无法转入作品。",
+                "Matching signed Reader not found; cannot open work.",
+                "同じ署名の Reader が見つかりません。"));return;
+        }
+        task(t("恢复在线作品…","Resuming online work…","作品を再開中…"),()->{
+            manager.resumeSavedBook(book.comicId,true);
+            String scope=manager.requireSession().scope;
+            return ()->launchReader(book.comicId,book.title,false,scope);
+        });
     }
     private void openOwnedReader(HostSourceManager.Book book,boolean save){
         if(!trustedReader()){
@@ -375,22 +491,23 @@ public final class HostBrowserActivity extends Activity {
         task(t("准备来源…","Preparing source…","ソース準備中…"),()->{
             manager.select(book.id);
             String scope=manager.requireSession().scope;
-            return ()->{
-                Intent intent=new Intent().setClassName(
-                    readerPackage,
-                    save?"com.picalibrary.android.ExternalImportActivity":
-                        "com.picalibrary.android.ExternalReaderActivity")
-                    .putExtra("scope",scope).putExtra("comicId",book.id)
-                    .putExtra("title",book.title);
-                if(!save)intent.putExtra("source","host");
-                try{startActivity(intent);}
-                catch(android.content.ActivityNotFoundException|SecurityException failure){
-                    status.setText(t("请安装同一签名的独立阅读器",
-                        "Install the matching signed Reader",
-                        "同じ署名の Reader が必要です"));
-                }
-            };
+            return ()->launchReader(book.id,book.title,save,scope);
         });
+    }
+    private void launchReader(String comicId,String title,boolean save,String scope){
+        Intent intent=new Intent().setClassName(
+            readerPackage,
+            save?"com.picalibrary.android.ExternalImportActivity":
+                 "com.picalibrary.android.ExternalReaderActivity")
+            .putExtra("scope",scope).putExtra("comicId",comicId)
+            .putExtra("title",title);
+        if(!save)intent.putExtra("source","host");
+        try{startActivity(intent);}
+        catch(android.content.ActivityNotFoundException|SecurityException failure){
+            status.setText(t("请安装同一签名的独立阅读器",
+                "Install the matching signed Reader",
+                "同じ署名の Reader が必要です"));
+        }
     }
     @Override protected void onResume(){
         super.onResume();

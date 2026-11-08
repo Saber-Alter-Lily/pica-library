@@ -1275,7 +1275,8 @@ def original_full_product_signed_host_flow(upstream_pages):
         tap(("已保存的在线作品","Saved online works",
              "保存済みオンライン作品"),seconds=30,only_class="Button")
         PACKAGE=USER_HOST_PACKAGE
-        wait(("No Host connected","尚未连接 Host","未接続"),seconds=35)
+        wait(("需要先授权连接原 Host。","First authorize the original Host.",
+              "まず元の Host への接続を許可してください。"),seconds=35)
         wait(("Interop Fixture CBZ",),seconds=35)
         page("41a-clean-original-home-saved-host-bookmark")
         record("original clean four-tab Home opens retained Host bookmark without auto-connect")

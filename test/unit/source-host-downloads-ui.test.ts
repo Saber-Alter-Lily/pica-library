@@ -87,6 +87,8 @@ function fixture(language = 0) {
                         offset: 0,
                         hasNext: false
                     }
+                  : input.action === 'saved'
+                    ? { books: [{ comicId: COMIC, title: '<img inert title>', sourceId: '9007199254740993' }], total: 1 }
                   : input.action === 'download-chapters'
                     ? {
                           chapters: [

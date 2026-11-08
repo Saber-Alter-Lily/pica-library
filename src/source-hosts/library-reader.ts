@@ -232,12 +232,24 @@ export class HostedLibraryReader {
                     } })
             })
         }
-        const allowed = input.action === 'list' || input.action === 'sources' ? ['action', 'sessionId', 'offset'] :
+        const allowed = input.action === 'saved' ? ['action', 'sessionId'] :
+            input.action === 'list' || input.action === 'sources' ? ['action', 'sessionId', 'offset'] :
             input.action === 'bind-source' ? ['action', 'sessionId', 'sourceId', 'consent'] : input.action === 'search' ? ['action', 'sessionId', 'query', 'page'] : ['action', 'sessionId', 'comicId']
         fields(input, allowed)
         const session = this.session(String(input.sessionId))
         if (input.action === 'close') { this.end(session.id); return { closed: true } }
         return this.withSignal(session, signal, async () => {
+        if (input.action === 'saved') {
+            // Reuse the already-owned selected-work index; this command is
+            // entirely local. The current Host principal and bound source are
+            // authoritative, never the title, an old token or a remote URL.
+            const books = this.storedBooks()
+                .filter(book => book.connectionId === session.host.id &&
+                    book.principal === session.principal && this.scopeAllows(session, book))
+                .map(book => ({ comicId: book.comicId, title: book.title, sourceId: book.sourceId }))
+            this.guard(session)
+            return { books, total: books.length }
+        }
         if (['sources', 'bind-source', 'search'].includes(String(input.action))) {
             if (session.scope !== 'source-search-read') throw new SourceHostError('SOURCE_HOST_SCOPE_REQUIRED')
             if (input.action === 'sources') {

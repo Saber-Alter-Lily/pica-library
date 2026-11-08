@@ -92,6 +92,64 @@ def old_release_create_shelf():
     record("actual public v0.5.0 app creates synthetic shelf through native UI")
 
 
+
+def require_setting_row(title_options, status_options):
+    """Check the real native row, not an unrelated label elsewhere on the page."""
+    titles = tuple(value.casefold() for value in title_options)
+    statuses = tuple(value.casefold() for value in status_options)
+    for node in qa.hierarchy().iter("node"):
+        if not node.attrib.get("class", "").endswith("LinearLayout"):
+            continue
+        labels = [child.attrib.get("text", "").strip().casefold()
+                  for child in node if child.tag == "node"]
+        if (any(title in labels for title in titles) and
+                any(status in labels for status in statuses)):
+            return
+    raise AssertionError(
+        "Original preference row missing: " + repr((title_options, status_options))
+    )
+
+
+def open_original_settings():
+    qa.tap(("设置", "Settings", "設定"), exact=True,
+           only_class="Button", seconds=25)
+    qa.wait(("个性化", "Personalization", "パーソナライズ"), seconds=25)
+
+
+def configure_legacy_preferences():
+    """Write two genuine v0.5.0 preferences through its existing native UI."""
+    open_original_settings()
+    qa.tap(("个性化", "Personalization", "パーソナライズ"), seconds=25)
+    qa.tap(("外观", "Appearance", "外観"), exact=True, seconds=20)
+    qa.tap(("深色", "Dark", "ダーク"), exact=True, seconds=20)
+    require_setting_row(("外观", "Appearance", "外観"),
+                        ("深色", "Dark", "ダーク"))
+    qa.adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    qa.wait(("推荐与画风", "Recommendation & Visual"), seconds=25)
+    qa.tap(("推荐与画风", "Recommendation & Visual"), seconds=25)
+    require_setting_row(("反馈原因", "Feedback reasons"),
+                        ("关闭", "Off", "Disabled"))
+    qa.tap(("反馈原因", "Feedback reasons"), seconds=20)
+    require_setting_row(("反馈原因", "Feedback reasons"),
+                        ("开启", "On", "Enabled"))
+    qa.adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    record("published v0.5.0 saves dark theme and recommendation-feedback preference via native UI")
+
+
+def require_legacy_preferences():
+    """Read the same two persisted settings before and after Android install -r."""
+    open_original_settings()
+    qa.tap(("个性化", "Personalization", "パーソナライズ"), seconds=25)
+    require_setting_row(("外观", "Appearance", "外観"),
+                        ("深色", "Dark", "ダーク"))
+    qa.adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    qa.wait(("推荐与画风", "Recommendation & Visual"), seconds=25)
+    qa.tap(("推荐与画风", "Recommendation & Visual"), seconds=25)
+    require_setting_row(("反馈原因", "Feedback reasons"),
+                        ("开启", "On", "Enabled"))
+    qa.adb("shell", "input", "keyevent", "KEYCODE_BACK")
+
+
 def version_code():
     return qa.installed_version_code(PACKAGE)
 
@@ -117,12 +175,18 @@ def main(old_apk, new_apk):
         stage = "v050-native-shelf-write"
         launch_original()
         old_release_create_shelf()
+        stage = "v050-real-preference-write"
+        launch_original()
+        configure_legacy_preferences()
         stage = "v050-cold-restart"
         launch_original()
         open_shelves()
         require_shelf()
         saved_screen("02-public-v050-shelf-survived-cold-restart")
         record("old app's saved shelf survives full process restart offline")
+        stage = "v050-preferences-survive-old-restart"
+        require_legacy_preferences()
+        record("public v0.5.0 theme and feedback settings survive cold restart offline")
 
         stage = "replace-real-package-id-with-source-neutral-v56"
         # No uninstall, clear-data, backup restore, downgrade or signature bypass.
@@ -137,6 +201,10 @@ def main(old_apk, new_apk):
         require_shelf()
         saved_screen("04-source-neutral-original-old-shelf")
         record("original clean four-tab app reads public v0.5.0 shelf without reimport")
+        stage = "clean-app-preserves-v050-appearance-and-feedback"
+        require_legacy_preferences()
+        saved_screen("04a-source-neutral-preserved-personalization")
+        record("original clean app retains old theme and recommendation feedback settings")
 
         stage = "new-clean-offline-cold-restart"
         launch_original()
@@ -144,6 +212,9 @@ def main(old_apk, new_apk):
         require_shelf()
         saved_screen("05-source-neutral-restart-old-shelf")
         record("source-neutral original Home preserves v0.5.0 shelf after offline restart")
+        stage = "clean-preferences-survive-second-cold-restart"
+        require_legacy_preferences()
+        record("retained v0.5.0 theme and recommendation feedback survive a second offline restart")
 
         result = {
             "status": "SIGNED_REAL_ID_EMULATOR_QA_PASS",
@@ -156,6 +227,9 @@ def main(old_apk, new_apk):
             "androidPackageManagerInstallReplace": True,
             "uninstallOrDataClearUsed": False,
             "existingOriginalShelfSurvived": True,
+            "originalThemePreferencePreserved": True,
+            "recommendationFeedbackPreferencePreserved": True,
+            "legacyPreferencesSurvivedPreAndPostUpgradeColdRestarts": True,
             "originalCleanReaderIndependentOfProviderLogin": True,
             "offlineColdRestart": True,
             "syntheticShelfOnly": True,

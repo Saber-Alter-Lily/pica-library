@@ -5,6 +5,7 @@ on:
     branches: [codex/product-integration-r1-20261102]
     paths:
       - '.github/workflows/s3-android-local-emulator.yml'
+      - 'scripts/ci/install-gradle-8.9-fallback.sh'
       - 'mobile/android-alpha2/local-app/**'
       - 'mobile/android-alpha2/user-host-core/**'
       - 'mobile/android-alpha2/source-bridge/**'
@@ -60,11 +61,23 @@ jobs:
         with:
           node-version: '24'
       - name: Fetch pinned official Suwayomi for user-Host integration
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --location --retry 2 --retry-delay 3 --max-time 180 \
+          jar="$RUNNER_TEMP/pica-r2-official-host.jar"
+          if ! curl --fail --location --retry 2 --retry-delay 3 --max-time 180 \
             'https://github.com/Suwayomi/Suwayomi-Server/releases/download/v2.4.2366/Suwayomi-Server-v2.4.2366.jar' \
-            --output "$RUNNER_TEMP/pica-r2-official-host.jar"
+            --output "$jar"; then
+            # This is the SAME upstream GitHub release asset, not a proxy or
+            # changed artifact. The pinned digest and size remain mandatory.
+            curl --fail --location --retry 2 --retry-delay 3 --max-time 180 \
+              --header 'Accept: application/octet-stream' \
+              --header "Authorization: Bearer $GITHUB_TOKEN" \
+              --header 'X-GitHub-Api-Version: 2022-11-28' \
+              'https://api.github.com/repos/Suwayomi/Suwayomi-Server/releases/assets/599895964' \
+              --output "$jar"
+          fi
           printf '%s  %s\n' \
             'af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd' \
             "$RUNNER_TEMP/pica-r2-official-host.jar" | sha256sum --check -
@@ -72,9 +85,14 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        uses: gradle/actions/setup-gradle@v4
+        continue-on-error: true
         with:
           gradle-version: '8.9'
+      - name: Recover pinned Gradle 8.9 from official CDN on distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Require real KVM acceleration
         run: |

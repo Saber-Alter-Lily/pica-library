@@ -5,6 +5,7 @@ on:
     branches: [codex/product-integration-r1-20261102]
     paths:
       - '.github/workflows/r4-v050-android-signed-inplace-qa.yml'
+      - 'scripts/ci/install-gradle-8.9-fallback.sh'
       - 'scripts/r4-v050-android-signed-inplace-flow.py'
       - 'scripts/s3-android-local-emulator-flow.py'
       - 'scripts/verify-android-clean-source-apk.py'
@@ -41,9 +42,14 @@ jobs:
         with:
           packages: platform-tools
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        uses: gradle/actions/setup-gradle@v4
+        continue-on-error: true
         with:
           gradle-version: '8.9'
+      - name: Recover pinned Gradle 8.9 from official CDN on distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
 
       - name: Pin released original v0.5.0 APK bytes, package and public certificate
         run: |

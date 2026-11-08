@@ -12,6 +12,10 @@ on:
       - 'mobile/android-alpha2/app/proguard-clean-source-qa.pro'
       - 'mobile/android-alpha2/app/src/cleanSourceQa/**'
       - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SignedSourceLauncher.java'
+      - 'mobile/android-alpha2/user-host-app/src/main/AndroidManifest.xml'
+      - 'mobile/android-alpha2/user-host-app/src/main/java/com/picalibrary/android/HostBrowserActivity.java'
+      - 'mobile/android-alpha2/user-host-app/build.gradle'
       - 'mobile/android-alpha2/signed-reader/**'
   workflow_dispatch:
 
@@ -73,7 +77,7 @@ jobs:
           unset ANDROID_PREVIEW_KEYSTORE_B64
           export PICA_ANDROID_VERSION_CODE=56
           export PICA_ANDROID_VERSION_NAME='0.5.0-r4-g3-qa'
-          gradle :app:assembleCleanProductionUpgradeQa -PsourceNeutralQa=true --no-daemon --max-workers=2
+          gradle :app:assembleCleanProductionUpgradeQa :user-host-app:assembleDebug -PsourceNeutralQa=true --no-daemon --max-workers=2
           apk=app/build/outputs/apk/cleanProductionUpgradeQa/app-cleanProductionUpgradeQa.apk
           test -s "$apk"
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
@@ -88,9 +92,19 @@ jobs:
           cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-r4-g3-cert.txt" | head -1 | tr A-F a-f)
           baseline_cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-v050-cert.txt" | head -1 | tr A-F a-f)
           test -n "$cert" && test "$cert" = "$baseline_cert"
+          # Use the SAME disposable trusted signer, but never publish this
+          # optional Host or either QA APK as a production distribution.
+          host_apk=user-host-app/build/outputs/apk/debug/user-host-app-debug.apk
+          test -s "$host_apk"
+          "$aapt" dump badging "$host_apk" > "$RUNNER_TEMP/pica-r4-host-badging.txt"
+          grep -q "package: name='com.picalibrary.android.userhost.qa'" "$RUNNER_TEMP/pica-r4-host-badging.txt"
+          "$signer" verify --verbose --print-certs "$host_apk" > "$RUNNER_TEMP/pica-r4-host-cert.txt"
+          host_cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-r4-host-cert.txt" | head -1 | tr A-F a-f)
+          test -n "$host_cert" && test "$host_cert" = "$baseline_cert"
+          echo 'PASS: separately installed optional Host shares actual public v0.5.0 signing certificate'
           python3 ../../scripts/verify-android-clean-source-apk.py "$apk" \
             app/build/outputs/mapping/cleanProductionUpgradeQa/mapping.txt
-          echo 'PASS: temporary QA APK has REAL v0.5.0 production package identity, fixed signing certificate, no bundled providers and no debugging'
+          echo 'PASS: temporary QA APK has REAL v0.5.0 production package identity, fixed signing certificate, no bundled providers and no debugging; independent Host has the matching signer'
           # Neither QA APK nor the keystore is uploaded, released or served by OTA.
 
       - name: Require actual hardware-accelerated Android 35 emulator

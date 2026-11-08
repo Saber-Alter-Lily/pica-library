@@ -47,7 +47,11 @@ public final class HostBrowserActivity extends Activity {
     // authorized same-signer full-product QA client can change this destination.
     private String readerPackage="com.picalibrary.android.localcore.qa";
     private boolean trustedReader(){
-        if(!"com.picalibrary.android.localcore.qa".equals(readerPackage)&&
+        // The published same-signer upgrade keeps the original production ID.
+        // Package allowlisting still requires matching signatures, exported
+        // first-party Reader activities and their signature-only permission.
+        if(!"com.picalibrary.android".equals(readerPackage)&&
+                !"com.picalibrary.android.localcore.qa".equals(readerPackage)&&
                 !"com.picalibrary.android.dev".equals(readerPackage)&&
                 !"com.picalibrary.android.cleanqa".equals(readerPackage))return false;
         android.content.pm.PackageManager pm=getPackageManager();

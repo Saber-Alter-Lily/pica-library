@@ -156,7 +156,8 @@ def version_code():
 
 def main(old_apk, new_apk):
     global stage
-    assert old_apk.is_file() and new_apk.is_file(), "Verified APK pair missing"
+    host_apk = Path("mobile/android-alpha2/user-host-app/build/outputs/apk/debug/user-host-app-debug.apk").resolve()
+    assert old_apk.is_file() and new_apk.is_file() and host_apk.is_file(), "Verified APK set missing"
     qa.adb("shell", "wm", "size", "720x1280")
     qa.adb("shell", "wm", "density", "320")
     qa.adb("shell", "settings", "put", "system", "font_scale", "1.0")
@@ -216,6 +217,33 @@ def main(old_apk, new_apk):
         require_legacy_preferences()
         record("retained v0.5.0 theme and recommendation feedback survive a second offline restart")
 
+        # Product-facing G2/G3 composition: a separately installed
+        # same-production-signer Host is visible from the actual signed v56
+        # original Home. Its saved-book shortcut reads empty local metadata
+        # with network disabled; it must not start a source automatically.
+        stage = "production-id-optional-signed-host-bookmarks"
+        qa.adb("install", "-r", str(host_apk), timeout=100)
+        launch_original()
+        qa.tap(("已保存的在线作品", "Saved online works",
+                "保存済みオンライン作品"), exact=True, only_class="Button",
+               seconds=35)
+        qa.wait(("还没有在线书签。可在搜索结果中单独保存。",
+                 "No online bookmarks. Save one from a search result.",
+                 "保存済みの作品はありません。検索結果から追加できます。"),
+                seconds=35)
+        active = qa.adb("shell", "dumpsys", "activity", "activities", timeout=35)
+        assert ("com.picalibrary.android.userhost.qa" in active and
+                "com.picalibrary.android.HostBrowserActivity" in active), (
+                "Signed real-production-ID core did not open independent Host")
+        saved_screen("06-production-id-signed-host-empty-bookmarks-offline")
+        record("actual production-ID clean Reader opens separately signed Host saved-book view without login/network")
+        qa.tap(("返回阅读器", "Back to Reader", "Reader に戻る"),
+               seconds=25, only_class="Button")
+        qa.wait(("我的书库", "My library", "マイライブラリ"), seconds=35)
+        open_shelves()
+        require_shelf()
+        record("real public v0.5.0 shelf remains intact after optional Host round-trip")
+
         result = {
             "status": "SIGNED_REAL_ID_EMULATOR_QA_PASS",
             "publicBaselineTag": "v0.5.0",
@@ -230,6 +258,9 @@ def main(old_apk, new_apk):
             "originalThemePreferencePreserved": True,
             "recommendationFeedbackPreferencePreserved": True,
             "legacyPreferencesSurvivedPreAndPostUpgradeColdRestarts": True,
+            "optionalUserHostMatchesPublicProductionSigner": True,
+            "signedProductionIdentityCanOpenOptionalHostBookmarksOffline": True,
+            "legacyShelfSurvivedHostRoundTrip": True,
             "originalCleanReaderIndependentOfProviderLogin": True,
             "offlineColdRestart": True,
             "syntheticShelfOnly": True,

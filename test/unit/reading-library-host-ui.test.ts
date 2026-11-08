@@ -21,6 +21,7 @@ async function fixture() {
         if (url.endsWith('/connections')) return {ok:true,json:async()=>({schemaVersion:1,scope:'inspect-only',credentials:'per-request-not-stored',storage:'available',capabilities:{sourceInspection:true,reader:false,libraryImport:false,extensionInstall:false},hosts:[listedHost]})}
         if (input.action === 'start') { expect(input.scope).toBe('library-read'); expect(input.consent).toBe(true); return {ok:true,json:async()=>({sessionId:SESSION,expiresAt:clock+60000,capabilities:{libraryRead:true,libraryImport:false},history:[]})} }
         if (input.action === 'list') return {ok:true,json:async()=>({books:[],hasNext:false,offset:0})}
+        if (input.action === 'saved') return {ok:true,json:async()=>({books:[],total:0})}
         if (input.action === 'select') return {ok:true,json:async()=>({sessionId:SESSION,comicId:input.comicId,title:'Selected title'})}
         if (input.action === 'close') return {ok:true,json:async()=>({closed:true})}
         throw Error('Unexpected local synthetic request')

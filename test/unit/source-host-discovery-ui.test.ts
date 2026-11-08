@@ -22,6 +22,7 @@ function fixture(language = 1) {
             input.action === 'bind-source' ? { selectedSource: { id: input.sourceId, name: 'Chosen', language: 'zh' }, history: [] } :
             input.action === 'search' ? { sourceId: SOURCE, page: input.page, query: input.query, hasNext: input.page < 2, books: [{ comicId: COMIC, title: '<script>inert title</script>', sourceId: SOURCE }] } :
             input.action === 'select' ? { sessionId: SESSION, comicId: input.comicId, title: 'Selected' } :
+            input.action === 'saved' ? { books: [{ comicId: COMIC, title: '<script>saved title</script>', sourceId: SOURCE }], total: 1 } :
             input.action === 'list' ? { books: [], offset: 0, hasNext: false } : input.action === 'close' ? { closed: true } : null
         if (!value) throw Error('Unexpected local command')
         return { ok: true, json: async () => value }
@@ -71,6 +72,27 @@ it('explicit search/Enter/pagination use the committed query and then the existi
     await f.get('read-' + COMIC).click()
     await vi.waitFor(() => expect(f.opens).toMatchObject([{ sessionId: SESSION, comicId: COMIC, csrfToken: 'local-only-csrf' }]))
     expect(f.commands('select')).toHaveLength(1)
+})
+it('shows previously selected works only after source binding, filters locally and resumes in the original Reader', async () => {
+    const f = fixture()
+    expect(f.get('saved-panel').hidden).toBe(true)
+    expect(f.commands('saved')).toEqual([])
+    await f.start()
+    expect(f.commands('saved')).toEqual([])
+    await f.bind()
+    await vi.waitFor(() => expect(f.get('saved-list').textContent).toContain('<script>saved title</script>'))
+    expect(f.get('saved-panel').hidden).toBe(false)
+    expect(f.commands('search')).toEqual([])
+    const requests = f.commands('saved').length
+    f.get('saved-filter').value = 'no-such-title'
+    ;(f.get('saved-filter') as any).oninput?.()
+    expect(f.get('saved-list').textContent).not.toContain('<script>saved title</script>')
+    f.get('saved-filter').value = 'saved'
+    ;(f.get('saved-filter') as any).oninput?.()
+    await f.get('saved-read-' + COMIC).click()
+    await vi.waitFor(() => expect(f.opens).toMatchObject([{ sessionId: SESSION, comicId: COMIC, csrfToken: 'local-only-csrf' }]))
+    expect(f.commands('search')).toEqual([])
+    expect(f.commands('saved')).toHaveLength(requests)
 })
 it('busy search prevents repeat submits/read clicks; ending the session fences an ignored-abort late result', async () => {
     const f = fixture(); await f.start(); await f.bind(); f.stall(); f.search('pending'); f.search('duplicate')

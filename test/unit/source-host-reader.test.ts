@@ -94,6 +94,22 @@ describe('actual hosted-library adapter + shared Reader — injected HTTP and st
         expect(JSON.stringify([...f.state])).toBe(before)
         expect(f.calls).toHaveLength(calls)
     })
+    it('returns only already-selected Host metadata on reauthorization, without fetching a catalogue or creating another Reader', async () => {
+        const f = fixture(), initial = await f.start()
+        expect(await f.reader.command({ action: 'saved', sessionId: initial.sessionId }, signal())).toMatchObject({ books: [], total: 0 })
+        const ids = await f.select(initial.sessionId)
+        const calls = f.calls.length, writes = f.db.setAppState.mock.calls.length
+        const saved = await f.reader.command({ action: 'saved', sessionId: initial.sessionId }, signal()) as { total: number; books: Array<{comicId: string; title: string; sourceId: string}> }
+        expect(saved).toEqual({ total: 1, books: [{ comicId: ids.comicId, title: 'Synthetic host book', sourceId: '9007199254740993' }] })
+        expect(JSON.stringify(saved)).not.toContain('host.example')
+        expect(f.calls).toHaveLength(calls)
+        expect(f.db.setAppState).toHaveBeenCalledTimes(writes)
+        await f.reader.command({ action: 'close', sessionId: initial.sessionId }, signal())
+        await expect(f.reader.command({ action: 'saved', sessionId: initial.sessionId }, signal())).rejects.toThrow('SOURCE_HOST_CANCELLED')
+        const next = await f.start()
+        expect(await f.reader.command({ action: 'saved', sessionId: next.sessionId }, signal())).toMatchObject({ total: 1, books: [{ comicId: ids.comicId }] })
+        expect(f.calls.filter(call => call.operation === 'PicaHostLibrary')).toHaveLength(1)
+    })
     it('rejects expired or unknown projection scopes without restoring sessions or fetching a host', async () => {
         const f = fixture(), { sessionId } = await f.start()
         await f.select(sessionId)

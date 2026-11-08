@@ -798,8 +798,10 @@ def source_free_user_host_flow():
         # through its existing opt-in source action, without a Host request.
         STEP = "source-free-library-to-saved-host-bookmark"
         operations_before_shortcut=len(operations)
-        adb("shell","am","start","-W","-n",
-            QA_PACKAGE+"/com.picalibrary.android.LocalLibraryActivity",timeout=45)
+        # Use the actual, now always-visible Host navigation rather than an
+        # adb activity launch that leaves an unrelated foreground Host screen.
+        tap(("Back to Reader","返回阅读器","Reader に戻る"),
+            seconds=25,exact=True,only_class="Button")
         PACKAGE=QA_PACKAGE
         wait(("Import CBZ","导入 CBZ","CBZ 取込"),seconds=30)
         tap(("我的外接来源 · 已安装","My external Host · installed",

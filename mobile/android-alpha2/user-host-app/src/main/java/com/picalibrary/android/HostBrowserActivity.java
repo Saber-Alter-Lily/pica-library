@@ -153,16 +153,19 @@ public final class HostBrowserActivity extends Activity {
         String requested=getIntent().getStringExtra("pica.reader.package");
         if(requested!=null)readerPackage=requested;
         manager=HostSourceManager.get(this);
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(20,20,26));
-        root.setPadding(dp(16),dp(18),dp(16),dp(26));
-        // Android 35 edge-to-edge: keep the long Host page clear of status
-        // and navigation gesture areas, including after collapsing setup.
-        root.setOnApplyWindowInsetsListener((v,insets)->{
-            v.setPadding(dp(16),insets.getSystemWindowInsetTop()+dp(12),
-                dp(16),insets.getSystemWindowInsetBottom()+dp(16));
+        // The Host controls are intentionally scrollable, but returning to
+        // the original Reader must remain available at any scroll position.
+        // Keep one native activity; this is not another Reader or navigation stack.
+        LinearLayout shell=new LinearLayout(this);shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setBackgroundColor(Color.rgb(20,20,26));
+        shell.setOnApplyWindowInsetsListener((v,insets)->{
+            v.setPadding(0,insets.getSystemWindowInsetTop(),0,
+                insets.getSystemWindowInsetBottom());
             return insets;
         });
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.rgb(20,20,26));
+        root.setPadding(dp(16),dp(12),dp(16),dp(16));
         root.addView(text(t("我的外部来源","My external sources","外部ソース"),23));
         root.addView(text(t(
             "仅连接你自行运行的 Suwayomi 2.4 Host。配置不会自动联网或安装任何漫画源；本地书库不受影响。",
@@ -173,7 +176,8 @@ public final class HostBrowserActivity extends Activity {
         status=text("",13);status.setTag("host.qa.status");
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         root.addView(status);
-        Button back=action(root,t("返回阅读器","Back to Reader","Reader に戻る"));
+        Button back=action(shell,t("返回阅读器","Back to Reader","Reader に戻る"));
+        back.setTag("host.back.to.reader");
         back.setOnClickListener(v->finish());
         manageHost=action(root,t("在浏览器管理我的 Host 来源",
             "Manage sources in my Host browser","ブラウザで Host のソースを管理"));
@@ -292,7 +296,8 @@ public final class HostBrowserActivity extends Activity {
         results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);
         searchPanel.addView(results);
         scroller=new ScrollView(this);scroller.setFillViewport(true);scroller.addView(root);
-        setContentView(scroller);root.requestApplyInsets();
+        shell.addView(scroller,new LinearLayout.LayoutParams(-1,0,1));
+        setContentView(shell);shell.requestApplyInsets();
 
         manageHost.setOnClickListener(v->{
             HostConfigStore.Config config=manager.config();

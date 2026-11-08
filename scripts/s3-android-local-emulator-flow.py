@@ -843,11 +843,18 @@ def source_free_user_host_flow():
 
         STEP = "user-host-binder-import-to-original-library"
         adb("shell","input","keyevent","KEYCODE_BACK")
-        # No Host-side local inventory: user explicitly saves straight into
-        # the sole original Reader library through the signed Binder bridge.
-        tap_scrolling(("Save to Reader library",
-                       "保存到阅读器书库","Reader 書庫に保存"),
+        # After returning from the saved-bookmark Reader, the previous
+        # search results are no longer visible. Import must remain actionable
+        # from this persisted bookmark without repeating a source search.
+        # No Host-side local inventory: explicit chapter confirmation still
+        # belongs to the original signed Reader import UI.
+        searches_before_import=operations.count("PicaHostSourceSearch")
+        tap_scrolling(("Save bookmarked chapter to Reader library",
+                       "从书签保存章节到阅读器书库",
+                       "ブックマークの章を Reader 書庫に保存"),
                       direction="down",only_class="Button")
+        assert operations.count("PicaHostSourceSearch")==searches_before_import, (
+            "Importing a saved bookmark unexpectedly repeated a source search")
         wait(("Save to original Reader","保存到原阅读器书库","元の Reader に保存"),
              seconds=35)
         tap(("Choose chapter to save","选择要保存的章节","保存する章を選択"),

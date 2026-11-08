@@ -182,3 +182,11 @@ Original 99-page-screen (nine scenario) locale matrix and existing Android35 Rea
 - 本次新的完整 Windows/Android RC 包必须由**本提交自身**的 push 构建产生，以该工作流的 `windows-rc`、`android-rc`、`RC_STATUS.json` 及 SHA-256 清单为准；PR 事件只执行合同、跳过打包，不代表已产出安装包。Windows 只能写入独立 `Pica Library Post Stable RC` 目录；Android 使用独立 `.dev` 包名。它们用于真实 UI 手工测试，不是物理无源正式发布包，更不可用于覆盖真实 v0.5.0 资料。
 
 **接下来的人工 G1 验收**：在实体 Windows 与代表性 Android 手机上，以同一组候选记录首页、书库导入/书架、Reader 续读、三语/放大字体、推荐/画风长任务可见进度与取消、1500 部带真实封面库的前台响应。来源 G2 须以自行管理的可信 Suwayomi Host 和实际获准的扩展完成真实章节/图片→原 Reader→自愿离线保存→撤销后可读；已有三扩展 JAR 注册并不等于站点内容读取。G3 真实用户备份/差异/回滚及 G4 正式发布仍 OPEN。
+
+### S3 源书签→离线导入闭环修复及重新制作候选（2026-11-08）
+
+[Android35 本轮复跑 #42468822037](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42468822037) **真实结论为 FAIL**，不是此前 504：已经由原无网络书库进入独立签名 Host 在线书签、在相同原 Reader 读取第 2 页并保留进度（这些步骤 PASS），但 Reader 返回后上一次搜索结果不会自动保留，原“保存到 Reader 书库”按钮随之消失，因而无法从书签直接自愿导入离线章节。
+
+本批**真实产品补齐**：在独立 Host 的已保存作品行加入“从书签保存章节到阅读器书库”操作，复用 `HostSourceManager.locateAndResumeSavedBook` 中的原来源身份核验、签名 Binder 及**已有**的 `ExternalImportActivity` 章节选择与单章确认，不重新搜索，不增第二套 Reader/下载器/数据库。离线/错误 Host/未授权来源时按钮按已有 `canLocateSaved` 保持禁用，书签本身与已导入作品互不删除。
+
+扩展**同一 S3 Android35 真实 UI 流程**：书签→原 Reader 第 2 页→回到书签→新导入按钮→用户选择一章并确认→对比两页图片字节→Host 撤销后原书库离线继续。该变更必须由**新 HEAD** 完整测试通过才能称为工程验收通过。为免陈旧候选误用于实机，本次修改继续触发已有未发布 Windows/Android RC 打包，而非发布正式版或覆盖用户数据。

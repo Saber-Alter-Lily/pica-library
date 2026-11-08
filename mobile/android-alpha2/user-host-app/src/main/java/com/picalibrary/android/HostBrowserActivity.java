@@ -617,7 +617,16 @@ public final class HostBrowserActivity extends Activity {
             Button resume=action(savedResults,t("继续在线阅读（自动定位原来源）",
                 "Resume online (find saved source)","オンライン読書を再開（ソースを探す）"));
             savedResumeButtons.put(resume,book);
-            resume.setOnClickListener(v->resumeSaved(book));
+            resume.setOnClickListener(v->openSavedBook(book,false));
+            // A saved online locator is already selectable; importing a
+            // specific chapter should not require repeating a source search.
+            // The ORIGINAL signed Reader still owns preview and user consent.
+            Button importBook=action(savedResults,t(
+                "从书签保存章节到阅读器书库",
+                "Save bookmarked chapter to Reader library",
+                "ブックマークの章を Reader 書庫に保存"));
+            savedResumeButtons.put(importBook,book);
+            importBook.setOnClickListener(v->openSavedBook(book,true));
             Button remove=action(savedResults,t("移除此在线书签",
                 "Remove online bookmark","ブックマークを削除"));
             remove.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
@@ -635,16 +644,21 @@ public final class HostBrowserActivity extends Activity {
         }
         controls();
     }
-    private void resumeSaved(HostSavedBooks.Book book){
+    private void openSavedBook(HostSavedBooks.Book book,boolean save){
         if(!trustedReader()){
             status.setText(t("未找到同签名的阅读器，无法转入作品。",
                 "Matching signed Reader not found; cannot open work.",
                 "同じ署名の Reader が見つかりません。"));return;
         }
-        task(t("恢复在线作品…","Resuming online work…","作品を再開中…"),()->{
+        // The same selected source identity and signed Binder bridge serve
+        // resume and the existing chapter import UI. Only a user click runs
+        // this operation; no bookmark load triggers chapter/network access.
+        task(save?t("准备导入书签章节…","Preparing bookmarked chapter…",
+                     "ブックマークの章を準備中…"):
+                  t("恢复在线作品…","Resuming online work…","作品を再開中…"),()->{
             manager.locateAndResumeSavedBook(book.comicId,true);
             String scope=manager.requireSession().scope;
-            return ()->launchReader(book.comicId,book.title,false,scope);
+            return ()->launchReader(book.comicId,book.title,save,scope);
         });
     }
     private void openOwnedReader(HostSourceManager.Book book,boolean save){

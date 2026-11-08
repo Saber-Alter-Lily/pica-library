@@ -3,6 +3,7 @@ import { renderHostedLocalDownloadJobs } from './host-download-view.js'
 
 let dialog, host = null, session = null, csrf = '', active = null, generation = 0, offset = 0, hasNext = false, expiryTimer = null
 let scope = 'library-read', selectedSource = null, searchQuery = '', searchPage = 0
+let savedBooks = [], savedOffset = 0, savedMatches = 0
 let downloadTarget = null, downloadPoll = null, downloadPending = false, downloadGeneration = 0, downloadRendering = 0
 const $ = id => document.getElementById('host-library-' + id)
 function node(tag, value) { const element = document.createElement(tag); element.textContent = value; return element }
@@ -14,6 +15,11 @@ function endOnExit() {
     selectedSource = null; searchQuery = ''; searchPage = 0; offset = 0; hasNext = false
     clearTimeout(expiryTimer); expiryTimer = null
     resetDownloads()
+    savedBooks = []; savedOffset = 0; savedMatches = 0
+    if ($('saved-list')) $('saved-list').replaceChildren()
+    if ($('saved-filter')) $('saved-filter').value = ''
+    if ($('saved-count')) $('saved-count').textContent = ''
+    if ($('saved-panel')) $('saved-panel').hidden = true
     document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed'))
     if ($('password')) { $('password').value = ''; $('username').value = '' }
     if ($('query')) { $('query').value = ''; $('source').replaceChildren() }
@@ -81,6 +87,22 @@ function makeDialog() {
     dialog.append(searchForm)
     const status = node('p', ''); status.id = 'host-library-state'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); dialog.append(status)
     const books = document.createElement('div'); books.id = 'host-library-books'; dialog.append(books)
+    const savedPanel = document.createElement('section'); savedPanel.id = 'host-library-saved-panel'; savedPanel.className = 'panel'; savedPanel.hidden = true
+    savedPanel.append(node('h3', t('已选在线作品', 'Previously selected online works', '選択済みのオンライン作品')))
+    savedPanel.append(node('p', t('只列出此 Host 和本次授权账号下已选过的作品索引。重新授权原来源后可以直接阅读，不会自动联网或下载。', 'Only previously selected titles for this Host and authorized account appear here. Reconnect and select the original source to resume; nothing connects or downloads automatically.', 'この Host と認証済みアカウントで選択済みの作品のみ表示。再接続後に元のソースを選んで再開できます。自動接続やダウンロードはしません。')))
+    const savedLabel = document.createElement('label'), savedFilter = document.createElement('input')
+    savedFilter.id = 'host-library-saved-filter'; savedFilter.type = 'search'; savedFilter.maxLength = 256; savedFilter.autocomplete = 'off'
+    savedLabel.append(node('span', t('筛选作品名或来源 ID', 'Filter by title or source ID', 'タイトル・ソース ID で絞り込む')), savedFilter)
+    savedFilter.oninput = () => { savedOffset = 0; renderSavedWorks() }
+    savedPanel.append(savedLabel)
+    const savedCount = node('p', ''); savedCount.id = 'host-library-saved-count'; savedCount.setAttribute('role', 'status')
+    savedPanel.append(savedCount)
+    const savedList = document.createElement('div'); savedList.id = 'host-library-saved-list'; savedPanel.append(savedList)
+    savedPanel.append(
+        button('saved-previous', t('上一页已选作品', 'Previous saved works', '前の選択済み作品'), () => { savedOffset = Math.max(0, savedOffset - 20); renderSavedWorks() }),
+        button('saved-next', t('下一页已选作品', 'Next saved works', '次の選択済み作品'), () => { savedOffset += 20; renderSavedWorks() })
+    )
+    dialog.append(savedPanel)
     makeDownloadPanel()
     dialog.append(button('previous', t('上一页', 'Previous page', '前のページ'), () => void navigate(-1)), button('next', t('下一页', 'Next page', '次のページ'), () => void navigate(1)), button('end', t('结束会话', 'End session', 'セッション終了'), () => { generation++; endOnExit(); books.replaceChildren(); controls(); status.textContent = t('会话已结束；阅读记录保留。', 'Session ended; reading records are retained.', 'セッションを終了しました。閲覧記録は保持します。') }), button('hide', t('关闭面板', 'Close panel', 'パネルを閉じる'), () => dialog.close()))
     dialog.addEventListener('close', () => { $('password').value = ''; $('username').value = ''; clearTimeout(downloadPoll); downloadPoll = null; document.dispatchEvent(new CustomEvent('pica-hosted-download-panel-changed')) })
@@ -92,6 +114,12 @@ function controls() {
     $('source').disabled = $('bind-source').disabled = Boolean(active) || !session || Boolean(selectedSource) || !$('source').value
     $('query').disabled = $('search').disabled = Boolean(active) || !session || !selectedSource
     for (const item of $('books').querySelectorAll('button')) item.disabled = Boolean(active) || !session
+    const savedReady = Boolean(session) && (!discovery || Boolean(selectedSource))
+    $('saved-panel').hidden = !savedReady
+    $('saved-filter').disabled = Boolean(active) || !savedReady
+    for (const item of $('saved-list').querySelectorAll('button')) item.disabled = Boolean(active) || !savedReady
+    $('saved-previous').disabled = Boolean(active) || !savedReady || savedOffset <= 0
+    $('saved-next').disabled = Boolean(active) || !savedReady || savedOffset + 20 >= savedMatches
     for (const id of ['start', 'username', 'password', 'consent']) $(id).disabled = Boolean(active) || Boolean(session)
     $('username').required = $('password').required = host?.authMode === 'basic'
     $('username').closest('label').hidden = $('password').closest('label').hidden = host?.authMode !== 'basic'
@@ -134,6 +162,42 @@ function render(value) {
         $('books').append(card)
     }
 }
+/** Offline metadata projection: no host RPC, no new storage or Reader. */
+function renderSavedWorks(value) {
+    if (value !== undefined) {
+        if (!value || !Array.isArray(value.books) || value.books.length > 500 || value.total !== value.books.length ||
+            value.books.some(book => typeof book.comicId !== 'string' || !/^hosted:[0-9a-f-]{36}:[0-9a-f]{64}$/.test(book.comicId) ||
+                typeof book.title !== 'string' || book.title.length > 500 ||
+                typeof book.sourceId !== 'string' || !/^-?[0-9]+$/.test(book.sourceId)))
+            throw Error('SOURCE_HOST_PROTOCOL')
+        savedBooks = value.books
+        savedOffset = 0
+    }
+    const needle = $('saved-filter').value.trim().toLocaleLowerCase()
+    const matches = savedBooks.filter(book => book.title.toLocaleLowerCase().includes(needle) || book.sourceId.includes(needle))
+    savedMatches = matches.length
+    savedOffset = Math.min(savedOffset, savedMatches ? Math.floor((savedMatches - 1) / 20) * 20 : 0)
+    const first = savedMatches ? savedOffset + 1 : 0, last = Math.min(savedOffset + 20, savedMatches)
+    $('saved-count').textContent = t(
+        `已选 ${savedBooks.length} 部 · 匹配 ${savedMatches} 部 · ${first}–${last} · 仅索引`,
+        `Selected ${savedBooks.length} · matching ${savedMatches} · ${first}–${last} · metadata only`,
+        `選択済み ${savedBooks.length} 件 · 一致 ${savedMatches} 件 · ${first}–${last} · 索引のみ`
+    )
+    const list = $('saved-list'); list.replaceChildren()
+    if (!savedMatches) list.append(node('p', savedBooks.length
+        ? t('没有匹配的作品。清除筛选可查看全部。', 'No matches. Clear the filter to show all.', '一致する作品はありません。')
+        : t('本次授权范围内还没有已选作品。先搜索并阅读一次即可在此找到。', 'No previously selected works in this authorized scope. Select a search result to save its locator here.', 'この認証範囲には選択済み作品がありません。')))
+    for (const book of matches.slice(savedOffset, savedOffset + 20)) {
+        const card = document.createElement('article'); card.className = 'panel'
+        card.append(node('strong', book.title), node('p', t('来源 ID：', 'Source ID: ', 'ソース ID：') + book.sourceId))
+        card.append(button('saved-read-' + book.comicId, t('直接继续阅读', 'Resume in Reader', 'Reader で再開'), () => {
+            const selectedSession = session?.sessionId
+            if (selectedSession) void resumeHostedLibraryComic(book.comicId, selectedSession).catch(() => {})
+        }))
+        list.append(card)
+    }
+    controls()
+}
 async function startSession() {
     const auth = host.authMode === 'basic' ? { mode: 'basic', username: $('username').value, password: $('password').value } : { mode: 'none' }
     await working(async () => {
@@ -151,6 +215,7 @@ async function startSession() {
         if (discovery) { renderSources(await command({ action: 'sources', sessionId: session.sessionId, offset: 0 })); return }
         render(await command({ action: 'list', sessionId: session.sessionId, offset: 0 }))
         renderHistory(value.history)
+        renderSavedWorks(await command({ action: 'saved', sessionId: session.sessionId }))
     })
 }
 function resetDownloads() {
@@ -236,6 +301,7 @@ async function bindSource() {
         const value = await command({ action: 'bind-source', sessionId: session.sessionId, sourceId, consent: true })
         if (value.selectedSource?.id !== sourceId) throw Error('SOURCE_HOST_PROTOCOL')
         selectedSource = value.selectedSource; hasNext = false; searchPage = 0; $('books').replaceChildren(); renderHistory(value.history)
+        renderSavedWorks(await command({ action: 'saved', sessionId: session.sessionId }))
         document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed'))
     })
 }

@@ -171,3 +171,14 @@ Inspection of the original four-tab `HomeActivity` found that `onCreate()` calls
 Small production-path fix: the existing instance skips only the `onResume()` redraw immediately following its own `onCreate()` initial `show()`, then restores all normal redraws on later resumes and explicit tab/intent navigation. This uses the same original asynchronous store workers and does not change catalog JSON/schema/reader/history. In the explicitly source-neutral isolated QA app, the legacy formal OTA auto-prompt/check is suppressed because `UpdateActivity` already deliberately disables production updates there; normal production/Dev update checks remain intact.
 
 Original 99-page-screen (nine scenario) locale matrix and existing Android35 Reader/Host/real-signer upgrade workflows are reused for regression. These updates must not be called verified until an exact source commit's CI and UI flows finish successfully.
+
+## R3 实机验收候选重新打包｜2026-11-08｜单一集成分支
+
+**触发目标：**以 R2/R3/R4 当前已审查的产品源 `b510f123c73b` 为代码基线，使用已有 `post-stable-rc-packages.yml` 产生一组完整 Windows/Android **未发布手动 QA 候选**。本次文档更新只记录已验证的工程边界并触发既有打包流程；不会合并 main、发布 Release、签正式更新、上传用户资料或部署 OTA。正式稳定版仍是 v0.5.0。
+
+- [R3 完整无源 Android 产品与可选 Host #42468821974](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42468821974)：同一源 `b510f123` 第二次执行 **SUCCESS**；原四标签无站点 SDK 的 APK 和独立可选 Host 经 Android R8/DEX/权限与签名兼容审查。临时两 APK 工程证据与原完整 Dev 产品候选不可混称。
+- [R4 公开 v0.5.0 同正式包名/签名原位升级 #42468821963](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42468821963)：同一源第二次执行 **SUCCESS**。真实旧版 APK 在 Android35 中建立临时书架、深色模式和推荐反馈设置，经 Android PackageManager 覆盖至无站点 SDK 的 v56 后保留；重启、独立同签名 Host 书签页往返、原书架重读均通过。未上传生产包名升级 APK，未触碰用户真实资料。
+- [综合 Web/Source 验收 #42468825866](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42468825866)：第二次执行 **SUCCESS**。Android35 完整 Host → 原书库 → 原 Reader 真实 UI 场景 [#42468822037](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42468822037) 在本次打包准备时**仍未取得最终判定**；不能以其他工作流绿色代替。
+- 本次新的完整 Windows/Android RC 包必须由**本提交自身**的 push 构建产生，以该工作流的 `windows-rc`、`android-rc`、`RC_STATUS.json` 及 SHA-256 清单为准；PR 事件只执行合同、跳过打包，不代表已产出安装包。Windows 只能写入独立 `Pica Library Post Stable RC` 目录；Android 使用独立 `.dev` 包名。它们用于真实 UI 手工测试，不是物理无源正式发布包，更不可用于覆盖真实 v0.5.0 资料。
+
+**接下来的人工 G1 验收**：在实体 Windows 与代表性 Android 手机上，以同一组候选记录首页、书库导入/书架、Reader 续读、三语/放大字体、推荐/画风长任务可见进度与取消、1500 部带真实封面库的前台响应。来源 G2 须以自行管理的可信 Suwayomi Host 和实际获准的扩展完成真实章节/图片→原 Reader→自愿离线保存→撤销后可读；已有三扩展 JAR 注册并不等于站点内容读取。G3 真实用户备份/差异/回滚及 G4 正式发布仍 OPEN。

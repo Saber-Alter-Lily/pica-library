@@ -11,7 +11,9 @@ final class SignedSourceLauncher {
     private static final String HOST="com.picalibrary.android.userhost.qa";
     private static final String ENTRY="com.picalibrary.android.HostBrowserActivity";
     private SignedSourceLauncher(){}
-    static void open(Activity app){
+    static void open(Activity app){open(app,false);}
+    static void openSaved(Activity app){open(app,true);}
+    private static void open(Activity app,boolean saved){
         PackageManager packages=app.getPackageManager();
         if(packages.checkSignatures(app.getPackageName(),HOST)!=
                 PackageManager.SIGNATURE_MATCH){
@@ -31,8 +33,10 @@ final class SignedSourceLauncher {
             if(!activity.exported||
                     !"com.picalibrary.android.remote.BIND_SOURCE".equals(activity.permission))
                 throw new SecurityException("Untrusted source entry");
-            app.startActivity(new Intent().setClassName(HOST,ENTRY)
-                .putExtra("pica.reader.package",app.getPackageName()));
+            Intent intent=new Intent().setClassName(HOST,ENTRY)
+                .putExtra("pica.reader.package",app.getPackageName());
+            if(saved)intent.putExtra("pica.open.saved.books",true);
+            app.startActivity(intent);
         }catch(PackageManager.NameNotFoundException|
                 android.content.ActivityNotFoundException|SecurityException unavailable){
             Toast.makeText(app,LocalizedText.ui(app,"来源组件不可用",

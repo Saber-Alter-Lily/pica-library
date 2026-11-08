@@ -91,9 +91,10 @@ public final class LocalLibraryActivity extends Activity {
         if(getPackageManager().checkSignatures(getPackageName(),SOURCE_PACKAGE)!=
                 android.content.pm.PackageManager.SIGNATURE_MATCH)return false;
         try{
-            getPackageManager().getActivityInfo(
+            android.content.pm.ActivityInfo entry=getPackageManager().getActivityInfo(
                 new android.content.ComponentName(SOURCE_PACKAGE,SOURCE_ACTIVITY),0);
-            return true;
+            return entry.exported &&
+                "com.picalibrary.android.remote.BIND_SOURCE".equals(entry.permission);
         }catch(android.content.pm.PackageManager.NameNotFoundException missing){
             return false;
         }
@@ -126,6 +127,7 @@ public final class LocalLibraryActivity extends Activity {
         boolean trusted=sourceTrusted();
         String[] actions=trusted?new String[]{
             copy("打开来源设置","Open source settings","ソース設定を開く"),
+            copy("查看我的在线书签","View saved online works","保存済みの作品を見る"),
             copy("在系统中管理／卸载来源","Manage or uninstall in Android settings",
                 "Android 設定で管理／削除")}:
             new String[]{copy("在系统中检查／卸载不受信任的组件",
@@ -137,10 +139,13 @@ public final class LocalLibraryActivity extends Activity {
                 copy("来源签名不匹配","Source signature mismatch",
                 "外部ソースの署名が一致しません"))
             .setItems(actions,(dialog,which)->{
-                if(trusted&&which==0){
+                if(trusted&&(which==0||which==1)){
                     try{
-                        startActivity(new Intent().setClassName(
-                            SOURCE_PACKAGE,SOURCE_ACTIVITY));
+                        Intent open=new Intent().setClassName(
+                            SOURCE_PACKAGE,SOURCE_ACTIVITY)
+                            .putExtra("pica.reader.package",getPackageName());
+                        if(which==1)open.putExtra("pica.open.saved.books",true);
+                        startActivity(open);
                     }catch(android.content.ActivityNotFoundException|SecurityException error){
                         refreshSourceButton();
                         android.widget.Toast.makeText(this,copy(

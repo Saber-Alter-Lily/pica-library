@@ -794,10 +794,25 @@ def source_free_user_host_flow():
         until_data("user-host-saved-books-v1.json",lambda data:
             len(data.get("books",[]))==1 and
             data["books"][0].get("title")=="S3-QA-Hosted-Comic")
-        tap_scrolling(("Saved online works","已保存的在线作品",
-                       "保存済みオンライン作品"),direction="up",only_class="Button")
+        # The SOURCE-FREE original local library now exposes the saved book
+        # through its existing opt-in source action, without a Host request.
+        STEP = "source-free-library-to-saved-host-bookmark"
+        operations_before_shortcut=len(operations)
+        adb("shell","am","start","-W","-n",
+            QA_PACKAGE+"/com.picalibrary.android.LocalLibraryActivity",timeout=45)
+        PACKAGE=QA_PACKAGE
+        wait(("Import CBZ","导入 CBZ","CBZ 取込"),seconds=30)
+        tap(("我的外接来源 · 已安装","My external Host · installed",
+             "外部 Host · インストール済み"),seconds=30,only_class="Button")
+        tap(("查看我的在线书签","View saved online works",
+             "保存済みの作品を見る"),seconds=25)
+        PACKAGE=USER_HOST_PACKAGE
         wait(("Online bookmarks 1","在线书签 1",
-              "オンラインブックマーク 1"),seconds=30)
+              "オンラインブックマーク 1"),seconds=35)
+        assert len(operations)==operations_before_shortcut, (
+            "Opening saved books from the original local Library contacted Host")
+        page("24a-original-library-opens-saved-online-books-offline")
+        record("source-free Library -> signed source-only saved bookmarks without Host network")
         tap_scrolling(("Resume online (find saved source)",
                        "继续在线阅读（自动定位原来源）","オンライン読書を再開（ソースを探す）"),
                       direction="down",only_class="Button")
@@ -1166,6 +1181,12 @@ def original_full_product_signed_host_flow(upstream_pages):
     type_into_host(("Search works", "搜索作品", "作品を検索"), "CBZ")
     tap_scrolling(("Search selected source", "搜索选中来源",
                    "選択ソースで検索"), only_class="Button")
+    tap_scrolling(("Save online bookmark (no download)",
+                   "保存在线书签（不下载）","オンラインブックマークを保存"),
+                  direction="down",only_class="Button")
+    until_data("user-host-saved-books-v1.json",lambda data:
+        any(row.get("title")=="Interop Fixture CBZ"
+            for row in data.get("books",[])),seconds=35)
     tap_scrolling("Read · Interop Fixture CBZ",
                   direction="down", only_class="Button")
     wait_page_counter("1 / 2", seconds=45)
@@ -1249,6 +1270,19 @@ def original_full_product_signed_host_flow(upstream_pages):
     wait(("我的书库", "My library", "マイライブラリ"), seconds=40)
     wait("Interop Fixture CBZ", seconds=50)
     page("41-original-product-library-after-host-stopped")
+    if ORIGINAL_PACKAGE == CLEAN_PACKAGE:
+        STEP = "r3-original-clean-home-opens-saved-host-books-offline"
+        tap(("已保存的在线作品","Saved online works",
+             "保存済みオンライン作品"),seconds=30,only_class="Button")
+        PACKAGE=USER_HOST_PACKAGE
+        wait(("No Host connected","尚未连接 Host","未接続"),seconds=35)
+        wait(("Interop Fixture CBZ",),seconds=35)
+        page("41a-clean-original-home-saved-host-bookmark")
+        record("original clean four-tab Home opens retained Host bookmark without auto-connect")
+        tap(("返回阅读器","Back to Reader","Reader に戻る"),
+            seconds=25,only_class="Button")
+        PACKAGE=ORIGINAL_PACKAGE
+        wait(("我的书库","My library","マイライブラリ"),seconds=35)
     tap("Interop Fixture CBZ", seconds=25)
     tap(("阅读", "Read", "読む"), seconds=55, only_class="Button")
     dismiss_immersive_help()

@@ -449,6 +449,10 @@ public final class HostBrowserActivity extends Activity {
         status.setText(manager.hasSession()?t("会话已连接","Host session connected","接続済み"):
             t("尚未连接 Host","No Host connected","未接続"));
         controls();
+        // An explicit Reader Library shortcut opens only already-saved
+        // metadata. No Host start, source discovery, login or page request.
+        if(getIntent().getBooleanExtra("pica.open.saved.books",false))
+            loadSaved(0);
     }
 
     private void loadSources(int offset){
@@ -550,6 +554,7 @@ public final class HostBrowserActivity extends Activity {
             "Online bookmarks loaded. No comic pages were downloaded.",
             "オンラインブックマークを読み込みました。漫画はダウンロードしていません。"));
         renderSaved();
+        scroller.post(()->scroller.smoothScrollTo(0,savedPanel.getTop()));
     }
     private void renderSaved(){
         savedResults.removeAllViews();savedResumeButtons.clear();

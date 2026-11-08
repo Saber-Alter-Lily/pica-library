@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,9 +27,10 @@ public final class HostBrowserActivity extends Activity {
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
     private final List<HostProtocol.Source> sources=new ArrayList<>();
     private final List<HostSavedBooks.Book> savedRows=new ArrayList<>();
+    private final List<HostSavedBooks.Book> visibleSavedRows=new ArrayList<>();
     private final Map<Button,HostSavedBooks.Book> savedResumeButtons=new LinkedHashMap<>();
     private HostSourceManager manager;
-    private EditText label,endpoint,username,password,query;
+    private EditText label,endpoint,username,password,query,savedSearch;
     private CheckBox allowLan,permission,basicAuth;
     private Spinner sourceChoices;
     private TextView sourcePageStatus,resultPageStatus;
@@ -36,11 +38,11 @@ public final class HostBrowserActivity extends Activity {
     private Button toggleSetup;
     private ScrollView scroller;
     private TextView status,savedStatus;
-    private Button save,enable,start,disconnect,refresh,select,search,previousSources,nextSources,previousResults,nextResults,savedToggle,savedPrevious,savedNext,manageHost,changeSource;
+    private Button save,enable,start,disconnect,refresh,select,search,previousSources,nextSources,previousResults,nextResults,savedToggle,savedPrevious,savedNext,manageHost,changeSource,savedApplyFilter,savedClearFilter;
     private boolean busy,destroyed,reopenSavedOnConnect;
     private int generation,sourceOffset,searchPage,savedOffset;
     private boolean sourceHasNext,searchHasNext;
-    private String searchQuery="";
+    private String searchQuery="",savedNeedle="";
     // Default stays the physically source-free QA Reader; only an explicitly
     // authorized same-signer full-product QA client can change this destination.
     private String readerPackage="com.picalibrary.android.localcore.qa";
@@ -135,7 +137,9 @@ public final class HostBrowserActivity extends Activity {
         changeSource.setEnabled(!busy&&bound);
         savedToggle.setEnabled(!busy);
         savedPrevious.setEnabled(!busy&&savedOffset>=20);
-        savedNext.setEnabled(!busy&&savedOffset+20<savedRows.size());
+        savedNext.setEnabled(!busy&&savedOffset+20<visibleSavedRows.size());
+        savedApplyFilter.setEnabled(!busy&&!savedRows.isEmpty());
+        savedClearFilter.setEnabled(!busy&&!savedNeedle.isEmpty());
         for(Map.Entry<Button,HostSavedBooks.Book> entry:savedResumeButtons.entrySet())
             entry.getKey().setEnabled(!busy&&manager.canLocateSaved(entry.getValue()));
     }
@@ -174,6 +178,19 @@ public final class HostBrowserActivity extends Activity {
         root.addView(savedPanel);
         savedStatus=text("",13);savedStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         savedPanel.addView(savedStatus);
+        savedSearch=field(savedPanel,t("按标题或 Host 搜索在线书签",
+            "Search online bookmarks by title or Host",
+            "作品名または Host でブックマークを検索"),false);
+        savedSearch.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        LinearLayout savedFilters=new LinearLayout(this);
+        savedFilters.setOrientation(LinearLayout.HORIZONTAL);
+        savedPanel.addView(savedFilters,new LinearLayout.LayoutParams(-1,dp(48)));
+        savedApplyFilter=new Button(this);savedApplyFilter.setAllCaps(false);
+        savedApplyFilter.setText(t("筛选书签","Filter bookmarks","ブックマークを絞り込む"));
+        savedFilters.addView(savedApplyFilter,new LinearLayout.LayoutParams(0,-1,1));
+        savedClearFilter=new Button(this);savedClearFilter.setAllCaps(false);
+        savedClearFilter.setText(t("清除筛选","Clear filter","絞り込みを解除"));
+        savedFilters.addView(savedClearFilter,new LinearLayout.LayoutParams(0,-1,1));
         LinearLayout savedPager=new LinearLayout(this);
         savedPager.setOrientation(LinearLayout.HORIZONTAL);
         savedPanel.addView(savedPager,new LinearLayout.LayoutParams(-1,dp(48)));
@@ -406,6 +423,22 @@ public final class HostBrowserActivity extends Activity {
         });
         savedPrevious.setOnClickListener(v->loadSaved(savedOffset-20));
         savedNext.setOnClickListener(v->loadSaved(savedOffset+20));
+        // Local bookmark metadata is filtered on-device. Typing or filtering
+        // never connects a Host, searches a website, or downloads a page.
+        savedApplyFilter.setOnClickListener(v->{
+            savedNeedle=savedSearch.getText().toString().trim().toLowerCase(Locale.ROOT);
+            savedOffset=0;
+            renderSaved();
+        });
+        savedClearFilter.setOnClickListener(v->{
+            savedNeedle="";savedSearch.setText("");savedOffset=0;renderSaved();
+        });
+        savedSearch.setOnEditorActionListener((view,action,event)->{
+            if(action==EditorInfo.IME_ACTION_SEARCH){
+                savedApplyFilter.performClick();return true;
+            }
+            return false;
+        });
         HostConfigStore.Config config=manager.config();
         label.setText(config.label);endpoint.setText(config.endpoint);
         allowLan.setChecked(config.allowLan);
@@ -511,8 +544,7 @@ public final class HostBrowserActivity extends Activity {
     private void showSaved(List<HostSavedBooks.Book> rows,int offset){
         savedRows.clear();savedRows.addAll(rows);
         Collections.reverse(savedRows);
-        int maximum=savedRows.isEmpty()?0:((savedRows.size()-1)/20)*20;
-        savedOffset=Math.min(Math.max(0,offset),maximum);
+        savedOffset=Math.max(0,offset);
         savedPanel.setVisibility(View.VISIBLE);
         status.setText(t("在线书签已就绪，不代表已下载漫画。",
             "Online bookmarks loaded. No comic pages were downloaded.",
@@ -521,15 +553,31 @@ public final class HostBrowserActivity extends Activity {
     }
     private void renderSaved(){
         savedResults.removeAllViews();savedResumeButtons.clear();
-        int end=Math.min(savedOffset+20,savedRows.size());
-        savedStatus.setText(t(
-            "在线书签 "+savedRows.size()+" 部 · 显示 "+(savedRows.isEmpty()?0:savedOffset+1)+"–"+end+" · 非离线副本",
-            "Online bookmarks "+savedRows.size()+" · showing "+(savedRows.isEmpty()?0:savedOffset+1)+"–"+end+" · not offline copies",
-            "オンラインブックマーク "+savedRows.size()+" 件 · "+(savedRows.isEmpty()?0:savedOffset+1)+"–"+end+" · オフライン保存ではありません"));
+        visibleSavedRows.clear();
+        for(HostSavedBooks.Book book:savedRows)
+            if(savedNeedle.isEmpty()||
+                    book.title.toLowerCase(Locale.ROOT).contains(savedNeedle)||
+                    book.hostLabel.toLowerCase(Locale.ROOT).contains(savedNeedle))
+                visibleSavedRows.add(book);
+        int total=visibleSavedRows.size();
+        int maximum=total==0?0:((total-1)/20)*20;
+        savedOffset=Math.min(Math.max(0,savedOffset),maximum);
+        int end=Math.min(savedOffset+20,total);
+        savedStatus.setText(savedNeedle.isEmpty()?t(
+            "在线书签 "+savedRows.size()+" 部 · 显示 "+(total==0?0:savedOffset+1)+"–"+end+" · 非离线副本",
+            "Online bookmarks "+savedRows.size()+" · showing "+(total==0?0:savedOffset+1)+"–"+end+" · not offline copies",
+            "オンラインブックマーク "+savedRows.size()+" 件 · "+(total==0?0:savedOffset+1)+"–"+end+" · オフライン保存ではありません"):
+            t("匹配 "+total+" / "+savedRows.size()+" 部 · 显示 "+(total==0?0:savedOffset+1)+"–"+end,
+              "Matches "+total+" / "+savedRows.size()+" · showing "+(total==0?0:savedOffset+1)+"–"+end,
+              "一致 "+total+" / "+savedRows.size()+" · "+(total==0?0:savedOffset+1)+"–"+end));
         if(savedRows.isEmpty())
             savedResults.addView(text(t("还没有在线书签。可在搜索结果中单独保存。",
                 "No online bookmarks. Save one from a search result.",
                 "保存済みの作品はありません。検索結果から追加できます。"),14));
+        else if(visibleSavedRows.isEmpty())
+            savedResults.addView(text(t("没有匹配的在线书签；清除筛选可查看全部。",
+                "No matching bookmarks. Clear the filter to see all works.",
+                "一致するブックマークはありません。絞り込みを解除してください。"),14));
         else if(!manager.hasSession()){
             savedResults.addView(text(t(
                 "需要先授权连接原 Host。不会自动登录、安装扩展或下载漫画。",
@@ -550,7 +598,7 @@ public final class HostBrowserActivity extends Activity {
                 "Resume checks up to 200 installed sources in this Host, then opens the existing Reader.",
                 "再開時に現在の Host の先頭200件までのソースを確認し、既存の Reader で開きます。"),14));
         for(int i=savedOffset;i<end;i++){
-            HostSavedBooks.Book book=savedRows.get(i);
+            HostSavedBooks.Book book=visibleSavedRows.get(i);
             savedResults.addView(text(book.title+" · "+book.hostLabel,16));
             Button resume=action(savedResults,t("继续在线阅读（自动定位原来源）",
                 "Resume online (find saved source)","オンライン読書を再開（ソースを探す）"));

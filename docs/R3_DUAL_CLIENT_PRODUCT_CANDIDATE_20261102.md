@@ -190,3 +190,14 @@ Original 99-page-screen (nine scenario) locale matrix and existing Android35 Rea
 本批**真实产品补齐**：在独立 Host 的已保存作品行加入“从书签保存章节到阅读器书库”操作，复用 `HostSourceManager.locateAndResumeSavedBook` 中的原来源身份核验、签名 Binder 及**已有**的 `ExternalImportActivity` 章节选择与单章确认，不重新搜索，不增第二套 Reader/下载器/数据库。离线/错误 Host/未授权来源时按钮按已有 `canLocateSaved` 保持禁用，书签本身与已导入作品互不删除。
 
 扩展**同一 S3 Android35 真实 UI 流程**：书签→原 Reader 第 2 页→回到书签→新导入按钮→用户选择一章并确认→对比两页图片字节→Host 撤销后原书库离线继续。该变更必须由**新 HEAD** 完整测试通过才能称为工程验收通过。为免陈旧候选误用于实机，本次修改继续触发已有未发布 Windows/Android RC 打包，而非发布正式版或覆盖用户数据。
+
+## R2/R3 双端「在线书签→原阅读器/本地保存」实机候选（2026-11-08）
+
+本次候选源码基线：`d778973498cb158eec4cb72c952fe57544b4f969`；仍为 #284 Draft，不改变 `main`、正式 v0.5.0、OTA 或用户生产数据。原先 [#42503205971](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42503205971) 在 `06be256f` 已生成 Windows/Android 双端 RC，但**不包含**此后补入的 Windows 书签章节保存按钮，因此必须由本次 `post-stable-rc-packages.yml` push 工作流重新生成同 SHA 安装测试包。PR 触发的合同任务即使绿色、Windows/Android 打包任务若 skipped，也不能认定新包已经生成。
+
+- **Windows 原产品：**用户手动连接并授权自己的 Suwayomi Host → 选择已安装来源 → 搜索并选择作品一次 → 以后在同账号/来源范围内的「已选在线作品」检索 → 可直接回到原在线 Reader，或点「保存书签章节到本地」进入现有章节选择/明确授权/任务进度 → 完整副本进入原本地书库。未授权、过期或其他 Host 的书签不得获得内容；展示作品索引不自动搜索或下载。
+- **Android 原产品/独立来源：**已保存在线作品可从无源四标签 Home 或独立本地书库跳转，检索/续读后可单独选择章节保存到原 Reader 的本地库存。独立来源 APK 可停用、升级、卸载；Reader 本地副本在来源失效后仍应可读。已有签名/权限/Binder 与原 Reader/LocalComicStore，不增任何内置站点 SDK。
+- **工程验收与实机分离：**在 `06be256f` 的 [Android35 #42503206015](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42503206015) 中，书签→原 Reader 第 2 页→明确保存章节→存入原书库且图片字节核验 **PASS**；唯一后续失败是 QA 脚本仍用滚动控件寻找顶部固定的 Back 按钮（y≈96 被旧滚动查找范围拒绝）。现有 S3 脚本已改成点击固定按钮，必须以之后脚本所属提交的最终 S3 工作流判定，绝不将旧部分通过冒充整条 PASS。真实 v0.5.0 包名及签名升级、旧书架/主题/偏好保存已在此前 `06be256f` 的 [R4 #42503206293](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42503206293) 工程通过。
+- **本次真实设备最小验收：**分别用独立 Windows QA 目录、Android QA 包名安装同一新来源 SHA 候选；原书库导入 CBZ/文件夹 → 书架/搜索/阅读/重启续读；已保存 Host 书签的直读和**仅确认指定章节才导入**；Host 断连/卸载后的离线阅读；窄屏 360/393/480dp、三语和大字号、推荐/Visual 长任务状态；约 1500 部实际带封面的书库流畅度、书架位置及前台响应。记录真实异常的发生步骤、截屏和准确源码 SHA，避免上传真实凭据/漫画内容。
+
+**仍 OPEN：** G1 Windows/实体 Android 性能和 UX、G2 两个独立合法第三方来源实际章节/图片可读、G3 完整真实用户旧资料只读盘点/备份/差异/异常回滚、G4 用户明确发布批准。当前任何 QA artifact 都不是正式安装包，不可覆盖已使用的正式 v0.5.0。

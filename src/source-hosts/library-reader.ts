@@ -98,7 +98,13 @@ export class HostedLibraryReader {
                 throw new SourceHostError('SOURCE_HOST_STALE')
             this.guard(session); session.chapters.set(comic, prepared.chapters)
         }
-        this.database.setAppState(BOOKS_KEY, [book, ...this.storedBooks().filter(row => row.comicId !== comic)].slice(0, 500))
+        const saved = this.storedBooks()
+        if (saved.length >= 500 && !saved.some(row => row.comicId === comic))
+            throw new SourceHostError('SOURCE_HOST_LIBRARY_FULL')
+        // A Reader selection must never evict someone else's online bookmark.
+        // The same capacity rule applies to explicit bookmark-only saves.
+        this.guard(session)
+        this.database.setAppState(BOOKS_KEY, [book, ...saved.filter(row => row.comicId !== comic)])
         return { sessionId: session.id, comicId: comic, title: book.title }
     }
     private remember(session: Session, mangas: HostManga[]) {

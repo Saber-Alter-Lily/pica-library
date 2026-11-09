@@ -76,6 +76,13 @@ describe('actual local host-inspection HTTP boundary — synthetic CI listener o
         await command({ action: 'sources', sessionId, offset: 0 })
         await command({ action: 'bind-source', sessionId, sourceId: hostBook.sourceId, consent: true })
         const found = await command({ action: 'search', sessionId, query: 'synthetic', page: 1 }), comicId = found.value.books[0].comicId
+        const beforeBookmark = f.wire.mock.calls.length
+        const bookmark = await command({ action: 'bookmark', sessionId, comicId, consent: true })
+        expect(bookmark).toMatchObject({ status: 200, value: { saved: true } })
+        expect((await command({ action: 'saved', sessionId })).value).toMatchObject({
+            total: 1, books: [{ comicId, sourceId: hostBook.sourceId }]
+        })
+        expect(f.wire).toHaveBeenCalledTimes(beforeBookmark)
         const chapters = await command({ action: 'download-chapters', sessionId, comicId }), episodeId = chapters.value.chapters[0].id
         const save = { action: 'download-start', sessionId, comicId, episodeId, consent: true, acceptLocalCopy: true }
         const before = f.wire.mock.calls.length
@@ -89,7 +96,11 @@ describe('actual local host-inspection HTTP boundary — synthetic CI listener o
             saved = snapshot.value.jobs.find((job: { id: string }) => job.id === started.value.id)
             expect(saved?.status).toBe('COMPLETED')
         })
-        await command({ action: 'close', sessionId })
+        // Revoke the whole external Host, not just close the temporary Reader
+        // panel. The offline copy must remain readable without network access.
+        f.connections.command({ action: 'set-enabled', id, expectedRevision: 1,
+            enabled: false, consent: true })
+        expect((await command({ action: 'downloads', sessionId })).status).toBe(409)
         const calls = f.wire.mock.calls.length
         const chapterPath = '/api/v1/reader/comics/' + encodeURIComponent(saved!.localComicId) + '/chapters/' + encodeURIComponent(saved!.localEpisodeId)
         const local = await fetch(f.server.url + chapterPath, { headers: f.headers }).then(response => response.json())

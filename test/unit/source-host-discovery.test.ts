@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SourceHostConnections } from '../../src/source-hosts/connections'
 import { HostedLibraryReader } from '../../src/source-hosts/library-reader'
@@ -155,6 +156,28 @@ describe('explicit user-host single-source search and existing Reader, inert HTT
         const resumed = await f.command({ action: 'resume-saved', sessionId: next.sessionId, comicId })
         expect(resumed).toMatchObject({ comicId, selectedSource: { id: SOURCE } })
         expect(f.calls.filter(row => row.operation === 'PicaHostSourceSearch')).toHaveLength(1)
+    })
+    it('never silently evicts an existing bookmark at the 500-work limit when selecting another source', async () => {
+        const f = fixture(), first = await f.start(), selected = await f.choose(first.sessionId)
+        const template = (f.state.get('host-reader-book-references-v1') as any[])[0]
+        const existing = [template, ...Array.from({ length: 499 }, (_, index) => {
+            const principal = createHash('sha256').update('inert-principal-' + index).digest('hex')
+            const comicId = 'hosted:' + template.connectionId + ':' +
+                createHash('sha256').update(JSON.stringify([
+                    principal, template.sourceId, template.urlDigest
+                ])).digest('hex')
+            return { ...template, principal, comicId, title: 'Preserved bookmark ' + index }
+        })]
+        f.state.set('host-reader-book-references-v1', existing)
+        const other = await f.start()
+        await f.bind(other.sessionId, OTHER)
+        const page = await f.search(other.sessionId)
+        const untouched = JSON.stringify(f.state.get('host-reader-book-references-v1'))
+        await expect(f.command({ action: 'select', sessionId: other.sessionId,
+            comicId: page.books[0].comicId })).rejects.toThrow('SOURCE_HOST_LIBRARY_FULL')
+        expect(JSON.stringify(f.state.get('host-reader-book-references-v1'))).toBe(untouched)
+        expect((await f.command({ action: 'saved', sessionId: first.sessionId })).total).toBe(1)
+        expect(selected.comicId).toBe(template.comicId)
     })
     it('saved works are locally visible after authorization and resume source page 2 without repeating a comic search', async () => {
         const f = fixture(), first = await f.start(), ids = await f.choose(first.sessionId)

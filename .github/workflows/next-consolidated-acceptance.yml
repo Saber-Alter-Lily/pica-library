@@ -39,9 +39,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 after official distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
       - run: pnpm install --frozen-lockfile
       - run: pnpm type:check && pnpm web:check && pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/linux-unit.json && pnpm build
       - run: gradle -p source-jvm test bundle dependencyNotices --no-daemon
@@ -303,9 +308,14 @@ jobs:
         with:
           packages: platform-tools
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 after official distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
       - name: Tests, lint and shrinker compatibility before secrets
         working-directory: mobile/android-alpha2
         run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon

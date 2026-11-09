@@ -57,9 +57,14 @@ jobs:
         with:
           packages: platform-tools
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 after official distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
       - name: Test, lint and build Android
         working-directory: mobile/android-alpha2
         timeout-minutes: 28

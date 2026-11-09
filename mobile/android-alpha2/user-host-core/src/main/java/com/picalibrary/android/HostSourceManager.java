@@ -61,7 +61,7 @@ final class HostSourceManager {
     }
     private SearchResult discover(String type,String query,int page)throws Exception {
         Session session=requireSession();String selected;synchronized(this){session.check();selected=session.sourceId;}if(selected==null)throw error("SOURCE_HOST_SOURCE_SELECTION_REQUIRED");if(page<1||page>200)throw error("INVALID_SOURCE_HOST");
-        HostProtocol.Search result=HostProtocol.search(rpc(session,"search",new JSONObject().put("input",new JSONObject().put("source",selected).put("type",type).put("page",page).put("query",query)),selected);
+        HostProtocol.Search result=HostProtocol.search(rpc(session,"search",new JSONObject().put("input",new JSONObject().put("source",selected).put("type",type).put("page",page).put("query",query))),selected);
         return session.commit(()->{List<Book> books=new ArrayList<>();for(HostProtocol.Manga manga:result.rows){Book book=new Book(session,manga);while(session.books.size()>=128){String removed=session.books.keySet().iterator().next();session.books.remove(removed);session.selected.remove(removed);session.chapters.remove(removed);session.prepared.keySet().removeIf(key->key.startsWith(removed+"\n"));}session.books.put(book.id,book);books.add(book);}return new SearchResult(books,result.next);});
     }
     static final class SearchResult {final List<Book> books;final boolean next;SearchResult(List<Book> books,boolean next){this.books=Collections.unmodifiableList(books);this.next=next;}}

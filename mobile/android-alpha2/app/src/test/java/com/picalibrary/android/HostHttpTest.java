@@ -30,6 +30,21 @@ public class HostHttpTest {
         HostSourceManager.Book book=fixture.selected();HostReaderSource source=new HostReaderSource(fixture.manager);BridgeClient.ChapterData chapter=source.chapter(book.id,source.chapters(book.id).get(0).id);fixture.imageType="image/jpeg";
         HttpURLConnection image=source.image(chapter.pages.get(0).url);try{assertThrows(IOException.class,image::getInputStream);}finally{image.disconnect();}fixture.imageType="text/html";image=source.image(chapter.pages.get(0).url);try{assertThrows(IOException.class,image::getResponseCode);}finally{image.disconnect();}
     }
+    @Test public void realSuwayomiJpgAliasIsCanonicalizedButStillRequiresJpegMagic()throws Exception {
+        HostSourceManager.Book book=fixture.selected();HostReaderSource source=new HostReaderSource(fixture.manager);
+        BridgeClient.ChapterData chapter=source.chapter(book.id,source.chapters(book.id).get(0).id);
+        String imageUrl=chapter.pages.get(0).url;
+        fixture.imageType="image/jpg; charset=binary";
+        fixture.image=new byte[]{(byte)255,(byte)216,(byte)255,(byte)224,0,1,2,3};
+        HttpURLConnection valid=source.image(imageUrl);
+        try(InputStream bytes=valid.getInputStream()){
+            assertEquals("image/jpeg",valid.getContentType());
+            assertEquals(255,bytes.read());
+        }finally{valid.disconnect();}
+        fixture.image=HostTestFixture.PNG;
+        HttpURLConnection invalid=source.image(imageUrl);
+        try{assertThrows(IOException.class,invalid::getInputStream);}finally{invalid.disconnect();}
+    }
     @Test public void boundedResponseReaderRejectsActualBytesNotJustDeclaredLength()throws Exception {
         assertEquals(10,HostHttp.read(new ByteArrayInputStream(new byte[10]),10).length);assertThrows(IOException.class,()->HostHttp.read(new ByteArrayInputStream(new byte[11]),10));
     }

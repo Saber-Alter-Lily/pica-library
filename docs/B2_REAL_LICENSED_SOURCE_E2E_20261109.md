@@ -54,3 +54,10 @@
 - [#42638248893](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42638248893) **terminal FAIL**，测试点击原 Clean Reader 的 Next 后等待第二页可见计数，报 `visible=[]`。这不是 Android 真源链路 PASS；没有进行明确章节离线保存/Hash 验证。
 - 在 Actions 失败工件 [#13685392969](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42638248893/artifacts/13685392969) 的 `latest.xml`，实际仍有原 Clean Reader 前台 `ViewPager2`、页面 `RecyclerView` 和 `ImageView`，却没有页码或错误控件；`ReaderScreenActivity.scheduleHide()` 的 2.8 秒隐藏机制与这一事实一致。这只支持**原测试忘记唤出栏**的解释，不足以证明真实图像已解码。保留此前 `#42633334908` 真图按钮错误历史，不篡改。
 - [`7c129b7`](https://github.com/Saber-Alter-Lily/pica-library/commit/7c129b7039c886e90c4a7c301c6b1d490583e515) 只把 B2 中原始 `wait(('2 / 6'))` 换成仓库既有、之前本地 Reader 已用的 `wait_page_counter()`；没有新 Reader、业务豁免或页面源伪造。真实新运行 [#42659776053](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42659776053) 当时仍未终态。下次以其实际 job 日志为唯一依据：真实来源两页 → 原书库保存 → 停止 Host → 离线 SHA256 全绿后才准开始第二个独立来源的 Android 实测。
+
+## 2026-11-09 Android35 第二次重试的真实结果：在线章节与离线 Hash 已通过，UI 搜索待核验
+
+- 第一次 [#42659776053](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42659776053) 在系统 Quickstep ANR 阶段失败，未进入作品；**同 SHA 的 attempt 2** 已结束于更下游的 `b2-public-licensed-offline-after-host-stop`，本运行整体仍 **FAIL**，不可标整条路径 PASS。
+- attempt 2 的操作日志：原 Clean Android + 独立签名 Host 通过官方 Suwayomi + 公开 Pepper&Carrot 扩展，在原 Reader 逐页阅读 1/6、2/6（明确 PASS）；选择 `Episode 1: The Potion of Flight` 完整章节，点击 `SAVE THIS CHAPTER`，实际原库成功入库（明确 PASS）；停止 Host 及其进程后重新启动原 Clean Home，通过本地 `LocalComicStore` 再查询同一作品 ID、完整页面并逐页 SHA256 对比，一致才继续。最终仅因约 `1503 本` 虚拟化列表未展示目标标题，在原 `tap("Pepper&Carrot")` 中超时，没有完成最后原 Reader 离线视觉闭环。
+- [`37c6ae0`](https://github.com/Saber-Alter-Lily/pica-library/commit/37c6ae0d83eba728f66c3f355953f9a439b5c3b2) 只使用**原版** Android Home 的搜索框和 Search 输入动作定位保存作品，随后用已有 Reader 及 auto-hide-aware 页码进行真实离线重开。没有新增测试框架/存储/界面模拟。新 [Android35 #42665563088](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42665563088) 正在单独验此路径；确认完整 job terminal SUCCESS 之前不将 G2/Android 记为 PASS。
+- 下一个宏目标：第二个独立公开来源 `xkcd` Android 原 signed Host，要求实际访问至少两章的两张图、明确保存/撤销/离线 Hash，而不是只做 JAR 注册。来源目标 Pica/JM/E-H 的实际授权站点测试、实体手机、真实旧用户资料、正式发布仍全部 OPEN。

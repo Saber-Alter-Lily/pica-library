@@ -39,7 +39,7 @@ final class HostHttp {
         catch(Exception error){slots.release();throw error;}
         return new HttpURLConnection(delegate.getURL()) {
             private boolean checked,closed;private String type;
-            private void validate()throws IOException {try{if(checked)return;status(delegate);String header=delegate.getContentType();type=header==null?"":header.split(";",2)[0].trim().toLowerCase(Locale.ROOT);if(!Arrays.asList("image/png","image/jpeg","image/gif","image/webp").contains(type))throw failure("SOURCE_HOST_PROTOCOL");checked=true;}catch(Exception error){throw safe(error);}}
+            private void validate()throws IOException {try{if(checked)return;status(delegate);String header=delegate.getContentType();type=header==null?"":header.split(";",2)[0].trim().toLowerCase(Locale.ROOT);if("image/jpg".equals(type))type="image/jpeg";if(!Arrays.asList("image/png","image/jpeg","image/gif","image/webp").contains(type))throw failure("SOURCE_HOST_PROTOCOL");checked=true;}catch(Exception error){throw safe(error);}}
             public synchronized void disconnect(){try{delegate.disconnect();}finally{if(!closed){closed=true;slots.release();}}}public boolean usingProxy(){return delegate.usingProxy();}public void connect()throws IOException {getResponseCode();}
             public int getResponseCode()throws IOException {validate();return 200;}public String getContentType(){try{validate();return type;}catch(IOException error){return "";}}
             public InputStream getInputStream()throws IOException {

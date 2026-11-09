@@ -310,7 +310,7 @@ async function optionalUserHostRoute(
             : code === 'SOURCE_HOST_SCOPE_REQUIRED' ? 403
             : ['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_STALE',
                 'SOURCE_HOST_DISABLED', 'SOURCE_HOST_BUSY',
-                'SOURCE_HOST_DUPLICATE'].includes(code) ? 409
+                'SOURCE_HOST_DUPLICATE', 'SOURCE_HOST_LIBRARY_FULL'].includes(code) ? 409
             : code === 'SOURCE_HOST_UNSUPPORTED' ? 422
             : code === 'SOURCE_HOST_TIMEOUT' ? 504
             : code === 'SOURCE_HOST_STORAGE' ? 503

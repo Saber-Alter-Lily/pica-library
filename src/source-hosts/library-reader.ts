@@ -87,6 +87,11 @@ export class HostedLibraryReader {
     /** Shared original Reader-selection path for search results and saved works. */
     private async selectBook(session: Session, comic: string, signal?: AbortSignal) {
         const book = this.findBook(session, comic)
+        const saved = this.storedBooks()
+        // Fail promptly before any remote metadata/cache mutation when the
+        // user has no remaining saved-work capacity.
+        if (saved.length >= 500 && !saved.some(row => row.comicId === comic))
+            throw new SourceHostError('SOURCE_HOST_LIBRARY_FULL')
         await this.ensureComic(session, comic, signal); this.guard(session)
         if (session.scope === 'source-search-read') {
             const prepared = hostPreparedManga(await this.run(session, abort =>
@@ -98,9 +103,6 @@ export class HostedLibraryReader {
                 throw new SourceHostError('SOURCE_HOST_STALE')
             this.guard(session); session.chapters.set(comic, prepared.chapters)
         }
-        const saved = this.storedBooks()
-        if (saved.length >= 500 && !saved.some(row => row.comicId === comic))
-            throw new SourceHostError('SOURCE_HOST_LIBRARY_FULL')
         // A Reader selection must never evict someone else's online bookmark.
         // The same capacity rule applies to explicit bookmark-only saves.
         this.guard(session)

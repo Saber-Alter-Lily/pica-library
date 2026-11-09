@@ -50,10 +50,24 @@ export async function cancelHostedLocalDownload(expectedSessionId, jobId, signal
     document.dispatchEvent(new CustomEvent('pica-hosted-downloads-changed'))
     return value
 }
+/** Explicit saved-work action; only a current authorized Host can locate a source. */
+async function selectRememberedComic(comicId, expectedSessionId) {
+    const locate = scope === 'source-search-read' && !selectedSource
+    const selected = await command({ action: locate ? 'resume-saved' : 'select',
+        sessionId: expectedSessionId, comicId })
+    if (locate) {
+        if (!selected?.selectedSource?.id ||
+            !/^-?[0-9]+$/.test(selected.selectedSource.id)) throw Error('SOURCE_HOST_PROTOCOL')
+        selectedSource = selected.selectedSource
+        hasNext = false; searchPage = 0
+        document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed'))
+    }
+    return selected
+}
 export async function resumeHostedLibraryComic(comicId, expectedSessionId) {
     if (currentHostedLibrarySession()?.sessionId !== expectedSessionId) throw Error('SOURCE_HOST_CANCELLED')
     const success = await working(async () => {
-        const selected = await command({ action: 'select', sessionId: expectedSessionId, comicId })
+        const selected = await selectRememberedComic(comicId, expectedSessionId)
         document.dispatchEvent(new CustomEvent('pica-open-hosted-reader', { detail: { ...selected, csrfToken: csrf } }))
         dialog.close()
     })
@@ -89,7 +103,7 @@ function makeDialog() {
     const books = document.createElement('div'); books.id = 'host-library-books'; dialog.append(books)
     const savedPanel = document.createElement('section'); savedPanel.id = 'host-library-saved-panel'; savedPanel.className = 'panel'; savedPanel.hidden = true
     savedPanel.append(node('h3', t('已选在线作品', 'Previously selected online works', '選択済みのオンライン作品')))
-    savedPanel.append(node('p', t('只列出此 Host 和本次授权账号下已选过的作品索引。重新授权原来源后可以直接阅读，不会自动联网或下载。', 'Only previously selected titles for this Host and authorized account appear here. Reconnect and select the original source to resume; nothing connects or downloads automatically.', 'この Host と認証済みアカウントで選択済みの作品のみ表示。再接続後に元のソースを選んで再開できます。自動接続やダウンロードはしません。')))
+    savedPanel.append(node('p', t('只显示当前已授权 Host 和账号下的已选作品。点击后从前 200 个已安装来源中核对原来源，不自动搜索、安装或下载。', 'Only previously selected works for this authorized Host and account. Clicking one locates its exact source among the first 200 installed sources; no automatic search, extension install or download.', '認証済みホストとアカウントの選択済み作品のみ表示。クリックすると導入済みソースの先頭200件から元のソースを確認します。自動検索・導入・保存はしません。')))
     const savedLabel = document.createElement('label'), savedFilter = document.createElement('input')
     savedFilter.id = 'host-library-saved-filter'; savedFilter.type = 'search'; savedFilter.maxLength = 256; savedFilter.autocomplete = 'off'
     savedLabel.append(node('span', t('筛选作品名或来源 ID', 'Filter by title or source ID', 'タイトル・ソース ID で絞り込む')), savedFilter)
@@ -114,7 +128,9 @@ function controls() {
     $('source').disabled = $('bind-source').disabled = Boolean(active) || !session || Boolean(selectedSource) || !$('source').value
     $('query').disabled = $('search').disabled = Boolean(active) || !session || !selectedSource
     for (const item of $('books').querySelectorAll('button')) item.disabled = Boolean(active) || !session
-    const savedReady = Boolean(session) && (!discovery || Boolean(selectedSource))
+    // Index visibility follows the explicitly authorized Host principal;
+    // opening actual pages still requires one verified installed source.
+    const savedReady = Boolean(session)
     $('saved-panel').hidden = !savedReady
     $('saved-filter').disabled = Boolean(active) || !savedReady
     for (const item of $('saved-list').querySelectorAll('button')) item.disabled = Boolean(active) || !savedReady
@@ -218,7 +234,11 @@ async function startSession() {
         clearTimeout(expiryTimer)
         if (Number.isSafeInteger(value.expiresAt)) expiryTimer = setTimeout(() => { generation++; endOnExit(); $('books').replaceChildren(); controls(); $('state').textContent = t('本次阅读会话已到期；请重新明确授权。', 'This reading session expired. Authorize a new session explicitly.', '読書セッションの有効期限が切れました。改めて明示的に許可してください。') }, Math.max(0, value.expiresAt - Date.now()))
         document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed'))
-        if (discovery) { renderSources(await command({ action: 'sources', sessionId: session.sessionId, offset: 0 })); return }
+        if (discovery) {
+            renderSources(await command({ action: 'sources', sessionId: session.sessionId, offset: 0 }))
+            renderSavedWorks(await command({ action: 'saved', sessionId: session.sessionId }))
+            return
+        }
         render(await command({ action: 'list', sessionId: session.sessionId, offset: 0 }))
         renderHistory(value.history)
         renderSavedWorks(await command({ action: 'saved', sessionId: session.sessionId }))
@@ -247,6 +267,12 @@ function makeDownloadPanel() {
 }
 async function chooseDownload(book) {
     await working(async () => {
+        // The same explicit source locator serves saved-work Reader and
+        // chapter-import actions; no duplicate manga search is performed.
+        if (scope === 'source-search-read' && !selectedSource) {
+            await selectRememberedComic(book.comicId, session.sessionId)
+            renderSavedWorks(await command({ action: 'saved', sessionId: session.sessionId }))
+        }
         const value = await command({ action: 'download-chapters', sessionId: session.sessionId, comicId: book.comicId })
         if (!Array.isArray(value.chapters) || value.chapters.length > 2000 || value.chapters.some(chapter => !/^host-chapter:[a-f0-9]{64}$/.test(chapter.id || '') || typeof chapter.title !== 'string')) throw Error('SOURCE_HOST_PROTOCOL')
         downloadGeneration++; downloadPending = false; clearTimeout(downloadPoll); downloadTarget = { comicId: book.comicId, title: book.title }

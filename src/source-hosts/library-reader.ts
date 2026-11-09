@@ -241,14 +241,56 @@ export class HostedLibraryReader {
         return this.withSignal(session, signal, async () => {
         if (input.action === 'saved') {
             // Reuse the already-owned selected-work index; this command is
-            // entirely local. The current Host principal and bound source are
-            // authoritative, never the title, an old token or a remote URL.
+            // entirely local. Current Host/principal remain authoritative;
+            // a separately authorized source browser can list saved refs
+            // BEFORE selecting the matching source. Reading still requires it.
             const books = this.storedBooks()
                 .filter(book => book.connectionId === session.host.id &&
-                    book.principal === session.principal && this.scopeAllows(session, book))
+                    book.principal === session.principal &&
+                    (this.scopeAllows(session, book) ||
+                        session.scope === 'source-search-read' && session.sourceId === null))
                 .map(book => ({ comicId: book.comicId, title: book.title, sourceId: book.sourceId }))
             this.guard(session)
             return { books, total: books.length }
+        }
+        if (input.action === 'resume-saved') {
+            if (session.scope !== 'source-search-read' || session.sourceId !== null)
+                throw new SourceHostError('SOURCE_HOST_SCOPE_REQUIRED')
+            const comic = comicId(String(input.comicId))
+            const book = this.storedBooks().find(row =>
+                row.comicId === comic && row.connectionId === session.host.id &&
+                row.principal === session.principal)
+            if (!book) throw new SourceHostError('SOURCE_HOST_STALE')
+            // Reuse Suwayomi's pinned, existing 25-row source pagination.
+            // This scans up to 200 installed sources ONLY on a bookmark click,
+            // never installs extensions, searches a manga or guesses aliases.
+            let located: HostedSource | undefined
+            for (let offset = 0; offset < 200; offset += 25) {
+                const page = suwayomiSourcePage(await this.run(session, abort =>
+                    sourceHostGraphql(session.connection, SUWAYOMI_QUERIES.sources,
+                        { first: 25, offset }, abort, this.fetcher), signal), offset)
+                located = page.sources.find(source => source.id === book.sourceId)
+                if (located || !page.hasNext) break
+            }
+            if (!located) throw new SourceHostError('SOURCE_HOST_SOURCE_SELECTION_REQUIRED')
+            this.guard(session)
+            session.sourceId = located.id
+            session.sourceChoices.clear()
+            try {
+                // Original select and Reader preparation recheck remote manga
+                // ID, exact source ID and page URL ownership before reading.
+                const selected = await this.command({
+                    action: 'select', sessionId: session.id, comicId: comic
+                }, signal)
+                this.guard(session)
+                return { ...(selected as { sessionId: string; comicId: string; title: string }), selectedSource: located }
+            } catch (error) {
+                if (this.sessions.has(session.id)) {
+                    session.sourceId = null
+                    session.chapters.clear()
+                }
+                throw error
+            }
         }
         if (['sources', 'bind-source', 'search'].includes(String(input.action))) {
             if (session.scope !== 'source-search-read') throw new SourceHostError('SOURCE_HOST_SCOPE_REQUIRED')

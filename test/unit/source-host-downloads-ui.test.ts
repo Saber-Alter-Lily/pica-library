@@ -231,6 +231,32 @@ it.each([0, 1, 2])(
         )
     }
 )
+it('saved Host bookmark can enter the existing chapter picker without another search or implicit download', async () => {
+    const f = fixture(1)
+    expect(f.get('saved-panel').hidden).toBe(true)
+    await f.start()
+    await vi.waitFor(() => expect(f.get('saved-save-' + COMIC)).not.toBe(null))
+    expect(f.get('saved-panel').hidden).toBe(false)
+    expect(f.commands('search')).toEqual([])
+    const savedIndexReads = f.commands('saved').length
+    await f.get('saved-save-' + COMIC).click()
+    await vi.waitFor(() => expect(f.get('download-panel').hidden).toBe(false))
+    expect(f.get('download-title').textContent).toBe('<img inert title>')
+    expect(f.get('download-chapter').value).toBe(EPISODE)
+    expect(f.get('download-consent').checked).toBe(false)
+    expect(f.commands('download-chapters')).toEqual([
+        { action: 'download-chapters', sessionId: SESSION, comicId: COMIC }
+    ])
+    expect(f.commands('search')).toEqual([])
+    expect(f.commands('saved')).toHaveLength(savedIndexReads)
+    f.get('download-form').onsubmit?.({ preventDefault() {} })
+    expect(f.commands('download-start')).toEqual([])
+    f.save()
+    await vi.waitFor(() => expect(f.commands('download-start')).toHaveLength(1))
+    expect(f.commands('download-start')[0]).toMatchObject({
+        comicId: COMIC, episodeId: EPISODE, consent: true, acceptLocalCopy: true
+    })
+})
 it('explicit submit uses only selected identities/consent, protects duplicate clicks and polls only the local job view', async () => {
     const f = fixture()
     await f.start()

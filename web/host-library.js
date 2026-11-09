@@ -161,7 +161,13 @@ async function working(action) {
     const timer = setTimeout(() => controller.abort(), 19000)
     $('state').textContent = t('正在处理本次操作…', 'Processing this action…', '今回の操作を処理中…')
     try { await action(); if (ticket === generation) $('state').textContent = t('仅处理你的自选宿主；搜索和章节读取可能更新其元数据/缓存。浏览不会自动保存本地内容，只有你单独确认的章节才会保存。', 'Only your chosen host is used; search/chapter requests may update its metadata/cache. Browsing never saves content locally; only separately confirmed chapters are saved.', '自分で選んだホストのみ使用し、検索・章取得でメタデータ・キャッシュが更新される場合があります。閲覧だけでローカル保存はせず、別途確認した章のみ保存します。'); return true }
-    catch (error) { if (ticket === generation) { if (['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_DISABLED'].includes(error.message)) { session = null; clearTimeout(expiryTimer); document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed')) } $('state').textContent = t('无法继续。请检查宿主、权限或重新建立会话。', 'Cannot continue. Check the host/permissions or start a new session.', '続行できません。ホスト・権限を確認するか、セッションを作り直してください。') + (/^SOURCE_HOST_[A-Z_]+$/.test(error.message || '') ? ` (${error.message})` : '') }; return false }
+    catch (error) { if (ticket === generation) { if (['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_DISABLED'].includes(error.message)) { session = null; clearTimeout(expiryTimer); document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed')) }
+        $('state').textContent = error.message === 'SOURCE_HOST_LIBRARY_FULL'
+            ? t('在线书签已达到 500 部上限；请先移除不需要的书签。本地章节不会被删除。',
+                'The 500 online-bookmark limit is reached. Remove an unwanted bookmark first; local chapters are not deleted.',
+                'オンラインブックマークは500件の上限に達しました。不要なものを削除してください。保存済み章は削除されません。')
+            : t('无法继续。请检查宿主、权限或重新建立会话。', 'Cannot continue. Check the host/permissions or start a new session.', '続行できません。ホスト・権限を確認するか、セッションを作り直してください。') + (/^SOURCE_HOST_[A-Z_]+$/.test(error.message || '') ? ` (${error.message})` : '')
+    }; return false }
     finally { clearTimeout(timer); $('password').value = ''; $('username').value = ''; if (active === controller) active = null; controls() }
 }
 function render(value) {

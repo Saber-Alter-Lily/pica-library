@@ -100,7 +100,20 @@ jobs:
           New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
           $name="Pica-Library-v$env:STABLE_VERSION-windows-x64.zip"
           $path=Join-Path 'artifacts/release-base' $name
-          Invoke-WebRequest -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v$env:STABLE_VERSION/$name" -OutFile $path
+          $ErrorActionPreference = 'Stop'
+          $uri = "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v$env:STABLE_VERSION/$name"
+          # A GitHub Release CDN 504 is not a source/build failure. Retry only
+          # this exact stable asset; never substitute another package.
+          for ($attempt=1; $attempt -le 3; $attempt++) {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+            try {
+              Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $path -ErrorAction Stop
+              break
+            } catch {
+              if ($attempt -eq 3) { throw }
+              Start-Sleep -Seconds (2 * $attempt)
+            }
+          }
           if ((Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant() -ne $env:BASE_WINDOWS_SHA256) { throw 'Released baseline checksum mismatch' }
       - name: Build and exercise isolated current-baseline RC
         shell: pwsh
@@ -158,9 +171,14 @@ jobs:
         with:
           packages: platform-tools
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Recover official checksum-pinned Gradle 8.9 if distribution provisioning fails
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
       - name: Test and lint before loading signing material
         working-directory: mobile/android-alpha2
         run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon

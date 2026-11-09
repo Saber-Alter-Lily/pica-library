@@ -119,17 +119,37 @@ jobs:
         run: bash scripts/ci/install-gradle-8.9-fallback.sh
 
       - name: Verify public v0.4.0 Android production identity
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           old_apk="$RUNNER_TEMP/Pica-Library-Android-v42.apk"
           cert_file="$RUNNER_TEMP/Pica-Library-Android-Preview.cert-sha256"
-          curl --fail --location --retry 3 --retry-delay 3 --max-time 120 \
-            'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-Android-v42.apk' \
-            --output "$old_apk"
-          curl --fail --location --retry 3 --retry-delay 3 --max-time 120 \
-            'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-Android-Preview.cert-sha256' \
-            --output "$cert_file"
-          printf '%s  %s\n' '718dfc81484627045a3d5209a79e705f87b6a3ae9be737721299956fc4a77ed2' "$old_apk" | sha256sum -c -
+          # Both routes address the SAME GitHub release asset ID. A verified
+          # byte digest is mandatory; never accept API metadata or a CDN error
+          # body in place of the pinned historical APK/certificate.
+          fetch_pinned_asset() {
+            local name="$1" asset_id="$2" digest="$3" output="$4" route
+            for route in browser api; do
+              rm -f -- "$output"
+              if [ "$route" = browser ]; then
+                curl --fail --location --retry 2 --retry-delay 3 --max-time 120 \
+                  "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/$name" --output "$output" || continue
+              else
+                curl --fail --location --retry 2 --retry-delay 3 --max-time 120 \
+                  -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/octet-stream' \
+                  "https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases/assets/$asset_id" --output "$output" || continue
+              fi
+              if printf '%s  %s\n' "$digest" "$output" | sha256sum --check -; then return 0; fi
+            done
+            rm -f -- "$output"
+            echo "Pinned public v0.4.0 release asset unavailable or invalid: $name" >&2
+            return 1
+          }
+          fetch_pinned_asset 'Pica-Library-Android-v42.apk' '565257877' \
+            '718dfc81484627045a3d5209a79e705f87b6a3ae9be737721299956fc4a77ed2' "$old_apk"
+          fetch_pinned_asset 'Pica-Library-Android-Preview.cert-sha256' '565257875' \
+            '9935e8ef518a80768a8f1830c5c55880fcf340b753bb3b7b7ca42d46bebda963' "$cert_file"
 
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$old_apk" > "$RUNNER_TEMP/v040-badging.txt"
           grep -q "package: name='com.picalibrary.android'" "$RUNNER_TEMP/v040-badging.txt"

@@ -2024,11 +2024,20 @@ def licensed_public_android_source_flow():
         for image in reread["pages"]]
     if after_hashes != original_hashes:
         raise AssertionError("Offline Reader byte hashes differ after Host stop")
-    tap("Pepper&Carrot", seconds=45)
+    # The original Home uses a virtualized RecyclerView. On the 1,500+
+    # collection, the imported entry can exist in LocalComicStore and pass
+    # every byte hash yet be outside the viewport. Exercise the actual
+    # search field + IME Search action rather than assuming it is visible.
+    search = wait(("",), seconds=25, only_class="EditText")
+    adb("shell", "input", "tap", str(search[0]), str(search[1]))
+    adb("shell", "input", "text", "Pepper")
+    adb("shell", "input", "keyevent", "KEYCODE_ENTER")
+    wait("Pepper&Carrot", seconds=55)
+    tap("Pepper&Carrot", seconds=30)
     tap(("阅读", "Read", "読む"), only_class="Button", seconds=40)
     dismiss_immersive_help()
-    wait(("1 / " + str(original_total),
-          "1/" + str(original_total)), seconds=45)
+    wait_page_counter(("1 / " + str(original_total),
+                       "1/" + str(original_total)), seconds=45)
     record("Host stopped: original four-tab Clean app opens preserved real-source offline chapter")
     (ROOT / "b2-public-license-android.json").write_text(json.dumps({
         "result": "EMULATOR_PUBLIC_LICENSED_SOURCE_PASS",

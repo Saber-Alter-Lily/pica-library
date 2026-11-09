@@ -1912,7 +1912,9 @@ def licensed_public_android_source_flow():
         total = int(numbers.group(1))
         advance_reader_next()
         try:
-            wait(("2 / " + str(total), "2/" + str(total)), seconds=50)
+            # Reuse the proven original Reader helper: chrome auto-hides after
+            # page turns. A hidden counter is not an image-transfer failure.
+            wait_page_counter(("2 / " + str(total), "2/" + str(total)), seconds=50)
         except AssertionError:
             # Inspect the original Reader's existing failure-details dialog,
             # but emit only classified error codes: never a comic image, URL,

@@ -10,6 +10,7 @@ afterEach(() => { for (const close of cleanup.splice(0)) close() })
 function fixture(language = 1) {
     const dom = inertReadingDom(), exports: Record<string, any> = {}, timers = new Map<number, () => void>()
     let timer = 0, stalled = false, release = () => {}
+    let savedByUser = false
     const opens: unknown[] = [], host = { id: HOST, revision: 1, enabled: true, label: 'My <host>', endpoint: 'https://user-host.invalid/', authMode: 'none' }
     const fetcher = vi.fn(async (url: string, init: any = {}) => {
         expect(url).toMatch(/^\/api\/v1\/desktop\//)
@@ -23,6 +24,7 @@ function fixture(language = 1) {
             input.action === 'search' ? { sourceId: SOURCE, page: input.page, query: input.query, hasNext: input.page < 2, books: [{ comicId: COMIC, title: '<script>inert title</script>', sourceId: SOURCE }] } :
             input.action === 'select' ? { sessionId: SESSION, comicId: input.comicId, title: 'Selected' } :
             input.action === 'resume-saved' ? { sessionId: SESSION, comicId: input.comicId, title: 'Selected', selectedSource: { id: SOURCE, name: 'Chosen', language: 'zh' } } :
+            input.action === 'bookmark' ? (savedByUser = true, { saved: true, alreadySaved: false }) :
             input.action === 'saved' ? { books: [{ comicId: COMIC, title: '<script>saved title</script>', sourceId: SOURCE }], total: 1 } :
             input.action === 'list' ? { books: [], offset: 0, hasNext: false } : input.action === 'close' ? { closed: true } : null
         if (!value) throw Error('Unexpected local command')
@@ -111,6 +113,21 @@ it('resumes an already-selected source without manual source binding or another 
     ]))
     expect(f.commands('search')).toEqual([])
     expect(f.commands('bind-source')).toEqual([])
+})
+it.each([0, 1, 2])('explicit source result bookmark keeps original Reader closed and does not download (%s)', async language => {
+    const f = fixture(language); await f.start(); await f.bind(); f.search('bookmarks')
+    await vi.waitFor(() => expect(f.get('bookmark-' + COMIC)).not.toBe(null))
+    const priorNetwork = f.commands('search').length
+    await f.get('bookmark-' + COMIC).click()
+    await vi.waitFor(() => expect(f.commands('bookmark')).toHaveLength(1))
+    expect(f.commands('bookmark')).toEqual([{ action: 'bookmark', sessionId: SESSION,
+        comicId: COMIC, consent: true }])
+    expect(f.commands('search')).toHaveLength(priorNetwork)
+    expect(f.commands('select')).toEqual([])
+    expect(f.commands('download-start')).toEqual([])
+    expect(f.opens).toEqual([])
+    expect(f.get('bookmark-' + COMIC).hidden).toBe(true)
+    expect(f.get('books').textContent).not.toContain('undefined')
 })
 it('busy search prevents repeat submits/read clicks; ending the session fences an ignored-abort late result', async () => {
     const f = fixture(); await f.start(); await f.bind(); f.stall(); f.search('pending'); f.search('duplicate')

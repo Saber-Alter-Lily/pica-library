@@ -250,13 +250,33 @@ export class HostedLibraryReader {
             })
         }
         const allowed = input.action === 'saved' ? ['action', 'sessionId'] :
-            input.action === 'remove-saved' ? ['action', 'sessionId', 'comicId', 'consent'] :
+            input.action === 'remove-saved' || input.action === 'bookmark' ?
+                ['action', 'sessionId', 'comicId', 'consent'] :
             input.action === 'list' || input.action === 'sources' ? ['action', 'sessionId', 'offset'] :
             input.action === 'bind-source' ? ['action', 'sessionId', 'sourceId', 'consent'] : input.action === 'search' ? ['action', 'sessionId', 'query', 'page'] : ['action', 'sessionId', 'comicId']
         fields(input, allowed)
         const session = this.session(String(input.sessionId))
         if (input.action === 'close') { this.end(session.id); return { closed: true } }
         return this.withSignal(session, signal, async () => {
+        if (input.action === 'bookmark') {
+            // Android's optional Host already saves a locator without opening
+            // the Reader. Only a previously searched, source-bound result can
+            // be saved here. Never fetch pages or mutate Host-side favorites.
+            if (input.consent !== true) throw new SourceHostError('SOURCE_HOST_CONSENT_REQUIRED')
+            if (session.scope !== 'source-search-read' || session.sourceId === null)
+                throw new SourceHostError('SOURCE_HOST_SCOPE_REQUIRED')
+            const id = comicId(String(input.comicId))
+            const book = session.refs.get(id)
+            if (!book || book.connectionId !== session.host.id ||
+                book.principal !== session.principal || book.sourceId !== session.sourceId)
+                throw new SourceHostError('SOURCE_HOST_STALE')
+            const stored = this.storedBooks()
+            const exists = stored.some(row => row.comicId === id)
+            if (!exists && stored.length >= 500) throw new SourceHostError('SOURCE_HOST_LIBRARY_FULL')
+            this.guard(session)
+            this.database.setAppState(BOOKS_KEY, [book, ...stored.filter(row => row.comicId !== id)])
+            return { saved: true, alreadySaved: exists }
+        }
         if (input.action === 'remove-saved') {
             // Forget only a local online locator. Existing Reader progress,
             // saved chapter copies and Host-side data must remain untouched.
@@ -270,6 +290,10 @@ export class HostedLibraryReader {
             if (!book) throw new SourceHostError('SOURCE_HOST_STALE')
             this.guard(session)
             this.database.setAppState(BOOKS_KEY, books.filter(row => row.comicId !== id))
+            // The same session must not resurrect a removed bookmark from its
+            // transient search-reference map without another explicit search.
+            session.refs.delete(id)
+            session.chapters.delete(id)
             return { removed: true }
         }
         if (input.action === 'saved') {

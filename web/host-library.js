@@ -174,6 +174,23 @@ function render(value) {
     for (const book of value.books) {
         const card = document.createElement('article'); card.className = 'panel'; card.append(node('strong', book.title), node('p', t('宿主来源 ID：', 'Host source ID: ', 'ホスト配信元 ID: ') + book.sourceId))
         card.append(button('read-' + book.comicId, t('阅读', 'Read', '読む'), () => void working(async () => { const selected = await command({ action: 'select', sessionId: session.sessionId, comicId: book.comicId }); document.dispatchEvent(new CustomEvent('pica-open-hosted-reader', { detail: { ...selected, csrfToken: csrf } })); dialog.close() })))
+        if (discovery) {
+            const saveBookmark = button('bookmark-' + book.comicId,
+                t('保存在线书签（不下载）', 'Save online bookmark (no download)', 'オンラインブックマークを保存（ダウンロードなし）'),
+                () => void working(async () => {
+                    const current = session?.sessionId
+                    if (!current) throw Error('SOURCE_HOST_CANCELLED')
+                    const result = await command({ action: 'bookmark', sessionId: current,
+                        comicId: book.comicId, consent: true })
+                    if (result.saved !== true) throw Error('SOURCE_HOST_PROTOCOL')
+                    renderSavedWorks(await command({ action: 'saved', sessionId: current }), true)
+                    saveBookmark.hidden = true
+                    card.append(node('p', t('已保存在线索引，未下载漫画。',
+                        'Online bookmark saved. No comic downloaded.',
+                        'オンラインブックマークを保存しました。漫画はダウンロードしていません。')))
+                }))
+            card.append(saveBookmark)
+        }
         if (session?.capabilities?.downloads === true) card.append(button('save-' + book.comicId, t('保存章节到本地…', 'Save a chapter locally…', '章をローカルに保存…'), () => void chooseDownload(book)))
         $('books').append(card)
     }
@@ -202,7 +219,7 @@ function renderSavedWorks(value, preservePage = false) {
     const list = $('saved-list'); list.replaceChildren()
     if (!savedMatches) list.append(node('p', savedBooks.length
         ? t('没有匹配的作品。清除筛选可查看全部。', 'No matches. Clear the filter to show all.', '一致する作品はありません。')
-        : t('本次授权范围内还没有已选作品。先搜索并阅读一次即可在此找到。', 'No previously selected works in this authorized scope. Select a search result to save its locator here.', 'この認証範囲には選択済み作品がありません。')))
+        : t('本次授权范围内还没有在线书签。可在搜索结果直接保存书签，无需阅读或下载。', 'No online bookmarks in this authorized scope. Save a search result directly without reading or downloading.', 'この認証範囲にはオンラインブックマークがありません。検索結果から読書・ダウンロードせず保存できます。')))
     for (const book of matches.slice(savedOffset, savedOffset + 20)) {
         const card = document.createElement('article'); card.className = 'panel'
         card.append(node('strong', book.title), node('p', t('来源 ID：', 'Source ID: ', 'ソース ID：') + book.sourceId))

@@ -129,6 +129,33 @@ describe('explicit user-host single-source search and existing Reader, inert HTT
         expect(await f.reader.read(a.sessionId, 'progress', {}, signal())).toMatchObject([{ comicId: aIds.comicId }])
         expect(f.reader.readingLibraryRows(b.sessionId).map(row => row.comicId)).toEqual([bIds.comicId])
     })
+    it('explicitly bookmarks a source search result without Reader, prepare, pages or downloads and survives reconnect', async () => {
+        const f = fixture(), first = await f.start()
+        await f.bind(first.sessionId)
+        const page = await f.search(first.sessionId), comicId = page.books[0].comicId
+        const beforeNetwork = f.calls.length
+        expect(await f.command({ action: 'saved', sessionId: first.sessionId })).toEqual({ books: [], total: 0 })
+        await expect(f.command({ action: 'bookmark', sessionId: first.sessionId,
+            comicId, consent: false })).rejects.toThrow('SOURCE_HOST_CONSENT_REQUIRED')
+        const result = await f.command({ action: 'bookmark', sessionId: first.sessionId,
+            comicId, consent: true })
+        expect(result).toEqual({ saved: true, alreadySaved: false })
+        expect(await f.command({ action: 'bookmark', sessionId: first.sessionId,
+            comicId, consent: true })).toEqual({ saved: true, alreadySaved: true })
+        expect(await f.command({ action: 'saved', sessionId: first.sessionId })).toMatchObject({
+            total: 1, books: [{ comicId, sourceId: SOURCE }]
+        })
+        expect(f.calls).toHaveLength(beforeNetwork)
+        expect(f.calls.some(row => ['PicaHostPrepareManga', 'PicaHostChapterPages', 'IMAGE'].includes(row.operation))).toBe(false)
+        expect(f.state.get('protected-catalogue-events-tags-visual')).toEqual({ untouched: true })
+        expect(f.db.setAppState.mock.calls.every(([key]) => key === 'host-reader-book-references-v1')).toBe(true)
+        await f.command({ action: 'close', sessionId: first.sessionId })
+        const next = await f.start()
+        expect(await f.command({ action: 'saved', sessionId: next.sessionId })).toMatchObject({ total: 1, books: [{ comicId }] })
+        const resumed = await f.command({ action: 'resume-saved', sessionId: next.sessionId, comicId })
+        expect(resumed).toMatchObject({ comicId, selectedSource: { id: SOURCE } })
+        expect(f.calls.filter(row => row.operation === 'PicaHostSourceSearch')).toHaveLength(1)
+    })
     it('saved works are locally visible after authorization and resume source page 2 without repeating a comic search', async () => {
         const f = fixture(), first = await f.start(), ids = await f.choose(first.sessionId)
         await f.reader.read(first.sessionId, 'save-progress', { ...ids, pageIndex: 0 }, signal())
@@ -166,6 +193,8 @@ describe('explicit user-host single-source search and existing Reader, inert HTT
             comicId: ids.comicId, consent: true })).toEqual({ removed: true })
         expect(await f.command({ action: 'saved', sessionId: first.sessionId })).toEqual({ books: [], total: 0 })
         expect(f.reader.readingLibraryRows(first.sessionId)).toEqual([])
+        await expect(f.command({ action: 'select', sessionId: first.sessionId,
+            comicId: ids.comicId })).rejects.toThrow('SOURCE_HOST_STALE')
         expect(JSON.stringify([...f.state].filter(([key]) => key !== 'host-reader-book-references-v1'))).toBe(intact)
         expect(f.calls).toHaveLength(beforeNetwork)
         await f.command({ action: 'close', sessionId: first.sessionId })

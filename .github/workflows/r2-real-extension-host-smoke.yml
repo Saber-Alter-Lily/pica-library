@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/r2-real-extension-host-smoke.yml'
       - 'scripts/r2-real-extension-host-smoke.py'
+      - 'scripts/r2-licensed-source-reader-probe.ts'
       - 'scripts/lib/source-host-interop-fixture.mjs'
   workflow_dispatch:
 
@@ -19,7 +20,7 @@ jobs:
   isolated-real-source:
     if: github.repository == 'Saber-Alter-Lily/pica-library'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 28
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +37,15 @@ jobs:
             file: jinmantiantang.jar
             url: https://github.com/keiyoushi/extensions/releases/download/4591fbc-2/tachiyomi-zh.jinmantiantang-v1.6.64.jar
             digest: 5eebd0bae530be491fe1cae32d1940c3914b224c46e7b9d6dd596415ef2c8be7
+          # Two independent, author-licensed public sites, not private accounts.
+          - kind: peppercarrot
+            file: peppercarrot.jar
+            url: https://github.com/keiyoushi/extensions/releases/download/b035310-0/tachiyomi-all.peppercarrot-v1.6.1.jar
+            digest: 7f0b9912a59c45d8c4ae147fdbed9231558aaa52715886c4dc390368c163c37d
+          - kind: comicfury
+            file: comicfury.jar
+            url: https://github.com/keiyoushi/extensions/releases/download/b035310-0/tachiyomi-all.comicfury-v1.6.1.jar
+            digest: 30744ec9dda0c7d7bdfa352437c383c514c7aae49815166fa4909775c2dde38e
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,6 +57,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Prepare existing Reader TypeScript runtime for licensed site tests
+        if: matrix.kind == 'peppercarrot' || matrix.kind == 'comicfury'
+        uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - name: Install frozen project Reader dependencies, licensed tests only
+        if: matrix.kind == 'peppercarrot' || matrix.kind == 'comicfury'
+        run: pnpm install --frozen-lockfile
       - name: Fetch SHA256-pinned official Host and external extension
         shell: bash
         run: |

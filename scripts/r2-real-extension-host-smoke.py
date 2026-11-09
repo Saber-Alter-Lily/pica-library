@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Test a real published source JAR or APK with official Suwayomi on disposable CI only.
 
-No manga-site requests, user accounts, product installation, or private files.
-The extension and official Host are independently SHA256 pinned.
+Existing Pica/JM/E-H cases test registration only, without any site access.
+Open-license Pepper&Carrot / ComicFury cases additionally exercise the original
+Reader and offline importer with real sites and transient page bytes.
+No accounts, credentials, image artifacts, or private user files are used.
+All extension and Host binaries are independently SHA256 pinned.
 """
 import hashlib
 import json
@@ -32,6 +35,17 @@ EXTENSIONS = {
         "digest": "5eebd0bae530be491fe1cae32d1940c3914b224c46e7b9d6dd596415ef2c8be7",
         "package": "eu.kanade.tachiyomi.extension.zh.jinmantiantang",
         "source": "6286738698187452081", "version": "1.6.64",
+    },
+    "peppercarrot": {
+        "digest": "7f0b9912a59c45d8c4ae147fdbed9231558aaa52715886c4dc390368c163c37d",
+        "package": "eu.kanade.tachiyomi.extension.all.peppercarrot",
+        "version": "1.6.1", "query": "Pepper", "title": "Pepper&Carrot",
+    },
+    "comicfury": {
+        "digest": "30744ec9dda0c7d7bdfa352437c383c514c7aae49815166fa4909775c2dde38e",
+        "package": "eu.kanade.tachiyomi.extension.all.comicfury",
+        "version": "1.6.1", "query": "The Way of the Metagamer",
+        "title": "The Way of the Metagamer",
     },
 }
 ENDPOINT = "http://127.0.0.1:4567/api/graphql"
@@ -98,13 +112,18 @@ def install_external_archive(archive):
 
 
 def source_ids():
-    data = graphql(
-        "query Installed($first:Int!,$offset:Int!){"
-        "sources(first:$first,offset:$offset){nodes{id name lang supportsLatest}"
-        "totalCount}}",
-        {"first": 25, "offset": 0},
-    )
-    return {row["id"] for row in data["sources"]["nodes"]}
+    result = set()
+    for offset in range(0, 200, 25):
+        data = graphql(
+            "query Installed($first:Int!,$offset:Int!){"
+            "sources(first:$first,offset:$offset){nodes{id name lang supportsLatest}"
+            "pageInfo{hasNextPage} totalCount}}",
+            {"first": 25, "offset": offset},
+        )["sources"]
+        result.update(row["id"] for row in data["nodes"])
+        if not data["pageInfo"]["hasNextPage"]:
+            return result
+    raise AssertionError("Installed sources exceed bounded 200-row scan")
 
 
 def main():
@@ -161,15 +180,35 @@ def main():
                         time.sleep(1)
                 else:
                     raise AssertionError("Official Host startup timed out")
-                if spec["source"] in source_ids():
+                before_sources = source_ids()
+                if spec.get("source") in before_sources:
                     raise AssertionError("Unexpected external source pre-installed")
                 installed = install_external_archive(extension)
                 if (installed.get("pkgName") != spec["package"] or
                     installed.get("versionName") != spec["version"] or
                     installed.get("isInstalled") is not True):
                     raise AssertionError("Real extension package/version rejected")
-                if spec["source"] not in source_ids():
+                added_sources = source_ids() - before_sources
+                if spec.get("source") and spec["source"] not in added_sources:
                     raise AssertionError("The pinned source was not registered")
+                if not added_sources:
+                    raise AssertionError("Extension installed but no source registered")
+                if spec.get("query"):
+                    if len(added_sources) != 1:
+                        raise AssertionError("Licensed-content case requires one exact source")
+                    probe_env = {key: value for key, value in os.environ.items()
+                                 if key not in ("GITHUB_TOKEN", "GH_TOKEN")}
+                    probe_env.update({
+                        "PICA_B2_SOURCE_ID": next(iter(added_sources)),
+                        "PICA_B2_SAMPLE_QUERY": spec["query"],
+                        "PICA_B2_SAMPLE_TITLE": spec["title"],
+                    })
+                    subprocess.run(
+                        ["pnpm", "exec", "tsx",
+                         "scripts/r2-licensed-source-reader-probe.ts",
+                         "online", str(root)],
+                        cwd=ROOT, env=probe_env, check=True, timeout=240,
+                    )
                 removed = graphql(
                     "mutation Remove($id:String!){"
                     "updateExtension(input:{id:$id,patch:{uninstall:true}})"
@@ -182,16 +221,16 @@ def main():
                 if (removed.get("extension") is not None and
                     removed["extension"].get("isInstalled") is not False):
                     raise AssertionError("External extension still marked installed")
-                if spec["source"] in source_ids():
+                if added_sources & source_ids():
                     raise AssertionError("Revoked external source remains registered")
                 print(json.dumps({
                     "status": "PASS", "gate": "R2-G2-REAL-EXTENSION-LIFECYCLE", "kind": kind,
                     "officialHost": "Suwayomi 2.4.2366",
                     "extensionPackage": spec["package"],
                     "extensionVersion": spec["version"],
-                    "sourceId": spec["source"],
+                    "sourceId": next(iter(added_sources)),
                     "installAndUninstallValidated": True,
-                    "realMangaSiteAccessed": False,
+                    "realMangaSiteAccessed": bool(spec.get("query")),
                     "userCredentialsUsed": False,
                     "productOrReleaseModified": False,
                 }))
@@ -208,6 +247,17 @@ def main():
                     except subprocess.TimeoutExpired:
                         server.kill()
                         server.wait(timeout=8)
+        if spec.get("query"):
+            # A separate Node process after the upstream Host has stopped:
+            # local Reader must reproduce stored image hashes offline.
+            subprocess.run(
+                ["pnpm", "exec", "tsx",
+                 "scripts/r2-licensed-source-reader-probe.ts",
+                 "offline", str(root)],
+                cwd=ROOT, check=True, timeout=75,
+                env={key: value for key, value in os.environ.items()
+                     if key not in ("GITHUB_TOKEN", "GH_TOKEN")},
+            )
 
 
 if __name__ == "__main__":

@@ -1911,7 +1911,28 @@ def licensed_public_android_source_flow():
             raise AssertionError("Actual source did not expose two Reader pages")
         total = int(numbers.group(1))
         advance_reader_next()
-        wait(("2 / " + str(total), "2/" + str(total)), seconds=50)
+        try:
+            wait(("2 / " + str(total), "2/" + str(total)), seconds=50)
+        except AssertionError:
+            # Inspect the original Reader's existing failure-details dialog,
+            # but emit only classified error codes: never a comic image, URL,
+            # cookie, account, or unbounded UI text in the public CI log.
+            failure_button = find(("Image failed · view details",
+                                   "图片读取失败 · 点此查看",
+                                   "画像エラー・詳細を見る"))
+            if failure_button:
+                adb("shell", "input", "tap",
+                    str(failure_button[0]), str(failure_button[1]))
+                detail_text = " ".join((text or desc) for text, desc, _, _ in nodes())
+                codes = sorted(set(re.findall(
+                    r"SOURCE_HOST_[A-Z_]+|HTTP [1-5][0-9]{2}|"
+                    r"服务器返回的内容不是有效图片|网络请求超时|"
+                    r"请求过于频繁|站点拒绝图片请求",
+                    detail_text)))
+                print("B2 original Reader image failure category: " +
+                      (", ".join(codes) if codes else "UNCLASSIFIED"),
+                      flush=True)
+            raise
         active = adb("shell", "dumpsys", "activity", "activities", timeout=35)
         if ("com.picalibrary.android.ExternalReaderActivity" not in active or
                 CLEAN_PACKAGE not in active):

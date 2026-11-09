@@ -89,6 +89,17 @@ function makeDialog() {
     form.append(consent, start); form.onsubmit = event => { event.preventDefault(); if (form.reportValidity()) void startSession() }; dialog.append(form)
     const sourceControls = document.createElement('section'); sourceControls.id = 'host-library-source-controls'
     sourceControls.append(node('p', t('只列出你在宿主上已安装的来源。选定一个后本次会话不能换源；结束会话后可重新选择。不会安装扩展或修改来源设置。', 'Only sources already installed on your host are listed. This session is bound to one chosen source; end it to choose another. No extensions are installed or source settings changed.', '自分のホストに導入済みの配信元のみ表示します。選択後はこのセッションで変更できず、終了後に選び直せます。拡張機能の導入・配信元設定の変更は行いません。')))
+    // Mirror Android's user-owned Host manager; this explicit browser action
+    // does not install a source, connect the Reader or transmit credentials.
+    sourceControls.append(button('manage-host', t('在浏览器中管理我自己的 Host 来源', 'Manage sources in my Host browser', '自分の Host のソースをブラウザで管理'), () => {
+        try {
+            const target = new URL(host?.endpoint || '')
+            if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password) throw Error('INVALID_SOURCE_HOST')
+            window.open(target.href, '_blank', 'noopener,noreferrer')
+        } catch {
+            $('state').textContent = t('无法打开自己的 Host，请检查已经保存的地址。', 'Cannot open your Host. Check its saved address.', 'Host を開けません。保存済みのアドレスを確認してください。')
+        }
+    }))
     const sourceLabel = document.createElement('label'), sourceSelect = document.createElement('select'); sourceSelect.id = 'host-library-source'
     sourceLabel.append(node('span', t('本次来源', 'Source for this session', '今回の配信元')), sourceSelect)
     sourceControls.append(sourceLabel, button('bind-source', t('确认只使用所选来源', 'Confirm this source only', 'この配信元のみ使用を確認'), () => void bindSource()))

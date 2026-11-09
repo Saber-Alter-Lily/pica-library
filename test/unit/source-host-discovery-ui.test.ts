@@ -57,7 +57,8 @@ it.each([0, 1, 2])('original Windows Host opens only its explicitly configured e
     ][language])
     expect(f.fetcher).not.toHaveBeenCalled()
     await f.get('manage-host').click()
-    expect(f.externalOpens).toHaveBeenCalledExactlyOnceWith(
+    expect(f.externalOpens).toHaveBeenCalledTimes(1)
+    expect(f.externalOpens).toHaveBeenCalledWith(
         'https://user-host.invalid/', '_blank', 'noopener,noreferrer')
     expect(f.fetcher).not.toHaveBeenCalled()
     expect(f.commands('start')).toEqual([])

@@ -2,7 +2,7 @@ import { copy as t } from './locale-runtime.js'
 import { renderHostedLocalDownloadJobs } from './host-download-view.js'
 
 let dialog, host = null, session = null, csrf = '', active = null, generation = 0, offset = 0, hasNext = false, expiryTimer = null
-let scope = 'library-read', selectedSource = null, searchQuery = '', searchPage = 0
+let scope = 'library-read', selectedSource = null, searchQuery = '', searchPage = 0, discoveryMode = 'search'
 let savedBooks = [], savedOffset = 0, savedMatches = 0
 let downloadTarget = null, downloadPoll = null, downloadPending = false, downloadGeneration = 0, downloadRendering = 0
 const $ = id => document.getElementById('host-library-' + id)
@@ -12,7 +12,7 @@ function endOnExit() {
     active?.abort()
     if (session && csrf) void fetch('/api/v1/desktop/host-reader', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': csrf }, body: JSON.stringify({ action: 'close', sessionId: session.sessionId }), keepalive: true }).catch(() => {})
     session = null
-    selectedSource = null; searchQuery = ''; searchPage = 0; offset = 0; hasNext = false
+    selectedSource = null; searchQuery = ''; searchPage = 0; discoveryMode = 'search'; offset = 0; hasNext = false
     clearTimeout(expiryTimer); expiryTimer = null
     resetDownloads()
     savedBooks = []; savedOffset = 0; savedMatches = 0
@@ -59,7 +59,7 @@ async function selectRememberedComic(comicId, expectedSessionId) {
         if (!selected?.selectedSource?.id ||
             !/^-?[0-9]+$/.test(selected.selectedSource.id)) throw Error('SOURCE_HOST_PROTOCOL')
         selectedSource = selected.selectedSource
-        hasNext = false; searchPage = 0
+        hasNext = false; searchPage = 0; discoveryMode = 'search'
         document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed'))
     }
     return selected
@@ -97,7 +97,10 @@ function makeDialog() {
     const queryLabel = document.createElement('label'), query = document.createElement('input'); query.id = 'host-library-query'; query.maxLength = 256; query.required = true; query.autocomplete = 'off'
     queryLabel.append(node('span', t('在自己选择的来源中搜索', 'Search your chosen source', '自分で選んだ配信元を検索')), query)
     const search = button('search', t('搜索', 'Search', '検索'), () => {}); search.type = 'submit'
-    searchForm.append(queryLabel, search); searchForm.onsubmit = event => { event.preventDefault(); if (searchForm.reportValidity()) void searchBooks(1, query.value.trim()) }
+    searchForm.append(queryLabel, search, button('browse',
+        t('浏览此来源作品（无需搜索词）', 'Browse this source (no search needed)', 'このソースを閲覧（検索語不要）'),
+        () => void browseBooks(1)))
+    searchForm.onsubmit = event => { event.preventDefault(); if (searchForm.reportValidity()) void searchBooks(1, query.value.trim()) }
     dialog.append(searchForm)
     const status = node('p', ''); status.id = 'host-library-state'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); dialog.append(status)
     const books = document.createElement('div'); books.id = 'host-library-books'; dialog.append(books)
@@ -126,7 +129,7 @@ function controls() {
     const discovery = scope === 'source-search-read'
     $('source-controls').hidden = !discovery; $('search-form').hidden = !discovery || !selectedSource
     $('source').disabled = $('bind-source').disabled = Boolean(active) || !session || Boolean(selectedSource) || !$('source').value
-    $('query').disabled = $('search').disabled = Boolean(active) || !session || !selectedSource
+    $('query').disabled = $('search').disabled = $('browse').disabled = Boolean(active) || !session || !selectedSource
     for (const item of $('books').querySelectorAll('button')) item.disabled = Boolean(active) || !session
     // Index visibility follows the explicitly authorized Host principal;
     // opening actual pages still requires one verified installed source.
@@ -173,10 +176,18 @@ async function working(action) {
 function render(value) {
     const discovery = scope === 'source-search-read'
     if (!Array.isArray(value.books) || value.books.length > (discovery ? 100 : 25) || typeof value.hasNext !== 'boolean' ||
-        discovery && (value.sourceId !== selectedSource?.id || typeof value.query !== 'string' || !Number.isSafeInteger(value.page) || value.page < 1 || value.page > 200)) throw Error('SOURCE_HOST_PROTOCOL')
-    if (discovery) { searchPage = value.page; searchQuery = value.query } else offset = value.offset
+        discovery && (value.sourceId !== selectedSource?.id || typeof value.query !== 'string' ||
+            (value.mode !== undefined && value.mode !== 'popular') ||
+            (value.mode === 'popular' && value.query !== '') ||
+            !Number.isSafeInteger(value.page) || value.page < 1 || value.page > 200)) throw Error('SOURCE_HOST_PROTOCOL')
+    if (discovery) { searchPage = value.page; searchQuery = value.query;
+        discoveryMode = value.mode === 'popular' ? 'popular' : 'search' } else offset = value.offset
     hasNext = value.hasNext; $('books').replaceChildren()
-    if (!value.books.length) $('books').append(node('p', discovery ? t('此来源本页没有搜索结果；可修改关键词，或结束会话后选择其他来源。', 'No search results on this page. Change the query, or end this session to choose another source.', 'このページに検索結果はありません。キーワードを変更するか、セッションを終了して別の配信元を選んでください。') : t('宿主书库本页没有作品。请在你自己的宿主中管理来源和书库。', 'No hosted-library items on this page. Manage sources and your library on your own host.', 'このページに作品はありません。配信元・書庫は自分のホストで管理してください。')))
+    if (!value.books.length) $('books').append(node('p', discovery
+        ? discoveryMode === 'popular'
+            ? t('此来源本页暂无可浏览作品，可翻页或更换来源。', 'No browsable works on this page. Try another page or source.', 'このページには閲覧できる作品がありません。')
+            : t('此来源本页没有搜索结果；可修改关键词，或结束会话后选择其他来源。', 'No search results on this page. Change the query, or end this session to choose another source.', 'このページに検索結果はありません。キーワードを変更するか、セッションを終了して別の配信元を選んでください。')
+        : t('宿主书库本页没有作品。请在你自己的宿主中管理来源和书库。', 'No hosted-library items on this page. Manage sources and your library on your own host.', 'このページに作品はありません。配信元・書庫は自分のホストで管理してください。')))
     for (const book of value.books) {
         const card = document.createElement('article'); card.className = 'panel'; card.append(node('strong', book.title), node('p', t('宿主来源 ID：', 'Host source ID: ', 'ホスト配信元 ID: ') + book.sourceId))
         card.append(button('read-' + book.comicId, t('阅读', 'Read', '読む'), () => void working(async () => { const selected = await command({ action: 'select', sessionId: session.sessionId, comicId: book.comicId }); document.dispatchEvent(new CustomEvent('pica-open-hosted-reader', { detail: { ...selected, csrfToken: csrf } })); dialog.close() })))
@@ -383,7 +394,7 @@ async function bindSource() {
     await working(async () => {
         const value = await command({ action: 'bind-source', sessionId: session.sessionId, sourceId, consent: true })
         if (value.selectedSource?.id !== sourceId) throw Error('SOURCE_HOST_PROTOCOL')
-        selectedSource = value.selectedSource; hasNext = false; searchPage = 0; $('books').replaceChildren(); renderHistory(value.history)
+        selectedSource = value.selectedSource; hasNext = false; searchPage = 0; discoveryMode = 'search'; $('books').replaceChildren(); renderHistory(value.history)
         renderSavedWorks(await command({ action: 'saved', sessionId: session.sessionId }))
         document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed'))
     })
@@ -392,9 +403,14 @@ async function searchBooks(page, query) {
     if (!session || !selectedSource || !query) return
     await working(async () => render(await command({ action: 'search', sessionId: session.sessionId, query, page })))
 }
+async function browseBooks(page) {
+    if (!session || !selectedSource) return
+    await working(async () => render(await command({ action: 'browse', sessionId: session.sessionId, page })))
+}
 async function navigate(direction) {
     if (scope === 'library-read') return list(Math.max(0, offset + direction * 25))
-    if (selectedSource) return searchBooks(searchPage + direction, searchQuery)
+    if (selectedSource) return discoveryMode === 'popular'
+        ? browseBooks(searchPage + direction) : searchBooks(searchPage + direction, searchQuery)
     return working(async () => renderSources(await command({ action: 'sources', sessionId: session.sessionId, offset: Math.max(0, offset + direction * 25) })))
 }
 function configure(event, requestedScope) {

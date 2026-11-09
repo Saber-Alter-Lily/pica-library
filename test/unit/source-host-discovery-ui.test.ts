@@ -22,6 +22,7 @@ function fixture(language = 1, initialSaved = true) {
             input.action === 'sources' ? { sources: [{ id: SOURCE, name: '<img inert>', language: 'zh' }], offset: input.offset, hasNext: false } :
             input.action === 'bind-source' ? { selectedSource: { id: input.sourceId, name: 'Chosen', language: 'zh' }, history: [] } :
             input.action === 'search' ? { sourceId: SOURCE, page: input.page, query: input.query, hasNext: input.page < 2, books: [{ comicId: COMIC, title: '<script>inert title</script>', sourceId: SOURCE }] } :
+            input.action === 'browse' ? { sourceId: SOURCE, mode: 'popular', page: input.page, query: '', hasNext: input.page < 2, books: [{ comicId: COMIC, title: '<script>inert catalogue</script>', sourceId: SOURCE }] } :
             input.action === 'select' ? { sessionId: SESSION, comicId: input.comicId, title: 'Selected' } :
             input.action === 'resume-saved' ? { sessionId: SESSION, comicId: input.comicId, title: 'Selected', selectedSource: { id: SOURCE, name: 'Chosen', language: 'zh' } } :
             input.action === 'bookmark' ? (savedByUser = true, { saved: true, alreadySaved: false }) :
@@ -75,6 +76,22 @@ it('explicit search/Enter/pagination use the committed query and then the existi
     await f.get('read-' + COMIC).click()
     await vi.waitFor(() => expect(f.opens).toMatchObject([{ sessionId: SESSION, comicId: COMIC, csrfToken: 'local-only-csrf' }]))
     expect(f.commands('select')).toHaveLength(1)
+})
+it.each([0, 1, 2])('Windows Host browses source without search and paginates the chosen catalogue (%s)', async language => {
+    const f = fixture(language)
+    await f.start(); expect(f.get('browse').disabled).toBe(true)
+    await f.bind(); expect(f.get('browse').disabled).toBe(false)
+    await f.get('browse').click()
+    await vi.waitFor(() => expect(f.commands('browse')).toHaveLength(1))
+    expect(f.commands('browse')[0]).toEqual({action:'browse',sessionId:SESSION,page:1})
+    expect(f.get('books').textContent).toContain('<script>inert catalogue</script>')
+    expect(f.commands('search')).toEqual([])
+    await f.get('next').click()
+    await vi.waitFor(() => expect(f.commands('browse')).toHaveLength(2))
+    expect(f.commands('browse')[1]).toMatchObject({page:2})
+    expect(f.commands('search')).toEqual([])
+    await f.get('read-' + COMIC).click()
+    await vi.waitFor(() => expect(f.opens).toMatchObject([{sessionId:SESSION,comicId:COMIC}]))
 })
 it('shows previously selected works only after source binding, filters locally and resumes in the original Reader', async () => {
     const f = fixture()

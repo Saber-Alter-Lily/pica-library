@@ -179,6 +179,22 @@ describe('explicit user-host single-source search and existing Reader, inert HTT
         expect((await f.command({ action: 'saved', sessionId: first.sessionId })).total).toBe(1)
         expect(selected.comicId).toBe(template.comicId)
     })
+    it('explicit POPULAR browsing reuses one bound source and the original Reader', async () => {
+        const f = fixture(), start = await f.start()
+        await expect(f.command({action:'browse',sessionId:start.sessionId,page:1}))
+            .rejects.toThrow('SOURCE_HOST_SOURCE_SELECTION_REQUIRED')
+        await f.bind(start.sessionId)
+        const result = await f.command({action:'browse',sessionId:start.sessionId,page:1})
+        expect(result).toMatchObject({mode:'popular',query:'',sourceId:SOURCE,page:1})
+        const request = f.calls.findLast(row => row.operation === 'PicaHostSourceSearch')
+        expect(request?.variables.input).toMatchObject({type:'POPULAR',source:SOURCE,page:1,query:''})
+        expect(result.books.length).toBe(1)
+        const selected = await f.command({action:'select',sessionId:start.sessionId,
+            comicId:result.books[0].comicId})
+        expect(selected.comicId).toBe(result.books[0].comicId)
+        await expect(f.command({action:'browse',sessionId:start.sessionId,page:1,query:'unexpected'}))
+            .rejects.toThrow('INVALID_SOURCE_HOST')
+    })
     it('saved works are locally visible after authorization and resume source page 2 without repeating a comic search', async () => {
         const f = fixture(), first = await f.start(), ids = await f.choose(first.sessionId)
         await f.reader.read(first.sessionId, 'save-progress', { ...ids, pageIndex: 0 }, signal())

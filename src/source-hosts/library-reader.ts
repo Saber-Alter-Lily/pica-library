@@ -261,7 +261,7 @@ export class HostedLibraryReader {
             input.action === 'remove-saved' || input.action === 'bookmark' ?
                 ['action', 'sessionId', 'comicId', 'consent'] :
             input.action === 'list' || input.action === 'sources' ? ['action', 'sessionId', 'offset'] :
-            input.action === 'bind-source' ? ['action', 'sessionId', 'sourceId', 'consent'] : input.action === 'search' ? ['action', 'sessionId', 'query', 'page'] : ['action', 'sessionId', 'comicId']
+            input.action === 'bind-source' ? ['action', 'sessionId', 'sourceId', 'consent'] : input.action === 'search' ? ['action', 'sessionId', 'query', 'page'] : input.action === 'browse' ? ['action', 'sessionId', 'page'] : ['action', 'sessionId', 'comicId']
         fields(input, allowed)
         const session = this.session(String(input.sessionId))
         if (input.action === 'close') { this.end(session.id); return { closed: true } }
@@ -355,7 +355,7 @@ export class HostedLibraryReader {
                 throw error
             }
         }
-        if (['sources', 'bind-source', 'search'].includes(String(input.action))) {
+        if (['sources', 'bind-source', 'search', 'browse'].includes(String(input.action))) {
             if (session.scope !== 'source-search-read') throw new SourceHostError('SOURCE_HOST_SCOPE_REQUIRED')
             if (input.action === 'sources') {
                 if (session.sourceId !== null) throw new SourceHostError('SOURCE_HOST_STALE')
@@ -373,13 +373,21 @@ export class HostedLibraryReader {
                 return { selectedSource: selected, history: this.history(session) }
             }
             if (session.sourceId === null) throw new SourceHostError('SOURCE_HOST_SOURCE_SELECTION_REQUIRED')
-            const query = input.query, page = input.page ?? 1
-            if (typeof query !== 'string' || !query.trim() || query.length > 256 || /[\u0000-\u001f\u007f]/.test(query) ||
-                !Number.isSafeInteger(page) || Number(page) < 1 || Number(page) > 200) throw new SourceHostError('INVALID_SOURCE_HOST')
+            const browse = input.action === 'browse'
+            const query = browse ? '' : input.query, page = input.page ?? 1
+            if (!browse && (typeof query !== 'string' || !query.trim() || query.length > 256 ||
+                /[\u0000-\u001f\u007f]/.test(query)) ||
+                !Number.isSafeInteger(page) || Number(page) < 1 || Number(page) > 200)
+                throw new SourceHostError('INVALID_SOURCE_HOST')
+            // The existing Suwayomi mutation supports POPULAR even for
+            // extensions without text search. Reuse Reader/source identity.
             const result = hostSearchPage(await this.run(session, abort => sourceHostGraphql(session.connection, HOST_DISCOVERY_OPERATIONS.search,
-                { input: { source: session.sourceId, type: 'SEARCH', page, query: query.trim() } }, abort, this.fetcher)), session.sourceId)
+                { input: { source: session.sourceId, type: browse ? 'POPULAR' : 'SEARCH',
+                    page, query: browse ? '' : String(query).trim() } }, abort, this.fetcher)), session.sourceId)
             this.guard(session)
-            return { page, query: query.trim(), sourceId: session.sourceId, hasNext: result.hasNext, books: this.remember(session, result.mangas) }
+            return { page, query: browse ? '' : String(query).trim(), sourceId: session.sourceId,
+                ...(browse ? { mode: 'popular' } : {}),
+                hasNext: result.hasNext, books: this.remember(session, result.mangas) }
         }
         if (input.action === 'list') {
             if (session.scope !== 'library-read') throw new SourceHostError('SOURCE_HOST_SCOPE_REQUIRED')

@@ -1,6 +1,6 @@
 # Pica Library｜集成候选至正式验收执行总计划（2026-11-09）
 
-> **唯一执行总账**｜当前状态：B1 `IN_PROGRESS`，B2–B5 `BLOCKED_BY_DEPENDENCY`；五批次覆盖现有 R0–R4/S0–S6，**不替换或缩小**历史 42+12 项验收。任何后续对话只收到“继续推进”时，先读本文、[总 Issue #283](https://github.com/Saber-Alter-Lily/pica-library/issues/283) 和本分支最新 SHA/CI，选择首个未过门禁的批次；禁止跑偏为零散接口/测试/视觉 PR。
+> **唯一执行总账**｜当前状态：B1 `PACKAGE_VERIFIED / MANUAL_QA_PENDING`，B2 `NEXT_REAL_SOURCE_GATE`，B3–B5 `BLOCKED_BY_DEPENDENCY`；五批次覆盖现有 R0–R4/S0–S6，**不替换或缩小**历史 42+12 项验收。任何后续对话只收到“继续推进”时，先读本文、[总 Issue #283](https://github.com/Saber-Alter-Lily/pica-library/issues/283) 和本分支最新 SHA/CI，选择首个未过门禁的批次；禁止跑偏为零散接口/测试/视觉 PR。
 
 ## 0. 产品目标与冻结边界
 
@@ -27,7 +27,7 @@
 
 ## 2. 工作顺序、不可并行的依赖和退出条件
 
-### B1｜同一 SHA 双端可安装候选与阻断清理（**NOW**，对应 R1/R3/R4 工程准备）
+### B1｜同一 SHA 双端可安装候选与阻断清理（**PACKAGE_VERIFIED，G1 仍 OPEN**；对应 R1/R3/R4 工程准备）
 
 **范围**：完成 CI、真实 Windows x64 ZIP+真实 Android 原四标签 **source-neutral clean QA APK** + 独立 **same-signer user-host APK**；Dev APK 仅作旧功能对照。不能把临时 QA 包说成“正式签名升级版”。
 
@@ -107,8 +107,14 @@
 
 | 批次 | 当前状态 | 阻断 | 最后证据 |
 |---|---|---|---|
-| B1 双端候选 | IN_PROGRESS | RC 实际 package jobs skipped；3 项专项外部 504 | `d9813ea` 工程 CI/Windows QA SUCCESS |
-| B2 两个真实来源 | NOT_ACCEPTED | 未取得两种第三方来源的实际章节/图片与授权证据 | JAR 生命周期 + synthetic Suwayomi 阅读不替代真实来源 |
+| B1 双端候选 | PACKAGE_VERIFIED / MANUAL_QA_PENDING | 物理设备交互尚未验收；S3 Android35 原端到端流程仍需独立终态 | 同一产物 SHA `ecd7435` Windows/Android RC 四 job SUCCESS；实际文件 SHA 和同签名验证见 [证据](PRODUCT_ACCEPTANCE_EVIDENCE_20261109.md) |
+| B2 两个真实来源 | NEXT / NOT_ACCEPTED | 未取得两种第三方来源的实际章节/图片与授权证据 | JAR 生命周期 + synthetic Suwayomi 阅读不替代真实来源 |
 | B3 体验/Issue/1500 负载 | NOT_ACCEPTED | 实体手机与同源真实数据及多个日常流程未闭环 | 历史模拟器/单测和合成 1500 部只作基础 |
 | B4 升级回滚 | NOT_ACCEPTED | 真实 v0.5.0 用户资料授权 + 全量差异与异常回滚 | 公开 APK 合成实机升级属部分工程证据 |
 | B5 发布裁决 | NOT_STARTED | G1–G4、54 项逐行回执及用户批准 | Draft #284，不更改 main |
+
+### 2026-11-09 B1 首轮工程关闭证据
+
+- 详细精确 SHA/证书/实际文件 Hash 与 Actions run：见 [B1 验收证据档](PRODUCT_ACCEPTANCE_EVIDENCE_20261109.md)。可信 `push` [RC run #42600954377](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600954377) 的 `contract`、`windows-rc`、`android-rc`、`artifact-summary` 全部 SUCCESS；`RC_STATUS.json` 明确为 `INSTALLABLE_ARTIFACTS_READY_MANUAL_QA_PENDING`。
+- 外部 504 阻断已在实际后续 [K3](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600963036)、[v0.4 升级](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600962878)、[P2](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600962896)、[标准 CI](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600962848) 和 [综合验收](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600962905) 中得到 SUCCESS；仍需注意后续不同网络环境的可重现性。
+- 此次工程关闭**不代表**真实手机 G1、两来源真站点 G2、真实用户资料 G3 或签正式版 G4 通过。B2 可以在 B1 的安装包基础上进入真实来源验证；无法获授权测试源时不得伪造 PASS。

@@ -242,6 +242,17 @@ describe('actual local host-inspection HTTP boundary — synthetic CI listener o
         const before = shadowDatabaseState(f.db), search = await command({ action: 'search', sessionId, query: 'test', page: 1 })
         expect(search.status).toBe(200); expect(shadowDatabaseState(f.db)).toEqual(before)
         const comicId = search.value.books[0].comicId
+        // Exercise the same localhost/CSRF command actually used by original
+        // Windows source-search UI: persist only its locator, no Reader or Host
+        // chapter/image requests until the user explicitly opens the book.
+        const beforeBookmarkNetwork = f.wire.mock.calls.length
+        expect((await command({ action: 'bookmark', sessionId, comicId, consent: false })).status).toBe(400)
+        const bookmark = await command({ action: 'bookmark', sessionId, comicId, consent: true })
+        expect(bookmark).toMatchObject({ status: 200, value: { saved: true, alreadySaved: false } })
+        expect((await command({ action: 'saved', sessionId })).value).toMatchObject({
+            total: 1, books: [{ comicId, sourceId: hostBook.sourceId }]
+        })
+        expect(f.wire).toHaveBeenCalledTimes(beforeBookmarkNetwork)
         expect((await command({ action: 'select', sessionId, comicId })).status).toBe(200)
         const root = endpoint + '/' + sessionId, chaptersPath = root + '/comics/' + encodeURIComponent(comicId) + '/chapters'
         const chapters = await fetch(chaptersPath, { headers: f.headers }).then(response => response.json())

@@ -124,7 +124,19 @@ jobs:
           if (-not $asset) { throw "Previous accepted Windows asset missing: $assetName" }
           $baseDir = 'artifacts\release-base'
           New-Item -ItemType Directory -Force -Path $baseDir | Out-Null
-          Invoke-WebRequest -Headers $headers -Uri $asset.browser_download_url -OutFile (Join-Path $baseDir $assetName)
+          # GitHub's release download CDN intermittently returns HTTP 504.
+          # Retry the same selected asset only; never substitute a new release.
+          $destination = Join-Path $baseDir $assetName
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Remove-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue
+            try {
+              Invoke-WebRequest -Headers $headers -Uri $asset.browser_download_url -OutFile $destination -ErrorAction Stop
+              break
+            } catch {
+              if ($attempt -eq 3) { throw }
+              Start-Sleep -Seconds (2 * $attempt)
+            }
+          }
           Write-Host "Prepared accepted launcher baseline: v$baseVersion"
       - name: Build and smoke current Windows package
         shell: pwsh

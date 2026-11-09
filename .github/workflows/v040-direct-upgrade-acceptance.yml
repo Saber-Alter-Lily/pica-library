@@ -59,7 +59,18 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $uri = 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-v0.4.0-windows-x64.zip'
           $path = Join-Path $env:RUNNER_TEMP 'Pica-Library-v0.4.0-windows-x64.zip'
-          Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $path
+          # Retry only transient release CDN failures; the pinned checksum
+          # and existing archive/data checks remain mandatory.
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+            try {
+              Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $path -ErrorAction Stop
+              break
+            } catch {
+              if ($attempt -eq 3) { throw }
+              Start-Sleep -Seconds (2 * $attempt)
+            }
+          }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
           if ($hash -ne '1e22df88d067c34152e1a94008fbb4c378c543fc41450768e01c25c105e698d0') {
             throw "Public v0.4.0 Windows checksum mismatch: $hash"
@@ -98,17 +109,26 @@ jobs:
         with:
           packages: platform-tools
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 on distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
 
       - name: Verify public v0.4.0 Android production identity
         run: |
           set -euo pipefail
           old_apk="$RUNNER_TEMP/Pica-Library-Android-v42.apk"
           cert_file="$RUNNER_TEMP/Pica-Library-Android-Preview.cert-sha256"
-          curl -fL 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-Android-v42.apk' -o "$old_apk"
-          curl -fL 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-Android-Preview.cert-sha256' -o "$cert_file"
+          curl --fail --location --retry 3 --retry-delay 3 --max-time 120 \
+            'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-Android-v42.apk' \
+            --output "$old_apk"
+          curl --fail --location --retry 3 --retry-delay 3 --max-time 120 \
+            'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-Android-Preview.cert-sha256' \
+            --output "$cert_file"
           printf '%s  %s\n' '718dfc81484627045a3d5209a79e705f87b6a3ae9be737721299956fc4a77ed2' "$old_apk" | sha256sum -c -
 
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$old_apk" > "$RUNNER_TEMP/v040-badging.txt"

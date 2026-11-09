@@ -84,6 +84,23 @@ export class HostedLibraryReader {
         return book
     }
     private scopeAllows(session: Session, book: Book) { return session.scope === 'library-read' || session.sourceId !== null && session.sourceId === book.sourceId }
+    /** Shared original Reader-selection path for search results and saved works. */
+    private async selectBook(session: Session, comic: string, signal?: AbortSignal) {
+        const book = this.findBook(session, comic)
+        await this.ensureComic(session, comic, signal); this.guard(session)
+        if (session.scope === 'source-search-read') {
+            const prepared = hostPreparedManga(await this.run(session, abort =>
+                sourceHostGraphql(session.connection, HOST_DISCOVERY_OPERATIONS.prepare,
+                    { input: { id: book.remoteId, fetchManga: true, fetchChapters: true } },
+                    abort, this.fetcher), signal))
+            if (prepared.manga.id !== book.remoteId || prepared.manga.sourceId !== book.sourceId ||
+                digest(prepared.manga.url) !== book.urlDigest)
+                throw new SourceHostError('SOURCE_HOST_STALE')
+            this.guard(session); session.chapters.set(comic, prepared.chapters)
+        }
+        this.database.setAppState(BOOKS_KEY, [book, ...this.storedBooks().filter(row => row.comicId !== comic)].slice(0, 500))
+        return { sessionId: session.id, comicId: comic, title: book.title }
+    }
     private remember(session: Session, mangas: HostManga[]) {
         for (const manga of mangas) { const book = this.book(session, manga); if (session.refs.size >= 128) session.refs.delete(session.refs.keys().next().value!); session.refs.set(book.comicId, book) }
         return mangas.map(manga => { const book = this.book(session, manga); return { comicId: book.comicId, title: book.title, sourceId: book.sourceId } })
@@ -279,11 +296,9 @@ export class HostedLibraryReader {
             try {
                 // Original select and Reader preparation recheck remote manga
                 // ID, exact source ID and page URL ownership before reading.
-                const selected = await this.command({
-                    action: 'select', sessionId: session.id, comicId: comic
-                }, signal)
+                const selected = await this.selectBook(session, comic, signal)
                 this.guard(session)
-                return { ...(selected as { sessionId: string; comicId: string; title: string }), selectedSource: located }
+                return { ...selected, selectedSource: located }
             } catch (error) {
                 if (this.sessions.has(session.id)) {
                     session.sourceId = null
@@ -325,19 +340,8 @@ export class HostedLibraryReader {
             const page = hostLibraryPage(await this.rpc(session, 'library', { offset }))
             return { offset, hasNext: page.hasNext, books: this.remember(session, page.mangas) }
         }
-        if (input.action === 'select') {
-            const comic = comicId(String(input.comicId)), book = this.findBook(session, comic)
-            await this.ensureComic(session, comic); this.guard(session)
-            if (session.scope === 'source-search-read') {
-                const prepared = hostPreparedManga(await this.run(session, abort => sourceHostGraphql(session.connection, HOST_DISCOVERY_OPERATIONS.prepare,
-                    { input: { id: book.remoteId, fetchManga: true, fetchChapters: true } }, abort, this.fetcher)))
-                if (prepared.manga.id !== book.remoteId || prepared.manga.sourceId !== book.sourceId || digest(prepared.manga.url) !== book.urlDigest)
-                    throw new SourceHostError('SOURCE_HOST_STALE')
-                this.guard(session); session.chapters.set(comic, prepared.chapters)
-            }
-            this.database.setAppState(BOOKS_KEY, [book, ...this.storedBooks().filter(row => row.comicId !== comic)].slice(0, 500))
-            return { sessionId: session.id, comicId: comic, title: book.title }
-        }
+        if (input.action === 'select')
+            return this.selectBook(session, comicId(String(input.comicId)), signal)
         throw new SourceHostError('INVALID_SOURCE_HOST')
         })
     }

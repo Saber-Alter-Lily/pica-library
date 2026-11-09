@@ -117,7 +117,7 @@ it('resumes an already-selected source without manual source binding or another 
 it.each([0, 1, 2])('explicit source result bookmark keeps original Reader closed and does not download (%s)', async language => {
     const f = fixture(language, false); await f.start(); await f.bind(); f.search('bookmarks')
     await vi.waitFor(() => expect(f.get('bookmark-' + COMIC)).not.toBe(null))
-    expect(f.get('saved-count').textContent).toContain('Selected 0')
+    expect(f.get('saved-count').textContent).toContain(['已选 0', 'Selected 0', '選択済み 0'][language])
     const priorNetwork = f.commands('search').length
     await f.get('bookmark-' + COMIC).click()
     await vi.waitFor(() => expect(f.commands('bookmark')).toHaveLength(1))
@@ -127,7 +127,7 @@ it.each([0, 1, 2])('explicit source result bookmark keeps original Reader closed
     expect(f.commands('select')).toEqual([])
     expect(f.commands('download-start')).toEqual([])
     expect(f.opens).toEqual([])
-    await vi.waitFor(() => expect(f.get('saved-count').textContent).toContain('Selected 1'))
+    await vi.waitFor(() => expect(f.get('saved-count').textContent).toContain(['已选 1', 'Selected 1', '選択済み 1'][language]))
     expect(f.get('saved-list').textContent).toContain('<script>saved title</script>')
     expect(f.get('bookmark-' + COMIC).hidden).toBe(true)
     expect(f.get('books').textContent).not.toContain('undefined')

@@ -33,3 +33,10 @@
 **严格解释：**已有两个公开授权的独立真实第三方来源完成原 Windows 组件和离线入库链路的工程实证。但此结论不是原 Windows 图形客户端的实物使用验收，更不能替代 Android 手机通过真实站点的签名 Host/Binder 阅读、用户目标 Pica/JM/E-H 的登录/章节、真实用户资料迁移或最终发布批准。G1–G4 继续 OPEN。
 
 新工程提交：Windows `8f45f2d`、Android `35bb97f` 的 POPULAR 浏览、`48f624e` 的有证据 MIME 规范化、`cad6d18` 的有上限长篇章节支持。下次按同一 SHA 重新核对 CI 和真实来源结果。
+
+## 2026-11-09 后续独立实证：xkcd 长篇章节边界关闭、Android 真站点待核验
+
+- **xkcd 原失败已按新源码重新实测 PASS（仅工程层）**：修复 `cad6d18` 后的 [独立来源六作业 #42626544616](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42626544616) 属于 `e7ceb9ce9268cde0ecf552c60b05ecf65bb950df`，**六个来源 job 均为 terminal SUCCESS**。其 xkcd job 实际输出 `ONLINE PASS`（`realImagePages=2`、`savedChapters=1`、`originalHostedReader=true`、`originalLocalImporter=true`）和 `OFFLINE PASS`（`hostStopped=true`、`localReader=true`）。因此前一运行 #42625363093 的 xkcd `FAIL/SOURCE_HOST_TOO_LARGE` 保留为历史事实，但不再是现行 5,000 章工程限制的未修复问题。此次并未验证 5,001 章以上成功；上限仍存在。
+- 同批真实来源 ComicFury、Pepper&Carrot 也各自 SUCCESS；Pica/JM/E-H 三项仍**仅** SHA 固定 JAR 安装、注册和移除，绝不推定站点搜索/登录/章节/图片。
+- **Android 原四标签 clean App + 独立同签 Host 的真 Pepper&Carrot UI/Reader/离线闭环**：`74db198` 已增补原有 Android35 ADB 工作流（不新建 Reader/DB/运行器），新源固定扩展 SHA-256，要求用户显式绑定真实来源、浏览、原 Reader 两张实际图片、单章本地写入后断开 Host 并在新进程逐页验证文件字节。前一 `74db198` Android run [#42628553992](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42628553992) 是 **FAIL**，原因是 Java `HostSourceManager.java:64` 的编译括号错误；已在后续 `dc6487e` 纠正。**新同源码实测 [#42633334908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42633334908) 尚无终态，本段登记时为 IN_PROGRESS，不能记为 Android 真站点 PASS。**
+- 2026-11-09 下一阻断：先取 #42633334908 实际 job/错误日志并修复真实首次失败；拿到 Android 原 App 真来源一次闭环后，再扩展到独立第二个来源（不得用同一来源的第二个漫画代替），随后推进两个平台的实体 GUI/设备确认。公开来源的 CI 成功不能替代 G2 目标 Pica/JM/E-H 账号授权访问或 G1 真机、G3 真实旧资料、G4 发布审批。所有这些仍 OPEN。

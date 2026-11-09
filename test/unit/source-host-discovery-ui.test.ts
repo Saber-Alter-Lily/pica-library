@@ -22,6 +22,7 @@ function fixture(language = 1) {
             input.action === 'bind-source' ? { selectedSource: { id: input.sourceId, name: 'Chosen', language: 'zh' }, history: [] } :
             input.action === 'search' ? { sourceId: SOURCE, page: input.page, query: input.query, hasNext: input.page < 2, books: [{ comicId: COMIC, title: '<script>inert title</script>', sourceId: SOURCE }] } :
             input.action === 'select' ? { sessionId: SESSION, comicId: input.comicId, title: 'Selected' } :
+            input.action === 'resume-saved' ? { sessionId: SESSION, comicId: input.comicId, title: 'Selected', selectedSource: { id: SOURCE, name: 'Chosen', language: 'zh' } } :
             input.action === 'saved' ? { books: [{ comicId: COMIC, title: '<script>saved title</script>', sourceId: SOURCE }], total: 1 } :
             input.action === 'list' ? { books: [], offset: 0, hasNext: false } : input.action === 'close' ? { closed: true } : null
         if (!value) throw Error('Unexpected local command')
@@ -78,7 +79,8 @@ it('shows previously selected works only after source binding, filters locally a
     expect(f.get('saved-panel').hidden).toBe(true)
     expect(f.commands('saved')).toEqual([])
     await f.start()
-    expect(f.commands('saved')).toEqual([])
+    await vi.waitFor(() => expect(f.get('saved-list').textContent).toContain('<script>saved title</script>'))
+    expect(f.get('saved-panel').hidden).toBe(false)
     await f.bind()
     await vi.waitFor(() => expect(f.get('saved-list').textContent).toContain('<script>saved title</script>'))
     expect(f.get('saved-panel').hidden).toBe(false)
@@ -93,6 +95,22 @@ it('shows previously selected works only after source binding, filters locally a
     await vi.waitFor(() => expect(f.opens).toMatchObject([{ sessionId: SESSION, comicId: COMIC, csrfToken: 'local-only-csrf' }]))
     expect(f.commands('search')).toEqual([])
     expect(f.commands('saved')).toHaveLength(requests)
+})
+it('resumes an already-selected source without manual source binding or another search', async () => {
+    const f = fixture()
+    await f.start()
+    await vi.waitFor(() => expect(f.get('saved-read-' + COMIC)).not.toBe(null))
+    expect(f.get('search-form').hidden).toBe(true)
+    expect(f.get('saved-panel').hidden).toBe(false)
+    expect(f.commands('bind-source')).toEqual([])
+    await f.get('saved-read-' + COMIC).click()
+    await vi.waitFor(() => expect(f.commands('resume-saved')).toHaveLength(1))
+    await vi.waitFor(() => expect(f.opens).toMatchObject([
+        { sessionId: SESSION, comicId: COMIC, csrfToken: 'local-only-csrf',
+          selectedSource: { id: SOURCE } }
+    ]))
+    expect(f.commands('search')).toEqual([])
+    expect(f.commands('bind-source')).toEqual([])
 })
 it('busy search prevents repeat submits/read clicks; ending the session fences an ignored-abort late result', async () => {
     const f = fixture(); await f.start(); await f.bind(); f.stall(); f.search('pending'); f.search('duplicate')

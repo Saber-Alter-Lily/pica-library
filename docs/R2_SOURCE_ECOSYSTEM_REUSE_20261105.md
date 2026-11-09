@@ -60,3 +60,11 @@ Exact GitHub-managed release asset evidence:
 | `tachiyomi-zh.jinmantiantang-v1.6.64.jar` | 263387 | `5eebd0bae530be491fe1cae32d1940c3914b224c46e7b9d6dd596415ef2c8be7` |
 
 The isolated three-case CI now uses these immutable-release JARs and exact byte digests. **JAR exists / SHA validates does not prove Suwayomi loads it, nor does loading prove real-site availability.** Each case still requires a terminal install + source-ID + revoke PASS. The verified E-Hentai 1.6.36 JAR lifecycle result is separate and remains valid.
+
+### Windows saved-bookmark source restoration — 2026-11-08
+
+Android's signed Host already located an installed source from a saved online work. Windows had a saved-work index, but hid it until manually selecting a source in every newly authorized session. The single user-managed Windows Host now shows the locally persisted, Host/principal-scoped selected-work metadata immediately after explicit session consent.
+
+Clicking a saved work may locate its exact source ID among the first **200 installed Suwayomi sources** through the already existing 25-row GraphQL pagination. It then invokes the original `select` and Reader identity checks. The same path powers explicit per-chapter offline import, which still needs a separate chosen chapter and local-copy consent. If the source is missing, it stops; it never guesses alternatives, performs a title search, installs an extension, logs into another Host or automatically downloads content. The normal pure-local Windows executable remains without Host capability. No plugin runtime or manga source SDK was added.
+
+Real-source third-party content, Windows native UI, physical G1, actual v0.5.0 profile migration G3 and signed G4 release decisions remain distinct, open gates. No stored manga-site credentials or copied website adapters.

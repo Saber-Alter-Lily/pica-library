@@ -27,7 +27,16 @@ function fixture() {
         const id = Number(input.variables?.id ?? input.variables?.input?.id ?? 1), book = books.find(book => book.id === id)!
         let data: unknown
         if (input.operationName === 'PicaSourceHostInfo') data = { aboutServer: { name: 'Suwayomi-Server', version: '2.4.2366' } }
-        else if (input.operationName === 'PicaSourceHostSources') data = { sources: { nodes: [SOURCE, OTHER].map(id => ({ id, name: '<inert source>', lang: 'zh', supportsLatest: true })), pageInfo: { hasNextPage: false, hasPreviousPage: false }, totalCount: 2 } }
+        else if (input.operationName === 'PicaSourceHostSources') {
+            const offset = Number(input.variables?.offset ?? 0)
+            const pageTwo = mode === 'saved-source-page-two', missing = mode === 'saved-source-missing'
+            const rows = pageTwo ? (offset === 0 ? Array.from({ length: 25 }, (_, i) =>
+                (9007199254742000n + BigInt(i)).toString()) : [SOURCE]) :
+                missing ? [OTHER] : [SOURCE, OTHER]
+            data = { sources: { nodes: rows.map(id => ({ id, name: '<inert source>', lang: 'zh', supportsLatest: true })),
+                pageInfo: { hasNextPage: pageTwo && offset === 0, hasPreviousPage: offset > 0 },
+                totalCount: pageTwo ? 26 : rows.length } }
+        }
         else if (input.operationName === 'PicaHostSourceSearch') data = { fetchSourceManga: { mangas: [books.find(book => book.sourceId === (mode === 'wrong-source' ? OTHER : input.variables.input.source))], hasNextPage: true } }
         else if (input.operationName === 'PicaHostPrepareManga') data = { fetchMangaAndChapters: { manga: mode === 'changed-prepare' ? { ...book, url: '/replaced-row' } : book, chapters: [chapter(id)] } }
         else if (input.operationName === 'PicaHostManga') data = { manga: { ...book, chapters: { nodes: [chapter(id)] } } }
@@ -119,6 +128,41 @@ describe('explicit user-host single-source search and existing Reader, inert HTT
         await expect(f.command({ action: 'select', sessionId: a.sessionId, comicId: bIds.comicId })).rejects.toThrow('SOURCE_HOST_STALE')
         expect(await f.reader.read(a.sessionId, 'progress', {}, signal())).toMatchObject([{ comicId: aIds.comicId }])
         expect(f.reader.readingLibraryRows(b.sessionId).map(row => row.comicId)).toEqual([bIds.comicId])
+    })
+    it('saved works are locally visible after authorization and resume source page 2 without repeating a comic search', async () => {
+        const f = fixture(), first = await f.start(), ids = await f.choose(first.sessionId)
+        await f.reader.read(first.sessionId, 'save-progress', { ...ids, pageIndex: 0 }, signal())
+        await f.command({ action: 'close', sessionId: first.sessionId })
+        f.mode('saved-source-page-two')
+        const later = await f.start()
+        const beforeCalls = f.calls.length, beforeWrites = f.db.setAppState.mock.calls.length
+        expect(await f.command({ action: 'saved', sessionId: later.sessionId })).toMatchObject({
+            total: 1, books: [{ comicId: ids.comicId, sourceId: SOURCE }]
+        })
+        expect(f.calls).toHaveLength(beforeCalls)
+        expect(f.db.setAppState).toHaveBeenCalledTimes(beforeWrites)
+        const resumed = await f.command({ action: 'resume-saved', sessionId: later.sessionId, comicId: ids.comicId })
+        expect(resumed).toMatchObject({ comicId: ids.comicId, selectedSource: { id: SOURCE } })
+        expect(f.calls.filter(row => row.operation === 'PicaSourceHostSources').slice(-2)
+            .map(row => row.variables?.offset)).toEqual([0, 25])
+        expect(f.calls.filter(row => row.operation === 'PicaHostSourceSearch')).toHaveLength(1)
+        expect(await f.reader.read(later.sessionId, 'chapter', ids, signal())).toMatchObject({
+            progress: { pageIndex: 0 }
+        })
+        expect(JSON.stringify([...f.state])).not.toContain('user-host.invalid')
+    })
+    it('does not auto-switch a bound source or guess an absent bookmark extension', async () => {
+        const f = fixture(), first = await f.start(), ids = await f.choose(first.sessionId)
+        await f.command({ action: 'close', sessionId: first.sessionId })
+        f.mode('saved-source-missing')
+        const later = await f.start(), previousWrites = f.db.setAppState.mock.calls.length
+        await expect(f.command({ action: 'resume-saved', sessionId: later.sessionId,
+            comicId: ids.comicId })).rejects.toThrow('SOURCE_HOST_SOURCE_SELECTION_REQUIRED')
+        expect(f.db.setAppState).toHaveBeenCalledTimes(previousWrites)
+        f.mode('')
+        await f.bind(later.sessionId)
+        await expect(f.command({ action: 'resume-saved', sessionId: later.sessionId,
+            comicId: ids.comicId })).rejects.toThrow('SOURCE_HOST_SCOPE_REQUIRED')
     })
     it('saved search progress resumes only after new explicit source binding, without redoing recommendation state', async () => {
         const f = fixture(), first = await f.start(), ids = await f.choose(first.sessionId)

@@ -108,7 +108,7 @@
 | 批次 | 当前状态 | 阻断 | 最后证据 |
 |---|---|---|---|
 | B1 双端候选 | PACKAGE_VERIFIED / MANUAL_QA_PENDING | 物理设备交互仍未验收 | 同一产物 SHA `ecd7435` Windows/Android RC 四 job SUCCESS；Android35 原 Reader/Host 真模拟器 [#42600954633](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600954633) SUCCESS，详情见 [证据](PRODUCT_ACCEPTANCE_EVIDENCE_20261109.md) |
-| B2 两个真实来源 | IN_PROGRESS / TWO_PUBLIC_SITE_CI_VERIFIED | 真实 Windows/Android 图形设备与目标 Pica/JM/E-H 站点尚未验收；xkcd 超长目录需要新 SHA 复核 | [#42625363093](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42625363093) ComicFury 与 Pepper&Carrot 各自真实网站原 Reader → 本地完整章节 → 断源离线 Hash PASS，细节在 [B2 证据](B2_REAL_LICENSED_SOURCE_E2E_20261109.md) |
+| B2 两个真实来源 | IN_PROGRESS / THREE_PUBLIC_SITE_CI_VERIFIED_ON_WINDOWS_PATH | Android 原 clean App + signed Host 的真实 Pepper&Carrot E2E 新 run 未终态；双端真机和目标 Pica/JM/E-H 仍未验收 | [六独立来源 #42626544616](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42626544616) 6/6 SUCCESS：ComicFury、Pepper&Carrot、xkcd 各真实在线 Reader→离线保存→Host 停止后新本地 Reader；Android [#42633334908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42633334908) 尚待终态。见 [B2 证据](B2_REAL_LICENSED_SOURCE_E2E_20261109.md) |
 | B3 体验/Issue/1500 负载 | NOT_ACCEPTED | 实体手机与同源真实数据及多个日常流程未闭环 | 历史模拟器/单测和合成 1500 部只作基础 |
 | B4 升级回滚 | NOT_ACCEPTED | 真实 v0.5.0 用户资料授权 + 全量差异与异常回滚 | 公开 APK 合成实机升级属部分工程证据 |
 | B5 发布裁决 | NOT_STARTED | G1–G4、54 项逐行回执及用户批准 | Draft #284，不更改 main |
@@ -118,3 +118,9 @@
 - 详细精确 SHA/证书/实际文件 Hash 与 Actions run：见 [B1 验收证据档](PRODUCT_ACCEPTANCE_EVIDENCE_20261109.md)。可信 `push` [RC run #42600954377](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600954377) 的 `contract`、`windows-rc`、`android-rc`、`artifact-summary` 全部 SUCCESS；`RC_STATUS.json` 明确为 `INSTALLABLE_ARTIFACTS_READY_MANUAL_QA_PENDING`。
 - 外部 504 阻断已在实际后续 [K3](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600963036)、[v0.4 升级](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600962878)、[P2](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600962896)、[标准 CI](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600962848) 和 [综合验收](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600962905) 中得到 SUCCESS；仍需注意后续不同网络环境的可重现性。
 - 此次工程关闭**不代表**真实手机 G1、两来源真站点 G2、真实用户资料 G3 或签正式版 G4 通过。B2 可以在 B1 的安装包基础上进入真实来源验证；无法获授权测试源时不得伪造 PASS。
+
+### 2026-11-09 B2 新 checkpoint（工程结果不代替实体设备）
+
+- 新真实网站矩阵 [#42626544616](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42626544616) 在 `e7ceb9c` 为 **6/6 terminal SUCCESS**：其中 xkcd 在线实际两页 → 原本地 Reader 明确保存一章 → Host 停止后离线启动成功，修复此前 #42625363093 的 `SOURCE_HOST_TOO_LARGE`。边界仍为 5,000 章与 1 MiB 响应限制；Pica/JM/E-H 仍只有扩展安装/撤销证据。
+- `74db198` 新增 **原 Android35 signed Host + 真 Pepper&Carrot** QA 实际用户路径；该 run 编译先因 `HostSourceManager.java:64` 失误失败，`dc6487e` 已对源码修复。新 [Android35 run #42633334908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42633334908) 在本 checkpoint 仍为 IN_PROGRESS。后续要读取最终真实 log，不能提前写 Android PASS。
+- G1 实体双端、G2 双端两种独立来源及目标来源实测、G3 授权真实资料、G4 用户批准仍全部 OPEN。详细变更与原因见 [B2 记录](B2_REAL_LICENSED_SOURCE_E2E_20261109.md)。下个批次先以 Android 实际失败点推进，不因 xkcd 已通过而改做新框架。

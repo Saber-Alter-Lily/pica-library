@@ -108,7 +108,7 @@
 | 批次 | 当前状态 | 阻断 | 最后证据 |
 |---|---|---|---|
 | B1 双端候选 | PACKAGE_VERIFIED / MANUAL_QA_PENDING | 物理设备交互仍未验收 | 同一产物 SHA `ecd7435` Windows/Android RC 四 job SUCCESS；Android35 原 Reader/Host 真模拟器 [#42600954633](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600954633) SUCCESS，详情见 [证据](PRODUCT_ACCEPTANCE_EVIDENCE_20261109.md) |
-| B2 两个真实来源 | IN_PROGRESS / THREE_PUBLIC_SITE_CI_VERIFIED_ON_WINDOWS_PATH | Android 原 clean App + signed Host 的真实 Pepper&Carrot E2E 新 run 未终态；双端真机和目标 Pica/JM/E-H 仍未验收 | [六独立来源 #42626544616](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42626544616) 6/6 SUCCESS：ComicFury、Pepper&Carrot、xkcd 各真实在线 Reader→离线保存→Host 停止后新本地 Reader；Android [#42633334908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42633334908) 尚待终态。见 [B2 证据](B2_REAL_LICENSED_SOURCE_E2E_20261109.md) |
+| B2 两个真实来源 | IN_PROGRESS / WINDOWS_3_PUBLIC_SITES_PASS__ANDROID_REAL_IMAGE_FAIL_UNDER_RETEST | 原 Android Reader 已真实连通 Pepper&Carrot，但第二页显示 Image failed，未完成离线闭环；尚需双端真机与目标 Pica/JM/E-H | [六独立来源 #42626544616](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42626544616) 6/6 SUCCESS，其中三个公开来源原 Windows 组件在线→保存→断源离线 PASS；[Android #42633334908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42633334908) 在真站点 Reader 图片步骤 FAIL。MIME 兼容修复已推送，新 [Android #42638248893](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42638248893) 待终态，见 [B2 证据](B2_REAL_LICENSED_SOURCE_E2E_20261109.md) |
 | B3 体验/Issue/1500 负载 | NOT_ACCEPTED | 实体手机与同源真实数据及多个日常流程未闭环 | 历史模拟器/单测和合成 1500 部只作基础 |
 | B4 升级回滚 | NOT_ACCEPTED | 真实 v0.5.0 用户资料授权 + 全量差异与异常回滚 | 公开 APK 合成实机升级属部分工程证据 |
 | B5 发布裁决 | NOT_STARTED | G1–G4、54 项逐行回执及用户批准 | Draft #284，不更改 main |
@@ -124,3 +124,9 @@
 - 新真实网站矩阵 [#42626544616](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42626544616) 在 `e7ceb9c` 为 **6/6 terminal SUCCESS**：其中 xkcd 在线实际两页 → 原本地 Reader 明确保存一章 → Host 停止后离线启动成功，修复此前 #42625363093 的 `SOURCE_HOST_TOO_LARGE`。边界仍为 5,000 章与 1 MiB 响应限制；Pica/JM/E-H 仍只有扩展安装/撤销证据。
 - `74db198` 新增 **原 Android35 signed Host + 真 Pepper&Carrot** QA 实际用户路径；该 run 编译先因 `HostSourceManager.java:64` 失误失败，`dc6487e` 已对源码修复。新 [Android35 run #42633334908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42633334908) 在本 checkpoint 仍为 IN_PROGRESS。后续要读取最终真实 log，不能提前写 Android PASS。
 - G1 实体双端、G2 双端两种独立来源及目标来源实测、G3 授权真实资料、G4 用户批准仍全部 OPEN。详细变更与原因见 [B2 记录](B2_REAL_LICENSED_SOURCE_E2E_20261109.md)。下个批次先以 Android 实际失败点推进，不因 xkcd 已通过而改做新框架。
+
+### 2026-11-09 B2 纠正 checkpoint：Android 真图失败、复测已发起
+
+先前标记“#42633334908 in progress”仅表示当时的快照；**最终已确认 terminal FAIL**，错误发生在原四标签 Android Reader 真实 Pepper&Carrot 第二页图片显示（“Image failed · view details”），并非外部来源安装、Suwayomi GraphQL 或编译失败。实际按钮操作已经抵达 Reader，但仍**不能**判定 Android 成功阅读。Windows 已实测的 ComicFury、Pepper&Carrot、xkcd 在线到离线链路仍分别 PASS，不覆盖这一失败。
+
+本批在**原代码**补了 Android 严格 `image/jpg`→`image/jpeg` 规范化与原 HostHttpTest JPEG magic 回归，并在原自动化出现失败时只留匿名分类诊断；另复用 Android 已有方式在 Windows Host 页面新增用户主动打开已保存 Host 来源管理 WebUI。核心 Reader/缓存/来源执行器/升级器均未新建。新 [Android35 #42638248893](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42638248893) 已进入队列，等待**实际终态**；MIME 仍只是待验证的原因假设。Windows 用户界面补丁也待同 SHA CI 验证，未发布。下一次首先读取此 Android job 真实日志，若未通过，不进入 B2 Android 完成或 B3 正式验收。细节见 [B2 日志](B2_REAL_LICENSED_SOURCE_E2E_20261109.md)。

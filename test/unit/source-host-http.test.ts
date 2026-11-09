@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { sourceHostHttp } from '../../src/source-hosts/http-transport'
+import { sourceHostBytes } from '../../src/source-hosts/http-body'
 import { sourceHostRequest, SOURCE_HOST_RESPONSE_BYTES } from '../../src/source-hosts/contract'
 
 const connection = (auth?: unknown) => sourceHostRequest({ kind: 'suwayomi', endpoint: 'http://127.0.0.1:4567/prefix/', consent: true, auth }).connection
@@ -44,6 +45,20 @@ describe('source-host bounded HTTP adapter — injected fetch, never a socket', 
     it.each(['text/html', 'text/plain', 'application/jsonp'])('refuses non-JSON response %s', async contentType => {
         const fake = vi.fn(async () => response(payload, { 'content-type': contentType }))
         await expect(sourceHostHttp(connection(), fake).read('info', {}, signal())).rejects.toMatchObject({ code: 'SOURCE_HOST_PROTOCOL' })
+    })
+    it('normalizes an actual Suwayomi image/jpg response to JPEG, but rejects unrecognized media', async () => {
+        const validJpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9])
+        const route = 'api/v1/manga/1/chapter/0/page/0'
+        const read = (type: string) => sourceHostBytes(connection(), route, undefined,
+            signal(), 1024, true, async () => new Response(validJpeg, {
+                headers: { 'content-type': type }
+            }))
+        const result = await read('image/jpg')
+        expect(result.contentType).toBe('image/jpeg')
+        expect(result.data).toEqual(validJpeg)
+        await expect(read('image/svg+xml')).rejects.toMatchObject({
+            code: 'SOURCE_HOST_PROTOCOL'
+        })
     })
     it('accepts the GraphQL JSON media type and valid UTF8 content', async () => {
         const value = { data: { label: '本地の synthetic' } }, fake = vi.fn(async () => response(value, { 'content-type': 'application/graphql-response+json; charset=utf-8' }))

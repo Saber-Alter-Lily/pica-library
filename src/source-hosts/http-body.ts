@@ -16,7 +16,11 @@ export async function sourceHostBytes(connection: SourceHostConnection, route: s
     if (response.status >= 300 && response.status < 400) reject('SOURCE_HOST_REDIRECT')
     if (response.status === 401 || response.status === 403) reject('SOURCE_HOST_AUTH_REQUIRED')
     if (!response.ok) reject('SOURCE_HOST_UNAVAILABLE')
-    const contentType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+    const declaredType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+    // Suwayomi can emit the widespread alias image/jpg for valid JPEG
+    // pages. Canonicalize just this alias; the original Reader still checks
+    // the actual JPEG signature before displaying or persisting the image.
+    const contentType = raster && declaredType === 'image/jpg' ? 'image/jpeg' : declaredType
     if (!(raster ? ['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(contentType) : ['application/json', 'application/graphql-response+json'].includes(contentType)) || !response.body) reject('SOURCE_HOST_PROTOCOL')
     const length = response.headers.get('content-length')
     if (length !== null && (!/^\d+$/.test(length) || Number(length) > limit)) reject('SOURCE_HOST_TOO_LARGE')

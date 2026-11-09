@@ -11,6 +11,8 @@ function fixture(language = 1, initialSaved = true) {
     const dom = inertReadingDom(), exports: Record<string, any> = {}, timers = new Map<number, () => void>()
     let timer = 0, stalled = false, release = () => {}
     let savedByUser = initialSaved
+    const externalOpens = vi.fn()
+    Object.assign(dom.window, { open: externalOpens })
     const opens: unknown[] = [], host = { id: HOST, revision: 1, enabled: true, label: 'My <host>', endpoint: 'https://user-host.invalid/', authMode: 'none' }
     const fetcher = vi.fn(async (url: string, init: any = {}) => {
         expect(url).toMatch(/^\/api\/v1\/desktop\//)
@@ -33,7 +35,7 @@ function fixture(language = 1, initialSaved = true) {
     })
     dom.document.addEventListener('pica-open-hosted-reader', event => opens.push(event.detail))
     const context = { exports, require: (name: string) => { expect(name).toBe('./locale-runtime.js'); return { copy: (...values: string[]) => values[language] } },
-        document: dom.document, window: dom.window, fetch: fetcher, CustomEvent: Event, AbortController, DOMException, Date, Error,
+        document: dom.document, window: dom.window, fetch: fetcher, CustomEvent: Event, AbortController, DOMException, Date, Error, URL,
         setTimeout: (action: () => void) => { timers.set(++timer, action); return timer }, clearTimeout: (id: number) => timers.delete(id) }
     Object.assign(exports, inertHostWebModules(context, (...values) => values[language])('web/host-library.js'))
     const get = (id: string) => dom.document.getElementById('host-library-' + id)!
@@ -44,10 +46,23 @@ function fixture(language = 1, initialSaved = true) {
     const bind = async () => { await get('bind-source').click(); await vi.waitFor(() => expect(get('query').disabled).toBe(false)) }
     const search = (query = 'sample') => { get('query').value = query; get('search-form').onsubmit?.({ preventDefault() {} }) }
     cleanup.push(() => dom.window.dispatchEvent(new Event('pagehide')))
-    return { ...dom, get, configure, fetcher, commands, start, bind, search, opens, exports,
+    return { ...dom, get, configure, fetcher, commands, start, bind, search, opens, externalOpens, exports,
         stall: () => { stalled = true }, release: () => release() }
 }
 
+it.each([0, 1, 2])('original Windows Host opens only its explicitly configured extension manager (%s)', async language => {
+    const f = fixture(language)
+    expect(f.get('manage-host').textContent).toContain([
+        '在浏览器中管理我自己的 Host 来源', 'Manage sources in my Host browser', '自分の Host のソースをブラウザで管理'
+    ][language])
+    expect(f.fetcher).not.toHaveBeenCalled()
+    await f.get('manage-host').click()
+    expect(f.externalOpens).toHaveBeenCalledExactlyOnceWith(
+        'https://user-host.invalid/', '_blank', 'noopener,noreferrer')
+    expect(f.fetcher).not.toHaveBeenCalled()
+    expect(f.commands('start')).toEqual([])
+    expect(f.opens).toEqual([])
+})
 it.each([0, 1, 2])('actual localized UI has no boot/panel requests, and source choice does not auto-search (%s)', async language => {
     const f = fixture(language)
     expect(f.fetcher).not.toHaveBeenCalled()

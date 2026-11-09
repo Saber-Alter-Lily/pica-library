@@ -99,12 +99,12 @@ it('removes only a confirmed local Host locator from original Windows UI without
     await vi.waitFor(() => expect(f.document.getElementById('host-library-saved-remove-' + BOOK)).not.toBe(null))
     const remove = f.document.getElementById('host-library-saved-remove-' + BOOK)!
     const confirmation = f.document.getElementById('host-library-saved-confirm-' + BOOK)!
-    expect(confirmation.parentElement!.hidden).toBe(true)
+    expect(confirmation.hidden).toBe(true)
     await remove.click()
-    expect(confirmation.parentElement!.hidden).toBe(false)
+    expect(confirmation.hidden).toBe(false)
     expect(f.fetcher.mock.calls.some(([,options]) => options.body && JSON.parse(options.body).action === 'remove-saved')).toBe(false)
     await f.document.getElementById('host-library-saved-cancel-' + BOOK)!.click()
-    expect(confirmation.parentElement!.hidden).toBe(true)
+    expect(confirmation.hidden).toBe(true)
     expect(remove.hidden).toBe(false)
     await remove.click()
     await confirmation.click()

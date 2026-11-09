@@ -896,8 +896,10 @@ def source_free_user_host_flow():
                       direction="up",only_class="Button")
         # The Host component owns no local inventory; Back returns to the
         # one no-INTERNET Reader, whose original Library keeps the saved copy.
-        tap_scrolling(("Back to Reader","返回阅读器","Reader に戻る"),
-                      direction="up",only_class="Button")
+        # The Host back control is fixed above the ScrollView (y~96 on
+        # Android35), outside the scroll helper's >=100 coordinate rule.
+        tap(("Back to Reader","返回阅读器","Reader に戻る"),
+            exact=True,only_class="Button",seconds=25)
         wait(("Import CBZ","导入 CBZ","CBZ 取込"),seconds=25)
 
         # Verify original Reader retains the Binder-imported chapter even
@@ -988,8 +990,10 @@ def source_free_user_host_flow():
         wait(("Connect and list sources","连接并读取来源",
               "接続してソースを表示"),seconds=25)
         record("explicit source switch revokes old Host session while retaining saved online and offline work")
-        tap_scrolling(("Back to Reader","返回阅读器","Reader に戻る"),
-                      direction="up",only_class="Button")
+        # The Host back control is fixed above the ScrollView (y~96 on
+        # Android35), outside the scroll helper's >=100 coordinate rule.
+        tap(("Back to Reader","返回阅读器","Reader に戻る"),
+            exact=True,only_class="Button",seconds=25)
         PACKAGE = QA_PACKAGE
         wait(("Import CBZ", "导入 CBZ", "CBZ 取込"),seconds=30)
         # Explicitly approved re-connect and saved-source discovery above

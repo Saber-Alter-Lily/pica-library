@@ -1789,6 +1789,241 @@ def original_large_shelf_flow():
     }, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+
+def licensed_public_android_source_flow():
+    """Actual third-party Pepper&Carrot -> original signed Android Reader.
+
+    Reuse the official Suwayomi process, the original clean four-tab app,
+    HostBrowserActivity/HostSourceManager and first-party Binder importer.
+    No site credentials, extensions in core, public comic image screenshots,
+    or persistent test images outside this disposable runner.
+    """
+    global PACKAGE, STEP
+    STEP = "b2-public-licensed-extension-setup"
+    jar = Path(os.environ["PICA_B2_PEPPER_JAR"]).resolve(strict=True)
+    if jar.stat().st_size != 137527 or hashlib.sha256(jar.read_bytes()).hexdigest() != (
+            "7f0b9912a59c45d8c4ae147fdbed9231558aaa52715886c4dc390368c163c37d"):
+        raise AssertionError("Licensed extension archive digest/size mismatch")
+    import importlib.util
+    helper_spec = importlib.util.spec_from_file_location(
+        "pica_pinned_extension_helper", Path(__file__).with_name(
+            "r2-real-extension-host-smoke.py"))
+    if helper_spec is None or helper_spec.loader is None:
+        raise AssertionError("Existing pinned extension helper unavailable")
+    helper = importlib.util.module_from_spec(helper_spec)
+    helper_spec.loader.exec_module(helper)
+    imported = None
+    original_hashes = []
+    original_total = 0
+    external_source_id = None
+    with pinned_official_suwayomi_local_source():
+        before_sources = helper.source_ids()
+        extension = helper.install_external_archive(jar)
+        if (extension.get("pkgName") !=
+                "eu.kanade.tachiyomi.extension.all.peppercarrot" or
+                extension.get("versionName") != "1.6.1" or
+                extension.get("isInstalled") is not True):
+            raise AssertionError("Host did not install the exact author-licensed extension")
+        added = [item for item in helper.source_rows()
+                 if item["id"] not in before_sources and
+                 "pepper" in item["name"].lower().replace(" ", "")]
+        if len(added) != 1:
+            raise AssertionError("Cannot uniquely identify the real Pepper&Carrot source")
+        external_source_id = added[0]["id"]
+        record("pinned independent Pepper&Carrot JAR installed in official Host, not in Reader")
+
+        # All app identities are disposable QA packages; never touch stable
+        # com.picalibrary.android or any user-owned source/account/profile.
+        adb("shell", "pm", "clear", USER_HOST_PACKAGE)
+        adb("shell", "am", "force-stop", CLEAN_PACKAGE)
+        PACKAGE = CLEAN_PACKAGE
+        adb("shell", "am", "start", "-W", "-n",
+            CLEAN_PACKAGE + "/com.picalibrary.android.DisclaimerActivity", timeout=55)
+        later = wait(("稍后再看", "Later", "後で"), seconds=8,
+                     required=False, only_class="Button")
+        if later:
+            adb("shell", "input", "tap", str(later[0]), str(later[1]))
+        wait(("我的书库", "My library", "マイライブラリ"), seconds=55)
+        tap(("在线", "Online", "オンライン"), exact=True, only_class="Button")
+        tap(("我的外接来源", "My external sources", "外部ソース"), seconds=40)
+        PACKAGE = USER_HOST_PACKAGE
+        wait(("No Host connected", "尚未连接 Host", "未接続"), seconds=35)
+
+        STEP = "b2-public-licensed-connect-user-host"
+        type_into_host(("Host name", "连接名称", "接続名"),
+                       "Licensed_Public_Only")
+        type_into_host(("Host URL", "Host URL (http:// 或 https://)"),
+                       "http://127.0.0.1:4567/")
+        tap_scrolling(("Save configuration", "保存配置", "設定を保存"),
+                      only_class="Button")
+        until_data("user-host-config-v1.json", lambda value:
+                   value.get("endpoint") == "http://127.0.0.1:4567/" and
+                   value.get("enabled") is False, seconds=30)
+        tap_scrolling(("Authorize this Host session",
+                       "我授权本次连接自己的 Host", "この接続を許可します"),
+                      only_class="CheckBox")
+        tap_scrolling(("Enable / disable Host", "启用 / 停用 Host",
+                       "Host 有効／無効"), only_class="Button")
+        until_data("user-host-config-v1.json",
+                   lambda value: value.get("enabled") is True, seconds=30)
+        tap_scrolling(("Connect and list sources", "连接并读取来源",
+                       "接続してソースを表示"), only_class="Button")
+
+        STEP = "b2-public-licensed-select-external-source"
+        # Select the already installed source by its actual Android Spinner,
+        # not by an index or a hard-coded language/LongString identity.
+        spinner = None
+        for _ in range(12):
+            for _, _, bounds, kind in nodes():
+                if not kind.endswith("Spinner"):
+                    continue
+                match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds)
+                if match:
+                    x1, y1, x2, y2 = map(int, match.groups())
+                    if x1 < x2 and 120 <= (y1+y2)//2 <= 1170:
+                        spinner = ((x1+x2)//2, (y1+y2)//2)
+                        break
+            if spinner:
+                break
+            adb("shell", "input", "swipe", "360", "980", "360", "420", "320")
+        if spinner is None:
+            raise AssertionError("Original Host source selector unavailable")
+        adb("shell", "input", "tap", str(spinner[0]), str(spinner[1]))
+        tap(("Pepper&Carrot", "Pepper & Carrot"), seconds=35)
+        tap_scrolling(("Use selected source", "选择此来源", "ソースを選択"),
+                      only_class="Button")
+
+        STEP = "b2-public-licensed-browse-original-reader"
+        tap_scrolling(("Browse this source (no search needed)",
+                       "浏览此来源作品（无需搜索词）",
+                       "このソースを閲覧（検索語不要）"), only_class="Button")
+        tap_scrolling(("Read · Pepper&Carrot", "阅读 · Pepper&Carrot",
+                       "読む · Pepper&Carrot"), only_class="Button")
+        dismiss_immersive_help()
+        # Reader chrome may auto-hide; reveal the counter and check two pages
+        # without capturing/re-uploading the actual comic artwork.
+        first = wait(("1 / ", "1/"), seconds=6, required=False)
+        if not first:
+            adb("shell", "input", "tap", "360", "480")
+            first = wait(("1 / ", "1/"), seconds=70)
+        numbers = re.search(r"1\s*/\s*(\d+)", first[2])
+        if not numbers or int(numbers.group(1)) < 2:
+            raise AssertionError("Actual source did not expose two Reader pages")
+        total = int(numbers.group(1))
+        advance_reader_next()
+        wait(("2 / " + str(total), "2/" + str(total)), seconds=50)
+        active = adb("shell", "dumpsys", "activity", "activities", timeout=35)
+        if ("com.picalibrary.android.ExternalReaderActivity" not in active or
+                CLEAN_PACKAGE not in active):
+            raise AssertionError("External site did not open original clean ReaderActivity")
+        record("real public-source image pages 1 and 2 opened in original clean signed Android Reader")
+
+        STEP = "b2-public-licensed-save-selected-chapter"
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        tap_scrolling(("Save to Reader library", "保存到阅读器书库",
+                       "Reader 書庫に保存"), direction="down", only_class="Button")
+        wait(("Save to original Reader", "保存到原阅读器书库",
+              "元の Reader に保存"), seconds=40)
+        tap(("Choose chapter to save", "选择要保存的章节",
+             "保存する章を選択"), seconds=40, only_class="Button")
+        chapter_list = next((node for node in hierarchy().iter("node")
+                             if node.attrib.get("class", "").endswith("ListView")), None)
+        if chapter_list is None:
+            raise AssertionError("Original chapter selector is not a native ListView")
+        titles = [item.attrib["text"] for item in chapter_list.iter("node")
+                  if item.attrib.get("text", "").strip() and
+                  item.attrib.get("class", "").endswith("TextView")]
+        if not titles:
+            raise AssertionError("Real source has no selectable chapter rows")
+        tap(titles[0], seconds=30, exact=True, only_class="TextView")
+        tap(("Save this chapter", "保存这一章", "この章を保存"),
+            exact=True, only_class="Button", seconds=30)
+
+        PACKAGE = CLEAN_PACKAGE
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            candidates = [book for book in book_rows()
+                          if "Pepper&Carrot" in book.get("title", "") and
+                          len(book.get("pages", [])) >= 2]
+            if candidates:
+                imported = candidates[-1]
+                break
+            time.sleep(1)
+        if imported is None:
+            raise AssertionError("Real public source did not enter original clean local library")
+        image_root = ("files/local-comics-v1/" +
+                      imported["id"].removeprefix("local:") + "/" +
+                      imported["generation"] + "/")
+        original_hashes = []
+        for image in imported["pages"]:
+            owned = adb("exec-out", "run-as", CLEAN_PACKAGE,
+                        "cat", image_root + image["file"], binary=True)
+            if len(owned) < 48:
+                raise AssertionError("Source-imported image page is empty")
+            original_hashes.append(hashlib.sha256(owned).hexdigest())
+        original_total = len(original_hashes)
+        PACKAGE = USER_HOST_PACKAGE
+        record("real public-source chapter explicitly saved into original clean app-private library")
+
+        STEP = "b2-public-licensed-revoke-host"
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        tap_scrolling(("Disconnect", "断开会话", "セッション終了"),
+                      direction="up", only_class="Button")
+        adb("shell", "am", "force-stop", USER_HOST_PACKAGE)
+
+    # Pinned official Suwayomi has actually terminated; no ADB reverse or Host.
+    STEP = "b2-public-licensed-offline-after-host-stop"
+    try:
+        urllib.request.urlopen("http://127.0.0.1:4567/api/graphql", timeout=1)
+    except OSError:
+        pass
+    else:
+        raise AssertionError("Suwayomi is still reachable after stop")
+    adb("shell", "am", "force-stop", CLEAN_PACKAGE)
+    PACKAGE = CLEAN_PACKAGE
+    adb("shell", "am", "start", "-W", "-n",
+        CLEAN_PACKAGE + "/com.picalibrary.android.DisclaimerActivity", timeout=55)
+    later = wait(("稍后再看", "Later", "後で"), seconds=8,
+                 required=False, only_class="Button")
+    if later:
+        adb("shell", "input", "tap", str(later[0]), str(later[1]))
+    wait(("我的书库", "My library", "マイライブラリ"), seconds=50)
+    reread = next((book for book in book_rows()
+                   if book.get("id") == imported["id"]), None)
+    if reread is None:
+        raise AssertionError("Completed chapter absent after Host termination")
+    image_root = ("files/local-comics-v1/" +
+                  reread["id"].removeprefix("local:") + "/" +
+                  reread["generation"] + "/")
+    after_hashes = [hashlib.sha256(adb(
+        "exec-out", "run-as", CLEAN_PACKAGE, "cat",
+        image_root + image["file"], binary=True)).hexdigest()
+        for image in reread["pages"]]
+    if after_hashes != original_hashes:
+        raise AssertionError("Offline Reader byte hashes differ after Host stop")
+    tap("Pepper&Carrot", seconds=45)
+    tap(("阅读", "Read", "読む"), only_class="Button", seconds=40)
+    dismiss_immersive_help()
+    wait(("1 / " + str(original_total),
+          "1/" + str(original_total)), seconds=45)
+    record("Host stopped: original four-tab Clean app opens preserved real-source offline chapter")
+    (ROOT / "b2-public-license-android.json").write_text(json.dumps({
+        "result": "EMULATOR_PUBLIC_LICENSED_SOURCE_PASS",
+        "source": "Pepper&Carrot",
+        "sourceId": external_source_id,
+        "extensionSha256": "7f0b9912a59c45d8c4ae147fdbed9231558aaa52715886c4dc390368c163c37d",
+        "realPagesRead": 2,
+        "localPagesVerified": original_total,
+        "offlineHashesIdentical": True,
+        "originalFourTabApp": CLEAN_PACKAGE,
+        "signedHostPackage": USER_HOST_PACKAGE,
+        "hostStopped": True,
+        "copyrightedImagesExported": False,
+        "physicalDevice": False,
+        "userDataTouched": False,
+    }, indent=2), encoding="utf-8")
+
+
 def main():
     global STEP
     try:
@@ -1814,12 +2049,14 @@ def main():
         clean_original_in_place_upgrade()
         legacy_dev_to_clean_compat_upgrade()
         original_large_shelf_flow()
+        licensed_public_android_source_flow()
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",
             "package": QA_PACKAGE,
             "also_tested": [ORIGINAL_PACKAGE, CLEAN_PACKAGE, USER_HOST_PACKAGE],
-            "network_source": "synthetic loopback and pinned official Suwayomi built-in local source only"},
+            "network_source": "synthetic, official Suwayomi Local Source, and independent Pepper&Carrot public extension",
+            "realPublicSiteOriginalAndroidOffline": True},
             ensure_ascii=False, indent=2), encoding="utf-8")
         print("S3 LOCAL END-TO-END PASS", flush=True)
     except Exception as error:
@@ -1835,10 +2072,13 @@ def main():
         (ROOT / "results.json").write_text(json.dumps({
             "result": "FAIL", "step": STEP, "error": str(error), "checks": CHECKS
         }, ensure_ascii=False, indent=2), encoding="utf-8")
-        try:
-            page("failure-" + re.sub("[^a-z0-9-]", "-", STEP.lower())[:48])
-        except Exception as capture_error:
-            print(f"Diagnostic capture failed: {capture_error}", file=sys.stderr)
+        # A licensed public manga page can be visible on failure. Never
+        # capture/re-upload third-party comic image pixels in CI artifacts.
+        if not STEP.startswith("b2-public-licensed"):
+            try:
+                page("failure-" + re.sub("[^a-z0-9-]", "-", STEP.lower())[:48])
+            except Exception as capture_error:
+                print(f"Diagnostic capture failed: {capture_error}", file=sys.stderr)
         raise
     finally:
         trace = adb("logcat", "-d", "-s", "AndroidRuntime:E", "ActivityTaskManager:W",

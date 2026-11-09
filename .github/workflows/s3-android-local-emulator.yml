@@ -44,7 +44,7 @@ jobs:
   local-ui-flow:
     if: github.repository == 'Saber-Alter-Lily/pica-library' && (github.event_name != 'pull_request' || github.head_ref != 'codex/product-integration-r1-20261102')
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 43
     steps:
       - uses: actions/checkout@v4
       # Real Suwayomi needs Java 21. Keep Java 17 as the default for
@@ -82,6 +82,16 @@ jobs:
             'af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd' \
             "$RUNNER_TEMP/pica-r2-official-host.jar" | sha256sum --check -
           test "$(stat --format=%s "$RUNNER_TEMP/pica-r2-official-host.jar")" = '182952426'
+      - name: Fetch SHA256-pinned public Pepper&Carrot JAR for disposable Android Host E2E
+        run: |
+          set -euo pipefail
+          jar="$RUNNER_TEMP/pica-b2-peppercarrot.jar"
+          curl --fail --location --retry 2 --retry-delay 3 --max-time 120 \
+            'https://github.com/keiyoushi/extensions/releases/download/b035310-0/tachiyomi-all.peppercarrot-v1.6.1.jar' \
+            --output "$jar"
+          printf '%s  %s\n' \
+            '7f0b9912a59c45d8c4ae147fdbed9231558aaa52715886c4dc390368c163c37d' "$jar" | sha256sum --check -
+          test "$(stat --format=%s "$jar")" = '137527'
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
@@ -103,6 +113,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           PICA_R2_REAL_HOST_JAR: ${{ runner.temp }}/pica-r2-official-host.jar
+          PICA_B2_PEPPER_JAR: ${{ runner.temp }}/pica-b2-peppercarrot.jar
         with:
           api-level: 35
           arch: x86_64

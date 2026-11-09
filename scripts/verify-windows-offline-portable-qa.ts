@@ -192,6 +192,8 @@ async function verifyOriginalNativeLauncherCorePreview(
             const status = await (await get('/api/v1/desktop/status')).json() as any
             if (!status.coreOnly || !status.hostedLibraryReader?.available ||
                 !status.hostedSourceBrowser?.available ||
+                status.hostedLibraryReader?.downloads !== true ||
+                status.hostedSourceBrowser?.downloads !== true ||
                 status.externalSources?.enabled?.length !== 0 ||
                 status.picaAccount?.enabled || status.ehAccount?.enabled)
                 throw new Error('Optional Host runtime status lost its source boundary')

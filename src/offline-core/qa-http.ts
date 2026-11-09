@@ -486,13 +486,17 @@ export async function startOfflineCoreHttp(options: QaHttpOptions): Promise<{
                         hostedLibraryReader: {
                             available: true, scope: 'explicit-session-library-read',
                             providerSearch: false, libraryImport: false,
-                            extensionInstall: false, downloads: false, native: false
+                            extensionInstall: false,
+                            downloads: options.userHost.reader.localDownloadsAvailable,
+                            native: false
                         },
                         hostedSourceBrowser: {
                             available: true,
                             scope: 'explicit-session-selected-source-search-read',
                             providerSearch: true, libraryImport: false,
-                            extensionInstall: false, downloads: false, native: false
+                            extensionInstall: false,
+                            downloads: options.userHost.reader.localDownloadsAvailable,
+                            native: false
                         }
                     } : {}),
                     nativePicker: localPickerStatus?.nativePicker ??

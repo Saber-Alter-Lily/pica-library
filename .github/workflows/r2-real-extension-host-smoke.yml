@@ -31,11 +31,11 @@ jobs:
             digest: 6e120f5a488381d4ae8960be3288e31d4d0a50b51b1e70beb0041bb692a88b74
           - kind: picacomic
             file: picacomic.jar
-            url: https://github.com/keiyoushi/extensions/releases/download/4591fbc-2/tachiyomi-zh.picacomic-v1.6.14.jar
+            url: https://github.com/keiyoushi/extensions/releases/download/b035310-3/tachiyomi-zh.picacomic-v1.6.14.jar
             digest: c62a89ce82e67640ef6de0feff3c76030622066d185530fd576264e98f40cb0a
           - kind: jinmantiantang
             file: jinmantiantang.jar
-            url: https://github.com/keiyoushi/extensions/releases/download/4591fbc-2/tachiyomi-zh.jinmantiantang-v1.6.64.jar
+            url: https://github.com/keiyoushi/extensions/releases/download/b035310-3/tachiyomi-zh.jinmantiantang-v1.6.64.jar
             digest: 5eebd0bae530be491fe1cae32d1940c3914b224c46e7b9d6dd596415ef2c8be7
           # Two independent, author-licensed public sites, not private accounts.
           - kind: peppercarrot

@@ -96,7 +96,9 @@ if (mode === 'offline') {
         }
         assert.ok(sourcePresent,'Exact installed external source not present')
         await command({action:'bind-source',sessionId:id,sourceId,consent:true})
-        const result = await command({action:'search',sessionId:id,query,page:1})
+        const result = await command(process.env.PICA_B2_BROWSE_POPULAR === '1'
+            ? {action:'browse',sessionId:id,page:1}
+            : {action:'search',sessionId:id,query,page:1})
         assert.ok(Array.isArray(result.books) && result.books.length)
         const selected = result.books.find((b:{title:string}) =>
             titleKey(b.title).includes(titleKey(expectedTitle)))

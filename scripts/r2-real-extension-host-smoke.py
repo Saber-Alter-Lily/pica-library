@@ -111,8 +111,8 @@ def install_external_archive(archive):
     return result["data"]["installExternalExtension"]["extension"]
 
 
-def source_ids():
-    result = set()
+def source_rows():
+    result = []
     for offset in range(0, 200, 25):
         data = graphql(
             "query Installed($first:Int!,$offset:Int!){"
@@ -120,10 +120,14 @@ def source_ids():
             "pageInfo{hasNextPage} totalCount}}",
             {"first": 25, "offset": offset},
         )["sources"]
-        result.update(row["id"] for row in data["nodes"])
+        result.extend(data["nodes"])
         if not data["pageInfo"]["hasNextPage"]:
             return result
     raise AssertionError("Installed sources exceed bounded 200-row scan")
+
+
+def source_ids():
+    return {row["id"] for row in source_rows()}
 
 
 def main():
@@ -194,14 +198,28 @@ def main():
                 if not added_sources:
                     raise AssertionError("Extension installed but no source registered")
                 if spec.get("query"):
-                    if len(added_sources) != 1:
-                        raise AssertionError("Licensed-content case requires one exact source")
+                    rows = [row for row in source_rows()
+                            if row["id"] in added_sources]
+                    # A single published JAR can register multiple language/site
+                    # identities; do not silently bind an arbitrary one.
+                    if kind == "comicfury":
+                        candidates = [row for row in rows
+                                      if row["lang"] in ("en", "all") and
+                                      "comicfury" in row["name"].lower().replace(" ", "")]
+                    else:
+                        candidates = [row for row in rows
+                                      if "pepper" in row["name"].lower().replace(" ", "")]
+                    if len(candidates) != 1:
+                        print(json.dumps({"newRegisteredSources": rows}), flush=True)
+                        raise AssertionError("Cannot identify one licensed catalogue by source language/name")
+                    selected_source = candidates[0]["id"]
                     probe_env = {key: value for key, value in os.environ.items()
                                  if key not in ("GITHUB_TOKEN", "GH_TOKEN")}
                     probe_env.update({
-                        "PICA_B2_SOURCE_ID": next(iter(added_sources)),
+                        "PICA_B2_SOURCE_ID": selected_source,
                         "PICA_B2_SAMPLE_QUERY": spec["query"],
                         "PICA_B2_SAMPLE_TITLE": spec["title"],
+                        "PICA_B2_BROWSE_POPULAR": "1" if kind == "peppercarrot" else "0",
                     })
                     subprocess.run(
                         ["pnpm", "exec", "tsx",

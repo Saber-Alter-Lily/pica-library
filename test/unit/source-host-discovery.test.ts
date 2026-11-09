@@ -151,6 +151,27 @@ describe('explicit user-host single-source search and existing Reader, inert HTT
         })
         expect(JSON.stringify([...f.state])).not.toContain('user-host.invalid')
     })
+    it('forgets an authorized online locator without requests, progress loss or cross-source removal', async () => {
+        const f = fixture(), first = await f.start(), ids = await f.choose(first.sessionId)
+        await f.reader.read(first.sessionId, 'save-progress', { ...ids, pageIndex: 0 }, signal())
+        const other = await f.start()
+        await f.bind(other.sessionId, OTHER)
+        const beforeNetwork = f.calls.length
+        const intact = JSON.stringify([...f.state].filter(([key]) => key !== 'host-reader-book-references-v1'))
+        await expect(f.command({ action: 'remove-saved', sessionId: first.sessionId,
+            comicId: ids.comicId, consent: false })).rejects.toThrow('SOURCE_HOST_CONSENT_REQUIRED')
+        await expect(f.command({ action: 'remove-saved', sessionId: other.sessionId,
+            comicId: ids.comicId, consent: true })).rejects.toThrow('SOURCE_HOST_STALE')
+        expect(await f.command({ action: 'remove-saved', sessionId: first.sessionId,
+            comicId: ids.comicId, consent: true })).toEqual({ removed: true })
+        expect(await f.command({ action: 'saved', sessionId: first.sessionId })).toEqual({ books: [], total: 0 })
+        expect(f.reader.readingLibraryRows(first.sessionId)).toEqual([])
+        expect(JSON.stringify([...f.state].filter(([key]) => key !== 'host-reader-book-references-v1'))).toBe(intact)
+        expect(f.calls).toHaveLength(beforeNetwork)
+        await f.command({ action: 'close', sessionId: first.sessionId })
+        const later = await f.start()
+        expect(await f.command({ action: 'saved', sessionId: later.sessionId })).toEqual({ books: [], total: 0 })
+    })
     it('does not auto-switch a bound source or guess an absent bookmark extension', async () => {
         const f = fixture(), first = await f.start(), ids = await f.choose(first.sessionId)
         await f.command({ action: 'close', sessionId: first.sessionId })

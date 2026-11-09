@@ -179,7 +179,7 @@ function render(value) {
     }
 }
 /** Offline metadata projection: no host RPC, no new storage or Reader. */
-function renderSavedWorks(value) {
+function renderSavedWorks(value, preservePage = false) {
     if (value !== undefined) {
         if (!value || !Array.isArray(value.books) || value.books.length > 500 || value.total !== value.books.length ||
             value.books.some(book => typeof book.comicId !== 'string' || !/^hosted:[0-9a-f-]{36}:[0-9a-f]{64}$/.test(book.comicId) ||
@@ -187,7 +187,7 @@ function renderSavedWorks(value) {
                 typeof book.sourceId !== 'string' || !/^-?[0-9]+$/.test(book.sourceId)))
             throw Error('SOURCE_HOST_PROTOCOL')
         savedBooks = value.books
-        savedOffset = 0
+        if (!preservePage) savedOffset = 0
     }
     const needle = $('saved-filter').value.trim().toLocaleLowerCase()
     const matches = savedBooks.filter(book => book.title.toLocaleLowerCase().includes(needle) || book.sourceId.includes(needle))
@@ -216,6 +216,31 @@ function renderSavedWorks(value) {
             card.append(button('saved-save-' + book.comicId, t('保存书签章节到本地…',
                 'Save bookmarked chapter locally…', 'ブックマークの章をローカルに保存…'),
                 () => void chooseDownload(book)))
+        // Android Host already allows removing a local bookmark without
+        // touching downloaded pages. Reuse that two-step UX, not another store.
+        const remove = button('saved-remove-' + book.comicId,
+            t('移除在线书签', 'Remove online bookmark', 'オンラインブックマークを削除'), () => {
+                remove.hidden = true
+                confirmation.hidden = false
+            })
+        const confirmation = document.createElement('div'); confirmation.hidden = true
+        confirmation.append(
+            node('p', t('只从本机移除此在线书签；阅读进度、已保存的本地章节和 Host 上的作品均保留。确定吗？',
+                'Forget this online bookmark on this device only. Reading progress, saved local chapters and Host data remain. Confirm?',
+                'この端末のブックマークのみ削除します。読書進捗・保存済み章・Host 側データは保持されます。')),
+            button('saved-confirm-' + book.comicId,
+                t('确认移除书签', 'Confirm bookmark removal', '削除を確定'), () => void working(async () => {
+                    const current = session?.sessionId
+                    if (!current) throw Error('SOURCE_HOST_CANCELLED')
+                    const result = await command({ action: 'remove-saved', sessionId: current,
+                        comicId: book.comicId, consent: true })
+                    if (result.removed !== true) throw Error('SOURCE_HOST_PROTOCOL')
+                    renderSavedWorks(await command({ action: 'saved', sessionId: current }), true)
+                })),
+            button('saved-cancel-' + book.comicId,
+                t('取消', 'Cancel', 'キャンセル'), () => { confirmation.hidden = true; remove.hidden = false })
+        )
+        card.append(remove, confirmation)
         list.append(card)
     }
     controls()

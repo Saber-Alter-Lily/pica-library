@@ -3,11 +3,13 @@ import { inertReadingDom, ReadingElement } from '../helpers/fake-reading-dom'
 import { inertHostWebModules } from '../helpers/inert-host-web-modules'
 
 const HOST = '64d223e0-5d29-4320-babb-5a2da654d345', SESSION = '74d223e0-5d29-4320-babb-5a2da654d345'
+const BOOK = 'hosted:' + HOST + ':' + 'a'.repeat(64)
 class InertEvent { detail: unknown; constructor(readonly type: string, options?: {detail?: unknown}) { this.detail = options?.detail } }
 const cleanups: Array<() => void> = []
 afterEach(() => { for (const close of cleanups.splice(0)) close() })
-async function fixture() {
+async function fixture(savedInitially = false) {
     const dom = inertReadingDom(), exports: Record<string, any> = {}, snapshots: unknown[] = [], scopeEvents: unknown[] = []
+    let savedBooks = savedInitially ? [{ comicId: BOOK, title: 'Saved fixture book', sourceId: '9007199254740993' }] : []
     let clock = Date.now(), timerId = 0
     const timers = new Map<number,{at:number;action:()=>void}>()
     class SessionDate extends Date { static now() { return clock } }
@@ -21,7 +23,13 @@ async function fixture() {
         if (url.endsWith('/connections')) return {ok:true,json:async()=>({schemaVersion:1,scope:'inspect-only',credentials:'per-request-not-stored',storage:'available',capabilities:{sourceInspection:true,reader:false,libraryImport:false,extensionInstall:false},hosts:[listedHost]})}
         if (input.action === 'start') { expect(input.scope).toBe('library-read'); expect(input.consent).toBe(true); return {ok:true,json:async()=>({sessionId:SESSION,expiresAt:clock+60000,capabilities:{libraryRead:true,libraryImport:false},history:[]})} }
         if (input.action === 'list') return {ok:true,json:async()=>({books:[],hasNext:false,offset:0})}
-        if (input.action === 'saved') return {ok:true,json:async()=>({books:[],total:0})}
+        if (input.action === 'saved') return {ok:true,json:async()=>({books:savedBooks,total:savedBooks.length})}
+        if (input.action === 'remove-saved') {
+            expect(input.consent).toBe(true)
+            expect(input.comicId).toBe(BOOK)
+            savedBooks = savedBooks.filter(book => book.comicId !== input.comicId)
+            return {ok:true,json:async()=>({removed:true})}
+        }
         if (input.action === 'select') return {ok:true,json:async()=>({sessionId:SESSION,comicId:input.comicId,title:'Selected title'})}
         if (input.action === 'close') return {ok:true,json:async()=>({closed:true})}
         throw Error('Unexpected local synthetic request')
@@ -84,4 +92,23 @@ it('the actual expiry callback clears authority and permits an explicit new sess
     expect(f.document.getElementById('host-library-start')!.disabled).toBe(false)
     expect(f.document.getElementById('host-library-state')!.textContent).toContain('expired')
     expect(f.fetcher.mock.calls.slice(before).map(([,options])=>JSON.parse(options.body).action)).toEqual(['close'])
+})
+
+it('removes only a confirmed local Host locator from original Windows UI without selecting a manga', async () => {
+    const f = await fixture(true)
+    await vi.waitFor(() => expect(f.document.getElementById('host-library-saved-remove-' + BOOK)).not.toBe(null))
+    const remove = f.document.getElementById('host-library-saved-remove-' + BOOK)!
+    const confirmation = f.document.getElementById('host-library-saved-confirm-' + BOOK)!
+    expect(confirmation.parentElement!.hidden).toBe(true)
+    await remove.click()
+    expect(confirmation.parentElement!.hidden).toBe(false)
+    expect(f.fetcher.mock.calls.some(([,options]) => options.body && JSON.parse(options.body).action === 'remove-saved')).toBe(false)
+    await f.document.getElementById('host-library-saved-cancel-' + BOOK)!.click()
+    expect(confirmation.parentElement!.hidden).toBe(true)
+    expect(remove.hidden).toBe(false)
+    await remove.click()
+    await confirmation.click()
+    await vi.waitFor(() => expect(f.document.getElementById('host-library-saved-count')!.textContent).toContain('Selected 0'))
+    expect(f.fetcher.mock.calls.filter(([,options]) => options.body && JSON.parse(options.body).action === 'remove-saved')).toHaveLength(1)
+    expect(f.fetcher.mock.calls.some(([,options]) => options.body && ['select', 'search', 'resume-saved', 'download-start'].includes(JSON.parse(options.body).action))).toBe(false)
 })

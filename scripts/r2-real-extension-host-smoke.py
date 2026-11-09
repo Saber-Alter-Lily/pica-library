@@ -47,6 +47,11 @@ EXTENSIONS = {
         "version": "1.6.1", "query": "The Way of the Metagamer",
         "title": "The Way of the Metagamer",
     },
+    "xkcd": {
+        "digest": "65548058e8400d82fbe2b30d03bf126012aef6123c103e6abe4de7e788c51701",
+        "package": "eu.kanade.tachiyomi.extension.all.xkcd",
+        "version": "1.6.1", "query": "xkcd", "title": "xkcd",
+    },
 }
 ENDPOINT = "http://127.0.0.1:4567/api/graphql"
 
@@ -206,6 +211,10 @@ def main():
                         candidates = [row for row in rows
                                       if row["lang"] == "en" and
                                       row["name"].lower().replace(" ", "") == "comicfury"]
+                    elif kind == "xkcd":
+                        candidates = [row for row in rows
+                                      if row["name"].strip().lower() == "xkcd" and
+                                      row["lang"] in ("en", "all", "other")]
                     else:
                         candidates = [row for row in rows
                                       if "pepper" in row["name"].lower().replace(" ", "")]
@@ -219,7 +228,7 @@ def main():
                         "PICA_B2_SOURCE_ID": selected_source,
                         "PICA_B2_SAMPLE_QUERY": spec["query"],
                         "PICA_B2_SAMPLE_TITLE": spec["title"],
-                        "PICA_B2_BROWSE_POPULAR": "1" if kind == "peppercarrot" else "0",
+                        "PICA_B2_BROWSE_POPULAR": "1" if kind in ("peppercarrot", "xkcd") else "0",
                     })
                     subprocess.run(
                         ["pnpm", "exec", "tsx",

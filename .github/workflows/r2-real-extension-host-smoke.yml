@@ -46,6 +46,10 @@ jobs:
             file: comicfury.jar
             url: https://github.com/keiyoushi/extensions/releases/download/b035310-0/tachiyomi-all.comicfury-v1.6.1.jar
             digest: 30744ec9dda0c7d7bdfa352437c383c514c7aae49815166fa4909775c2dde38e
+          - kind: xkcd
+            file: xkcd.jar
+            url: https://github.com/keiyoushi/extensions/releases/download/b035310-0/tachiyomi-all.xkcd-v1.6.1.jar
+            digest: 65548058e8400d82fbe2b30d03bf126012aef6123c103e6abe4de7e788c51701
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,12 +62,12 @@ jobs:
         with:
           node-version: '24'
       - name: Prepare existing Reader TypeScript runtime for licensed site tests
-        if: matrix.kind == 'peppercarrot' || matrix.kind == 'comicfury'
+        if: matrix.kind == 'peppercarrot' || matrix.kind == 'comicfury' || matrix.kind == 'xkcd'
         uses: pnpm/action-setup@v4
         with:
           version: '11.16.0'
       - name: Install frozen project Reader dependencies, licensed tests only
-        if: matrix.kind == 'peppercarrot' || matrix.kind == 'comicfury'
+        if: matrix.kind == 'peppercarrot' || matrix.kind == 'comicfury' || matrix.kind == 'xkcd'
         run: pnpm install --frozen-lockfile
       - name: Fetch SHA256-pinned official Host and external extension
         shell: bash

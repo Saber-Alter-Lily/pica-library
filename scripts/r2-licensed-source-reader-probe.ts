@@ -74,8 +74,38 @@ if (mode === 'offline') {
         consent:true,scope:'inspect-only'})
     connections.command({action:'set-enabled',id:HOST,expectedRevision:0,
         enabled:true,consent:true})
+    // CI-only bounded metadata trace. Keep image bytes, URLs and remote error
+    // bodies out of logs; diagnose failures using fixed operation + MIME
+    // and upstream page counts without weakening production validation.
+    const trace: Array<Record<string, string | number | boolean | null>> = []
+    const observedFetch = (async (...args: Parameters<typeof fetch>) => {
+        const init = args[1]
+        let operation = 'IMAGE'
+        if (init?.body) {
+            try { operation = JSON.parse(String(init.body)).operationName ?? 'GRAPHQL' }
+            catch { operation = 'GRAPHQL' }
+        }
+        const response = await fetch(...args)
+        const row: Record<string, string | number | boolean | null> = {
+            operation, status: response.status,
+            mime: response.headers.get('content-type')?.split(';')[0] ?? null
+        }
+        if (operation === 'PicaHostChapterPages' && response.ok) {
+            try {
+                const body: any = await response.clone().json()
+                const pages = body?.data?.fetchChapterPages?.pages
+                const chapter = body?.data?.fetchChapterPages?.chapter
+                row.pages = Array.isArray(pages) ? pages.length : -1
+                row.pageCount = Number.isInteger(chapter?.pageCount) ? chapter.pageCount : -1
+                row.graphqlError = Array.isArray(body?.errors) && body.errors.length > 0
+            } catch { row.graphqlError = true }
+        }
+        if (trace.length >= 50) trace.shift()
+        trace.push(row)
+        return response
+    }) as typeof fetch
     const hosted = new HostedLibraryReader(connections, db,
-        () => new PreviewCacheManager(path.join(root,'image-cache')), fetch, Date.now,
+        () => new PreviewCacheManager(path.join(root,'image-cache')), observedFetch, Date.now,
         {saveChapter: input => importer.importGeneratedChapter(input),
          resources: new RuntimeResourceCoordinator()})
     const command = (input: Record<string, unknown>) =>
@@ -134,7 +164,7 @@ if (mode === 'offline') {
                     throw Error('Original local chapter job did not complete: ' +
                         JSON.stringify({status:job.status,phase:job.phase,
                             errorCode:code,completed:job.progressCompleted,
-                            total:job.progressTotal}))
+                            total:job.progressTotal,operations:trace.slice(-12)}))
                 }
                 await pause(500)
             }

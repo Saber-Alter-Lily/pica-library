@@ -7,6 +7,8 @@ on:
       - '.github/workflows/r2-real-extension-host-smoke.yml'
       - 'scripts/r2-real-extension-host-smoke.py'
       - 'scripts/r2-licensed-source-reader-probe.ts'
+      - 'src/source-hosts/http-body.ts'
+      - 'src/source-hosts/library-reader.ts'
       - 'scripts/lib/source-host-interop-fixture.mjs'
   workflow_dispatch:
 

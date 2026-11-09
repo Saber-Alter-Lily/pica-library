@@ -7,10 +7,10 @@ const COMIC = 'hosted:' + HOST + ':' + 'a'.repeat(64)
 class Event { constructor(readonly type: string, readonly options: { detail?: any } = {}) {} get detail() { return this.options.detail } }
 const cleanup: Array<() => void> = []
 afterEach(() => { for (const close of cleanup.splice(0)) close() })
-function fixture(language = 1) {
+function fixture(language = 1, initialSaved = true) {
     const dom = inertReadingDom(), exports: Record<string, any> = {}, timers = new Map<number, () => void>()
     let timer = 0, stalled = false, release = () => {}
-    let savedByUser = false
+    let savedByUser = initialSaved
     const opens: unknown[] = [], host = { id: HOST, revision: 1, enabled: true, label: 'My <host>', endpoint: 'https://user-host.invalid/', authMode: 'none' }
     const fetcher = vi.fn(async (url: string, init: any = {}) => {
         expect(url).toMatch(/^\/api\/v1\/desktop\//)
@@ -25,7 +25,7 @@ function fixture(language = 1) {
             input.action === 'select' ? { sessionId: SESSION, comicId: input.comicId, title: 'Selected' } :
             input.action === 'resume-saved' ? { sessionId: SESSION, comicId: input.comicId, title: 'Selected', selectedSource: { id: SOURCE, name: 'Chosen', language: 'zh' } } :
             input.action === 'bookmark' ? (savedByUser = true, { saved: true, alreadySaved: false }) :
-            input.action === 'saved' ? { books: [{ comicId: COMIC, title: '<script>saved title</script>', sourceId: SOURCE }], total: 1 } :
+            input.action === 'saved' ? { books: savedByUser ? [{ comicId: COMIC, title: '<script>saved title</script>', sourceId: SOURCE }] : [], total: savedByUser ? 1 : 0 } :
             input.action === 'list' ? { books: [], offset: 0, hasNext: false } : input.action === 'close' ? { closed: true } : null
         if (!value) throw Error('Unexpected local command')
         return { ok: true, json: async () => value }
@@ -115,8 +115,9 @@ it('resumes an already-selected source without manual source binding or another 
     expect(f.commands('bind-source')).toEqual([])
 })
 it.each([0, 1, 2])('explicit source result bookmark keeps original Reader closed and does not download (%s)', async language => {
-    const f = fixture(language); await f.start(); await f.bind(); f.search('bookmarks')
+    const f = fixture(language, false); await f.start(); await f.bind(); f.search('bookmarks')
     await vi.waitFor(() => expect(f.get('bookmark-' + COMIC)).not.toBe(null))
+    expect(f.get('saved-count').textContent).toContain('Selected 0')
     const priorNetwork = f.commands('search').length
     await f.get('bookmark-' + COMIC).click()
     await vi.waitFor(() => expect(f.commands('bookmark')).toHaveLength(1))
@@ -126,6 +127,8 @@ it.each([0, 1, 2])('explicit source result bookmark keeps original Reader closed
     expect(f.commands('select')).toEqual([])
     expect(f.commands('download-start')).toEqual([])
     expect(f.opens).toEqual([])
+    await vi.waitFor(() => expect(f.get('saved-count').textContent).toContain('Selected 1'))
+    expect(f.get('saved-list').textContent).toContain('<script>saved title</script>')
     expect(f.get('bookmark-' + COMIC).hidden).toBe(true)
     expect(f.get('books').textContent).not.toContain('undefined')
 })

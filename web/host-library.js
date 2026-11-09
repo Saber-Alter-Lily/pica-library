@@ -194,6 +194,12 @@ function renderSavedWorks(value) {
             const selectedSession = session?.sessionId
             if (selectedSession) void resumeHostedLibraryComic(book.comicId, selectedSession).catch(() => {})
         }))
+        // Same existing chapter importer as the search-result card. Nothing
+        // downloads until a specific chapter and separate consent are chosen.
+        if (session?.capabilities?.downloads === true)
+            card.append(button('saved-save-' + book.comicId, t('保存书签章节到本地…',
+                'Save bookmarked chapter locally…', 'ブックマークの章をローカルに保存…'),
+                () => void chooseDownload(book)))
         list.append(card)
     }
     controls()
@@ -247,6 +253,9 @@ async function chooseDownload(book) {
         $('download-title').textContent = book.title; $('download-panel').hidden = false; $('download-consent').checked = false; $('download-chapter').replaceChildren()
         for (const chapter of value.chapters) { const option = node('option', chapter.title); option.value = chapter.id; $('download-chapter').append(option) }
         if (!value.chapters.length) { downloadTarget = null; $('download-title').textContent = t('此作品暂无可保存章节。', 'No chapters are available to save.', '保存できる章がありません。') }
+        // Saved-book buttons can appear above a long list. Reveal the same
+        // existing chapter picker rather than leaving a hidden action below.
+        $('download-panel').scrollIntoView?.({ block: 'nearest' })
     })
 }
 async function queueDownload() {

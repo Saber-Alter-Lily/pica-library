@@ -38,8 +38,8 @@ public final class HostBrowserActivity extends Activity {
     private Button toggleSetup;
     private ScrollView scroller;
     private TextView status,savedStatus;
-    private Button save,enable,start,disconnect,refresh,select,search,previousSources,nextSources,previousResults,nextResults,savedToggle,savedPrevious,savedNext,manageHost,changeSource,savedApplyFilter,savedClearFilter;
-    private boolean busy,destroyed,reopenSavedOnConnect;
+    private Button save,enable,start,disconnect,refresh,select,search,browse,previousSources,nextSources,previousResults,nextResults,savedToggle,savedPrevious,savedNext,manageHost,changeSource,savedApplyFilter,savedClearFilter;
+    private boolean busy,destroyed,reopenSavedOnConnect,browsingPopular;
     private int generation,sourceOffset,searchPage,savedOffset;
     private boolean sourceHasNext,searchHasNext;
     private String searchQuery="",savedNeedle="";
@@ -133,6 +133,7 @@ public final class HostBrowserActivity extends Activity {
         refresh.setEnabled(!busy&&session&&manager.selectedSource().isEmpty());
         select.setEnabled(!busy&&session&&manager.selectedSource().isEmpty()&&!sources.isEmpty());
         search.setEnabled(!busy&&session&&!manager.selectedSource().isEmpty());
+        browse.setEnabled(!busy&&session&&!manager.selectedSource().isEmpty());
         previousSources.setEnabled(!busy&&session&&manager.selectedSource().isEmpty()&&sourceOffset>=25);
         nextSources.setEnabled(!busy&&session&&manager.selectedSource().isEmpty()&&sourceHasNext&&sourceOffset<5000);
         previousResults.setEnabled(!busy&&session&&!manager.selectedSource().isEmpty()&&searchPage>1);
@@ -276,6 +277,8 @@ public final class HostBrowserActivity extends Activity {
         query=field(searchPanel,t("搜索作品","Search works","作品を検索"),false);
         query.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         search=action(searchPanel,t("搜索选中来源","Search selected source","選択ソースで検索"));
+        browse=action(searchPanel,t("浏览此来源作品（无需搜索词）",
+            "Browse this source (no search needed)","このソースを閲覧（検索語不要）"));
         resultPageStatus=text(t("尚未搜索作品","No search performed","まだ検索していません"),13);
         resultPageStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         resultPageStatus.setTag("host.qa.results.page");
@@ -422,8 +425,15 @@ public final class HostBrowserActivity extends Activity {
             });
         });
         search.setOnClickListener(v->loadResults(query.getText().toString().trim(),1));
-        previousResults.setOnClickListener(v->loadResults(searchQuery,searchPage-1));
-        nextResults.setOnClickListener(v->loadResults(searchQuery,searchPage+1));
+        browse.setOnClickListener(v->loadPopular(1));
+        previousResults.setOnClickListener(v->{
+            if(browsingPopular)loadPopular(searchPage-1);
+            else loadResults(searchQuery,searchPage-1);
+        });
+        nextResults.setOnClickListener(v->{
+            if(browsingPopular)loadPopular(searchPage+1);
+            else loadResults(searchQuery,searchPage+1);
+        });
         savedToggle.setOnClickListener(v->{
             if(savedPanel.getVisibility()==View.VISIBLE){
                 reopenSavedOnConnect=false;
@@ -499,22 +509,29 @@ public final class HostBrowserActivity extends Activity {
         if(needle.isEmpty()||page<1||page>200)return;
         task(t("搜索中…","Searching…","検索中…"),()->{
             HostSourceManager.SearchResult found=manager.search(needle,page);
-            return ()->showResults(found,needle,page);
+            return ()->showResults(found,needle,page,false);
+        });
+    }
+    private void loadPopular(int page){
+        if(page<1||page>200)return;
+        task(t("浏览来源作品…","Browsing source works…","ソースを閲覧中…"),()->{
+            HostSourceManager.SearchResult found=manager.browse(page);
+            return ()->showResults(found,"",page,true);
         });
     }
     private void clearResults(){
-        searchQuery="";searchPage=0;searchHasNext=false;
+        searchQuery="";searchPage=0;searchHasNext=false;browsingPopular=false;
         results.removeAllViews();
         resultPageStatus.setText(t("尚未搜索作品","No search performed","まだ検索していません"));
     }
-    private void showResults(HostSourceManager.SearchResult found,String needle,int page){
-        searchQuery=needle;searchPage=page;searchHasNext=found.next;
+    private void showResults(HostSourceManager.SearchResult found,String needle,int page,boolean popular){
+        searchQuery=needle;searchPage=page;searchHasNext=found.next;browsingPopular=popular;
         results.removeAllViews();
         int count=found.books.size();
         resultPageStatus.setText(t(
-            "搜索第 "+page+" 页 · "+count+" 部"+(found.next?" · 还有下一页":""),
-            "Search page "+page+" · "+count+" works"+(found.next?" · more available":""),
-            "検索 "+page+" ページ · "+count+" 件"+(found.next?" · 次ページあり":"")));
+            (popular?"浏览":"搜索")+"第 "+page+" 页 · "+count+" 部"+(found.next?" · 还有下一页":""),
+            (popular?"Browse":"Search")+" page "+page+" · "+count+" works"+(found.next?" · more available":""),
+            (popular?"閲覧":"検索")+" "+page+" ページ · "+count+" 件"+(found.next?" · 次ページあり":"")));
         controls();
         scroller.post(()->scroller.smoothScrollTo(0,searchPanel.getTop()+resultPageStatus.getTop()));
         if(found.books.isEmpty()){

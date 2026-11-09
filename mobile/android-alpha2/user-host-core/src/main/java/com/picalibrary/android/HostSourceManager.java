@@ -52,8 +52,16 @@ final class HostSourceManager {
     HostProtocol.Sources sources(int offset)throws Exception {Session session=requireSession();if(offset<0||offset>5000||offset%25!=0)throw error("INVALID_SOURCE_HOST");synchronized(this){session.check();if(session.sourceId!=null)throw error("SOURCE_HOST_STALE");}HostProtocol.Sources result=HostProtocol.sources(rpc(session,"sources",new JSONObject().put("first",25).put("offset",offset)));session.commit(()->{session.choices.clear();for(HostProtocol.Source source:result.rows)session.choices.put(source.id,source);return null;});return result;}
     void bind(String sourceId,boolean consent)throws Exception {if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");Session session=requireSession();String id=HostProtocol.sourceId(sourceId);session.commit(()->{if(session.sourceId!=null||!session.choices.containsKey(id))throw error("SOURCE_HOST_STALE");session.sourceId=id;session.choices.clear();return null;});}
     SearchResult search(String query,int page)throws Exception {
-        Session session=requireSession();String selected;synchronized(this){session.check();selected=session.sourceId;}if(selected==null)throw error("SOURCE_HOST_SOURCE_SELECTION_REQUIRED");HostProtocol.text(query,256);if(page<1||page>200)throw error("INVALID_SOURCE_HOST");
-        HostProtocol.Search result=HostProtocol.search(rpc(session,"search",new JSONObject().put("input",new JSONObject().put("source",selected).put("type","SEARCH").put("page",page).put("query",query.trim()))),selected);
+        HostProtocol.text(query,256);
+        return discover("SEARCH",query.trim(),page);
+    }
+    /** Reuse the existing Suwayomi POPULAR operation for searchless sources. */
+    SearchResult browse(int page)throws Exception {
+        return discover("POPULAR","",page);
+    }
+    private SearchResult discover(String type,String query,int page)throws Exception {
+        Session session=requireSession();String selected;synchronized(this){session.check();selected=session.sourceId;}if(selected==null)throw error("SOURCE_HOST_SOURCE_SELECTION_REQUIRED");if(page<1||page>200)throw error("INVALID_SOURCE_HOST");
+        HostProtocol.Search result=HostProtocol.search(rpc(session,"search",new JSONObject().put("input",new JSONObject().put("source",selected).put("type",type).put("page",page).put("query",query)),selected);
         return session.commit(()->{List<Book> books=new ArrayList<>();for(HostProtocol.Manga manga:result.rows){Book book=new Book(session,manga);while(session.books.size()>=128){String removed=session.books.keySet().iterator().next();session.books.remove(removed);session.selected.remove(removed);session.chapters.remove(removed);session.prepared.keySet().removeIf(key->key.startsWith(removed+"\n"));}session.books.put(book.id,book);books.add(book);}return new SearchResult(books,result.next);});
     }
     static final class SearchResult {final List<Book> books;final boolean next;SearchResult(List<Book> books,boolean next){this.books=Collections.unmodifiableList(books);this.next=next;}}

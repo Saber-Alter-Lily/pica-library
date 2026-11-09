@@ -125,8 +125,17 @@ if (mode === 'offline') {
                 const jobs=(await command({action:'downloads',sessionId:id})).jobs
                 const job=jobs.find((j:{id:string})=>j.id===task.id)
                 if(job?.status==='COMPLETED'){done=job;break}
-                if(job?.status==='FAILED'||job?.status==='CANCELLED')
-                    throw Error('Original local chapter job did not complete')
+                if(job?.status==='FAILED'||job?.status==='CANCELLED'){
+                    // Never echo remote exception bodies, URLs or credentials.
+                    // Snapshot metadata is sufficient to pinpoint a real
+                    // blocked local-import step without exposing site content.
+                    const code = typeof job.error === 'string' &&
+                        /^[A-Z][A-Z0-9_]{1,80}$/.test(job.error) ? job.error : 'REDACTED'
+                    throw Error('Original local chapter job did not complete: ' +
+                        JSON.stringify({status:job.status,phase:job.phase,
+                            errorCode:code,completed:job.progressCompleted,
+                            total:job.progressTotal}))
+                }
                 await pause(500)
             }
             assert.ok(done?.localComicId&&done?.localEpisodeId,

@@ -204,8 +204,8 @@ def main():
                     # identities; do not silently bind an arbitrary one.
                     if kind == "comicfury":
                         candidates = [row for row in rows
-                                      if row["lang"] in ("en", "all") and
-                                      "comicfury" in row["name"].lower().replace(" ", "")]
+                                      if row["lang"] == "en" and
+                                      row["name"].lower().replace(" ", "") == "comicfury"]
                     else:
                         candidates = [row for row in rows
                                       if "pepper" in row["name"].lower().replace(" ", "")]

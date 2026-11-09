@@ -255,7 +255,9 @@ def main():
                     "officialHost": "Suwayomi 2.4.2366",
                     "extensionPackage": spec["package"],
                     "extensionVersion": spec["version"],
-                    "sourceId": next(iter(added_sources)),
+                    # Log the actually authorized bound source, never an
+                    # arbitrary sibling ID from a multi-language extension.
+                    "sourceId": selected_source if spec.get("query") else spec["source"],
                     "installAndUninstallValidated": True,
                     "realMangaSiteAccessed": bool(spec.get("query")),
                     "userCredentialsUsed": False,

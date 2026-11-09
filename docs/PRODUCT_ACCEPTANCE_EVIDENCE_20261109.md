@@ -43,3 +43,9 @@
 - **B1 包工程：PACKAGE_VERIFIED**（不是 USER_ACCEPTED）。本证据是严格同源码的 Windows/Android RC 与基础 CI 证据，保留供实机 G1。
 - **B2 应继续实际来源**：用户自管 Suwayomi、独立可信扩展 → 搜索 → 原 Reader 实际图 → 明确离线保存 → 断开 Host → 原本地 Reader 恢复。至少两种独立来源、双端、真实章节和图片；不能把已通过的 Suwayomi Local Source/三 JAR 注册当成真正网站 G2。
 - 不用再为 B1 反复重造打包器或插件接口。B3 可以推进不依赖第三方授权的 UI/1500 部实体 QA；旧用户资料和正式发布仍必须等待 B4/B5 授权。
+
+## 5. B2 第三方真实来源工程证据（独立于 B1 包与 G1/G2 人工验收）
+
+- 参考 [B2 来源证据档](B2_REAL_LICENSED_SOURCE_E2E_20261109.md)。真实 [#42625363093](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42625363093) 按六独立 matrix job 核验。**Pepper&Carrot 与 ComicFury 两个真实站点各自完整 SUCCESS**：Pepper 1 章/6 张真实图片，ComicFury 2 章/2 张；均在原 Host Reader 读取、用户明确本地保存、撤销并关闭 Suwayomi 后在新本地 Reader 进程进行 Hash 对照。没有上传站点图片或账号 Cookie。原三款 Pica/JM/E-H 扩展仅安装/注册/撤销 SUCCESS，**未**验证目标站点内容。
+- xkcd 独立 case 因旧 2000 章数量上限 FAIL，故整个 matrix 工作流为 FAILURE；不能把两个通过 job 偷换成整体通过。后续 bounded 5000 章的双端代码已提交 `cad6d18`，与精确新 SHA 的真实 xkcd 结果、完整 CI 仍需复验。来源 ID 报告在 multi-ID 扩展中存在次要的记录错误，已于后续修正；Reader 实际绑定的精确来源身份没有改变。
+- Android35 实际原 Reader/Host [#42600954633](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600954633) **SUCCESS**（Suwayomi 官方 Local Source，非目标第三方真实站点）。G1 物理设备、G2 双端真实第三方及用户目标站点、G3 真实用户资料和 G4 发布仍 OPEN。

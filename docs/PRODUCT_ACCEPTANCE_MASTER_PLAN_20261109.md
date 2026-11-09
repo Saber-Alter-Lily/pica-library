@@ -107,8 +107,8 @@
 
 | 批次 | 当前状态 | 阻断 | 最后证据 |
 |---|---|---|---|
-| B1 双端候选 | PACKAGE_VERIFIED / MANUAL_QA_PENDING | 物理设备交互尚未验收；S3 Android35 原端到端流程仍需独立终态 | 同一产物 SHA `ecd7435` Windows/Android RC 四 job SUCCESS；实际文件 SHA 和同签名验证见 [证据](PRODUCT_ACCEPTANCE_EVIDENCE_20261109.md) |
-| B2 两个真实来源 | NEXT / NOT_ACCEPTED | 未取得两种第三方来源的实际章节/图片与授权证据 | JAR 生命周期 + synthetic Suwayomi 阅读不替代真实来源 |
+| B1 双端候选 | PACKAGE_VERIFIED / MANUAL_QA_PENDING | 物理设备交互仍未验收 | 同一产物 SHA `ecd7435` Windows/Android RC 四 job SUCCESS；Android35 原 Reader/Host 真模拟器 [#42600954633](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600954633) SUCCESS，详情见 [证据](PRODUCT_ACCEPTANCE_EVIDENCE_20261109.md) |
+| B2 两个真实来源 | IN_PROGRESS / TWO_PUBLIC_SITE_CI_VERIFIED | 真实 Windows/Android 图形设备与目标 Pica/JM/E-H 站点尚未验收；xkcd 超长目录需要新 SHA 复核 | [#42625363093](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42625363093) ComicFury 与 Pepper&Carrot 各自真实网站原 Reader → 本地完整章节 → 断源离线 Hash PASS，细节在 [B2 证据](B2_REAL_LICENSED_SOURCE_E2E_20261109.md) |
 | B3 体验/Issue/1500 负载 | NOT_ACCEPTED | 实体手机与同源真实数据及多个日常流程未闭环 | 历史模拟器/单测和合成 1500 部只作基础 |
 | B4 升级回滚 | NOT_ACCEPTED | 真实 v0.5.0 用户资料授权 + 全量差异与异常回滚 | 公开 APK 合成实机升级属部分工程证据 |
 | B5 发布裁决 | NOT_STARTED | G1–G4、54 项逐行回执及用户批准 | Draft #284，不更改 main |

@@ -18,3 +18,18 @@
 
 - 最新 CI/Android 原四标签与两个真实网站的实际完整终态以本批修改产生的 **同一 SHA Actions** 为准。新增 POPULAR 按钮的自动化 PASS ≠ 真机 UI PASS。
 - 上述两个公开站点是**真正第三方来源通路的工程证据**，并不验证 Pica、JM、E-H 的真实账户、完整漫画或持续稳定性。G2 必须另外核对用户自行获得且授权的目标站点扩展、证书、章节/图片及 Windows/Android 实机；G1/G3/G4 继续 OPEN，正式生产包无变化。
+
+## 2026-11-09 真站点正式运行证据与边界
+
+[真实六来源验收 #42625363093](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42625363093) 属于源码 `7de7441`，作业**分别记录**，不因总流程的 xkcd FAIL 擅改状态：
+
+| 来源 | 作业结果 | 真实业务证据 | 尚需注意 |
+|---|---|---|---|
+| ComicFury 英文来源 | **SUCCESS** | 站点搜索 → 原在线 Reader 实际 2 张图 → 本地保存 2 章 → 停用并停止官方 Suwayomi → 新 Reader 进程离线逐页 Hash PASS | 本次脚本最后的 `sourceId` 摘要字段曾采用集合首项，未必是实际英文绑定 ID，下一提交已修正；源绑定本身有精确 ID 校验 |
+| Pepper&Carrot | **SUCCESS** | 经 POPULAR 浏览 → 原在线 Reader → 1 章真实 6 张图 → 本地保存 → 断 Host → 离线 SHA256 PASS | 修复 `image/jpg`→`image/jpeg` 单一 MIME 别名后通过；其他 MIME、图像字节与大小校验不变 |
+| Pica、JM、E-H 三扩展 | **三项均 SUCCESS** | 固定 SHA 的独立 JAR 安装、源注册、撤销 | **没有**登录、搜索、阅读或下载目标站点，不能宣称这些平台真实内容支持 |
+| xkcd | **FAIL** | 注册成功，因 >2000 章节触发原内存边界 `SOURCE_HOST_TOO_LARGE`，未取得完整内容 | 已将 Windows 和 Android 原解析器的章节数组上限调整为有限的 5000，保留原 1 MiB 整体响应约束及唯一身份校验；新 SHA 的真实来源结果仍须复测 |
+
+**严格解释：**已有两个公开授权的独立真实第三方来源完成原 Windows 组件和离线入库链路的工程实证。但此结论不是原 Windows 图形客户端的实物使用验收，更不能替代 Android 手机通过真实站点的签名 Host/Binder 阅读、用户目标 Pica/JM/E-H 的登录/章节、真实用户资料迁移或最终发布批准。G1–G4 继续 OPEN。
+
+新工程提交：Windows `8f45f2d`、Android `35bb97f` 的 POPULAR 浏览、`48f624e` 的有证据 MIME 规范化、`cad6d18` 的有上限长篇章节支持。下次按同一 SHA 重新核对 CI 和真实来源结果。

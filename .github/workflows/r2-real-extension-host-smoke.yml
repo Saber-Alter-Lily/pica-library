@@ -9,6 +9,8 @@ on:
       - 'scripts/r2-licensed-source-reader-probe.ts'
       - 'src/source-hosts/http-body.ts'
       - 'src/source-hosts/library-reader.ts'
+      - 'src/source-hosts/reader-protocol.ts'
+      - 'mobile/android-alpha2/user-host-core/src/main/java/com/picalibrary/android/HostProtocol.java'
       - 'scripts/lib/source-host-interop-fixture.mjs'
   workflow_dispatch:
 

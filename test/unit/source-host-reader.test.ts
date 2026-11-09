@@ -50,6 +50,19 @@ describe('actual hosted-library adapter + shared Reader — injected HTTP and st
         expect(hostMangaChapters({ data: { manga: { ...f.manga, chapters: { nodes: [unknown] } } } }).chapters[0].pageCount).toBe(-1)
         expect(hostPreparedManga({ data: { fetchMangaAndChapters: { manga: f.manga, chapters: [unknown] } } }).chapters[0].pageCount).toBe(-1)
     })
+    it('retains 3,200 distinct real-world long-running chapters without removing the finite size bound', () => {
+        const f = fixture()
+        const chapters = Array.from({length: 3200}, (_, index) => ({
+            ...f.chapter, id: index + 10, sourceOrder: index,
+            url: '/chapter-' + index, name: 'Episode ' + index,
+            chapterNumber: index + 1, pageCount: 1
+        }))
+        const parsed = hostPreparedManga({
+            data: {fetchMangaAndChapters: {manga: f.manga, chapters}}
+        })
+        expect(parsed.chapters).toHaveLength(3200)
+        expect(parsed.chapters[3199].sourceOrder).toBe(3199)
+    })
     it('accepts no other negative, noninteger, coerced or oversized metadata page count', () => {
         const f = fixture()
         for (const pageCount of [-2, -1.1, 0.1, '-1', null, NaN, Infinity, 10001])

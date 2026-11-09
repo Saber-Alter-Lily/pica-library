@@ -333,7 +333,7 @@ async function chooseDownload(book) {
             renderSavedWorks(await command({ action: 'saved', sessionId: session.sessionId }))
         }
         const value = await command({ action: 'download-chapters', sessionId: session.sessionId, comicId: book.comicId })
-        if (!Array.isArray(value.chapters) || value.chapters.length > 2000 || value.chapters.some(chapter => !/^host-chapter:[a-f0-9]{64}$/.test(chapter.id || '') || typeof chapter.title !== 'string')) throw Error('SOURCE_HOST_PROTOCOL')
+        if (!Array.isArray(value.chapters) || value.chapters.length > 5000 || value.chapters.some(chapter => !/^host-chapter:[a-f0-9]{64}$/.test(chapter.id || '') || typeof chapter.title !== 'string')) throw Error('SOURCE_HOST_PROTOCOL')
         downloadGeneration++; downloadPending = false; clearTimeout(downloadPoll); downloadTarget = { comicId: book.comicId, title: book.title }
         $('download-title').textContent = book.title; $('download-panel').hidden = false; $('download-consent').checked = false; $('download-chapter').replaceChildren()
         for (const chapter of value.chapters) { const option = node('option', chapter.title); option.value = chapter.id; $('download-chapter').append(option) }

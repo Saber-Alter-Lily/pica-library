@@ -321,6 +321,6 @@ describe('explicit user-host single-source search and existing Reader, inert HTT
         const f = fixture(), row = { ...f.books[0] }
         for (const mangas of [Array(101).fill(row), [row, row], [{ ...row, inLibrary: undefined }], [{ ...row, sourceId: OTHER }]])
             expect(() => hostSearchPage({ data: { fetchSourceManga: { mangas, hasNextPage: false } } }, SOURCE)).toThrow('SOURCE_HOST_PROTOCOL')
-        expect(() => hostPreparedManga({ data: { fetchMangaAndChapters: { manga: row, chapters: Array(2001).fill({}) } } })).toThrow('SOURCE_HOST_TOO_LARGE')
+        expect(() => hostPreparedManga({ data: { fetchMangaAndChapters: { manga: row, chapters: Array(5001).fill({}) } } })).toThrow('SOURCE_HOST_TOO_LARGE')
     })
 })

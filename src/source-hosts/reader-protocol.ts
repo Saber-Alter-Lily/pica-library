@@ -49,7 +49,9 @@ export function hostMangaChapters(value: unknown) {
     return mangaChapters(manga, chapters)
 }
 function mangaChapters(manga: HostManga, chapters: unknown) {
-    if (!Array.isArray(chapters) || chapters.length > 2000) throw new SourceHostError('SOURCE_HOST_TOO_LARGE')
+    // A real long-running webcomic can exceed 2,000 chapters. Keep a hard
+    // 5,000-row bound; transport still enforces a separate 1 MiB JSON limit.
+    if (!Array.isArray(chapters) || chapters.length > 5000) throw new SourceHostError('SOURCE_HOST_TOO_LARGE')
     const rows = chapters.map(hostChapter)
     if (rows.some(row => row.mangaId !== manga.id) || new Set(rows.map(row => row.id)).size !== rows.length || new Set(rows.map(row => row.url)).size !== rows.length) throw new SourceHostError('SOURCE_HOST_PROTOCOL')
     return { manga, chapters: rows }

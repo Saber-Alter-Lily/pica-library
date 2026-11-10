@@ -14,7 +14,7 @@ final class HostTestFixture {
     static final byte[] PNG=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=");
     final List<Connection> opened=new ArrayList<>();final AtomicLong clock=new AtomicLong(1000);
     final HostSourceManager manager;
-    String source=SOURCE,imageType="image/png",errorOperation="";int status=200;boolean wrongPage,failWithOom,unknownPageCount;byte[] image=PNG;Runnable imageRead;
+    String source=SOURCE,imageType="image/png",errorOperation="";int status=200;boolean wrongPage,failWithOom,unknownPageCount;int syntheticChapterCount=1;byte[] image=PNG;Runnable imageRead;
     HostTestFixture(Context context)throws Exception {
         JSONObject operations;try(InputStream in=context.getResources().openRawResource(com.picalibrary.android.userhost.R.raw.host_source_operations)){operations=HostJson.object(HostHttp.read(in,32768));}
         manager=new HostSourceManager(context,new HostHttp(url->{Connection c=new Connection(url);opened.add(c);return c;},operations),clock::get);
@@ -23,14 +23,26 @@ final class HostTestFixture {
     HostSourceManager.Book selected()throws Exception {configured();manager.start("","",true);manager.sources(0);manager.bind(SOURCE,true);HostSourceManager.Book book=manager.search("synthetic",1).books.get(0);manager.select(book.id);return book;}
     JSONObject manga()throws Exception{return new JSONObject().put("id",7).put("sourceId",source).put("url","/synthetic/manga").put("title","Synthetic user Host comic").put("inLibrary",false);}
     JSONObject chapter()throws Exception{return new JSONObject().put("id",11).put("mangaId",7).put("url","/synthetic/chapter").put("name","Synthetic chapter").put("sourceOrder",0).put("pageCount",unknownPageCount?-1:2).put("chapterNumber",1);}
-    JSONObject response(String operation)throws Exception {
+    JSONObject response(String operation)throws Exception {return response(operation,new JSONObject());}
+    JSONObject response(String operation,JSONObject variables)throws Exception {
         JSONObject body=new JSONObject();
         switch(operation){
             case "PicaSourceHostInfo":body.put("aboutServer",new JSONObject().put("name","Suwayomi-Server").put("version","v2.4.2366"));break;
             case "PicaSourceHostSources":body.put("sources",new JSONObject().put("nodes",new JSONArray().put(new JSONObject().put("id",SOURCE).put("name","User installed fixture").put("lang","en").put("supportsLatest",true))).put("pageInfo",new JSONObject().put("hasNextPage",false).put("hasPreviousPage",false)).put("totalCount",1));break;
             case "PicaHostSourceSearch":body.put("fetchSourceManga",new JSONObject().put("mangas",new JSONArray().put(manga())).put("hasNextPage",false));break;
-            case "PicaHostManga":body.put("manga",manga().put("chapters",new JSONObject().put("nodes",new JSONArray().put(chapter()))));break;
-            case "PicaHostPrepareManga":body.put("fetchMangaAndChapters",new JSONObject().put("manga",manga()).put("chapters",new JSONArray().put(chapter())));break;
+            case "PicaHostManga":body.put("manga",manga());break;
+            case "PicaHostPrepareManga":body.put("fetchMangaAndChapters",new JSONObject().put("manga",manga()));break;
+            case "PicaHostPagedChapters":{
+                int first=variables.optInt("first",500),offset=variables.optInt("offset",0);
+                JSONArray rows=new JSONArray();int end=Math.min(syntheticChapterCount,offset+first);
+                for(int i=offset;i<end;i++)rows.put(chapter().put("id",11+i)
+                    .put("url",i==0?"/synthetic/chapter":"/synthetic/chapter/"+i)
+                    .put("sourceOrder",i).put("chapterNumber",i+1));
+                body.put("chapters",new JSONObject().put("nodes",rows)
+                    .put("totalCount",syntheticChapterCount)
+                    .put("pageInfo",new JSONObject().put("hasNextPage",end<syntheticChapterCount)));
+                break;
+            }
             case "PicaHostChapter":body.put("chapter",chapter());break;
             case "PicaHostChapterPages":unknownPageCount=false;body.put("fetchChapterPages",new JSONObject().put("chapter",chapter()).put("pages",new JSONArray().put("/api/v1/manga/7/chapter/0/page/0").put(wrongPage?"https://other.invalid/private":"/api/v1/manga/7/chapter/0/page/1")));break;
             default:throw new AssertionError("Unexpected synthetic operation");
@@ -48,7 +60,7 @@ final class HostTestFixture {
             if(!url.getPath().endsWith("api/graphql")){if(imageRead!=null)imageRead.run();return new ByteArrayInputStream(image);}
             request=new JSONObject(output.toString("UTF-8"));String operation=request.getString("operationName");
             if(errorOperation.equals(operation))throw new IOException("secret response https://user:password@fixture.invalid/?token=private");
-            return new ByteArrayInputStream(response(operation).toString().getBytes(StandardCharsets.UTF_8));
+            return new ByteArrayInputStream(response(operation,request.optJSONObject("variables")!=null?request.getJSONObject("variables"):new JSONObject()).toString().getBytes(StandardCharsets.UTF_8));
         }catch(IOException error){throw error;}catch(Exception error){throw new IOException("Synthetic fixture error",error);}}
         public OutputStream getOutputStream(){return output;}
     }

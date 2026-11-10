@@ -15,8 +15,9 @@ public class HostProtocolTest {
     @Test public void pinnedUnknownCountIsMetadataOnlyAndPreservedInBothCatalogueShapes()throws Exception {
         HostTestFixture fixture=new HostTestFixture(RuntimeEnvironment.getApplication());fixture.unknownPageCount=true;
         assertEquals(-1,new HostProtocol.Chapter(fixture.chapter()).pageCount);
-        assertEquals(-1,HostProtocol.bundle(fixture.response("PicaHostManga"),false).chapters.get(0).pageCount);
-        assertEquals(-1,HostProtocol.bundle(fixture.response("PicaHostPrepareManga"),true).chapters.get(0).pageCount);
+        assertEquals(7,HostProtocol.manga(fixture.response("PicaHostManga"),false).id);
+        assertEquals(7,HostProtocol.manga(fixture.response("PicaHostPrepareManga"),true).id);
+        assertEquals(-1,HostProtocol.chapterPage(fixture.response("PicaHostPagedChapters"),7,500,0).rows.get(0).pageCount);
         for(Object count:new Object[]{-2,-1.1,0.1,"-1",JSONObject.NULL,10001})assertThrows(Exception.class,()->new HostProtocol.Chapter(fixture.chapter().put("pageCount",count)));
     }
     @Test public void pageFetchMustResolveUnknownCountAndRetainsOwnershipChecks()throws Exception {
@@ -42,9 +43,26 @@ public class HostProtocolTest {
         fixture.wrongPage=true;assertThrows(IllegalArgumentException.class,()->HostProtocol.pages(fixture.response("PicaHostChapterPages"),chapter));
     }
     @Test public void malformedChapterIdentityAndDuplicateRowsFailClosed()throws Exception {
-        HostTestFixture fixture=new HostTestFixture(RuntimeEnvironment.getApplication());JSONObject response=fixture.response("PicaHostManga");JSONArray rows=response.getJSONObject("data").getJSONObject("manga").getJSONObject("chapters").getJSONArray("nodes");rows.put(fixture.chapter());assertThrows(IllegalArgumentException.class,()->HostProtocol.bundle(response,false));
+        HostTestFixture fixture=new HostTestFixture(RuntimeEnvironment.getApplication());JSONObject response=fixture.response("PicaHostPagedChapters");JSONArray rows=response.getJSONObject("data").getJSONObject("chapters").getJSONArray("nodes");rows.put(fixture.chapter());assertThrows(IllegalArgumentException.class,()->HostProtocol.chapterPage(response,7,500,0));
         assertThrows(IllegalArgumentException.class,()->new HostProtocol.Chapter(fixture.chapter().put("mangaId",0)));
         assertThrows(IllegalArgumentException.class,()->new HostProtocol.Chapter(fixture.chapter().put("pageCount",10001)));
+    }
+    @Test public void pagedLongMangaRejectsCrossSourceAndChangesWithoutUnboundedPayload()throws Exception {
+        HostTestFixture f=new HostTestFixture(RuntimeEnvironment.getApplication());
+        f.syntheticChapterCount=1001;
+        JSONObject first=f.response("PicaHostPagedChapters",new JSONObject().put("id",7).put("first",500).put("offset",0));
+        assertEquals(500,HostProtocol.chapterPage(first,7,500,0).rows.size());
+        JSONObject last=f.response("PicaHostPagedChapters",new JSONObject().put("id",7).put("first",500).put("offset",1000));
+        assertEquals(1,HostProtocol.chapterPage(last,7,500,1000).rows.size());
+        assertThrows(IllegalArgumentException.class,()->HostProtocol.chapterPage(first,8,500,0));
+        JSONObject over=f.response("PicaHostPagedChapters");
+        over.getJSONObject("data").getJSONObject("chapters").put("totalCount",5001);
+        assertEquals("SOURCE_HOST_TOO_LARGE",assertThrows(IllegalArgumentException.class,
+            ()->HostProtocol.chapterPage(over,7,500,0)).getMessage());
+        JSONObject bad=f.response("PicaHostPagedChapters");
+        bad.getJSONObject("data").getJSONObject("chapters").getJSONArray("nodes")
+            .getJSONObject(0).put("mangaId",8);
+        assertThrows(IllegalArgumentException.class,()->HostProtocol.chapterPage(bad,7,500,0));
     }
     @Test public void strictJsonRejectsTrailingDuplicatePermissiveAndDeepPayloads()throws Exception {
         assertEquals(1,HostJson.object("{\"n\":1}".getBytes(StandardCharsets.UTF_8)).getInt("n"));

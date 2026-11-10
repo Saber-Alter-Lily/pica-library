@@ -19,11 +19,11 @@ final class HostHttp {
     static HostHttp create(Context context)throws Exception {try(InputStream in=context.getResources().openRawResource(R.raw.host_source_operations)){return new HostHttp(url->(HttpURLConnection)url.openConnection(),HostJson.object(read(in,32768)));}}
     HostHttp(Factory factory,JSONObject operations)throws Exception {
         this.factory=factory;this.operations=new JSONObject(operations.toString());
-        if(operations.length()!=10||operations.getInt("schemaVersion")!=1||!"40bc5da57820324ed0ae724cbbc020cc4673b594".equals(operations.getString("upstreamCommit")))throw failure("SOURCE_HOST_PROTOCOL");
-        for(String name:Arrays.asList("info","sources","library","manga","chapter","pages","search","prepare")){JSONObject op=operations.getJSONObject(name);if(op.length()!=2||!op.getString("operationName").matches("Pica(?:SourceHost|Host)[A-Za-z]+")||op.getString("query").length()>2048)throw failure("SOURCE_HOST_PROTOCOL");}
+        if(operations.length()!=11||operations.getInt("schemaVersion")!=2||!"40bc5da57820324ed0ae724cbbc020cc4673b594".equals(operations.getString("upstreamCommit")))throw failure("SOURCE_HOST_PROTOCOL");
+        for(String name:Arrays.asList("info","sources","library","manga","chapter","pages","search","prepare","pagedChapters")){JSONObject op=operations.getJSONObject(name);if(op.length()!=2||!op.getString("operationName").matches("Pica(?:SourceHost|Host)[A-Za-z]+")||op.getString("query").length()>2048)throw failure("SOURCE_HOST_PROTOCOL");}
     }
     JSONObject json(HostEndpoint endpoint,String auth,String operation,JSONObject variables,SourceAccessPolicy.Access access)throws Exception {
-        if(!Arrays.asList("info","sources","library","manga","chapter","pages","search","prepare").contains(operation))throw failure("INVALID_SOURCE_HOST");
+        if(!Arrays.asList("info","sources","library","manga","chapter","pages","search","prepare","pagedChapters").contains(operation))throw failure("INVALID_SOURCE_HOST");
         JSONObject op=operations.getJSONObject(operation);byte[] body=new JSONObject().put("operationName",op.getString("operationName")).put("query",op.getString("query")).put("variables",variables).toString().getBytes(StandardCharsets.UTF_8);
         access.check();if(!slots.tryAcquire(15,TimeUnit.SECONDS))throw failure("SOURCE_HOST_BUSY");
         HttpURLConnection connection=null;

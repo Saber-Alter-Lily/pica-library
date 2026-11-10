@@ -119,17 +119,55 @@ final class HostSourceManager {
     }
     void select(String comicId)throws Exception {select(requireSession(),comicId);}
     private void select(Session session,String comicId)throws Exception {
-        Book book=book(session,comicId);verify(session,book);
-        HostProtocol.Bundle result=HostProtocol.bundle(rpc(session,"prepare",new JSONObject().put("input",new JSONObject().put("id",book.remote).put("fetchManga",true).put("fetchChapters",true))),true);
-        match(book,result.manga);session.commit(()->{putChapters(session,book,result.chapters);session.selected.add(book.id);return null;});
+        Book book=book(session,comicId);
+        // First verify the saved source/manga identity, not an unbounded
+        // nested manga.chapters payload.
+        verify(session,book);
+        HostProtocol.Manga prepared=HostProtocol.manga(rpc(session,"prepare",new JSONObject()
+            .put("input",new JSONObject().put("id",book.remote).put("fetchManga",true).put("fetchChapters",true))),true);
+        match(book,prepared);
+        List<HostProtocol.Chapter> chapters=loadChapters(session,book);
+        session.commit(()->{putChapters(session,book,chapters);session.selected.add(book.id);return null;});
     }
     private Book book(Session session,String id){synchronized(this){session.check();Book book=session.books.get(id);if(book==null||session.sourceId==null||!session.sourceId.equals(book.source))throw error("SOURCE_HOST_STALE");return book;}}
-    private HostProtocol.Bundle verify(Session session,Book book)throws Exception {HostProtocol.Bundle fresh=HostProtocol.bundle(rpc(session,"manga",new JSONObject().put("id",book.remote)),false);match(book,fresh.manga);session.commit(()->{putChapters(session,book,fresh.chapters);return null;});return fresh;}
+    private void verify(Session session,Book book)throws Exception {
+        HostProtocol.Manga fresh=HostProtocol.manga(rpc(session,"manga",new JSONObject().put("id",book.remote)),false);
+        match(book,fresh);
+        List<HostProtocol.Chapter> chapters=loadChapters(session,book);
+        session.commit(()->{putChapters(session,book,chapters);return null;});
+    }
+    private List<HostProtocol.Chapter> loadChapters(Session session,Book book)throws Exception {
+        // Official pinned upstream ChapterQuery.chapters supports exact
+        // mangaId/first/offset. Each reply remains below the existing 1 MiB
+        // cap; total <= 5000 chapters, at most ten pages and no repeated IDs.
+        final int size=500;
+        List<HostProtocol.Chapter> all=new ArrayList<>();
+        Set<Integer> ids=new HashSet<>();Set<String> urls=new HashSet<>();
+        int expected=-1;
+        for(int offset=0;offset<5000;offset+=size){
+            session.check();
+            HostProtocol.ChapterPage page=HostProtocol.chapterPage(
+                rpc(session,"pagedChapters",new JSONObject()
+                    .put("id",book.remote).put("first",size).put("offset",offset)),
+                book.remote,size,offset);
+            if(expected<0)expected=page.total;
+            if(page.total!=expected)throw error("SOURCE_HOST_STALE");
+            for(HostProtocol.Chapter row:page.rows){
+                if(!ids.add(row.id)||!urls.add(row.url))throw error("SOURCE_HOST_PROTOCOL");
+                all.add(row);
+            }
+            if(!page.next){
+                if(all.size()!=expected)throw error("SOURCE_HOST_PROTOCOL");
+                return all;
+            }
+        }
+        throw error("SOURCE_HOST_TOO_LARGE");
+    }
     private static void match(Book book,HostProtocol.Manga manga){if(book.remote!=manga.id||!book.source.equals(manga.source)||!book.urlDigest.equals(ReaderPolicy.hash(manga.url)))throw error("SOURCE_HOST_STALE");}
     private static String chapterId(Book book,HostProtocol.Chapter chapter){return "host-chapter:"+ReaderPolicy.hash(book.id+"\n"+chapter.url);}
     private void putChapters(Session session,Book book,List<HostProtocol.Chapter> rows){if(!session.chapters.containsKey(book.id)&&session.chapters.size()>=20)session.chapters.remove(session.chapters.keySet().iterator().next());session.chapters.put(book.id,new ArrayList<>(rows));}
     List<ReaderContent.Chapter> chapters(Session session,String comicId)throws Exception {
-        Book book=selected(session,comicId);HostProtocol.Bundle bundle=verify(session,book);List<HostProtocol.Chapter> sorted=new ArrayList<>(bundle.chapters);sorted.sort(Comparator.comparingDouble((HostProtocol.Chapter chapter)->chapter.number).thenComparing((a,b)->Integer.compare(b.sourceOrder,a.sourceOrder)));List<ReaderContent.Chapter> out=new ArrayList<>();for(HostProtocol.Chapter chapter:sorted)out.add(new ReaderContent.Chapter(chapterId(book,chapter),chapter.title,out.size()+1,chapter.pageCount));session.check();return out;
+        Book book=selected(session,comicId);verify(session,book);List<HostProtocol.Chapter> sorted; synchronized(this){session.check();sorted=new ArrayList<>(session.chapters.getOrDefault(book.id,Collections.emptyList()));}sorted.sort(Comparator.comparingDouble((HostProtocol.Chapter chapter)->chapter.number).thenComparing((a,b)->Integer.compare(b.sourceOrder,a.sourceOrder)));List<ReaderContent.Chapter> out=new ArrayList<>();for(HostProtocol.Chapter chapter:sorted)out.add(new ReaderContent.Chapter(chapterId(book,chapter),chapter.title,out.size()+1,chapter.pageCount));session.check();return out;
     }
     ReaderContent.ChapterData chapter(Session session,String comicId,String episodeId)throws Exception {
         Book book=selected(session,comicId);List<ReaderContent.Chapter> list=chapters(session,comicId);HostProtocol.Chapter chapter=knownChapter(session,book,episodeId),fresh=HostProtocol.chapter(rpc(session,"chapter",new JSONObject().put("id",chapter.id)));HostProtocol.same(chapter,fresh);

@@ -10,7 +10,7 @@ final class HostProtocol {
     static final class Sources {final List<Source> rows;final boolean next;Sources(List<Source> rows,boolean next){this.rows=Collections.unmodifiableList(rows);this.next=next;}}
     static final class Manga {final int id;final String source,url,title;final boolean inLibrary;Manga(JSONObject row)throws Exception{id=integer(row.get("id"),false);source=sourceId(row.get("sourceId"));url=text(row.get("url"),2048);title=text(row.get("title"),500);inLibrary=bool(row.get("inLibrary"));}}
     static final class Chapter {final int id,mangaId,sourceOrder,pageCount;final String url,title;final double number;Chapter(JSONObject row)throws Exception{id=integer(row.get("id"),false);mangaId=integer(row.get("mangaId"),false);sourceOrder=integer(row.get("sourceOrder"),true);pageCount=chapterPageCount(row.get("pageCount"));url=text(row.get("url"),2048);title=text(row.get("name"),500);Object n=row.get("chapterNumber");if(!(n instanceof Number)||!Double.isFinite(((Number)n).doubleValue()))throw invalid();number=((Number)n).doubleValue();}}
-    static final class Bundle {final Manga manga;final List<Chapter> chapters;Bundle(Manga manga,List<Chapter> chapters){this.manga=manga;this.chapters=Collections.unmodifiableList(chapters);}}
+    static final class ChapterPage {final List<Chapter> rows;final int total;final boolean next;ChapterPage(List<Chapter> rows,int total,boolean next){this.rows=Collections.unmodifiableList(rows);this.total=total;this.next=next;}}
     static final class Search {final List<Manga> rows;final boolean next;Search(List<Manga> rows,boolean next){this.rows=Collections.unmodifiableList(rows);this.next=next;}}
     private HostProtocol(){}
     static JSONObject data(JSONObject root)throws Exception {if(root.has("errors")&&(!(root.get("errors") instanceof JSONArray)||root.getJSONArray("errors").length()!=0))throw invalid();return root.getJSONObject("data");}
@@ -27,9 +27,27 @@ final class HostProtocol {
         for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);String id=sourceId(row.get("id"));if(!seen.add(id))throw invalid();bool(row.get("supportsLatest"));out.add(new Source(id,text(row.get("name"),200),text(row.get("lang"),32)));}return new Sources(out,next);
     }
     static Search search(JSONObject root,String selected)throws Exception {JSONObject value=data(root).getJSONObject("fetchSourceManga");JSONArray rows=value.getJSONArray("mangas");if(rows.length()>100)throw invalid();List<Manga> out=new ArrayList<>();Set<Integer> ids=new HashSet<>();Set<String> urls=new HashSet<>();for(int i=0;i<rows.length();i++){Manga row=new Manga(rows.getJSONObject(i));if(!selected.equals(row.source)||!ids.add(row.id)||!urls.add(row.url))throw invalid();out.add(row);}return new Search(out,bool(value.get("hasNextPage")));}
-    static Bundle bundle(JSONObject root,boolean prepared)throws Exception {
-        JSONObject data=data(root),container=prepared?data.getJSONObject("fetchMangaAndChapters"):data.getJSONObject("manga");Manga manga=new Manga(prepared?container.getJSONObject("manga"):container);JSONArray rows=prepared?container.getJSONArray("chapters"):container.getJSONObject("chapters").getJSONArray("nodes");
-        if(rows.length()>5000)throw invalid();List<Chapter> chapters=new ArrayList<>();Set<Integer> ids=new HashSet<>();Set<String> urls=new HashSet<>();for(int i=0;i<rows.length();i++){Chapter row=new Chapter(rows.getJSONObject(i));if(row.mangaId!=manga.id||!ids.add(row.id)||!urls.add(row.url))throw invalid();chapters.add(row);}return new Bundle(manga,chapters);
+    static Manga manga(JSONObject root,boolean prepared)throws Exception {
+        JSONObject data=data(root);
+        return new Manga(prepared?data.getJSONObject("fetchMangaAndChapters").getJSONObject("manga"):data.getJSONObject("manga"));
+    }
+    /** Fixed upstream top-level chapters(condition:mangaId,first,offset); no arbitrary GraphQL. */
+    static ChapterPage chapterPage(JSONObject root,int mangaId,int first,int offset)throws Exception {
+        if(mangaId<1||first!=500||offset<0||offset>5000||offset%500!=0)throw invalid();
+        JSONObject body=data(root).getJSONObject("chapters"),meta=body.getJSONObject("pageInfo");
+        int total=integer(body.get("totalCount"),true);
+        if(total>5000)throw new IllegalArgumentException("SOURCE_HOST_TOO_LARGE");
+        JSONArray rows=body.getJSONArray("nodes");
+        if(rows.length()>first||offset+rows.length()>total||rows.length()!=Math.min(first,Math.max(0,total-offset)))throw invalid();
+        boolean next=bool(meta.get("hasNextPage"));
+        if(next!=(offset+rows.length()<total))throw invalid();
+        List<Chapter> result=new ArrayList<>();Set<Integer> ids=new HashSet<>();Set<String> urls=new HashSet<>();
+        for(int i=0;i<rows.length();i++){
+            Chapter chapter=new Chapter(rows.getJSONObject(i));
+            if(chapter.mangaId!=mangaId||!ids.add(chapter.id)||!urls.add(chapter.url))throw invalid();
+            result.add(chapter);
+        }
+        return new ChapterPage(result,total,next);
     }
     static Chapter chapter(JSONObject root)throws Exception {return new Chapter(data(root).getJSONObject("chapter"));}
     static void same(Chapter expected,Chapter actual) {if(expected.id!=actual.id||expected.mangaId!=actual.mangaId||expected.sourceOrder!=actual.sourceOrder||!expected.url.equals(actual.url))throw new IllegalArgumentException("SOURCE_HOST_STALE");}

@@ -96,6 +96,14 @@ public class HostSourceManagerTest {
     @Test public void corruptConfigurationRemainsUntouchedAndFailsClosed()throws Exception {
         File file=new File(context.getFilesDir(),"user-host-config-v1.json");byte[] bytes="{broken private".getBytes(java.nio.charset.StandardCharsets.UTF_8);Files.write(file.toPath(),bytes);HostTestFixture broken=new HostTestFixture(context);assertEquals("SOURCE_HOST_STORAGE",broken.manager.storageError());assertThrows(Exception.class,()->broken.manager.configure(0,"label","https://fixture.invalid","none",false));assertThrows(Exception.class,()->broken.manager.start("","",true));assertEquals(0,broken.opened.size());assertArrayEquals(bytes,Files.readAllBytes(file.toPath()));
     }
+    @Test public void officialPaginatedChaptersPreserveLongSeriesOwnershipAndAllRows()throws Exception {
+        HostTestFixture fixture=new HostTestFixture(RuntimeEnvironment.getApplication());
+        fixture.syntheticChapterCount=1001;
+        HostSourceManager.Book book=fixture.selected();
+        List<com.picalibrary.android.ReaderContent.Chapter> chapters=fixture.manager.chapters(fixture.manager.requireSession(),book.id);
+        assertEquals(1001,chapters.size());
+        assertEquals(1001,new HashSet<>(chapters.stream().map(c->c.id).collect(java.util.stream.Collectors.toList())).size());
+    }
     @Test public void failedStartupErrorDoesNotLeaveAnUnreadySessionBlockingTheNextGrant()throws Exception {
         fixture.configured();fixture.failWithOom=true;assertThrows(OutOfMemoryError.class,()->fixture.manager.start("","",true));assertFalse(fixture.manager.hasSession());assertTrue(fixture.opened.get(0).disconnects>0);
         fixture.failWithOom=false;fixture.manager.start("","",true);assertTrue(fixture.manager.hasSession());assertEquals(2,fixture.opened.size());

@@ -1821,7 +1821,7 @@ def licensed_public_android_source_flow(kind):
     if jar.stat().st_size != spec["size"] or (
             hashlib.sha256(jar.read_bytes()).hexdigest() != spec["sha"]):
         raise AssertionError("Public extension archive digest/size mismatch")
-        import importlib.util
+    import importlib.util
     helper_spec = importlib.util.spec_from_file_location(
         "pica_pinned_extension_helper", Path(__file__).with_name(
             "r2-real-extension-host-smoke.py"))

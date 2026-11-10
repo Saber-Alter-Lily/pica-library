@@ -47,6 +47,8 @@ jobs:
     timeout-minutes: 43
     steps:
       - uses: actions/checkout@v4
+      - name: Compile-check the existing Android ADB acceptance script
+        run: python3 -m py_compile scripts/s3-android-local-emulator-flow.py
       # Real Suwayomi needs Java 21. Keep Java 17 as the default for
       # the existing Android Gradle build; never ship Java or the Host in APKs.
       - uses: actions/setup-java@v5

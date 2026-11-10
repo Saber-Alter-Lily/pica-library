@@ -91,6 +91,27 @@ public class HostSourceManagerTest {
         ReadingHistoryStore.importLocalBookmarksOnce(context);assertEquals(1,ReadingHistoryStore.load(context).sorted().size());ReadingHistoryStore.Session row=ReadingHistoryStore.load(context).sorted().get(0);assertEquals("host",row.providerId);assertEquals("host",row.sourceKind);assertEquals(book.title,row.title);assertFalse(UnifiedCatalogStore.load(context).byId.containsKey(book.id));assertFalse(source.emitsRecommendationEvidence());
         assertEquals(1,new ReaderProgress(context,new HostReaderSource(fixture.manager)).position(book.id,chapter.id,0));
     }
+    @Test public void originalReaderImagesRevalidateWorkAndChapterWithoutRefetchingWholeSeries()throws Exception {
+        HostSourceManager.Book book=fixture.selected();
+        HostReaderSource source=new HostReaderSource(fixture.manager);
+        BridgeClient.ChapterItem item=source.chapters(book.id).get(0);
+        BridgeClient.ChapterData data=source.chapter(book.id,item.id);
+        long before=fixture.opened.stream().filter(connection->connection.request!=null&&
+                "PicaHostPagedChapters".equals(connection.request.optString("operationName"))).count();
+        for(BridgeClient.PageItem page:data.pages){
+            HttpURLConnection image=source.image(page.url);
+            try(InputStream in=image.getInputStream()){assertEquals(137,in.read());}
+            finally{image.disconnect();}
+        }
+        long after=fixture.opened.stream().filter(connection->connection.request!=null&&
+                "PicaHostPagedChapters".equals(connection.request.optString("operationName"))).count();
+        assertEquals(before,after);
+        assertTrue(fixture.opened.stream().anyMatch(connection->connection.request!=null&&
+                "PicaHostChapter".equals(connection.request.optString("operationName"))));
+        fixture.source="1";
+        Exception stale=assertThrows(Exception.class,()->source.image(data.pages.get(0).url));
+        assertEquals("SOURCE_HOST_STALE",stale.getMessage());
+    }
     @Test public void endingSessionDisconnectsAndFencesOldPermitsEvenAfterNewGrant()throws Exception {
         HostSourceManager.Book book=fixture.selected();HostReaderSource source=new HostReaderSource(fixture.manager);HostSourceManager.Session old=fixture.manager.requireSession();BridgeClient.ChapterItem chapter=source.chapters(book.id).get(0);BridgeClient.ChapterData data=source.chapter(book.id,chapter.id);HttpURLConnection connection=source.image(data.pages.get(0).url);InputStream in=connection.getInputStream();int opened=fixture.opened.size();
         fixture.manager.end();assertFalse(fixture.manager.hasSession());assertThrows(RuntimeException.class,old::check);assertThrows(IOException.class,in::read);assertTrue(fixture.opened.get(opened-1).disconnects>0);assertThrows(Exception.class,()->source.image(data.pages.get(0).url));assertEquals(opened,fixture.opened.size());connection.disconnect();

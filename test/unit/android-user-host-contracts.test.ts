@@ -85,6 +85,11 @@ describe('native user-Host source/resource contracts only', () => {
         expect(protocol).toContain('actual.sourceOrder+"/page/"+i')
         expect(manager).toContain('!book.source.equals(manga.source)')
         expect(manager).toContain('!session.id.equals(row[1])')
+        const image = manager.slice(manager.indexOf('HttpURLConnection image('), manager.indexOf('private Book selected('))
+        expect(image).toContain('verifyIdentity(session,book)')
+        expect(image).toContain('HostProtocol.same(expected,fresh)')
+        expect(image).not.toContain('verify(session,book)')
+        expect(java('HostSourceManagerTest', true)).toContain('originalReaderImagesRevalidateWorkAndChapterWithoutRefetchingWholeSeries')
     })
     it('retains normal TLS, rejects redirects/ambient cookies and has bounded strict JSON/raster intake', () => {
         const http = java('HostHttp'), json = java('HostJson')

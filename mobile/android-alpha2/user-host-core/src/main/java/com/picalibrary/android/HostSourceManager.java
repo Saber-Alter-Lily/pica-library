@@ -124,9 +124,9 @@ final class HostSourceManager {
     void select(String comicId)throws Exception {select(requireSession(),comicId);}
     private void select(Session session,String comicId)throws Exception {
         Book book=book(session,comicId);
-        // First verify the saved source/manga identity, not an unbounded
-        // nested manga.chapters payload.
-        verify(session,book);
+        // Verify only the scoped work before preparation; load its bounded
+        // chapter listing once after the actual prepare action.
+        verifyIdentity(session,book);
         HostProtocol.Manga prepared=HostProtocol.manga(rpc(session,"prepare",new JSONObject()
             .put("input",new JSONObject().put("id",book.remote).put("fetchManga",true).put("fetchChapters",true))),true);
         match(book,prepared);
@@ -134,9 +134,12 @@ final class HostSourceManager {
         session.commit(()->{putChapters(session,book,chapters);session.selected.add(book.id);return null;});
     }
     private Book book(Session session,String id){synchronized(this){session.check();Book book=session.books.get(id);if(book==null||session.sourceId==null||!session.sourceId.equals(book.source))throw error("SOURCE_HOST_STALE");return book;}}
-    private void verify(Session session,Book book)throws Exception {
+    private void verifyIdentity(Session session,Book book)throws Exception {
         HostProtocol.Manga fresh=HostProtocol.manga(rpc(session,"manga",new JSONObject().put("id",book.remote)),false);
         match(book,fresh);
+    }
+    private void verify(Session session,Book book)throws Exception {
+        verifyIdentity(session,book);
         List<HostProtocol.Chapter> chapters=loadChapters(session,book);
         session.commit(()->{putChapters(session,book,chapters);return null;});
     }
@@ -182,7 +185,20 @@ final class HostSourceManager {
         return new ReaderContent.ChapterData(new ReaderContent.Chapter(episodeId,ready.title,order,pages.size()),pages,0);
     }
     HttpURLConnection image(Session session,String locator)throws Exception {
-        if(locator==null||!locator.matches("host-page:[0-9a-f-]{36}:[0-9a-f]{64}:[0-9a-f]{64}:(?:0|[1-9][0-9]{0,3})"))throw error("INVALID_SOURCE_HOST");String[] row=locator.split(":");if(!session.id.equals(row[1]))throw error("SOURCE_HOST_STALE");String comic="hosted:"+session.host.id+":"+row[2],episode="host-chapter:"+row[3];Book book=selected(session,comic);HostProtocol.Chapter expected;synchronized(this){expected=session.prepared.get(comic+"\n"+episode);}if(expected==null)throw error("SOURCE_HOST_STALE");verify(session,book);HostProtocol.Chapter current=knownChapter(session,book,episode);HostProtocol.same(expected,current);int index=Integer.parseInt(row[4]);if(current.pageCount!=expected.pageCount||index>=expected.pageCount)throw error("SOURCE_HOST_STALE");return http.image(session.endpoint,session.auth,"api/v1/manga/"+current.mangaId+"/chapter/"+current.sourceOrder+"/page/"+index,session);
+        if(locator==null||!locator.matches("host-page:[0-9a-f-]{36}:[0-9a-f]{64}:[0-9a-f]{64}:(?:0|[1-9][0-9]{0,3})"))throw error("INVALID_SOURCE_HOST");String[] row=locator.split(":");if(!session.id.equals(row[1]))throw error("SOURCE_HOST_STALE");String comic="hosted:"+session.host.id+":"+row[2],episode="host-chapter:"+row[3];Book book=selected(session,comic);HostProtocol.Chapter expected;synchronized(this){expected=session.prepared.get(comic+"\n"+episode);}if(expected==null)throw error("SOURCE_HOST_STALE");
+        // Each page still verifies fresh manga AND chapter identity, but must
+        // never re-fetch a 5,000-chapter catalogue for a single image.
+        verifyIdentity(session,book);
+        HostProtocol.Chapter current=knownChapter(session,book,episode);
+        HostProtocol.same(expected,current);
+        HostProtocol.Chapter fresh=HostProtocol.chapter(rpc(session,"chapter",new JSONObject().put("id",current.id)));
+        HostProtocol.same(expected,fresh);
+        int index=Integer.parseInt(row[4]);
+        if((current.pageCount>=0&&current.pageCount!=expected.pageCount)||
+                (fresh.pageCount>=0&&fresh.pageCount!=expected.pageCount)||
+                index>=expected.pageCount)throw error("SOURCE_HOST_STALE");
+        return http.image(session.endpoint,session.auth,
+            "api/v1/manga/"+fresh.mangaId+"/chapter/"+fresh.sourceOrder+"/page/"+index,session);
     }
     private Book selected(Session session,String id){Book book=book(session,id);synchronized(this){if(!session.selected.contains(id))throw error("SOURCE_HOST_SCOPE_REQUIRED");}return book;}
     private HostProtocol.Chapter knownChapter(Session session,Book book,String episode){synchronized(this){session.check();for(HostProtocol.Chapter chapter:session.chapters.getOrDefault(book.id,Collections.emptyList()))if(chapterId(book,chapter).equals(episode))return chapter;}throw error("SOURCE_HOST_STALE");}

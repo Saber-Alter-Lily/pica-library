@@ -2036,6 +2036,16 @@ def licensed_public_android_source_flow():
     # The Android keyboard shrinks Home to ~546px and hides all RecyclerView
     # entries; BACK dismisses ONLY the keyboard so we inspect the real list.
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    # At 360dp the original three-column cover card can be taller than the
+    # remaining 320px RecyclerView viewport; its title is BELOW the fold,
+    # although the original filter already reports 1 / 1503 matching books.
+    # Reuse the product's existing Display > List interaction to reveal
+    # the selected work and prove real offline Reader navigation.
+    filtered = wait(("1 / ",), seconds=50)
+    if "1503" not in filtered[2]:
+        raise AssertionError("Real library did not retain 1503 baseline works")
+    tap(("显示", "Display", "表示"), exact=True, only_class="Button", seconds=25)
+    tap(("列表", "List", "リスト"), exact=True, seconds=25)
     wait("Pepper&Carrot", seconds=55)
     tap("Pepper&Carrot", seconds=30)
     tap(("阅读", "Read", "読む"), only_class="Button", seconds=40)

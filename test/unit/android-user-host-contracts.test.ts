@@ -89,7 +89,7 @@ describe('native user-Host source/resource contracts only', () => {
         expect(image).toContain('verifyIdentity(session,book)')
         expect(image).toContain('HostProtocol.same(expected,fresh)')
         expect(image).not.toContain('verify(session,book)')
-        expect(java('HostSourceManagerTest', true)).toContain('originalReaderImagesRevalidateWorkAndChapterWithoutRefetchingWholeSeries')
+        expect(read('test/java/com/picalibrary/android/HostSourceManagerTest.java')).toContain('originalReaderImagesRevalidateWorkAndChapterWithoutRefetchingWholeSeries')
     })
     it('retains normal TLS, rejects redirects/ambient cookies and has bounded strict JSON/raster intake', () => {
         const http = java('HostHttp'), json = java('HostJson')

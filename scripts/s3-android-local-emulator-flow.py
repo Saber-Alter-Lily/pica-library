@@ -2032,6 +2032,10 @@ def licensed_public_android_source_flow():
     adb("shell", "input", "tap", str(search[0]), str(search[1]))
     adb("shell", "input", "text", "Pepper")
     adb("shell", "input", "keyevent", "KEYCODE_ENTER")
+    # Hardware Enter must submit the same original Home filter as IME Search.
+    # The Android keyboard shrinks Home to ~546px and hides all RecyclerView
+    # entries; BACK dismisses ONLY the keyboard so we inspect the real list.
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
     wait("Pepper&Carrot", seconds=55)
     tap("Pepper&Carrot", seconds=30)
     tap(("阅读", "Read", "読む"), only_class="Button", seconds=40)

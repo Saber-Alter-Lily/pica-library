@@ -17,14 +17,31 @@ const java = (name: string) => name === 'LocalComicStore'
 const strings = (locale: string) => Object.fromEntries([...read(`main/res/${locale}/strings_host.xml`).matchAll(/<string name="([^"]+)">([\s\S]*?)<\/string>/g)].map(row => [row[1], row[2]]))
 
 describe('native user-Host source/resource contracts only', () => {
-    it('reuses the same eight pinned operations rather than exposing an arbitrary GraphQL caller', () => {
+    it('reuses only pinned upstream operations, including bounded chapter paging, never arbitrary GraphQL', () => {
         const raw = JSON.parse(fs.readFileSync(host + 'res/raw/host_source_operations.json', 'utf8'))
         const { schemaVersion, upstreamCommit, ...operations } = raw
-        expect(schemaVersion).toBe(1)
+        expect(schemaVersion).toBe(2)
         expect(upstreamCommit).toBe('40bc5da57820324ed0ae724cbbc020cc4673b594')
-        expect(operations).toEqual({ ...SUWAYOMI_QUERIES, ...HOST_READER_OPERATIONS, ...HOST_DISCOVERY_OPERATIONS })
+        expect(operations).toEqual({
+            ...SUWAYOMI_QUERIES, ...HOST_READER_OPERATIONS, ...HOST_DISCOVERY_OPERATIONS,
+            manga: {
+                operationName: 'PicaHostManga',
+                query: 'query PicaHostManga($id: Int!) { manga(id: $id) { id sourceId url title inLibrary } }',
+            },
+            prepare: {
+                operationName: 'PicaHostPrepareManga',
+                query: 'mutation PicaHostPrepareManga($input: FetchMangaAndChaptersInput!) { fetchMangaAndChapters(input: $input) { manga { id sourceId url title inLibrary } } }',
+            },
+            pagedChapters: {
+                operationName: 'PicaHostPagedChapters',
+                query: 'query PicaHostPagedChapters($id: Int!, $first: Int!, $offset: Int!) { chapters(condition: { mangaId: $id }, first: $first, offset: $offset) { nodes { id mangaId url name sourceOrder pageCount chapterNumber } totalCount pageInfo { hasNextPage } } }',
+            },
+        })
         for (const operation of Object.values(operations) as Array<{ query: string }>)
             expect(operation.query).not.toMatch(/installExtension|updateManga|setSettings|enqueueDownload|updateChapter/)
+        expect(java('HostHttp')).toContain('read(in,1024*1024)')
+        expect(java('HostSourceManager')).toContain('final int size=500')
+        expect(java('HostProtocol')).toContain('if(total>5000)')
     })
     it('keeps a user-entered endpoint, separate plain-LAN choice and narrow request routes', () => {
         const endpoint = java('HostEndpoint')
@@ -60,7 +77,10 @@ describe('native user-Host source/resource contracts only', () => {
         const protocol = java('HostProtocol'), manager = java('HostSourceManager')
         expect(protocol).toContain('new BigInteger((String)value)')
         expect(protocol).toContain('Long.MIN_VALUE')
-        expect(protocol).toContain('row.mangaId!=manga.id')
+        expect(protocol).toContain('chapter.mangaId!=mangaId')
+        expect(protocol).toContain('!ids.add(chapter.id)||!urls.add(chapter.url)')
+        expect(manager).toContain('!ids.add(row.id)||!urls.add(row.url)')
+        expect(manager).toContain('page.total!=expected')
         expect(protocol).toContain('!selected.equals(row.source)')
         expect(protocol).toContain('actual.sourceOrder+"/page/"+i')
         expect(manager).toContain('!book.source.equals(manga.source)')

@@ -1890,8 +1890,8 @@ def licensed_public_android_source_flow(kind):
         # not by an index or a hard-coded language/LongString identity.
         spinner = None
         for _ in range(12):
-            for _, _, bounds, kind in nodes():
-                if not kind.endswith("Spinner"):
+            for _, _, bounds, node_class in nodes():
+                if not node_class.endswith("Spinner"):
                     continue
                 match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds)
                 if match:
@@ -1961,8 +1961,13 @@ def licensed_public_android_source_flow(kind):
         # Use the original native import chooser for every real chapter.
         # xkcd must save TWO distinct chapters, not two copies of one work.
         saved_records = []
+        # The first screen is the original ExternalReaderActivity. Returning
+        # to the Host before the native import action is mandatory, just as
+        # in the already-verified single-source Android user flow.
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
         for selected_index in range(spec["chapters"]):
             if selected_index:
+                # Each earlier save ends on ExternalImportActivity, not Host.
                 adb("shell", "input", "keyevent", "KEYCODE_BACK")
             tap_scrolling(("Save to Reader library", "保存到阅读器书库",
                            "Reader 書庫に保存"), direction="down", only_class="Button")

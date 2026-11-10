@@ -1840,12 +1840,28 @@ def licensed_public_android_source_flow(kind):
                 extension.get("versionName") != "1.6.1" or
                 extension.get("isInstalled") is not True):
             raise AssertionError("Host did not install the exact pinned public extension")
-        added = [item for item in helper.source_rows()
-                 if item["id"] not in before_sources and
-                 spec["match"] in item["name"].lower().replace(" ", "")]
+        # Reuse the exact source name/language identity verified by the
+        # independent original Windows Suwayomi smoke. A multi-source JAR
+        # can register sibling aliases; substring matching is ambiguous.
+        newly_installed = [row for row in helper.source_rows()
+                           if row["id"] not in before_sources]
+        if kind == "xkcd":
+            added = [row for row in newly_installed
+                     if row["name"].strip().lower() == "xkcd" and
+                     row["lang"] in ("en", "all", "other")]
+        else:
+            added = [row for row in newly_installed
+                     if "pepper" in row["name"].lower().replace(" ", "")]
         if len(added) != 1:
+            # Only public registered metadata (no URL, image, login or content).
+            names = [{"name": re.sub(r"[^a-zA-Z0-9 ._-]", "?", str(row["name"]))[:60],
+                      "lang": str(row["lang"])[:15]}
+                     for row in newly_installed[:12]]
+            print("B2 public extension source candidate metadata: " +
+                  json.dumps(names, sort_keys=True), flush=True)
             raise AssertionError("Cannot uniquely identify one independent public source")
         external_source_id = added[0]["id"]
+        source_option = added[0]["name"] + " · " + added[0]["lang"]
         record("pinned independent " + label + " JAR installed in official Host, not in Reader")
 
         # All app identities are disposable QA packages; never touch stable
@@ -1905,7 +1921,7 @@ def licensed_public_android_source_flow(kind):
         if spinner is None:
             raise AssertionError("Original Host source selector unavailable")
         adb("shell", "input", "tap", str(spinner[0]), str(spinner[1]))
-        tap((label,), seconds=35)
+        tap(source_option, seconds=35, exact=True)
         tap_scrolling(("Use selected source", "选择此来源", "ソースを選択"),
                       only_class="Button")
 
@@ -1923,14 +1939,20 @@ def licensed_public_android_source_flow(kind):
             adb("shell", "input", "tap", "360", "480")
             first = wait(("1 / ", "1/"), seconds=70)
         numbers = re.search(r"1\s*/\s*(\d+)", first[2])
-        if not numbers or int(numbers.group(1)) < 2:
-            raise AssertionError("Actual source did not expose two Reader pages")
+        if not numbers or int(numbers.group(1)) < (2 if kind == "peppercarrot" else 1):
+            raise AssertionError("Actual public source Reader lacks real image pages")
         total = int(numbers.group(1))
-        advance_reader_next()
+        if total >= 2:
+            advance_reader_next()
         try:
-            # Reuse the proven original Reader helper: chrome auto-hides after
-            # page turns. A hidden counter is not an image-transfer failure.
-            wait_page_counter(("2 / " + str(total), "2/" + str(total)), seconds=50)
+            # xkcd can have only one image per chapter; the xkcd acceptance
+            # requires TWO distinct real chapters and verifies both imports.
+            # Pepper still requires the originally verified two-page chapter.
+            if total >= 2:
+                wait_page_counter(("2 / " + str(total), "2/" + str(total)), seconds=50)
+            elif find(("Image failed · view details", "图片读取失败 · 点此查看",
+                       "画像エラー・詳細を見る")):
+                raise AssertionError("First real xkcd image failed to display")
         except AssertionError:
             # Inspect the original Reader's existing failure-details dialog,
             # but emit only classified error codes: never a comic image, URL,
@@ -1955,7 +1977,9 @@ def licensed_public_android_source_flow(kind):
         if ("com.picalibrary.android.ExternalReaderActivity" not in active or
                 CLEAN_PACKAGE not in active):
             raise AssertionError("External site did not open original clean ReaderActivity")
-        record("real " + label + " source image pages 1 and 2 opened in original clean signed Android Reader")
+        record("real " + label + " public-source original Android Reader " +
+               ("pages 1 and 2 opened" if total >= 2 else
+                "page 1 opened; two distinct chapters required for image coverage"))
 
         STEP = "b2-public-licensed-" + kind + "-save-selected-chapter"
         # Use the original native import chooser for every real chapter.

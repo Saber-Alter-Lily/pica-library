@@ -13,4 +13,6 @@ interface ISourceEndpoint {
     String chapters(String comicId);
     String chapter(String comicId, String episodeId);
     ParcelFileDescriptor openPage(String opaquePageLocator);
+    // Append v2 method so transaction IDs of the v1 ABI stay unchanged.
+    ParcelFileDescriptor openChapterList(String comicId);
 }

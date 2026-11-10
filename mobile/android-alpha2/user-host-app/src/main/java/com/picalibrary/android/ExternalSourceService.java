@@ -12,7 +12,9 @@ import com.picalibrary.android.remote.ISourceEndpoint;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.net.HttpURLConnection;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONArray;
@@ -48,9 +50,20 @@ public final class ExternalSourceService extends Service {
             throw new SecurityException("External source permission denied");
     }
 
+    private String chapterManifest(HostSourceManager.Session session,String comicId)throws Exception{
+        List<ReaderContent.Chapter> chapters=manager.chapters(session,comicId);
+        if(chapters.size()>5000)throw new IOException("SOURCE_HOST_TOO_LARGE");
+        JSONArray out=new JSONArray();
+        for(ReaderContent.Chapter value:chapters){
+            out.put(new JSONObject().put("id",value.id)
+                    .put("title",value.title).put("order",value.order)
+                    .put("count",value.downloadedPictures));
+        }
+        return out.toString();
+    }
     private final ISourceEndpoint.Stub bridge=new ISourceEndpoint.Stub(){
         @Override public int protocolVersion()throws RemoteException{
-            verifyCaller();return 1;
+            verifyCaller();return 2;
         }
         @Override public String sessionScope()throws RemoteException{
             verifyCaller();
@@ -60,16 +73,44 @@ public final class ExternalSourceService extends Service {
             verifyCaller();
             try{
                 HostSourceManager.Session session=manager.requireSession();
-                JSONArray out=new JSONArray();
-                for(ReaderContent.Chapter value:manager.chapters(session,comicId)){
-                    out.put(new JSONObject().put("id",value.id)
-                            .put("title",value.title).put("order",value.order)
-                            .put("count",value.downloadedPictures));
-                }
-                String json=out.toString();
+                String json=chapterManifest(session,comicId);
+                // Version 1 retains the old Binder string boundary unchanged.
                 if(json.length()>480000)throw new IOException("SOURCE_HOST_TOO_LARGE");
                 return json;
             }catch(Exception problem){throw new IllegalStateException("SOURCE_HOST_UNAVAILABLE");}
+        }
+        @Override public ParcelFileDescriptor openChapterList(String comicId)
+                throws RemoteException{
+            verifyCaller();
+            final HostSourceManager.Session session=manager.requireSession();
+            ParcelFileDescriptor[] pipe=null;
+            try{
+                pipe=ParcelFileDescriptor.createPipe();
+                final ParcelFileDescriptor writer=pipe[1];
+                streams.execute(()->{
+                    try(OutputStream out=new ParcelFileDescriptor.AutoCloseOutputStream(writer)){
+                        session.check();
+                        byte[] bytes=chapterManifest(session,comicId)
+                                .getBytes(StandardCharsets.UTF_8);
+                        if(bytes.length>4*1024*1024)
+                            throw new IOException("SOURCE_HOST_TOO_LARGE");
+                        for(int offset=0;offset<bytes.length;offset+=16384){
+                            session.check();
+                            out.write(bytes,offset,Math.min(16384,bytes.length-offset));
+                        }
+                    }catch(Exception ignored){
+                        // Truncated or empty data fail the original Reader parser.
+                        // A revoked session cannot turn into a partial valid chapter list.
+                    }finally{
+                        try{writer.close();}catch(IOException ignored){}
+                    }
+                });
+                return pipe[0];
+            }catch(Exception failure){
+                if(pipe!=null)for(ParcelFileDescriptor descriptor:pipe)
+                    try{descriptor.close();}catch(IOException ignored){}
+                throw new IllegalStateException("SOURCE_HOST_UNAVAILABLE");
+            }
         }
         @Override public String chapter(String comicId,String episodeId)
                 throws RemoteException{

@@ -10,6 +10,8 @@ import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import com.picalibrary.android.remote.ISourceEndpoint;
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -92,7 +94,8 @@ final class BoundSourceClient implements AutoCloseable {
         try{
             ISourceEndpoint bridge=ready();
             // Independently installable companion/Reader must share this ABI.
-            if(bridge.protocolVersion()!=1)
+            int version=bridge.protocolVersion();
+            if(version!=1&&version!=2)
                 throw new IOException("SOURCE_HOST_UNSUPPORTED");
             if(!expectedScope.equals(bridge.sessionScope()))
                 throw new IOException("SOURCE_HOST_STALE");
@@ -102,11 +105,41 @@ final class BoundSourceClient implements AutoCloseable {
     }
 
     List<ReaderContent.Chapter> chapters(String comic)throws Exception{
-        String payload=active().chapters(comic);
-        if(payload==null||payload.length()>480000)
+        ISourceEndpoint bridge=active();
+        int protocol=bridge.protocolVersion();
+        String payload;
+        if(protocol==2){
+            // The existing same-signer FD transport avoids Binder's ~1 MiB
+            // transaction ceiling for 2,001–5,000 chapter webcomics.
+            payload=readChapterManifest(bridge.openChapterList(comic));
+        }else{
+            // Keep old v1 Host interop for smaller legacy collections.
+            payload=bridge.chapters(comic);
+            if(payload==null||payload.length()>480000)
+                throw new IOException("SOURCE_HOST_PROTOCOL");
+        }
+        return parseChapterRows(payload,protocol==2?5000:2000);
+    }
+    private static String readChapterManifest(ParcelFileDescriptor fd)throws IOException{
+        if(fd==null)throw new IOException("SOURCE_HOST_UNAVAILABLE");
+        try(InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(fd);
+            ByteArrayOutputStream out=new ByteArrayOutputStream()){
+            byte[] buffer=new byte[16384];int n;
+            while((n=in.read(buffer))!=-1){
+                if(out.size()+n>4*1024*1024)
+                    throw new IOException("SOURCE_HOST_TOO_LARGE");
+                out.write(buffer,0,n);
+            }
+            if(out.size()==0)throw new IOException("SOURCE_HOST_UNAVAILABLE");
+            return new String(out.toByteArray(),StandardCharsets.UTF_8);
+        }
+    }
+    static List<ReaderContent.Chapter> parseChapterRows(String payload,int limit)throws Exception{
+        if(payload==null||payload.length()>4*1024*1024)
             throw new IOException("SOURCE_HOST_PROTOCOL");
         JSONArray rows=new JSONArray(payload);
-        if(rows.length()>2000)throw new IOException("SOURCE_HOST_TOO_LARGE");
+        if(limit<1||limit>5000||rows.length()>limit)
+            throw new IOException("SOURCE_HOST_TOO_LARGE");
         List<ReaderContent.Chapter> out=new ArrayList<>();
         for(int i=0;i<rows.length();i++){
             JSONObject item=rows.getJSONObject(i);

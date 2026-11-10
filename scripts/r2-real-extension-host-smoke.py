@@ -135,6 +135,75 @@ def source_ids():
     return {row["id"] for row in source_rows()}
 
 
+
+def probe_xkcd_chapter_bounds(source_id):
+    """Bounded PUBLIC-site metadata probe using the same pinned upstream operations.
+
+    Only aggregate counts and byte length leave the ephemeral Host. No titles,
+    URLs, page pixels, tokens, credentials, or raw GraphQL payload are logged.
+    """
+    catalog = graphql(
+        "mutation PicaHostSourceSearch($input:FetchSourceMangaInput!){"
+        "fetchSourceManga(input:$input){mangas{id sourceId title} hasNextPage}}",
+        {"input": {"source": source_id, "type": "POPULAR", "query": "", "page": 1}},
+    )["fetchSourceManga"]["mangas"]
+    candidates = [item for item in catalog
+                  if item["sourceId"] == source_id
+                  and item["title"].strip().lower() == "xkcd"]
+    if len(candidates) != 1:
+        raise AssertionError("PUBLIC_CHAPTER_PROBE_UNIQUE_WORK_REQUIRED")
+    manga_id = candidates[0]["id"]
+    prepared = graphql(
+        "mutation PicaHostPrepareManga($input:FetchMangaAndChaptersInput!){"
+        "fetchMangaAndChapters(input:$input){manga{id}}}",
+        {"input": {"id": manga_id, "fetchManga": True, "fetchChapters": True}},
+        timeout=90,
+    )["fetchMangaAndChapters"]["manga"]
+    if prepared["id"] != manga_id:
+        raise AssertionError("PUBLIC_CHAPTER_PROBE_MANGA_ID_CHANGED")
+    count = graphql(
+        "query PicaHostPagedChapters($id:Int!,$first:Int!,$offset:Int!){"
+        "chapters(condition:{mangaId:$id},first:$first,offset:$offset){"
+        "totalCount nodes{id} pageInfo{hasNextPage}}}",
+        {"id": manga_id, "first": 1, "offset": 0},
+    )["chapters"]["totalCount"]
+    # Measure the response for the EXACT Android 500-chapter projection while
+    # reading no more than 1 MiB + 1 byte. Never output chapter records.
+    query = (
+        "query PicaHostPagedChapters($id:Int!,$first:Int!,$offset:Int!){"
+        "chapters(condition:{mangaId:$id},first:$first,offset:$offset){"
+        "nodes{id mangaId url name sourceOrder pageCount chapterNumber}"
+        "totalCount pageInfo{hasNextPage}}}"
+    )
+    request = urllib.request.Request(
+        ENDPOINT,
+        data=json.dumps({"query": query, "operationName": "PicaHostPagedChapters",
+                         "variables": {"id": manga_id, "first": 500, "offset": 0}}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=90) as response:
+        raw = response.read(1024 * 1024 + 1)
+    oversized = len(raw) > 1024 * 1024
+    page_count = None
+    if not oversized:
+        parsed = json.loads(raw.decode())
+        pages = parsed.get("data", {}).get("chapters")
+        if parsed.get("errors") or not isinstance(pages, dict):
+            raise AssertionError("PUBLIC_CHAPTER_PROBE_GRAPHQL_ERROR")
+        page_count = len(pages["nodes"])
+        if pages["totalCount"] != count:
+            raise AssertionError("PUBLIC_CHAPTER_PROBE_COUNT_CHANGED")
+    print(json.dumps({
+        "gate": "B2-PUBLIC-XKCD-CHAPTER-BOUND-DIAGNOSTIC",
+        "site": "xkcd", "chapterTotalCount": count,
+        "requestedPageSize": 500, "pageReturned": page_count,
+        "graphQLResponseBytesAtMost1048577": len(raw),
+        "singleResponseExceeds1MiB": oversized,
+        "existingChapterLimit5000Exceeded": count > 5000,
+        "contentsOrCredentialsExported": False,
+    }), flush=True)
+
+
 def main():
     if (os.getenv("GITHUB_ACTIONS") != "true" or
         os.getenv("GITHUB_REPOSITORY") != "Saber-Alter-Lily/pica-library"):
@@ -230,6 +299,8 @@ def main():
                         "PICA_B2_SAMPLE_TITLE": spec["title"],
                         "PICA_B2_BROWSE_POPULAR": "1" if kind in ("peppercarrot", "xkcd") else "0",
                     })
+                    if kind == "xkcd":
+                        probe_xkcd_chapter_bounds(selected_source)
                     subprocess.run(
                         ["pnpm", "exec", "tsx",
                          "scripts/r2-licensed-source-reader-probe.ts",

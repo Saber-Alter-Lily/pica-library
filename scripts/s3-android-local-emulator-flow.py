@@ -148,7 +148,7 @@ def type_into_host(hint, value):
 
 @contextmanager
 def synthetic_user_host():
-    """A real loopback-only Suwayomi 2.4 API with the original eight operations.
+    """A real loopback-only Suwayomi 2.4 API with pinned paged chapter operations.
 
     The Android app connects through ADB reverse and its own HttpURLConnection.
     This exposes no real site, credentials or extension and never changes
@@ -211,9 +211,16 @@ def synthetic_user_host():
                 else:
                     data={"fetchSourceManga":{"mangas":[],"hasNextPage":False}}
             elif name=="PicaHostManga":
-                data={"manga":dict(book,chapters={"nodes":[chapter]})}
+                data={"manga":book}
             elif name=="PicaHostPrepareManga":
-                data={"fetchMangaAndChapters":{"manga":book,"chapters":[chapter]}}
+                data={"fetchMangaAndChapters":{"manga":book}}
+            elif name=="PicaHostPagedChapters":
+                variables=request.get("variables",{})
+                if (variables.get("id")!=7 or variables.get("first")!=500 or
+                        variables.get("offset")!=0):
+                    return self.respond(b"invalid chapter page","text/plain",422)
+                data={"chapters":{"nodes":[chapter],"totalCount":1,
+                                  "pageInfo":{"hasNextPage":False}}}
             elif name=="PicaHostChapter":
                 data={"chapter":chapter}
             elif name=="PicaHostChapterPages":
@@ -819,7 +826,8 @@ def source_free_user_host_flow():
                        "继续在线阅读（自动定位原来源）","オンライン読書を再開（ソースを探す）"),
                       direction="down",only_class="Button")
         wait_page_counter("1 / 2",seconds=45)
-        record("persistent source-only bookmark opens existing original Reader without repeating search")
+        wait_host_operation(operations,"PicaHostPagedChapters")
+        record("persistent source-only bookmark opens existing original Reader through bounded chapter paging")
         # The Host app must open the separately installed no-INTERNET Reader,
         # not silently fall back to the Host companion Reader.
         active=adb("shell","dumpsys","activity","activities",timeout=35)

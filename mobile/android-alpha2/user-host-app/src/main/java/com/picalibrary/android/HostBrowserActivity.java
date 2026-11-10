@@ -549,7 +549,6 @@ public final class HostBrowserActivity extends Activity {
                 "Save online bookmark (no download)","オンラインブックマークを保存"));
             bookmark.setOnClickListener(v->task(t("保存在线书签…",
                 "Saving online bookmark…","ブックマークを保存中…"),()->{
-                manager.select(book.id);
                 manager.saveBook(book.id,true);
                 List<HostSavedBooks.Book> list=manager.savedBooks();
                 return ()->{

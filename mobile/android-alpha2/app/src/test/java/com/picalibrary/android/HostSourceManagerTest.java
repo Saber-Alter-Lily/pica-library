@@ -21,11 +21,25 @@ public class HostSourceManagerTest {
     private Context context;private HostTestFixture fixture;
     @Before public void setup()throws Exception {context=RuntimeEnvironment.getApplication();fixture=new HostTestFixture(context);}
     @After public void end(){fixture.manager.end();HostSourceManager.resetForTests();}
-    @Test public void pinRequiresExplicitConsentAndActualSelectionThenWritesWithoutExtraHostRequests()throws Exception {
-        fixture.configured();fixture.manager.start("","",true);fixture.manager.sources(0);fixture.manager.bind(HostTestFixture.SOURCE,true);HostSourceManager.Book book=fixture.manager.search("synthetic",1).books.get(0);int before=fixture.opened.size();
-        assertThrows(RuntimeException.class,()->fixture.manager.saveBook(book.id,false));assertThrows(RuntimeException.class,()->fixture.manager.saveBook(book.id,true));assertEquals(0,fixture.manager.savedBooks().size());assertEquals(before,fixture.opened.size());
-        fixture.manager.select(book.id);before=fixture.opened.size();fixture.manager.saveBook(book.id,true);assertEquals(before,fixture.opened.size());assertEquals(book.id,fixture.manager.savedBooks().get(0).comicId);
-        fixture.manager.end();assertEquals(1,fixture.manager.savedBooks().size());assertEquals(before,fixture.opened.size());
+    @Test public void pinRequiresConsentAndSavesSearchLocatorWithoutPreparingOrFetchingChapters()throws Exception {
+        fixture.configured();fixture.manager.start("","",true);fixture.manager.sources(0);fixture.manager.bind(HostTestFixture.SOURCE,true);
+        HostSourceManager.Book book=fixture.manager.search("synthetic",1).books.get(0);
+        int before=fixture.opened.size();
+        assertThrows(RuntimeException.class,()->fixture.manager.saveBook(book.id,false));
+        assertThrows(RuntimeException.class,()->fixture.manager.saveBook("hosted:not-a-valid-book",true));
+        assertEquals(0,fixture.manager.savedBooks().size());
+        assertEquals(before,fixture.opened.size());
+        HostSavedBooks.Book saved=fixture.manager.saveBook(book.id,true);
+        assertEquals(before,fixture.opened.size());
+        assertEquals(book.id,saved.comicId);
+        assertEquals(book.title,saved.title);
+        assertEquals(1,fixture.manager.savedBooks().size());
+        // Re-pinning cannot implicitly prepare or read chapters either.
+        fixture.manager.saveBook(book.id,true);
+        assertEquals(before,fixture.opened.size());
+        fixture.manager.end();
+        assertEquals(1,fixture.manager.savedBooks().size());
+        assertEquals(before,fixture.opened.size());
     }
     @Test public void freshSessionRestoresPinnedIdentityWithoutRepeatingSearchButRevalidatesActualBook()throws Exception {
         HostSourceManager.Book book=fixture.selected();fixture.manager.saveBook(book.id,true);fixture.manager.end();HostTestFixture fresh=new HostTestFixture(context);

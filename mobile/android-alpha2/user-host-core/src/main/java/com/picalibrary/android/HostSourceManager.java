@@ -72,7 +72,11 @@ final class HostSourceManager {
     }
     List<HostSavedBooks.Book> savedBooks()throws Exception {return savedBooks.load();}
     HostSavedBooks.Book saveBook(String comicId,boolean consent)throws Exception {
-        if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");Session session=requireSession();Book book=selected(session,comicId);
+        if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");Session session=requireSession();
+        // A user-selected search locator is already Host/source/session scoped. Saving
+        // its metadata must not fetch thousands of chapters or download comic pages.
+        // Live manga/chapter identity is verified when the Reader is explicitly opened.
+        Book book=book(session,comicId);
         return session.commit(()->savedBooks.put(new HostSavedBooks.Book(book.id,session.host.id,session.principal,book.source,book.remote,book.urlDigest,book.title,session.host.label,java.time.Instant.now().toString())));
     }
     void removeSavedBook(String comicId,boolean consent)throws Exception {if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");savedBooks.remove(comicId);}

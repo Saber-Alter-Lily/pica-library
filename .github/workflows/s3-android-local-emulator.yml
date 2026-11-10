@@ -127,6 +127,10 @@ jobs:
           PICA_R2_REAL_HOST_JAR: ${{ runner.temp }}/pica-r2-official-host.jar
           PICA_B2_PEPPER_JAR: ${{ runner.temp }}/pica-b2-peppercarrot.jar
           PICA_B2_XKCD_JAR: ${{ runner.temp }}/pica-b2-xkcd.jar
+          # Independently run xkcd now: PepperCarrot's current popular listing
+          # returns site navigation links, not previously verified chapters.
+          # Do NOT claim a two-site pass from this isolated xkcd run.
+          PICA_B2_PUBLIC_SOURCE: xkcd
         with:
           api-level: 35
           arch: x86_64

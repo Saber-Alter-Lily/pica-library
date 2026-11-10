@@ -2128,16 +2128,24 @@ def main():
         clean_original_in_place_upgrade()
         legacy_dev_to_clean_compat_upgrade()
         original_large_shelf_flow()
-        licensed_public_android_source_flow("peppercarrot")
-        licensed_public_android_source_flow("xkcd")
+        # Test one independently pinned public site per full real-Android run.
+        # Upstream availability for one publisher must not block evidence from
+        # a different unrelated extension. "both" remains an explicit option.
+        selected = os.environ.get("PICA_B2_PUBLIC_SOURCE", "both")
+        if selected not in ("peppercarrot", "xkcd", "both"):
+            raise AssertionError("Unrecognized pinned B2 site selection")
+        real_sites = ("peppercarrot", "xkcd") if selected == "both" else (selected,)
+        for site in real_sites:
+            licensed_public_android_source_flow(site)
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",
             "package": QA_PACKAGE,
             "also_tested": [ORIGINAL_PACKAGE, CLEAN_PACKAGE, USER_HOST_PACKAGE],
-            "network_source": "synthetic, official Suwayomi Local Source, and independent Pepper&Carrot + xkcd public extensions",
+            "network_source": "synthetic, official Suwayomi Local Source, and specifically pinned independently tested public site(s)",
+            "publicSourceCasesActuallyRun": list(real_sites),
             "realPublicSiteOriginalAndroidOffline": True,
-            "independentRealPublicSitesVerified": 2},
+            "independentRealPublicSitesVerifiedInThisRun": len(real_sites)},
             ensure_ascii=False, indent=2), encoding="utf-8")
         print("S3 LOCAL END-TO-END PASS", flush=True)
     except Exception as error:

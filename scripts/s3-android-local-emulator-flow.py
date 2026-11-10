@@ -2027,7 +2027,7 @@ def licensed_public_android_source_flow(kind):
                 imported = next((book for book in book_rows()
                                  if label in book.get("title", "") and
                                  book["id"] not in prior_ids and
-                                 len(book.get("pages", [])) >= (2 if selected_index == 0 else 1)), None)
+                                 len(book.get("pages", [])) >= (2 if kind == "peppercarrot" else 1)), None)
                 if imported is not None:
                     break
                 time.sleep(1)

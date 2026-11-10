@@ -43,10 +43,10 @@ describe('native explicitly saved Host references — source/identity/resource c
         expect(storage).not.toMatch(/delete\(|clear\(|catch\([^)]*\)\{return new ArrayList/)
         expect(java('HostSavedBooksTest', true)).toContain('assertArrayEquals(before,Files.readAllBytes(file.toPath()))')
     })
-    it('pins only selected books inside the existing revocation-fenced session and with separate consent', () => {
+    it('pins only source-scoped search locators inside the revocation-fenced session with consent', () => {
         const save = manager.slice(manager.indexOf('HostSavedBooks.Book saveBook('), manager.indexOf('void removeSavedBook('))
         expect(save.indexOf('if(!consent)')).toBeLessThan(save.indexOf('Session session=requireSession()'))
-        expect(save).toContain('Book book=selected(session,comicId)')
+        expect(save).toContain('Book book=book(session,comicId)')
         expect(save).toContain('session.commit(()->savedBooks.put(')
         expect(save).not.toMatch(/rpc\(|search\(|PhoneDownload|UnifiedCatalog/)
     })

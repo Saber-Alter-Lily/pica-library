@@ -104,6 +104,16 @@ jobs:
           printf '%s  %s\n' \
             'dfc223927a78720af033adb2f9f168ac10342adcbc0759d40a401b49aac746ad' "$jar" | sha256sum --check -
           test "$(stat --format=%s "$jar")" = '149852'
+      - name: Fetch SHA256-pinned independent ComicFury JAR for public Android E2E
+        run: |
+          set -euo pipefail
+          jar="$RUNNER_TEMP/pica-b2-comicfury.jar"
+          curl --fail --location --retry 2 --retry-delay 3 --max-time 120 \
+            'https://github.com/keiyoushi/extensions/releases/download/3cf15bc/tachiyomi-all.comicfury-v1.6.1.jar' \
+            --output "$jar"
+          printf '%s  %s\n' \
+            '851185e7b79787aa37157cd6a9102849ea44a88dc1a7dfd00052a3dadf32365f' "$jar" | sha256sum --check -
+          test "$(stat --format=%s "$jar")" = '95849'
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
@@ -127,10 +137,12 @@ jobs:
           PICA_R2_REAL_HOST_JAR: ${{ runner.temp }}/pica-r2-official-host.jar
           PICA_B2_PEPPER_JAR: ${{ runner.temp }}/pica-b2-peppercarrot.jar
           PICA_B2_XKCD_JAR: ${{ runner.temp }}/pica-b2-xkcd.jar
-          # Independently run xkcd now: PepperCarrot's current popular listing
-          # returns site navigation links, not previously verified chapters.
-          # Do NOT claim a two-site pass from this isolated xkcd run.
-          PICA_B2_PUBLIC_SOURCE: xkcd
+          PICA_B2_COMICFURY_JAR: ${{ runner.temp }}/pica-b2-comicfury.jar
+          # Independently check ComicFury: the current xkcd v1.6.2 extension
+          # fails its upstream headless Host image interception ("Stub!").
+          # Keep old xkcd evidence, but require actual second-source pages,
+          # two distinct original Reader saves and offline byte validation.
+          PICA_B2_PUBLIC_SOURCE: comicfury
         with:
           api-level: 35
           arch: x86_64

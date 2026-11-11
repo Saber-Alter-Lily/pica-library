@@ -1813,6 +1813,15 @@ def licensed_public_android_source_flow(kind):
             "name": "Pepper&Carrot", "match": "pepper", "search": "Pepper",
             "chapters": 1, "proof": "b2-public-license-android.json",
         },
+        "comicfury": {
+            "env": "PICA_B2_COMICFURY_JAR", "size": 95849,
+            "version": "1.6.1",
+            "sha": "851185e7b79787aa37157cd6a9102849ea44a88dc1a7dfd00052a3dadf32365f",
+            "package": "eu.kanade.tachiyomi.extension.all.comicfury",
+            "name": "The Way of the Metagamer", "match": "comicfury",
+            "search": "Metagamer", "chapters": 2,
+            "proof": "b2-public-license-android-comicfury.json",
+        },
         "xkcd": {
             "env": "PICA_B2_XKCD_JAR", "size": 149852,
             "version": "1.6.2",
@@ -1859,6 +1868,10 @@ def licensed_public_android_source_flow(kind):
             added = [row for row in newly_installed
                      if row["name"].strip().lower() == "xkcd" and
                      row["lang"] in ("en", "all", "other")]
+        elif kind == "comicfury":
+            added = [row for row in newly_installed
+                     if row["name"].strip().lower().replace(" ", "") == "comicfury"
+                     and row["lang"] == "en"]
         else:
             added = [row for row in newly_installed
                      if "pepper" in row["name"].lower().replace(" ", "")]
@@ -2177,7 +2190,7 @@ def main():
         # Upstream availability for one publisher must not block evidence from
         # a different unrelated extension. "both" remains an explicit option.
         selected = os.environ.get("PICA_B2_PUBLIC_SOURCE", "both")
-        if selected not in ("peppercarrot", "xkcd", "both"):
+        if selected not in ("peppercarrot", "xkcd", "comicfury", "both"):
             raise AssertionError("Unrecognized pinned B2 site selection")
         real_sites = ("peppercarrot", "xkcd") if selected == "both" else (selected,)
         for site in real_sites:

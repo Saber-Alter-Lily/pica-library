@@ -2117,8 +2117,12 @@ def licensed_public_android_source_flow(kind):
         raise AssertionError("Actual 1500+ library did not retain real source chapters")
     tap(("显示", "Display", "表示"), exact=True, only_class="Button", seconds=25)
     tap(("列表", "List", "リスト"), exact=True, seconds=25)
-    wait(imported["title"], seconds=55, only_class="TextView")
-    tap(imported["title"], seconds=30, only_class="TextView")
+    # A new Library search or display mode must start at the first result,
+    # not restore the last scroll position from the unfiltered 1500+ books.
+    # The second saved chapter is already checked by original-store ID and
+    # SHA256 above; open the FIRST through the actual original Home UI.
+    wait(imported["title"], seconds=55, exact=True, only_class="TextView")
+    tap(imported["title"], seconds=30, exact=True, only_class="TextView")
     tap(("阅读", "Read", "読む"), only_class="Button", seconds=40)
     dismiss_immersive_help()
     wait_page_counter(("1 / " + str(original_total),

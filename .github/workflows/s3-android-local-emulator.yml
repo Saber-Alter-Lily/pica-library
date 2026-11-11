@@ -99,11 +99,11 @@ jobs:
           set -euo pipefail
           jar="$RUNNER_TEMP/pica-b2-xkcd.jar"
           curl --fail --location --retry 2 --retry-delay 3 --max-time 120 \
-            'https://github.com/keiyoushi/extensions/releases/download/b035310-0/tachiyomi-all.xkcd-v1.6.1.jar' \
+            'https://github.com/keiyoushi/extensions/releases/download/3cf15bc/tachiyomi-all.xkcd-v1.6.2.jar' \
             --output "$jar"
           printf '%s  %s\n' \
-            '65548058e8400d82fbe2b30d03bf126012aef6123c103e6abe4de7e788c51701' "$jar" | sha256sum --check -
-          test "$(stat --format=%s "$jar")" = '128549'
+            'dfc223927a78720af033adb2f9f168ac10342adcbc0759d40a401b49aac746ad' "$jar" | sha256sum --check -
+          test "$(stat --format=%s "$jar")" = '149852'
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools

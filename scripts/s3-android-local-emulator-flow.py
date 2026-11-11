@@ -1807,14 +1807,16 @@ def licensed_public_android_source_flow(kind):
     specs = {
         "peppercarrot": {
             "env": "PICA_B2_PEPPER_JAR", "size": 137527,
+            "version": "1.6.1",
             "sha": "7f0b9912a59c45d8c4ae147fdbed9231558aaa52715886c4dc390368c163c37d",
             "package": "eu.kanade.tachiyomi.extension.all.peppercarrot",
             "name": "Pepper&Carrot", "match": "pepper", "search": "Pepper",
             "chapters": 1, "proof": "b2-public-license-android.json",
         },
         "xkcd": {
-            "env": "PICA_B2_XKCD_JAR", "size": 128549,
-            "sha": "65548058e8400d82fbe2b30d03bf126012aef6123c103e6abe4de7e788c51701",
+            "env": "PICA_B2_XKCD_JAR", "size": 149852,
+            "version": "1.6.2",
+            "sha": "dfc223927a78720af033adb2f9f168ac10342adcbc0759d40a401b49aac746ad",
             "package": "eu.kanade.tachiyomi.extension.all.xkcd",
             "name": "xkcd", "match": "xkcd", "search": "xkcd",
             "chapters": 2, "proof": "b2-public-license-android-xkcd.json",
@@ -1845,7 +1847,7 @@ def licensed_public_android_source_flow(kind):
         before_sources = helper.source_ids()
         extension = helper.install_external_archive(jar)
         if (extension.get("pkgName") != spec["package"] or
-                extension.get("versionName") != "1.6.1" or
+                extension.get("versionName") != spec["version"] or
                 extension.get("isInstalled") is not True):
             raise AssertionError("Host did not install the exact pinned public extension")
         # Reuse the exact source name/language identity verified by the

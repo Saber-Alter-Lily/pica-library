@@ -48,9 +48,9 @@ EXTENSIONS = {
         "title": "The Way of the Metagamer",
     },
     "xkcd": {
-        "digest": "65548058e8400d82fbe2b30d03bf126012aef6123c103e6abe4de7e788c51701",
+        "digest": "dfc223927a78720af033adb2f9f168ac10342adcbc0759d40a401b49aac746ad",
         "package": "eu.kanade.tachiyomi.extension.all.xkcd",
-        "version": "1.6.1", "query": "xkcd", "title": "xkcd",
+        "version": "1.6.2", "query": "xkcd", "title": "xkcd",
     },
 }
 ENDPOINT = "http://127.0.0.1:4567/api/graphql"

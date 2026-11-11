@@ -42,7 +42,7 @@ EXTENSIONS = {
         "version": "1.6.1", "query": "Pepper", "title": "Pepper&Carrot",
     },
     "comicfury": {
-        "digest": "30744ec9dda0c7d7bdfa352437c383c514c7aae49815166fa4909775c2dde38e",
+        "digest": "851185e7b79787aa37157cd6a9102849ea44a88dc1a7dfd00052a3dadf32365f",
         "package": "eu.kanade.tachiyomi.extension.all.comicfury",
         "version": "1.6.1", "query": "The Way of the Metagamer",
         "title": "The Way of the Metagamer",

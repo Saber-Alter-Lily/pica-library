@@ -48,8 +48,8 @@ jobs:
             digest: 7f0b9912a59c45d8c4ae147fdbed9231558aaa52715886c4dc390368c163c37d
           - kind: comicfury
             file: comicfury.jar
-            url: https://github.com/keiyoushi/extensions/releases/download/b035310-0/tachiyomi-all.comicfury-v1.6.1.jar
-            digest: 30744ec9dda0c7d7bdfa352437c383c514c7aae49815166fa4909775c2dde38e
+            url: https://github.com/keiyoushi/extensions/releases/download/3cf15bc/tachiyomi-all.comicfury-v1.6.1.jar
+            digest: 851185e7b79787aa37157cd6a9102849ea44a88dc1a7dfd00052a3dadf32365f
           - kind: xkcd
             file: xkcd.jar
             url: https://github.com/keiyoushi/extensions/releases/download/3cf15bc/tachiyomi-all.xkcd-v1.6.2.jar

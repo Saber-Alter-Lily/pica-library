@@ -2007,6 +2007,13 @@ def licensed_public_android_source_flow(kind):
                   "元の Reader に保存"), seconds=40)
             tap(("Choose chapter to save", "选择要保存的章节",
                  "保存する章を選択"), seconds=40, only_class="Button")
+            # The original ExternalImportActivity fetches the chapter list on
+            # its existing worker. A 3,321-chapter Host may still show
+            # "Loading authorized chapters…" immediately after the click.
+            # Wait for the actual native dialog; do not infer failure from a
+            # transient pre-dialog UI tree or bypass the original chooser.
+            wait(("Select one chapter", "选择一章", "1章を選択"),
+                 seconds=100, exact=True, only_class="TextView")
             chapter_list = next((node for node in hierarchy().iter("node")
                                  if node.attrib.get("class", "").endswith("ListView")), None)
             if chapter_list is None:

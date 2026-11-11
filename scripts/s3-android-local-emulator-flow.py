@@ -1955,9 +1955,19 @@ def licensed_public_android_source_flow(kind):
                       only_class="Button")
 
         STEP = "b2-public-licensed-" + kind + "-browse-original-reader"
-        tap_scrolling(("Browse this source (no search needed)",
-                       "浏览此来源作品（无需搜索词）",
-                       "このソースを閲覧（検索語不要）"), only_class="Button")
+        if kind == "comicfury":
+            # The independent Windows R2 acceptance uses a normal SEARCH
+            # request for ComicFury. POPULAR did not return an Android Host
+            # result for this source, so use the same first-party search UI.
+            # No direct GraphQL, source switch, or Reader shortcut here.
+            type_into_host(("Search works", "搜索作品", "作品を検索"),
+                           spec["search"])
+            tap_scrolling(("Search selected source", "搜索选中来源",
+                           "選択ソースで検索"), only_class="Button")
+        else:
+            tap_scrolling(("Browse this source (no search needed)",
+                           "浏览此来源作品（无需搜索词）",
+                           "このソースを閲覧（検索語不要）"), only_class="Button")
         tap_scrolling(("Read · " + label, "阅读 · " + label,
                        "読む · " + label), only_class="Button")
         dismiss_immersive_help()

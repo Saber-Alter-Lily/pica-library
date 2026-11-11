@@ -145,3 +145,13 @@
 - [新 Android35 push S3 #42992543983](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42992543983) 已触发，本检查点 **尚无终态**。旧 #42966691815 的 Android FAIL 必须保留，Windows ComicFury [#42966388477](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42966388477) 成功不可替代 Android。xkcd 1.6.2 上游 Headless Host 的 `SpannableString Stub!` 另行保留真实 FAIL。
 - G1 实体双端 UI、G2 第二真实来源完整 Android/目标 Pica-JM-E-H 授权内容、G3 v0.5.0 真实资料迁移回滚、G4 54 项签收/正式发布仍全部 OPEN；Draft PR #284 不合并，`main` v0.5.0、用户资料、生产签名、Release/OTA 不变。下一步必须读取 **#42992543983** 的真实终态并且从首个实际失败点继续。
 
+## 2026-11-11 ComicFury 正确来源选定后 POPULAR 与 SEARCH 差异
+
+- [独立 Android35 真实任务 #42992543983](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42992543983) **attempt 1 terminal FAIL**：模拟器 `Quickstep isn't responding`，在本地 CBZ 初始化之前，不涉及 ComicFury 业务；对同一真实代码 SHA `281bc053` 仅重跑失败 job。
+- **attempt 2 也是 terminal FAIL，但取得有用业务证据**：官方 Suwayomi 2.4.2366 / 固定签名外部 ComicFury 1.6.1 扩展启动成功、原 Android User Host 原生下拉 Spinner 通过滚动找到并点击确切的 `Comic Fury · en`，随后点击 `Use selected source` 成功；第一次 POPULAR `Browse this source` 后显示通用 `Operation failed. Check Host, session and permissions.`，并无目标作品/Reader 出现。保留 [原 Android 工件 #13846407368](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42992543983/artifacts/13846407368) 与控制台日志；本次不能计在线图片、两章保存或离线 PASS。**此前 Spinner 未滚动问题已经真实消除。**
+- 根因调查发现 [Windows 同扩展真实来源 R2 #42966388477](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42966388477) 两个不同真实章节与 Host 停止离线 PASS 实际调用 `action:'search'`（普通关键词 `Metagamer`），**未使用 `action:'browse'` 的 POPULAR 模式**。Android 验收先前统一 POPULAR，未对不同来源使用已有且已经验证的搜索操作，因此无法直接证明 POPULAR 本身是否受扩展站点或 Android 严格解析限制。
+- 新代码 [`000ef2e`](https://github.com/Saber-Alter-Lily/pica-library/commit/000ef2ece0529c69ba9a2eba00afd3754df1da38) 仅在已有 Android 原生 ADB 验收流程对 ComicFury 使用 **`Search works` 输入查询+ `Search selected source`**，严格匹配同一官方 `Comic Fury · en` 来源与 `The Way of the Metagamer` 作品标题；其它 xkcd/Pepper 来源模式不变。没有直接调第三方 API、换 Reader、修改账户或默认增加来源；两不同章/真实页/原 LocalComicStore/Host 撤销/每页 SHA256/冷启动离线重开所有要求不降低。
+- [新真正 push Android35 #43025455861](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43025455861) 已启动，**未取得 terminal PASS**。旧 PR-only SKIPPED S3 不得代替。标准 Android/Web/Desktop CI [#42992697941](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42992697941) 和适用综合 [#42992698055](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42992698055) 上轮 SUCCESS；新代码须以其自身实际运行判断。
+- B1 PACKAGE_VERIFIED/MANUAL_QA_PENDING、B2 IN_PROGRESS、B3/B4/B5 仍待实体/授权依赖；G1–G4 未关闭。Draft PR #284，`main` `095d6910` v0.5.0、Release/OTA、生产签名和真实用户库保持不变。下次优先读 **#43025455861** 真实终态，针对第一个确证失败继续。
+
+

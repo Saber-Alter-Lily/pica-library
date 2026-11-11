@@ -1798,6 +1798,80 @@ def original_large_shelf_flow():
 
 
 
+
+def original_home_responsive_matrix():
+    """Original four-tab Home UI: engineering emulator evidence, NOT physical QA.
+
+    Runs only on the previously synthetic 1500-work QA catalogue, before any
+    real extension is launched. Does not export third-party image pixels.
+    """
+    global PACKAGE, STEP
+    PACKAGE = CLEAN_PACKAGE
+    cases = ((360, 1.0), (393, 1.3), (480, 1.5))
+    nav = (
+        ("书库", "Library", "ライブラリ"),
+        ("推荐", "Recommendations", "おすすめ"),
+        ("在线", "Online", "オンライン"),
+        ("设置", "Settings", "設定"),
+    )
+    completed = []
+    try:
+        for width_dp, font in cases:
+            STEP = f"b3-original-home-{width_dp}dp-font-{int(font * 100)}"
+            adb("shell", "wm", "size", f"{width_dp * 2}x1280")
+            adb("shell", "settings", "put", "system", "font_scale", str(font))
+            adb("shell", "am", "force-stop", CLEAN_PACKAGE)
+            adb("shell", "am", "start", "-W", "-n",
+                CLEAN_PACKAGE + "/com.picalibrary.android.DisclaimerActivity",
+                timeout=55)
+            later = wait(("稍后再看", "Later", "後で"), seconds=6,
+                         required=False, only_class="Button")
+            if later:
+                adb("shell", "input", "tap", str(later[0]), str(later[1]))
+            wait(("我的书库", "My library", "マイライブラリ"), seconds=48)
+            tree = hierarchy()
+            regions = []
+            for synonyms in nav:
+                choices = [node.attrib for node in tree.iter("node")
+                           if node.attrib.get("class", "").endswith("Button")
+                           and node.attrib.get("text", "") in synonyms]
+                if not choices:
+                    raise AssertionError("Original four-tab action missing at " +
+                                         str(width_dp) + "dp: " + str(synonyms))
+                bounds = choices[0]["bounds"]
+                match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]",
+                                     bounds)
+                if not match:
+                    raise AssertionError("Original native navigation has no bounds")
+                x1, y1, x2, y2 = map(int, match.groups())
+                if not (0 <= x1 < x2 <= width_dp * 2 and 0 <= y1 < y2 <= 1280):
+                    raise AssertionError("Native navigation clipped outside emulator window")
+                regions.append((x1, y1, x2, y2))
+            for left, right in zip(regions, regions[1:]):
+                if left[2] > right[0]:
+                    raise AssertionError("Four-tab hit targets overlap in narrow layout")
+            page(f"b3-original-home-{width_dp}dp-font-{int(font * 100)}")
+            completed.append({"widthDp": width_dp, "fontScale": font,
+                              "navigationVisible": 4, "hitRegionsDoNotOverlap": True})
+            record(f"original four-tab Home navigation usable at {width_dp}dp " +
+                   f"font {int(font * 100)}% with 1500 synthetic catalogue entries")
+    finally:
+        adb("shell", "wm", "size", "720x1280")
+        adb("shell", "settings", "put", "system", "font_scale", "1.0")
+        adb("shell", "am", "force-stop", CLEAN_PACKAGE)
+        adb("shell", "am", "start", "-W", "-n",
+            CLEAN_PACKAGE + "/com.picalibrary.android.DisclaimerActivity",
+            timeout=55)
+        PACKAGE = CLEAN_PACKAGE
+    wait(("我的书库", "My library", "マイライブラリ"), seconds=45)
+    (ROOT / "b3-original-home-responsive-emulator.json").write_text(
+        json.dumps({"result": "EMULATOR_ENGINEERING_PASS",
+                    "cases": completed, "actualPhysicalDevice": False,
+                    "real1500CoversUsed": False,
+                    "userAccountsOrProfilesTouched": False},
+                   indent=2), encoding="utf-8")
+
+
 def licensed_public_android_source_flow(kind):
     """Same original Android signed Host/Reader path for independent public sites.
 
@@ -1962,8 +2036,39 @@ def licensed_public_android_source_flow(kind):
             # No direct GraphQL, source switch, or Reader shortcut here.
             type_into_host(("Search works", "搜索作品", "作品を検索"),
                            spec["search"])
-            tap_scrolling(("Search selected source", "搜索选中来源",
-                           "選択ソースで検索"), only_class="Button")
+            result_ready = False
+            for search_attempt in range(2):
+                # Each call is an actual on-screen user click, never a hidden
+                # GraphQL retry. Network failure remains visible and cannot
+                # pass the real-source acceptance gate.
+                tap_scrolling(("Search selected source", "搜索选中来源",
+                               "選択ソースで検索"), only_class="Button")
+                deadline = time.monotonic() + 30
+                failure_codes = set()
+                while time.monotonic() < deadline:
+                    labels = [text or desc for text, desc, _, _ in nodes()]
+                    status_text = " ".join(labels)
+                    failure_codes = set(re.findall(r"SOURCE_HOST_[A-Z_]+",
+                                                   status_text))
+                    if failure_codes:
+                        break
+                    if any(("Search page 1" in text or "搜索第 1 页" in text
+                            or "検索 1 ページ" in text) for text in labels):
+                        result_ready = True
+                        break
+                    time.sleep(.8)
+                if result_ready:
+                    break
+                transient = {"SOURCE_HOST_UNAVAILABLE", "SOURCE_HOST_TIMEOUT",
+                             "SOURCE_HOST_BUSY", "SOURCE_HOST_PROTOCOL"}
+                if search_attempt or not (failure_codes & transient):
+                    raise AssertionError("Original explicit ComicFury search failed: " +
+                                         (", ".join(sorted(failure_codes)) or "NO_RESULT"))
+                print("B2 external source request unavailable; user-visible " +
+                      "retry of the SAME selected source once: " +
+                      ", ".join(sorted(failure_codes)), flush=True)
+            if not result_ready:
+                raise AssertionError("Original source search did not reach its results page")
         else:
             tap_scrolling(("Browse this source (no search needed)",
                            "浏览此来源作品（无需搜索词）",
@@ -2243,6 +2348,7 @@ def main():
         clean_original_in_place_upgrade()
         legacy_dev_to_clean_compat_upgrade()
         original_large_shelf_flow()
+        original_home_responsive_matrix()
         # Test one independently pinned public site per full real-Android run.
         # Upstream availability for one publisher must not block evidence from
         # a different unrelated extension. "both" remains an explicit option.

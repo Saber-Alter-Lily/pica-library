@@ -111,12 +111,36 @@ public final class HostBrowserActivity extends Activity {
                     status.setText(t("此书签属于不同的 Host、账号或已选择的来源。请连接原 Host 并选择对应来源。",
                         "This bookmark belongs to a different Host, account, or selected source. Use its original Host.",
                         "別の Host・アカウント・ソースのブックマークです。元の Host に接続してください。"));
-                else status.setText(t("操作失败：检查 Host 地址、会话或授权。",
-                    "Operation failed. Check Host, session and permissions.",
-                    "操作に失敗しました。Host と接続を確認してください。"));
+                else status.setText(safeTaskFailure(error));
                 controls();
             });
         });
+    }
+
+    /** Only public bounded failure categories are shown; raw provider errors,
+     * URLs, usernames and credentials must never reach Android UI or logs. */
+    private String safeTaskFailure(Exception error){
+        String code=error==null?"":error.getMessage();
+        if("SOURCE_HOST_UNAVAILABLE".equals(code)||"SOURCE_HOST_BUSY".equals(code)||
+                "SOURCE_HOST_TIMEOUT".equals(code))
+            return t("外接来源暂时不可用，可明确重试搜索；本地书库未修改。",
+                "External source temporarily unavailable. Retry the search; local books unchanged.",
+                "外部ソースを利用できません。検索を再試行できます。保存済みの本は変更されません。")+" ("+code+")";
+        if("SOURCE_HOST_PROTOCOL".equals(code))
+            return t("来源返回的数据不符合当前 Host 协议，请检查已安装扩展及 Host 版本。",
+                "Source response did not match the Host protocol. Check the installed extension and Host version.",
+                "ソース応答が Host プロトコルと一致しません。拡張機能と Host のバージョンを確認してください。")+" (SOURCE_HOST_PROTOCOL)";
+        if("SOURCE_HOST_AUTH_REQUIRED".equals(code))
+            return t("Host 授权失效，请检查自己的 Host 登录；原本地数据仍保留。",
+                "Host authentication required. Check your own Host credentials; saved books remain.",
+                "Host の認証が必要です。保存済みの本は変更されません。")+" (SOURCE_HOST_AUTH_REQUIRED)";
+        if("SOURCE_HOST_CANCELLED".equals(code)||"SOURCE_HOST_STALE".equals(code))
+            return t("会话已结束或来源已变更，请重新授权连接。",
+                "Host session ended or source changed. Reconnect explicitly.",
+                "Host 接続が終了または変更されました。再接続してください。")+" ("+code+")";
+        return t("操作未完成：检查 Host 和授权；本地书库没有改变。",
+            "Operation did not complete. Check Host and authorization; local books unchanged.",
+            "操作を完了できませんでした。Host と認証を確認してください。");
     }
     private void controls(){
         if(manager==null||save==null)return;

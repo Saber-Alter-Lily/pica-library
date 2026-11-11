@@ -75,6 +75,19 @@ public class HostSourceManagerTest {
         fixture.configured();assertTrue(fixture.manager.config().enabled);assertFalse(fixture.manager.hasSession());assertEquals(0,fixture.opened.size());
         assertThrows(IllegalStateException.class,()->fixture.manager.start("","",false));assertEquals(0,fixture.opened.size());
     }
+    @Test public void transientSearchFailureKeepsSameExplicitSessionForOneUserRetry()throws Exception {
+        fixture.configured();fixture.manager.start("","",true);
+        fixture.manager.sources(0);fixture.manager.bind(HostTestFixture.SOURCE,true);
+        String bound=fixture.manager.selectedSource();int count=fixture.opened.size();
+        fixture.errorOperation="PicaHostSourceSearch";
+        Exception failure=assertThrows(Exception.class,()->fixture.manager.search("synthetic",1));
+        assertEquals("SOURCE_HOST_UNAVAILABLE",failure.getMessage());
+        assertTrue(fixture.manager.hasSession());assertEquals(bound,fixture.manager.selectedSource());
+        assertEquals(count+1,fixture.opened.size());
+        fixture.errorOperation="";
+        assertEquals(1,fixture.manager.search("synthetic",1).books.size());
+        assertEquals(bound,fixture.manager.selectedSource());
+    }
     @Test public void listingBindingAndSearchingAreSeparateExplicitActions()throws Exception {
         fixture.configured();fixture.manager.start("","",true);assertEquals(1,fixture.opened.size());
         assertThrows(IllegalStateException.class,()->fixture.manager.search("query",1));assertThrows(IllegalStateException.class,()->fixture.manager.bind(HostTestFixture.SOURCE,true));assertEquals(1,fixture.opened.size());

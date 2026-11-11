@@ -1944,7 +1944,13 @@ def licensed_public_android_source_flow(kind):
         if spinner is None:
             raise AssertionError("Original Host source selector unavailable")
         adb("shell", "input", "tap", str(spinner[0]), str(spinner[1]))
-        tap(source_option, seconds=35, exact=True)
+        # Native Spinner popup is a scrollable ListView. A multi-language
+        # extension such as ComicFury registers more entries than fit in the
+        # popup viewport: the required exact name/lang may be below the fold.
+        # Reuse the existing real ADB swipe/tap helper, not an index, a
+        # different source, or an app-private shortcut.
+        tap_scrolling((source_option,), direction="down",
+                      only_class="CheckedTextView", attempts=12)
         tap_scrolling(("Use selected source", "选择此来源", "ソースを選択"),
                       only_class="Button")
 

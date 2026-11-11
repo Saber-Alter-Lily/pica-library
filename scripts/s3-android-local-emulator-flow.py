@@ -2029,13 +2029,17 @@ def licensed_public_android_source_flow(kind):
         # in the already-verified single-source Android user flow.
         adb("shell", "input", "keyevent", "KEYCODE_BACK")
         for selected_index in range(spec["chapters"]):
-            if selected_index:
-                # Each earlier save ends on ExternalImportActivity, not Host.
-                adb("shell", "input", "keyevent", "KEYCODE_BACK")
-            tap_scrolling(("Save to Reader library", "保存到阅读器书库",
-                           "Reader 書庫に保存"), direction="down", only_class="Button")
-            wait(("Save to original Reader", "保存到原阅读器书库",
-                  "元の Reader に保存"), seconds=40)
+            if selected_index == 0:
+                tap_scrolling(("Save to Reader library", "保存到阅读器书库",
+                               "Reader 書庫に保存"), direction="down", only_class="Button")
+                wait(("Save to original Reader", "保存到原阅读器书库",
+                      "元の Reader に保存"), seconds=40)
+            else:
+                # A genuine user can save the next chapter inside the SAME
+                # original ExternalImportActivity and signed Host session.
+                # Do not navigate back to Host and download the whole list.
+                wait(("Choose chapter to save", "选择要保存的章节",
+                      "保存する章を選択"), seconds=30, only_class="Button")
             tap(("Choose chapter to save", "选择要保存的章节",
                  "保存する章を選択"), seconds=40, only_class="Button")
             # The original ExternalImportActivity fetches the chapter list on
@@ -2054,23 +2058,51 @@ def licensed_public_android_source_flow(kind):
                       node.attrib.get("class", "").endswith("TextView")]
             if len(titles) < spec["chapters"] or len(set(titles[:spec["chapters"]])) < spec["chapters"]:
                 raise AssertionError("Two distinct source chapters are not selectable")
-            tap(titles[selected_index], seconds=35, exact=True, only_class="TextView")
-            tap(("Save this chapter", "保存这一章", "この章を保存"),
-                exact=True, only_class="Button", seconds=35)
-            PACKAGE = CLEAN_PACKAGE
-            imported = None
-            deadline = time.monotonic() + 120
-            prior_ids = {book["id"] for book, _ in saved_records}
-            while time.monotonic() < deadline:
-                imported = next((book for book in book_rows()
-                                 if label in book.get("title", "") and
-                                 book["id"] not in prior_ids and
-                                 len(book.get("pages", [])) >= (2 if kind == "peppercarrot" else 1)), None)
-                if imported is not None:
+            chosen_title = titles[selected_index]
+            tap(chosen_title, seconds=35, exact=True, only_class="TextView")
+            confirm = ("Save this chapter", "保存这一章", "この章を保存")
+            # Native AlertDialog may swallow an ADB tap while animating.
+            # Require that the actual user's explicit confirmation was
+            # dismissed, retry once if the same dialog is still present.
+            for attempt in range(2):
+                tap(confirm, exact=True, only_class="Button", seconds=35)
+                time.sleep(2)
+                if not find(confirm, exact=True, only_class="Button"):
+                    break
+            else:
+                raise AssertionError("Original chapter confirmation remained open after two explicit taps")
+            # Require an actual completed status from the ORIGINAL import
+            # screen, for the SELECTED chapter (not the previous chapter).
+            # Detect a native failure immediately instead of blindly waiting
+            # 120 seconds on a missing LocalComicStore row.
+            completed_status = False
+            save_deadline = time.monotonic() + 110
+            while time.monotonic() < save_deadline:
+                texts = [node_text for node_text, _, _, _ in nodes() if node_text]
+                if any(text.startswith(("此章未保存成功", "此章超过原导入器",
+                                        "来源会话已失效", "Chapter not saved.",
+                                        "Chapter exceeds original import limits.",
+                                        "Source session ended.", "保存できませんでした",
+                                        "章が元の保存上限", "ソース接続が失効"))
+                       for text in texts):
+                    raise AssertionError("Original chapter importer reported a failed or revoked chapter")
+                if any(text.startswith(("已进入原书库：", "Saved in original library: ",
+                                        "元の書庫に保存：")) and chosen_title[:35] in text
+                       for text in texts):
+                    completed_status = True
                     break
                 time.sleep(1)
+            if not completed_status:
+                raise AssertionError("Selected chapter never reached original importer success state")
+            PACKAGE = CLEAN_PACKAGE
+            prior_ids = {book["id"] for book, _ in saved_records}
+            imported = next((book for book in book_rows()
+                             if label in book.get("title", "") and
+                             chosen_title[:35] in book.get("title", "") and
+                             book["id"] not in prior_ids and
+                             len(book.get("pages", [])) >= (2 if kind == "peppercarrot" else 1)), None)
             if imported is None:
-                raise AssertionError("Selected real chapter did not enter the original local library")
+                raise AssertionError("Successful original import not found in owned LocalComicStore")
             image_root = ("files/local-comics-v1/" +
                           imported["id"].removeprefix("local:") + "/" +
                           imported["generation"] + "/")

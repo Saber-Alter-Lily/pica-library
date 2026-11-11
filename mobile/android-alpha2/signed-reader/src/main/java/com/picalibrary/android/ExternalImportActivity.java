@@ -32,6 +32,9 @@ public final class ExternalImportActivity extends Activity {
     private volatile boolean cancelled,busy;
     private String comic,title;
     private LocalComicStore.Comic saved;
+    // Only an in-memory list for this already signed/authorized Host session.
+    // Each reuse rechecks the live Binder scope; each import still verifies its chapter.
+    private volatile List<ReaderContent.Chapter> chapterOptions;
 
     private String t(String zh,String en,String ja){return LocalCopy.ui(this,zh,en,ja);}
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
@@ -106,9 +109,13 @@ public final class ExternalImportActivity extends Activity {
         busy(true);status.setText(t("读取当前授权的章节…","Loading authorized chapters…",
             "許可された章を取得中…"));
         executor.submit(()->{
-            List<ReaderContent.Chapter> chapters=null;
-            try{chapters=client.chapters(comic);}catch(Exception ignored){}
-            List<ReaderContent.Chapter> result=chapters;
+            List<ReaderContent.Chapter> choices=null;
+            try{
+                client.check();
+                choices=chapterOptions;
+                if(choices==null)choices=client.chapters(comic);
+            }catch(Exception ignored){chapterOptions=null;}
+            List<ReaderContent.Chapter> result=choices;
             runOnUiThread(()->{
                 if(cancelled)return;
                 busy(false);
@@ -116,6 +123,10 @@ public final class ExternalImportActivity extends Activity {
                     status.setText(t("来源不可用或会话已过期","Session expired or source unavailable",
                         "ソースまたはセッションが無効です"));return;
                 }
+                chapterOptions=result;
+                status.setText(t("可选章节："+result.size()+"，请选择需要保存的章节",
+                    result.size()+" chapters available · choose a chapter",
+                    result.size()+"章から保存する章を選択"));
                 String[] labels=new String[result.size()];
                 for(int i=0;i<labels.length;i++)labels[i]=result.get(i).title;
                 new AlertDialog.Builder(this)
@@ -144,6 +155,7 @@ public final class ExternalImportActivity extends Activity {
         busy(true);status.setText(t("保存中…","Saving chapter…","保存中…"));
         executor.submit(()->{
             LocalComicStore.Comic result=null;
+            Exception failureReason=null;
             try{
                 ReaderContent.ChapterData contents=client.chapter(comic,chapter.id);
                 if(contents.pages.isEmpty()||
@@ -192,20 +204,38 @@ public final class ExternalImportActivity extends Activity {
             }catch(Exception failure){
                 // The original importer cancels/removes only its own staging
                 // generation. Never delete a previous book on a failed copy.
+                failureReason=failure;
             }
             LocalComicStore.Comic completed=result;
+            Exception problem=failureReason;
             runOnUiThread(()->{
                 if(cancelled)return;
-                saved=completed;
+                // A failing second chapter must not erase the valid first
+                // chapter's "Read saved local copy" action.
+                if(completed!=null)saved=completed;
                 busy(false);
-                status.setText(completed==null?
-                    t("保存失败或会话已撤销，原文件保持不变",
-                      "Save failed or authorization expired. Existing files unchanged.",
-                      "保存失敗／許可期限切れ。既存ファイルは変更しません。"):
+                status.setText(completed==null?saveFailureMessage(problem):
                     t("已进入原书库：","Saved in original library: ",
                       "元の書庫に保存：")+completed.title);
             });
         });
+    }
+    private String saveFailureMessage(Exception problem){
+        // Never display external URLs, stack traces or site error bodies.
+        String code=problem==null?"":problem.getMessage();
+        if("SOURCE_HOST_CANCELLED".equals(code)||"SOURCE_HOST_STALE".equals(code)||
+                "SOURCE_HOST_SCOPE_REQUIRED".equals(code)||
+                "SOURCE_HOST_AUTH_REQUIRED".equals(code))
+            return t("来源会话已失效，请重新连接 Host；以前保存的章节仍可离线阅读",
+                "Source session ended. Reconnect Host; previously saved chapters remain offline.",
+                "ソース接続が失効しました。再接続してください。保存済みの章はオフラインで読めます。");
+        if("SOURCE_HOST_TOO_LARGE".equals(code))
+            return t("此章超过原导入器的大小或页数限制，未覆盖已保存的章节",
+                "Chapter exceeds original import limits. Existing saved chapters were not replaced.",
+                "章が元の保存上限を超えています。保存済みの章は変更されません。");
+        return t("此章未保存成功，可重试；先前保存的章节和文件不变",
+            "Chapter not saved. Retry if needed; previously saved chapters and files are unchanged.",
+            "保存できませんでした。再試行できます。以前保存した章とファイルは変更されません。");
     }
     private static String truncate(String value,int size){
         return value.length()<=size?value:value.substring(0,size-1)+"…";

@@ -8,7 +8,26 @@ BASE_URL="http://127.0.0.1:${PORT}"
 # Keep Playwright as a CI-only smoke dependency for this development branch.
 # The normal frozen dependency install has already completed before this script runs.
 pnpm add -D "@playwright/test@${PLAYWRIGHT_VERSION}" --ignore-workspace-root-check
-pnpm exec playwright install --with-deps chromium
+# Hosted Linux runners already contain a system Chromium-compatible browser.
+# Reuse that official image asset if present instead of attempting apt-get
+# every run; an intermittent Ubuntu mirror DNS failure must not abort 2,921+
+# successful source-level checks before a browser is even launched.
+# In environments without a browser, fetch the Playwright-matched Chromium
+# artifact, without apt-managed OS package mutations.
+if [[ -n "${PICA_WEB_SMOKE_BROWSER_PATH:-}" ]]; then
+    test -x "${PICA_WEB_SMOKE_BROWSER_PATH}"
+else
+    for candidate in google-chrome-stable google-chrome chromium chromium-browser; do
+        if command -v "${candidate}" >/dev/null 2>&1; then
+            export PICA_WEB_SMOKE_BROWSER_PATH
+            PICA_WEB_SMOKE_BROWSER_PATH="$(command -v "${candidate}")"
+            break
+        fi
+    done
+    if [[ -z "${PICA_WEB_SMOKE_BROWSER_PATH:-}" ]]; then
+        pnpm exec playwright install chromium
+    fi
+fi
 
 python3 -m http.server "${PORT}" --bind 127.0.0.1 --directory web \
     >"${RUNNER_TEMP:-/tmp}/pica-web-smoke-http.log" 2>&1 &

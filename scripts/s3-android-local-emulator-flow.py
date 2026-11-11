@@ -2180,17 +2180,25 @@ def licensed_public_android_source_flow(kind):
         raise AssertionError("Actual 1500+ library did not retain real source chapters")
     tap(("显示", "Display", "表示"), exact=True, only_class="Button", seconds=25)
     tap(("列表", "List", "リスト"), exact=True, seconds=25)
-    # A new Library search or display mode must start at the first result,
-    # not restore the last scroll position from the unfiltered 1500+ books.
-    # The second saved chapter is already checked by original-store ID and
-    # SHA256 above; open the FIRST through the actual original Home UI.
-    wait(imported["title"], seconds=55, exact=True, only_class="TextView")
-    tap(imported["title"], seconds=30, exact=True, only_class="TextView")
-    tap(("阅读", "Read", "読む"), only_class="Button", seconds=40)
-    dismiss_immersive_help()
-    wait_page_counter(("1 / " + str(original_total),
-                       "1/" + str(original_total)), seconds=45)
-    record("Host stopped: original four-tab Clean app opens preserved " + label + " real-source offline chapter")
+    # A 360dp screen may show only ONE row of the 2 / 1504 filtered
+    # RecyclerView results. LATEST sorts the second imported chapter first;
+    # the older chapter is correctly virtualized below the viewport. Open
+    # BOTH distinct chapters by normal user scrolling, not by launching an
+    # Activity with adb or changing original Library sort/data.
+    for owned_book, page_hashes in reversed(saved_records):
+        tap_scrolling((owned_book["title"],), direction="down",
+                      only_class="TextView", attempts=10)
+        tap(("阅读", "Read", "読む"), only_class="Button", seconds=40)
+        dismiss_immersive_help()
+        pages = str(len(page_hashes))
+        wait_page_counter(("1 / " + pages, "1/" + pages), seconds=45)
+        record("Host stopped: original four-tab Clean app opens real " +
+               label + " offline chapter from normal Library list")
+        # Return through original Reader -> detail -> original Home before
+        # opening the other result. No privileged content/intent shortcut.
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        wait(("我的书库", "My library", "マイライブラリ"), seconds=40)
     (ROOT / spec["proof"]).write_text(json.dumps({
         "result": "EMULATOR_PUBLIC_LICENSED_SOURCE_PASS",
         "source": label,
@@ -2198,6 +2206,7 @@ def licensed_public_android_source_flow(kind):
         "extensionSha256": spec["sha"],
         "realPagesRead": 2,
         "distinctRealChaptersSaved": len(saved_records),
+        "offlineChaptersReopenedInOriginalReader": len(saved_records),
         "localPagesVerified": sum(len(hashes) for _, hashes in saved_records),
         "offlineHashesIdentical": True,
         "originalFourTabApp": CLEAN_PACKAGE,

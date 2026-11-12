@@ -2334,10 +2334,13 @@ def licensed_public_android_source_flow(kind):
         wait_page_counter(("1 / " + pages, "1/" + pages), seconds=45)
         record("Host stopped: original four-tab Clean app opens real " +
                label + " offline chapter from normal Library list")
-        # Return through original Reader -> detail -> original Home before
-        # opening the other result. No privileged content/intent shortcut.
+        # Return through the real Reader -> detail -> Home UI, rather than
+        # racing two KEYCODE_BACK events while Android is transitioning.
+        # The first back must actually reveal the original detail page.
+        # Then use its visible back control, as a user would.
         adb("shell", "input", "keyevent", "KEYCODE_BACK")
-        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        wait("漫画详情", seconds=35, exact=True, only_class="TextView")
+        tap("‹ 返回", seconds=30, exact=True, only_class="Button")
         wait(("我的书库", "My library", "マイライブラリ"), seconds=40)
     (ROOT / spec["proof"]).write_text(json.dumps({
         "result": "EMULATOR_PUBLIC_LICENSED_SOURCE_PASS",

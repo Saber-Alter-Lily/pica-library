@@ -2407,7 +2407,11 @@ def main():
         selected = os.environ.get("PICA_B2_PUBLIC_SOURCE", "both")
         if selected not in ("peppercarrot", "xkcd", "comicfury", "both"):
             raise AssertionError("Unrecognized pinned B2 site selection")
-        real_sites = ("peppercarrot", "comicfury") if selected == "both" else (selected,)
+        # Run the recently verified ComicFury before the upstream-drifting
+        # Pepper&Carrot site; if Pepper's published directory fails, retain
+        # ComicFury's genuine on-device chapter and offline proof in artifacts.
+        # Never turn an upstream source failure into a two-site PASS.
+        real_sites = ("comicfury", "peppercarrot") if selected == "both" else (selected,)
         verified_sites = [licensed_public_android_source_flow(site)
                           for site in real_sites]
         if len(verified_sites) > 1:

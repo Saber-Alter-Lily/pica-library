@@ -32,6 +32,18 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(manifest).toContain('.HistoryActivity')
   })
 
+  it('resets only the Library viewport when search, filter, sort or display mode changes', () => {
+    const home = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java','utf8')
+    const flow = fs.readFileSync('scripts/s3-android-local-emulator-flow.py','utf8')
+    expect(home).toContain('if(!nextQuery.equals(libraryQuery))resetLibraryViewportOnShow=true')
+    expect(home).toContain('next->{resetLibraryViewportOnShow=true;librarySpec=next')
+    expect(home).toContain('if(librarySpec.sort!=values[w])resetLibraryViewportOnShow=true')
+    expect(home).toContain('if(collectionMode!=modes[which]&&current==0&&!showingShelves)resetLibraryViewportOnShow=true')
+    expect(home).toContain('tabListPosition[0]=0;tabListOffset[0]=0;')
+    expect(flow).toContain('original1500LibrarySearchAndListVisible')
+    expect(flow).toContain('50b-original-clean-1500-library-search-and-list')
+  })
+
   it('uses an auditable creator concept and two-stage creator navigation', () => {
     const concepts = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AuthorConceptStore.java','utf8')
     const detail = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java','utf8')

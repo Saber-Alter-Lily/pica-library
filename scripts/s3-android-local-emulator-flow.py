@@ -1779,6 +1779,25 @@ def original_large_shelf_flow():
     page("50-original-clean-library-after-1500-shelf")
     record("original Library remains navigable after 1500-work shelf projection and switches")
 
+    # B3 real UI sanity: filter a 1,500+ work Library to an older row and
+    # switch grid -> list. This uses the SAME normal Home input/IME and
+    # display chooser; a previously saved scroll index must never make the
+    # newly filtered target disappear. No synthetic Reader bypass.
+    STEP = "b3-1500-original-library-title-search-and-view"
+    search = wait(("",), seconds=25, only_class="EditText")
+    adb("shell", "input", "tap", str(search[0]), str(search[1]))
+    adb("shell", "input", "text", "QA_LOAD_1499")
+    adb("shell", "input", "keyevent", "KEYCODE_ENTER")
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    results = wait(("1 / ",), seconds=50)
+    if not re.search(r"^1\s*/\s*1[5-9]\d\d", results[2]):
+        raise AssertionError("Original 1500+ Library lost synthetic filter count")
+    tap(("显示", "Display", "表示"), exact=True, only_class="Button", seconds=25)
+    tap(("列表", "List", "リスト"), exact=True, seconds=25)
+    wait("QA_LOAD_1499", seconds=50, exact=True, only_class="TextView")
+    page("50b-original-clean-1500-library-search-and-list")
+    record("original 1500+ Library native search + list layout shows exact older work without stale viewport")
+
     (ROOT / "r3-original-1500-shelf-load.json").write_text(json.dumps({
         "result": "EMULATOR_UI_PASS", "originalApp": CLEAN_PACKAGE,
         "catalogRowsSynthetic": 1500, "largeShelfMembers": 1500,
@@ -1790,6 +1809,7 @@ def original_large_shelf_flow():
         "scrolledWorkTitles": len(scrolled_titles),
         "largeShelfScrollPreservedAcrossSwitch": True,
         "libraryAndShelvesUseIndependentViewports": True,
+        "original1500LibrarySearchAndListVisible": True,
         "returnToOriginalLibraryMsObserved": library_ms,
         "actualRealBooksUsed": False,
         "actualPhysicalDeviceUsed": False, "performanceBudgetApproved": False,

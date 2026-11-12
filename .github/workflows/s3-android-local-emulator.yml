@@ -138,11 +138,13 @@ jobs:
           PICA_B2_PEPPER_JAR: ${{ runner.temp }}/pica-b2-peppercarrot.jar
           PICA_B2_XKCD_JAR: ${{ runner.temp }}/pica-b2-xkcd.jar
           PICA_B2_COMICFURY_JAR: ${{ runner.temp }}/pica-b2-comicfury.jar
-          # Independently check ComicFury: the current xkcd v1.6.2 extension
-          # fails its upstream headless Host image interception ("Stub!").
-          # Keep old xkcd evidence, but require actual second-source pages,
-          # two distinct original Reader saves and offline byte validation.
-          PICA_B2_PUBLIC_SOURCE: comicfury
+          # B2 same-SHA two-source release gate: the existing full original
+          # Android UI flow now exercises independently pinned Pepper&Carrot
+          # and ComicFury, preserving local pages across the Host switch.
+          # The newer xkcd v1.6.2 still has an upstream headless "Stub!"
+          # failure and is retained as an independent diagnostic, never a PASS.
+          # Do not fall back to synthetic images when either source fails.
+          PICA_B2_PUBLIC_SOURCE: both
         with:
           api-level: 35
           arch: x86_64

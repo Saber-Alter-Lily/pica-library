@@ -2359,6 +2359,20 @@ def licensed_public_android_source_flow(kind):
         "physicalDevice": False,
         "userDataTouched": False,
     }, indent=2), encoding="utf-8")
+    # Ephemeral in-memory proof only: a second independent source must not
+    # replace or mutate the pages already imported by the first source.
+    # Keep image bytes, file paths and checksums out of public CI artifacts.
+    return {
+        "kind": kind, "sourceId": external_source_id,
+        "localChapters": [
+            {
+                "id": book["id"], "generation": book["generation"],
+                "pages": [(page["file"], digest)
+                          for page, digest in zip(book["pages"], hashes)],
+            }
+            for book, hashes in saved_records
+        ],
+    }
 
 
 def main():
@@ -2387,15 +2401,56 @@ def main():
         legacy_dev_to_clean_compat_upgrade()
         original_large_shelf_flow()
         original_home_responsive_matrix()
-        # Test one independently pinned public site per full real-Android run.
-        # Upstream availability for one publisher must not block evidence from
-        # a different unrelated extension. "both" remains an explicit option.
+        # One exact app SHA, two independently pinned real public sources.
+        # Reuse the established single-source flow for each; fail explicitly
+        # rather than substituting synthetic pages if an upstream site fails.
         selected = os.environ.get("PICA_B2_PUBLIC_SOURCE", "both")
         if selected not in ("peppercarrot", "xkcd", "comicfury", "both"):
             raise AssertionError("Unrecognized pinned B2 site selection")
-        real_sites = ("peppercarrot", "xkcd") if selected == "both" else (selected,)
-        for site in real_sites:
-            licensed_public_android_source_flow(site)
+        real_sites = ("peppercarrot", "comicfury") if selected == "both" else (selected,)
+        verified_sites = [licensed_public_android_source_flow(site)
+                          for site in real_sites]
+        if len(verified_sites) > 1:
+            STEP = "b2-independent-sources-preserve-earlier-offline-library"
+            source_ids = [entry["sourceId"] for entry in verified_sites]
+            chapters = [chapter for entry in verified_sites
+                        for chapter in entry["localChapters"]]
+            if len(set(source_ids)) != len(source_ids):
+                raise AssertionError("Two independent extensions shared a source identity")
+            if len(set(chapter["id"] for chapter in chapters)) != len(chapters):
+                raise AssertionError("Cross-source local chapter ID collision")
+            PACKAGE = CLEAN_PACKAGE
+            actual_books = {book["id"]: book for book in book_rows()}
+            for chapter in chapters:
+                book = actual_books.get(chapter["id"])
+                if book is None or book["generation"] != chapter["generation"]:
+                    raise AssertionError("Later source invalidated earlier local chapter")
+                image_root = ("files/local-comics-v1/" +
+                              chapter["id"].removeprefix("local:") + "/" +
+                              chapter["generation"] + "/")
+                actual_hashes = [
+                    hashlib.sha256(adb(
+                        "exec-out", "run-as", CLEAN_PACKAGE, "cat",
+                        image_root + filename, binary=True)).hexdigest()
+                    for filename, _ in chapter["pages"]
+                ]
+                if actual_hashes != [digest for _, digest in chapter["pages"]]:
+                    raise AssertionError("Later source mutated earlier offline page bytes")
+            (ROOT / "b2-independent-sources-same-sha.json").write_text(
+                json.dumps({
+                    "result": "EMULATOR_TWO_INDEPENDENT_PUBLIC_SOURCES_PASS",
+                    "sources": [entry["kind"] for entry in verified_sites],
+                    "distinctSources": len(verified_sites),
+                    "separateLocalChapters": len(chapters),
+                    "earlierOfflineChaptersPreserved": True,
+                    "hostStoppedBeforeOfflineVerification": True,
+                    "originalCleanReaderOnly": True,
+                    "realHandset": False,
+                    "actualProductionAccounts": False,
+                    "imagesOrSecretsExported": False,
+                }, indent=2), encoding="utf-8")
+            record("two independent real sources share one clean Reader without "
+                   "cross-source chapter identity or image mutation")
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",

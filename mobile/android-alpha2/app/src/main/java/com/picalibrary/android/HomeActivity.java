@@ -584,9 +584,9 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     private void recommendations(){
         LinearLayout p=page(true);
         RecommendationProgressPanel progress=new RecommendationProgressPanel(this,()->{if(current==1&&!isDestroyed()&&!isFinishing())show();});
-        Button preferences=compact("画像 / 调整",v->startActivity(new Intent(this,RecommendationStyleActivity.class)));preferences.setTag(AndroidOnboarding.RECOMMEND_PREFERENCES);
-        ImageButton refresh=Ui.iconButton(this,R.drawable.ic_refresh_24,"重新生成手机推荐",v->refreshRecommendations(progress));refresh.setTag(AndroidOnboarding.RECOMMEND_BUILD);
-        titleRow(p,"为你推荐",preferences,refresh);
+        Button preferences=compact(LocalizedText.ui(this,"画像 / 调整","Profile / adjust","好み / 調整"),v->startActivity(new Intent(this,RecommendationStyleActivity.class)));preferences.setTag(AndroidOnboarding.RECOMMEND_PREFERENCES);
+        ImageButton refresh=Ui.iconButton(this,R.drawable.ic_refresh_24,LocalizedText.ui(this,"重新生成手机推荐","Regenerate phone recommendations","スマホのおすすめを再生成"),v->refreshRecommendations(progress));refresh.setTag(AndroidOnboarding.RECOMMEND_BUILD);
+        titleRow(p,LocalizedText.ui(this,"为你推荐","For you","おすすめ"),preferences,refresh);
         p.addView(progress);
 
         LinearLayout loading=SettingsRow.panel(this,null);
@@ -639,21 +639,21 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
             int sessionCount,boolean canRun,boolean paired){
         recommendationVisibleSnapshot=snapshot;
         LinearLayout statusCard=SettingsRow.panel(this,null);
-        statusCard.addView(SettingsRow.statusLine(this,"运行节点",Ui.text(this,"Android 本机",12,Ui.TEXT,true)));
-        statusCard.addView(SettingsRow.statusLine(this,"当前 Cycle",Ui.text(this,stored.cycleId.isEmpty()?"尚未生成":stored.cycleId.substring(0,Math.min(12,stored.cycleId.length())),12,Ui.MUTED,true)));
-        statusCard.addView(SettingsRow.statusLine(this,"候选基础",Ui.rawText(this,portable.available()?LocalizedText.ui(this,portable.candidates.size()+" 个 · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length())),portable.candidates.size()+" items · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length())),portable.candidates.size()+" 件 · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length()))):LocalizedText.ui(this,"尚未同步","Not synced yet","未同期"),12,Ui.MUTED,true)));
-        statusCard.addView(SettingsRow.statusLine(this,"本次 Session",Ui.rawText(this,LocalizedText.ui(this,sessionCount+" 条行为 · 仅手机",sessionCount+" behaviors · phone only",sessionCount+" 件の行動 · スマートフォンのみ"),12,Ui.MUTED,true)));
+        statusCard.addView(SettingsRow.statusLine(this,LocalizedText.ui(this,"运行节点","Running on","実行端末"),Ui.text(this,LocalizedText.ui(this,"Android 本机","On this Android","この Android"),12,Ui.TEXT,true)));
+        statusCard.addView(SettingsRow.statusLine(this,LocalizedText.ui(this,"当前 Cycle","Current cycle","現在のサイクル"),Ui.text(this,stored.cycleId.isEmpty()?LocalizedText.ui(this,"尚未生成","Not generated yet","未生成"):stored.cycleId.substring(0,Math.min(12,stored.cycleId.length())),12,Ui.MUTED,true)));
+        statusCard.addView(SettingsRow.statusLine(this,LocalizedText.ui(this,"候选基础","Candidate base","候補の基盤"),Ui.rawText(this,portable.available()?LocalizedText.ui(this,portable.candidates.size()+" 个 · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length())),portable.candidates.size()+" items · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length())),portable.candidates.size()+" 件 · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length()))):LocalizedText.ui(this,"尚未同步","Not synced yet","未同期"),12,Ui.MUTED,true)));
+        statusCard.addView(SettingsRow.statusLine(this,LocalizedText.ui(this,"本次 Session","This session","今回のセッション"),Ui.rawText(this,LocalizedText.ui(this,sessionCount+" 条行为 · 仅手机",sessionCount+" behaviors · phone only",sessionCount+" 件の行動 · スマートフォンのみ"),12,Ui.MUTED,true)));
         p.addView(statusCard);
 
         if(!snapshot.available()){
-            TextView t=Ui.text(this,stored.available()?"当前候选已被本机反馈或屏蔽规则耗尽。":"还没有手机本地推荐周期。",14,Ui.MUTED,false);
+            TextView t=Ui.text(this,stored.available()?LocalizedText.ui(this,"当前候选已被本机反馈或屏蔽规则耗尽。","No candidates remain after your feedback and filters.","評価と除外設定により候補が残っていません。"):LocalizedText.ui(this,"还没有手机本地推荐周期。","No phone-local recommendation cycle yet.","スマホ内のおすすめサイクルはまだありません。"),14,Ui.MUTED,false);
             t.setPadding(0,Ui.dp(this,12),0,Ui.dp(this,10));p.addView(t);
             if(canRun){
-                p.addView(compact("生成手机推荐",v->{NativeRecommendationJobs.refresh(this);progress.begin();}));
+                p.addView(compact(LocalizedText.ui(this,"生成手机推荐","Generate phone recommendations","スマホのおすすめを生成"),v->{NativeRecommendationJobs.refresh(this);progress.begin();}));
             }else if(paired){
-                p.addView(compact("同步候选基础",v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
+                p.addView(compact(LocalizedText.ui(this,"同步候选基础","Sync candidate base","候補データを同期"),v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
             }else{
-                p.addView(compact("连接电脑或配置在线来源",v->startActivity(new Intent(this,PairingActivity.class))));
+                p.addView(compact(LocalizedText.ui(this,"连接电脑或配置在线来源","Pair Desktop or configure a source","PCと接続またはソースを設定"),v->startActivity(new Intent(this,PairingActivity.class))));
             }
             return;
         }
@@ -661,9 +661,9 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         TextView sourceView=Ui.rawText(this,LocalizedText.ui(this,"手机独立排序 · Lifetime / Recent / Session / Explicit","Phone-local ranking · Lifetime / Recent / Session / Explicit","スマートフォン独立順位付け · Lifetime / Recent / Session / Explicit")+(portable.available()?LocalizedText.ui(this," · 已接入同步候选基础"," · synced candidate base connected"," · 同期済み候補基盤を利用"):""),12,Ui.MUTED,false);
         sourceView.setPadding(0,0,0,Ui.dp(this,6));p.addView(sourceView);
         LinearLayout pager=new LinearLayout(this);pager.setGravity(Gravity.CENTER_VERTICAL);
-        pager.addView(compact("上一批",v->switchHomeRecommendationBatch(-1)),new LinearLayout.LayoutParams(0,-2,1));
+        pager.addView(compact(LocalizedText.ui(this,"上一批","Previous batch","前のバッチ"),v->switchHomeRecommendationBatch(-1)),new LinearLayout.LayoutParams(0,-2,1));
         recommendationBatchLabel=Ui.text(this,"",13,Ui.MUTED,false);recommendationBatchLabel.setGravity(Gravity.CENTER);pager.addView(recommendationBatchLabel,new LinearLayout.LayoutParams(0,-1,1));
-        pager.addView(compact("下一批",v->switchHomeRecommendationBatch(1)),new LinearLayout.LayoutParams(0,-2,1));
+        pager.addView(compact(LocalizedText.ui(this,"下一批","Next batch","次のバッチ"),v->switchHomeRecommendationBatch(1)),new LinearLayout.LayoutParams(0,-2,1));
         p.addView(pager);
 
         recommendationCatalog=catalog;
@@ -731,9 +731,9 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
             feedback.setOrientation(LinearLayout.VERTICAL);
             feedback.setPadding(0,Ui.dp(this,8),0,0);
             LinearLayout opinions=new LinearLayout(this);
-            Button like=compact(liked?"👍 已喜欢":"👍 喜欢",
+            Button like=compact(liked?LocalizedText.ui(this,"已喜欢","Liked","好き"):LocalizedText.ui(this,"喜欢","Like","好き"),
                 v->recommendationFeedback(item,"like"));
-            Button dislike=compact(disliked?"👎 已不喜欢":"👎 不喜欢",
+            Button dislike=compact(disliked?LocalizedText.ui(this,"已不喜欢","Disliked","苦手"):LocalizedText.ui(this,"不喜欢","Dislike","苦手"),
                 v->recommendationFeedback(item,"dislike"));
             like.setSingleLine(false);like.setMaxLines(2);
             dislike.setSingleLine(false);dislike.setMaxLines(2);
@@ -742,7 +742,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
             opinions.addView(dislike,new LinearLayout.LayoutParams(0,Ui.dp(this,48),1));
             feedback.addView(opinions);
             UnifiedCatalogStore.Entry target=e;
-            feedback.addView(compact("⚙ 调节偏好",
+            feedback.addView(compact(LocalizedText.ui(this,"调节偏好","Adjust preferences","好みを調整"),
                 v->RecommendationItemControlDialog.show(this,target,this::show)),
                 new LinearLayout.LayoutParams(-1,Ui.dp(this,48)));
             copy.addView(feedback);
@@ -777,7 +777,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     }
 
     private void refreshCurrentRecommendationFeedback(){if(recommendationVisibleSnapshot!=null&&recommendationBatchList!=null&&recommendationBatchLabel!=null)renderHomeRecommendationBatch(recommendationVisibleSnapshot);}
-    private void recommendationFeedback(NativeRecommendationStore.Item item,String sentiment){if(sentiment.equals(RecommendationFeedbackStore.sentiment(this,item.comicId))){refreshCurrentRecommendationFeedback();return;}RecommendationFeedbackStore.setSentiment(this,item.comicId,sentiment);refreshCurrentRecommendationFeedback();if(!RecommendationFeedbackStore.askReasons(this))return;String[] labels={"画风","题材 / 标签","作者","角色 / IP","已经看过","推荐太重复"};String[] keys={"style","topic","author","character","already_seen","repetitive"};boolean[] checked=new boolean[labels.length];new AlertDialog.Builder(this).setTitle("like".equals(sentiment)?LocalizedText.ui("为什么喜欢？（可选）"):LocalizedText.ui("为什么不喜欢？（可选）")).setMultiChoiceItems(LocalizedText.ui(labels),checked,(d,which,value)->checked[which]=value).setNegativeButton(LocalizedText.ui("跳过"),(d,w)->refreshCurrentRecommendationFeedback()).setPositiveButton(LocalizedText.ui("保存原因"),(d,w)->{List<String> reasons=new ArrayList<>();for(int i=0;i<keys.length;i++)if(checked[i])reasons.add(keys[i]);RecommendationFeedbackStore.setReasons(this,item.comicId,sentiment,reasons);if(reasons.contains("already_seen"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen",true,30);if(reasons.contains("repetitive"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"duplicate",true,30);refreshCurrentRecommendationFeedback();}).setOnCancelListener(d->refreshCurrentRecommendationFeedback()).show();}
+    private void recommendationFeedback(NativeRecommendationStore.Item item,String sentiment){if(sentiment.equals(RecommendationFeedbackStore.sentiment(this,item.comicId))){refreshCurrentRecommendationFeedback();return;}RecommendationFeedbackStore.setSentiment(this,item.comicId,sentiment);refreshCurrentRecommendationFeedback();if(!RecommendationFeedbackStore.askReasons(this))return;String[] labels={LocalizedText.ui(this,"画风","Art style","絵柄"),LocalizedText.ui(this,"题材 / 标签","Topics / tags","題材 / タグ"),LocalizedText.ui(this,"作者","Author","作者"),LocalizedText.ui(this,"角色 / IP","Characters / IP","キャラクター / IP"),LocalizedText.ui(this,"已经看过","Already read","既読"),LocalizedText.ui(this,"推荐太重复","Too repetitive","重複が多い")};String[] keys={"style","topic","author","character","already_seen","repetitive"};boolean[] checked=new boolean[labels.length];new AlertDialog.Builder(this).setTitle("like".equals(sentiment)?LocalizedText.ui("为什么喜欢？（可选）"):LocalizedText.ui("为什么不喜欢？（可选）")).setMultiChoiceItems(LocalizedText.ui(labels),checked,(d,which,value)->checked[which]=value).setNegativeButton(LocalizedText.ui("跳过"),(d,w)->refreshCurrentRecommendationFeedback()).setPositiveButton(LocalizedText.ui("保存原因"),(d,w)->{List<String> reasons=new ArrayList<>();for(int i=0;i<keys.length;i++)if(checked[i])reasons.add(keys[i]);RecommendationFeedbackStore.setReasons(this,item.comicId,sentiment,reasons);if(reasons.contains("already_seen"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen",true,30);if(reasons.contains("repetitive"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"duplicate",true,30);refreshCurrentRecommendationFeedback();}).setOnCancelListener(d->refreshCurrentRecommendationFeedback()).show();}
 
     private void openOnlineSource(String sourceMode){
         Intent i=new Intent(this,PicaBrowseActivity.class);
@@ -788,7 +788,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     private void openSignedSourceCompanion(){SignedSourceLauncher.open(this);}
 
     private void onlineEntry(){
-        LinearLayout p=page(true);titleRow(p,"在线");
+        LinearLayout p=page(true);titleRow(p,LocalizedText.ui(this,"在线","Online","オンライン"));
         if(BuildConfig.SOURCE_NEUTRAL_QA){
             LinearLayout source=SettingsRow.row(this,
                 LocalizedText.ui(this,"我的外接来源","My external sources","外部ソース"),
@@ -846,20 +846,20 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
             v->startActivity(new Intent(this,HostSourceActivity.class)));
         userHost.setTag("online-user-host");
         p.addView(userHost);
-        p.addView(SettingsRow.row(this,"全部来源","Pica + E-H"+(exh.available()?" + ExH":""),v->openOnlineSource("all")));
-        p.addView(SettingsRow.row(this,"Pica",pica?"可用":"未登录",v->openOnlineSource("pica")));
-        p.addView(SettingsRow.row(this,"E-Hentai",eh?"账号已连接":"游客可浏览",v->openOnlineSource("eh")));
-        p.addView(SettingsRow.row(this,"ExHentai",exh.available()?"可用":"可选扩展",v->openOnlineSource("exh")));
-        p.addView(SettingsRow.row(this,"账号与来源","管理登录与连接",v->startActivity(new Intent(this,AccountSourcesActivity.class))));
+        p.addView(SettingsRow.row(this,LocalizedText.ui(this,"全部来源","All sources","すべてのソース"),"Pica + E-H"+(exh.available()?" + ExH":""),v->openOnlineSource("all")));
+        p.addView(SettingsRow.row(this,"Pica",pica?LocalizedText.ui(this,"可用","Available","利用可能"):LocalizedText.ui(this,"未登录","Not signed in","未ログイン"),v->openOnlineSource("pica")));
+        p.addView(SettingsRow.row(this,"E-Hentai",eh?LocalizedText.ui(this,"账号已连接","Account connected","アカウント接続済み"):LocalizedText.ui(this,"游客可浏览","Guest browsing available","ゲスト閲覧可能"),v->openOnlineSource("eh")));
+        p.addView(SettingsRow.row(this,"ExHentai",exh.available()?LocalizedText.ui(this,"可用","Available","利用可能"):LocalizedText.ui(this,"可选扩展","Optional extension","任意の拡張"),v->openOnlineSource("exh")));
+        p.addView(SettingsRow.row(this,LocalizedText.ui(this,"账号与来源","Accounts and sources","アカウントとソース"),LocalizedText.ui(this,"管理登录与连接","Manage sign-ins and connections","ログインと接続を管理"),v->startActivity(new Intent(this,AccountSourcesActivity.class))));
     }
 
     private void settingsEntry(){
-        LinearLayout p=page(true);titleRow(p,"设置");
+        LinearLayout p=page(true);titleRow(p,LocalizedText.ui(this,"设置","Settings","設定"));
         if(BuildConfig.LOCAL_ONLY_DRAFT){
             p.addView(Ui.text(this,LocalizedText.ui(this,"独立本地书库 · 不连接漫画源、电脑或网盘","Local library only · no online sources, Desktop or WebDAV","ローカル書庫のみ · オンラインソース・PC・WebDAV は使用しません"),13,Ui.MUTED,false));
             p.addView(SettingsRow.row(this,LocalizedText.ui(this,"导入本地漫画","Import local comics","ローカル漫画を取り込む"),"Folder / CBZ",v->startActivity(new Intent(this,LocalComicImportActivity.class))));
             p.addView(SettingsRow.row(this,getString(R.string.settings_language),getString(R.string.settings_language_summary),v->startActivity(new Intent(this,LanguageActivity.class))));
-            p.addView(SettingsRow.row(this,"个性化",ThemeStore.label(this),v->startActivity(new Intent(this,AppearanceActivity.class))));
+            p.addView(SettingsRow.row(this,LocalizedText.ui(this,"个性化","Appearance","外観"),ThemeStore.label(this),v->startActivity(new Intent(this,AppearanceActivity.class))));
             p.addView(SettingsRow.row(this,LocalizedText.ui(this,"关于","About","情報"),LocalizedText.ui(this,"本地阅读开发版本","Local reading development build","ローカル閲覧開発版"),v->startActivity(new Intent(this,AboutActivity.class))));
             return;
         }
@@ -874,20 +874,20 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
             p.addView(SettingsRow.row(this,
                 LocalizedText.ui(this,"外接来源","External sources","外部ソース"),
                 "Signed optional Host",v->openSignedSourceCompanion()));
-            LinearLayout pair=SettingsRow.row(this,"连接电脑",
-                paired?"已连接":"未连接",
+            LinearLayout pair=SettingsRow.row(this,LocalizedText.ui(this,"连接电脑","Pair Desktop","PCと接続"),
+                paired?LocalizedText.ui(this,"已连接","Connected","接続済み"):LocalizedText.ui(this,"未连接","Not connected","未接続"),
                 v->startActivity(new Intent(this,PairingActivity.class)));
             pair.setTag(AndroidOnboarding.SETTINGS_PAIR);
             p.addView(pair);
-            p.addView(SettingsRow.row(this,"存储 / WebDAV",
+            p.addView(SettingsRow.row(this,LocalizedText.ui(this,"存储 / WebDAV","Storage / WebDAV","ストレージ / WebDAV"),
                 "Local / Desktop / WebDAV",
                 v->startActivity(new Intent(this,StorageHubActivity.class))));
-            p.addView(SettingsRow.row(this,"推荐与画风",
-                "Local / synced candidates",
+            p.addView(SettingsRow.row(this,LocalizedText.ui(this,"推荐与画风","Recommendations / Visual","おすすめ / 画風"),
+                LocalizedText.ui(this,"本机候选 / 同步候选","Local / synced candidates","端末内 / 同期候補"),
                 v->startActivity(new Intent(this,RecommendationStyleActivity.class))));
-            p.addView(SettingsRow.row(this,"个性化",ThemeStore.label(this),
+            p.addView(SettingsRow.row(this,LocalizedText.ui(this,"个性化","Appearance","外観"),ThemeStore.label(this),
                 v->startActivity(new Intent(this,AppearanceActivity.class))));
-            p.addView(SettingsRow.row(this,"本地数据与缓存","Storage",
+            p.addView(SettingsRow.row(this,LocalizedText.ui(this,"本地数据与缓存","Local data and cache","ローカルデータとキャッシュ"),LocalizedText.ui(this,"本地存储","Local storage","ローカルストレージ"),
                 v->startActivity(new Intent(this,StorageSettingsActivity.class))));
             LinearLayout help=SettingsRow.row(this,
                 getString(R.string.onboarding_settings_title),
@@ -895,7 +895,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
                 v->startActivity(new Intent(this,OnboardingSettingsActivity.class)));
             help.setTag(AndroidOnboarding.SETTINGS_HELP);
             p.addView(help);
-            p.addView(SettingsRow.row(this,"关于","Source-neutral QA · no OTA",
+            p.addView(SettingsRow.row(this,LocalizedText.ui(this,"关于","About","情報"),"Source-neutral QA · no OTA",
                 v->startActivity(new Intent(this,AboutActivity.class))));
             return;
         }
@@ -903,15 +903,15 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         boolean pica=PicaAccountStore.load(this).configured();
         boolean eh=EhAccountStore.load(this).configured();
         LinearLayout languageRow=SettingsRow.row(this,getString(R.string.settings_language),getString(R.string.settings_language_summary),v->startActivity(new Intent(this,LanguageActivity.class)));languageRow.setTag(AndroidOnboarding.SETTINGS_LANGUAGE);p.addView(languageRow);
-        p.addView(SettingsRow.row(this,"账号与来源",(pica||eh)?"本机已配置":"",v->startActivity(new Intent(this,AccountSourcesActivity.class))));
-        LinearLayout pairRow=SettingsRow.row(this,"连接电脑",paired?"已连接":"未连接",v->startActivity(new Intent(this,PairingActivity.class)));pairRow.setTag(AndroidOnboarding.SETTINGS_PAIR);p.addView(pairRow);
-        p.addView(SettingsRow.row(this,"存储与下载","目录 / WebDAV / 下载策略",v->startActivity(new Intent(this,StorageHubActivity.class))));
-        p.addView(SettingsRow.row(this,"个性化",ThemeStore.label(this),v->startActivity(new Intent(this,AppearanceActivity.class))));
-        LinearLayout recommendRow=SettingsRow.row(this,"推荐与画风",paired?"独立运行 · 可同步":"本机独立运行",v->startActivity(new Intent(this,RecommendationStyleActivity.class)));recommendRow.setTag(AndroidOnboarding.SETTINGS_RECOMMEND);p.addView(recommendRow);
-        p.addView(SettingsRow.row(this,"数据与缓存","缓存与本地数据",v->startActivity(new Intent(this,StorageSettingsActivity.class))));
-        LinearLayout updateRow=SettingsRow.row(this,"软件更新","检查并安装正式更新",v->startActivity(new Intent(this,UpdateActivity.class)));updateRow.setTag(AndroidOnboarding.SETTINGS_UPDATE);p.addView(updateRow);
+        p.addView(SettingsRow.row(this,LocalizedText.ui(this,"账号与来源","Accounts and sources","アカウントとソース"),(pica||eh)?LocalizedText.ui(this,"本机已配置","Configured on this phone","この端末で設定済み"):"",v->startActivity(new Intent(this,AccountSourcesActivity.class))));
+        LinearLayout pairRow=SettingsRow.row(this,LocalizedText.ui(this,"连接电脑","Pair Desktop","PCと接続"),paired?LocalizedText.ui(this,"已连接","Connected","接続済み"):LocalizedText.ui(this,"未连接","Not connected","未接続"),v->startActivity(new Intent(this,PairingActivity.class)));pairRow.setTag(AndroidOnboarding.SETTINGS_PAIR);p.addView(pairRow);
+        p.addView(SettingsRow.row(this,LocalizedText.ui(this,"存储与下载","Storage and downloads","ストレージとダウンロード"),LocalizedText.ui(this,"目录 / WebDAV / 下载策略","Folders / WebDAV / download settings","フォルダー / WebDAV / ダウンロード設定"),v->startActivity(new Intent(this,StorageHubActivity.class))));
+        p.addView(SettingsRow.row(this,LocalizedText.ui(this,"个性化","Appearance","外観"),ThemeStore.label(this),v->startActivity(new Intent(this,AppearanceActivity.class))));
+        LinearLayout recommendRow=SettingsRow.row(this,LocalizedText.ui(this,"推荐与画风","Recommendations / Visual","おすすめ / 画風"),paired?LocalizedText.ui(this,"独立运行 · 可同步","Local recommendations · sync available","端末内おすすめ · 同期可能"):LocalizedText.ui(this,"本机独立运行","Runs on this phone","この端末で独立実行"),v->startActivity(new Intent(this,RecommendationStyleActivity.class)));recommendRow.setTag(AndroidOnboarding.SETTINGS_RECOMMEND);p.addView(recommendRow);
+        p.addView(SettingsRow.row(this,LocalizedText.ui(this,"数据与缓存","Data and cache","データとキャッシュ"),LocalizedText.ui(this,"缓存与本地数据","Cache and local data","キャッシュと端末内データ"),v->startActivity(new Intent(this,StorageSettingsActivity.class))));
+        LinearLayout updateRow=SettingsRow.row(this,LocalizedText.ui(this,"软件更新","Software updates","ソフトウェア更新"),LocalizedText.ui(this,"检查并安装正式更新","Check and install official updates","公式アップデートを確認・インストール"),v->startActivity(new Intent(this,UpdateActivity.class)));updateRow.setTag(AndroidOnboarding.SETTINGS_UPDATE);p.addView(updateRow);
         LinearLayout helpRow=SettingsRow.row(this,getString(R.string.onboarding_settings_title),getString(R.string.onboarding_replay_summary),v->startActivity(new Intent(this,OnboardingSettingsActivity.class)));helpRow.setTag(AndroidOnboarding.SETTINGS_HELP);p.addView(helpRow);
-        p.addView(SettingsRow.row(this,"支持项目","爱赞助 / GitHub · 支持开源开发",v->startActivity(new Intent(this,SupportActivity.class))));
-        p.addView(SettingsRow.row(this,"关于","版本 / 开源 / 使用说明",v->startActivity(new Intent(this,AboutActivity.class))));
+        p.addView(SettingsRow.row(this,LocalizedText.ui(this,"支持项目","Support the project","プロジェクトを支援"),LocalizedText.ui(this,"爱赞助 / GitHub · 支持开源开发","Azz.net / GitHub · support open source","Azz.net / GitHub · オープンソースを支援"),v->startActivity(new Intent(this,SupportActivity.class))));
+        p.addView(SettingsRow.row(this,LocalizedText.ui(this,"关于","About","情報"),LocalizedText.ui(this,"版本 / 开源 / 使用说明","Version / licenses / help","バージョン / ライセンス / ヘルプ"),v->startActivity(new Intent(this,AboutActivity.class))));
     }
 }

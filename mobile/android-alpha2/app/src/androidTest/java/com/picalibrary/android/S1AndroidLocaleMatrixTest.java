@@ -140,6 +140,27 @@ public final class S1AndroidLocaleMatrixTest {
                         assertNotNull(page+": original content anchor missing: "+control,anchor);
                         assertTrue(page+": original content control outside viewport",
                             anchor.getGlobalVisibleRect(visible));
+                        // Check the real visible product labels, not only painted pixels:
+                        // previously the screens passed nine screenshot scenarios while
+                        // Recommendation/Online/Settings still displayed hard-coded Chinese.
+                        if(homeTab==1){
+                            assertTrue(page+": recommendation heading not localized",
+                                hasText(decor,LocalizedText.ui(current,"为你推荐","For you","おすすめ")));
+                            assertTrue(page+": recommendation preferences not localized",
+                                hasText(decor,LocalizedText.ui(current,"画像 / 调整","Profile / adjust","好み / 調整")));
+                        }else if(homeTab==2){
+                            assertTrue(page+": online heading not localized",
+                                hasText(decor,LocalizedText.ui(current,"在线","Online","オンライン")));
+                            assertTrue(page+": source entry not localized",
+                                hasText(decor,LocalizedText.ui(current,"我的外接来源","My external sources","外部ソース")));
+                        }else if(homeTab==3){
+                            assertTrue(page+": settings heading not localized",
+                                hasText(decor,LocalizedText.ui(current,"设置","Settings","設定")));
+                            assertTrue(page+": recommendation settings row not localized",
+                                hasText(decor,LocalizedText.ui(current,"推荐与画风","Recommendations / Visual","おすすめ / 画風")));
+                            assertTrue(page+": appearance mode not localized",
+                                hasText(decor,ThemeStore.label(current)));
+                        }
                         if(homeTab==0){
                             View local=decor.findViewWithTag("library-local-import");
                             assertNotNull("Original Library local import missing",local);
@@ -187,6 +208,16 @@ public final class S1AndroidLocaleMatrixTest {
     /** A launcher ANR dialog can make a blank or obscured frame pass a simple
      * luminance test. Require this Activity to own the active focused window,
      * in addition to painted content, before accepting any screenshot. */
+    private static boolean hasText(View view,String value){
+        if(view instanceof TextView && value.contentEquals(((TextView)view).getText()))return true;
+        if(view instanceof android.view.ViewGroup){
+            android.view.ViewGroup group=(android.view.ViewGroup)view;
+            for(int i=0;i<group.getChildCount();i++)
+                if(hasText(group.getChildAt(i),value))return true;
+        }
+        return false;
+    }
+
     private Bitmap readyScreenshot(Instrumentation inst,String page,String theme,String caseId,File dir,Activity current){
         String ownPackage=inst.getTargetContext().getPackageName();
         String lastOwner="<none>";

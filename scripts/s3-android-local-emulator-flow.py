@@ -1863,7 +1863,22 @@ def original_home_responsive_matrix():
             CLEAN_PACKAGE + "/com.picalibrary.android.DisclaimerActivity",
             timeout=55)
         PACKAGE = CLEAN_PACKAGE
+    # `Later` is deliberately session-only in OnboardingStore. After
+    # force-stop a new Activity may display the genuine welcome dialog
+    # asynchronously (~700 ms). Exercise its visible Later control after
+    # restoring the baseline size/font, just as each test case does; never
+    # edit the app's onboarding preferences or bypass the original Home.
+    STEP = "b3-original-home-default-restore"
+    welcome = wait(("稍后再看", "Later", "後で"), seconds=16,
+                   required=False, only_class="Button")
+    if welcome:
+        adb("shell", "input", "tap", str(welcome[0]), str(welcome[1]))
+        print("UI tap: original onboarding Later after responsive-matrix restore",
+              flush=True)
     wait(("我的书库", "My library", "マイライブラリ"), seconds=45)
+    if find(("稍后再看", "Later", "後で"), only_class="Button"):
+        raise AssertionError("Original onboarding obstructed restored Home")
+    record("original Home restored after B3 responsive checks, including actual session-only onboarding dismissal")
     (ROOT / "b3-original-home-responsive-emulator.json").write_text(
         json.dumps({"result": "EMULATOR_ENGINEERING_PASS",
                     "cases": completed, "actualPhysicalDevice": False,

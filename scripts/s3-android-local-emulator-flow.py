@@ -2376,7 +2376,7 @@ def licensed_public_android_source_flow(kind):
 
 
 def main():
-    global STEP
+    global STEP, PACKAGE
     try:
         STEP = "fixtures"
         adb("shell", "wm", "size", "720x1280")

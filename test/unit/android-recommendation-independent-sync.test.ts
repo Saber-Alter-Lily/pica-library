@@ -14,13 +14,13 @@ describe('Android independent recommendation runtime and sync UI', () => {
             home.indexOf('private void library()'),
             home.indexOf('private void chooseLibrarySort()')
         )
-        expect(library).toContain('compact("书架"')
-        expect(library).toContain('compact("显示"')
+        expect(library).toContain('compact(LocalizedText.ui(this,"书架","Shelves","本棚"')
+        expect(library).toContain('compact(LocalizedText.ui(this,"显示","Display","表示"')
         expect(library).toContain(
-            'Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新书库"'
+            'Ui.iconButton(this,R.drawable.ic_refresh_24,LocalizedText.ui(this,"刷新书库","Refresh library","書庫を更新"'
         )
         expect(library).toContain(
-            'titleRow(p,"我的书库",history,shelfButton,display,refresh)'
+            'titleRow(p,LocalizedText.ui(this,"我的书库","My library","マイライブラリ"),history,shelfButton,display,refresh)'
         )
         expect(library).not.toContain('compact("⋮"')
         expect(library).not.toContain('showLibraryMenu()')

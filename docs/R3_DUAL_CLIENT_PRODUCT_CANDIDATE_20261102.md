@@ -2,6 +2,26 @@
 
 > **交付目标：**把已有完整 Windows 与 Android 客户端放进同一个未发布的产品候选流程，提供可直接安装、体验全部旧功能的 QA 包。不得把原完整客户端错误标记为物理无源正式版。稳定版 `main` / v0.5.0 / OTA / 正式数据保持不变。
 
+## 2026-11-12｜B3 双端实体体验验收候选：一次性同源码打包检查点
+
+**目的**：在原 Windows 全量 Web/Reader 与原 Android 四标签清洁版已经打通后，为实际 G1 产品体验提供**同一源码 SHA** 的双端隔离 QA 包。复用仓库既有 `post-stable-rc-packages.yml`，不增加第二打包器或发布渠道。本次文档提交是有意触发可信 integration-branch **push** 的一次产品候选打包检查点；这不是频繁随每次小提交重打包，也**不授权正式 Release、OTA、生产签名、更新真实软件或访问任何真实用户账户**。
+
+### 真实工件的最低验收
+
+- 必须检查同一 `GITHUB_SHA` 的工作流中 **`contract`、`windows-rc`、`android-rc`、`artifact-summary` 四个 job 的实际终态**，不能从 PR-only `contract SUCCESS` 且包 job `SKIPPED` 推断已成功打包。
+- Windows 工件需有可独立解压启动的完整原 Web/Reader ZIP、源码 SHA、版本、SHA256 与既有 v0.5.0→候选全量替换及模拟健康失败回滚记录。只在 `%LOCALAPPDATA%\\Pica Library Post Stable RC` 隔离路径操作，禁止覆盖旧正式库。
+- Android 工件应包含原四标签 `Clean-Android.apk` 和**同一工件、同一预览证书**的 `User-Host.apk`，以及历史 `Android.apk`（仅作旧功能对照）。验收须比对 Manifest/packageId/versionCode、apksigner 证书、所有 DEX 来源 SDK 排除、实际文件 Hash。清洁候选使用 `com.picalibrary.android.cleanqa`，**不是** `com.picalibrary.android` 的正式原位升级包。不得为解决签名冲突自动卸载任何已有 App。
+- 本次已合入原 Android 推荐/在线/设置中英日标签、九场景/11 页仪器化真实控件检查、封面缓存按尺寸采样解码。九场景 [#43269080308](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43269080308) 在较早源码为 SUCCESS；最终 QA 包仍需核对它自身的 SHA/CI，不能借用旧版本绿灯。封面内存优化不等于真实 1500 封面性能已验证。
+
+### G1 实体设备测试（每项提交真实记录，不预填 PASS）
+
+1. **Windows x64 原产品**：解压隔离 ZIP，首次无来源启动；文件夹/CBZ 导入→书库检索/排序→书架→原 Reader 章节/页码→关机式关闭与重启续读。检查设置、来源可选与默认无来源的差异。
+2. **Android 原四标签 clean + 可选 Host**：从同一构建工件选择 Clean/Host 两 APK 安装；验证系统 SAF 导入、书架批量操作、详情/Reader/历史、重启续读以及在没有 Host 时完全可用。用获允许的公开测试漫画验证自愿来源接入、单章本地保存、断连后离线阅读；网络第三方不可用时诚实记录失败阶段。
+3. **可见 UI**：Android 360/393/480dp × zh-CN/en/ja × light/dark × 字号 100/130/150% 的代表性交叉矩阵，四主标签、推荐卡反馈按钮、在线来源、设置、八章高级引导**实际控件高亮**，跳过不更改业务完成状态；验证返回/手势/字体溢出。真实手机结果与 Android35 模拟器分别登记。
+4. **负载与长任务**：以获准的、带实际封面图的约 1500 部测试书库，在 v0.5.0 和新候选相同设备/条件下比较冷启动、前台交互 p95、内存、ANR/掉帧；推荐 12 本批次/反馈、Visual、下载及 WebDAV/LAN 同时运行时的状态、暂停/取消、完成后恢复与崩溃重启。合成 1500 条元数据只算导航工程证据，不冒充真实封面性能。
+5. **公开问题**：#199 客观收藏图鉴 BLOCK/LESS 只过滤显示、不改原统计；#200 低频/简繁/私人标签与推荐偏好语义；#204 只有真实授权可访问的来源内容才可预览确认纳入推荐。无许可或无账号只记 `NOT_RUN/BLOCKED_AUTHORIZED_ACCESS`，不代填 PASS。
+6. **输出**：每个用户路径登记设备、OS、字号/主题/语言、精确源码 SHA、预期/实得、截图（不得含实际私有漫画像素或凭据）、性能原始采样与 P0/P1 结论。G1 实体用户签收、G2 双来源、G3 真资料升级回滚和 G4 54 行最终验收仍全部 OPEN。
+
 ## 本批可实际拿到什么
 
 | 候选 | 交付入口 | 产品范围 | 用户数据边界 |

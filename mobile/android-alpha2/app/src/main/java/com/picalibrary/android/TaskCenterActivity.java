@@ -40,15 +40,20 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
 
     private WorkInfo currentWork(List<WorkInfo> values,String scope,String id){
         String expected=MobileTaskRegistryStore.workId(this,scope,id);
-        // KEEP may retain an older active WorkInfo. Ignore stale finished
-        // registry IDs so the running/paused task stays visible and actionable.
+        // A KEEP request may preserve an existing active UUID, while a failed
+        // terminal UUID must remain visible for its error and Retry action.
+        WorkInfo terminalFallback=null;
         if(expected!=null&&!expected.isEmpty())for(WorkInfo value:values)
-            if(value.getId().toString().equals(expected)&&active(value))return value;
+            if(value.getId().toString().equals(expected)){
+                if(active(value))return value;
+                terminalFallback=value;
+                break;
+            }
         for(WorkInfo value:values)if(active(value)){
             MobileTaskRegistryStore.setWorkId(this,scope,id,value.getId());
             return value;
         }
-        return null;
+        return terminalFallback;
     }
 
     private List<DownloadView> reconstructDownloads(List<WorkInfo> infos){
@@ -151,7 +156,12 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
             androidx.work.Data d=rec==null?androidx.work.Data.EMPTY:(active(rec)?rec.getProgress():rec.getOutputData());
             String phase=d.getString(NativeRecommendationWorker.KEY_PHASE);
             int done=d.getInt(NativeRecommendationWorker.KEY_DONE,0),total=d.getInt(NativeRecommendationWorker.KEY_TOTAL,0);
-            recCard.addView(Ui.text(this,recPaused?(recPauseAck?"已暂停":recWorkerActive?"正在暂停…":"暂停状态已保留"):(rec==null?"等待继续":status(rec))+(phase==null||phase.isEmpty()?"":" · "+phase),13,Ui.MUTED,false));
+            String recStatus=rec==null?"等待继续":status(rec);
+            if(rec!=null&&BuildConfig.SOURCE_NEUTRAL_QA&&rec.getState()==WorkInfo.State.ENQUEUED)
+                recStatus=LocalizedText.ui(this,"排队中 · 同步候选可离线生成",
+                    "Queued · synced candidates can run offline",
+                    "待機中 · 同期済み候補はオフラインで生成可能");
+            recCard.addView(Ui.text(this,recPaused?(recPauseAck?"已暂停":recWorkerActive?"正在暂停…":"暂停状态已保留"):recStatus+(phase==null||phase.isEmpty()?"":" · "+phase),13,Ui.MUTED,false));
             if(total>0)recCard.addView(Ui.text(this,done+" / "+total,12,Ui.PRIMARY,false));
             if(recPaused){
                 recCard.addView(Ui.text(this,recPauseAck?"继续会从当前检查点继续本轮生成；上一轮可用推荐不会被覆盖。":recWorkerActive?"当前有界请求结束后进入暂停；继续不会重新开始本轮。":"后台 Worker 已结束；继续会重新执行未完成阶段，上一轮可用推荐不会被覆盖。",12,Ui.MUTED,false));

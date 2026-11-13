@@ -10,6 +10,15 @@
 - **本次实际推进的同源码新门禁**：在唯一集成分支的 [Android35 原工作流](https://github.com/Saber-Alter-Lily/pica-library/blob/codex/product-integration-r1-20261102/.github/workflows/s3-android-local-emulator.yml) 复用原真 UI、真实官方 Host、固定摘要的 Pepper&Carrot 与 ComicFury，在同一 SHA 顺序完整运行。第二来源完成后重新读回两来源原 LocalComicStore 全部章节和逐页 Hash，防止来源切换删改已有离线副本。实现提交 `1e694f6`、工作流提交 `32f7971`；此条目前仅是 **IMPLEMENTED / EXACT_SHA_RUN_PENDING**，任何失败应区分上游站点、UI 与真实数据错误，不可降级断言或伪造图片。旧 xkcd 1.6.2 Headless `Stub!` 单独保留 FAIL，不冒称可用。
 - **接下来的完整交付批次**：新真实双源工作流必须 terminal SUCCESS 并有两个独立 `EMULATOR_PUBLIC_LICENSED_SOURCE_PASS` 和跨源账本证据，才能转 B3 实体 Windows + Android、三语言/1500 真实带图负载/推荐/Visual/同步及 #199/#200/#204 的集中人工体验。B4 需要另行授权的 v0.5.0 生产资料只读盘点；B5 必须逐项完成 54 条并获用户明确正式签名/发布许可。保留 `main` v0.5.0、真实账号、Release/OTA/安装不变。
 
+## 2026-11-12 晚间 B2/B3 真正运行结论与集中回归
+
+- [B3 三语九场景、11 页面实际 Android35 #43269080308](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43269080308)：**terminal SUCCESS**，包括最新主导航显式中英日文本断言。对应代码 `cc4f541`；是真实模拟器屏幕证据，非用户实体机签收。
+- [B3 原 Clean App DEX/签名边界 #43270049391](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43270049391)：`39a2b6f` **terminal SUCCESS**，覆盖此前 B3 页面多语言和封面采样解码源码，不能据此推定真实 1500 张带图实体机性能 PASS。
+- [B3 标准 CI #43270060961](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43270060961) 和 [综合 #43270061493](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43270061493)：`39a2b6f` **FAIL**，原因是五项旧 TypeScript 静态字符串断言仍匹配中文硬编码：2918/2937 passed、5 failed、14 skipped，非新 Android 编译或真实业务功能错误。一次提交 [`0f372227`](https://github.com/Saber-Alter-Lily/pica-library/commit/0f372227a0e7c22c494782c255342774ef0fc847) 统一修订五个已有测试，仍检查来源入口、推荐反馈、设置与赞助三语路径；其自己的 CI 必须另看实际终态，不借旧 CI。
+- [B2 最新真 Android35 #43269138568](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43269138568)：`e9d881b` **terminal FAILURE**，原 Clean 书库/Reader/Host/1500 合成书库及三组布局 PASS；到达 ComicFury 真搜索时两次用户可见请求返回 `SOURCE_HOST_UNAVAILABLE`，没有实际章节读图或离线成果。与较早 Pepper&Carrot `Press/References/Wiki` 目录漂移同属当前外部来源阻断，不能视为当前 SHA 双来源可用或框架 bug。历史 ComicFury 双章/离线 [#43156012750](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43156012750) 的成功仍然独立保留。
+- **本次下一完整 B2 验收程序**：复用已有 S3 原四标签/签名 Host/真实 JAR/逐页 Hash，不再因首个上游服务失败而不执行第二独立真实来源；每个站点都留下只含来源名称、阶段、白名单错误码的结果，成功过的离线章节再次确认未被另一源删除或改写；**只在双方同 SHA 全程成功时产出 `EMULATOR_TWO_INDEPENDENT_PUBLIC_SOURCES_PASS`，否则整个 B2 仍 FAIL**。这是减少无效重复构建的证据收集优化，不降任何真实来源/人工验收标准。
+- **边界不变**：B1 QA 工程包需实体确认；B2 两实际来源在冻结双端候选的完整稳定运行仍 OPEN，且未获授权的 Pica/JM/E-H 真实账号内容不冒称验收；B3 的真实带封面 1500 本、推荐/Visual/长任务/LAN/WebDAV 交叉功能和手机实机未验收；B4 真实旧用户资料备份/升级/故障回滚待授权；B5 42+12 逐行及正式签名发布审批未启动。仅 Draft #284，不动 `main`、Release/OTA/账户/生产资料。
+
 ## 0. 产品目标与冻结边界
 
 - **唯一开发与验收分支**：`codex/product-integration-r1-20261102`；唯一产品 PR：[Draft #284](https://github.com/Saber-Alter-Lily/pica-library/pull/284)。截至建档基线为 `d9813ea92c86c9beb01faaa4f90b48b301bff9cf`，以后必须按**最新实际 SHA**逐次更新，不把此 SHA 当恒定当前版本。

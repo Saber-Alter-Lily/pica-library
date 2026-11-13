@@ -2412,9 +2412,41 @@ def main():
         # ComicFury's genuine on-device chapter and offline proof in artifacts.
         # Never turn an upstream source failure into a two-site PASS.
         real_sites = ("comicfury", "peppercarrot") if selected == "both" else (selected,)
-        verified_sites = [licensed_public_android_source_flow(site)
-                          for site in real_sites]
-        if len(verified_sites) > 1:
+        # Each real provider gets its own attributable verdict, even when
+        # another public site's live catalogue is unavailable. A failed
+        # provider is NEVER treated as success or replaced with fixture data.
+        verified_sites = []
+        source_results = []
+        failed_sites = []
+        for site in real_sites:
+            try:
+                proof = licensed_public_android_source_flow(site)
+                verified_sites.append(proof)
+                source_results.append({"source": site, "result": "PASS",
+                                       "stage": "original-reader-offline"})
+            except Exception as source_error:
+                stage = STEP
+                codes = sorted(set(re.findall(r"SOURCE_HOST_[A-Z_]+",
+                                              str(source_error))))
+                source_results.append({
+                    "source": site, "result": "FAIL", "stage": stage,
+                    "hostErrorCodes": codes[:5],
+                    "exceptionType": type(source_error).__name__,
+                })
+                failed_sites.append(site)
+                print("B2 independent real source FAIL: " + site +
+                      " at " + stage +
+                      (" [" + ",".join(codes[:5]) + "]" if codes else ""),
+                      file=sys.stderr, flush=True)
+            finally:
+                (ROOT / "b2-real-site-verdicts.json").write_text(
+                    json.dumps({"sourceSha": os.environ.get("GITHUB_SHA", ""),
+                                "sitesRequested": list(real_sites),
+                                "independentResults": source_results,
+                                "bothSitesPassed": len(source_results) == len(real_sites)
+                                    and not failed_sites},
+                               indent=2), encoding="utf-8")
+        if verified_sites:
             STEP = "b2-independent-sources-preserve-earlier-offline-library"
             source_ids = [entry["sourceId"] for entry in verified_sites]
             chapters = [chapter for entry in verified_sites
@@ -2440,9 +2472,14 @@ def main():
                 ]
                 if actual_hashes != [digest for _, digest in chapter["pages"]]:
                     raise AssertionError("Later source mutated earlier offline page bytes")
-            (ROOT / "b2-independent-sources-same-sha.json").write_text(
+            complete_two_site = len(real_sites) > 1 and not failed_sites and (
+                len(verified_sites) == len(real_sites))
+            (ROOT / ("b2-independent-sources-same-sha.json" if complete_two_site
+                     else "b2-independent-sources-partial.json")).write_text(
                 json.dumps({
-                    "result": "EMULATOR_TWO_INDEPENDENT_PUBLIC_SOURCES_PASS",
+                    "result": ("EMULATOR_TWO_INDEPENDENT_PUBLIC_SOURCES_PASS"
+                               if complete_two_site else
+                               "EMULATOR_PARTIAL_SOURCE_HASH_CHECK"),
                     "sources": [entry["kind"] for entry in verified_sites],
                     "distinctSources": len(verified_sites),
                     "separateLocalChapters": len(chapters),
@@ -2453,8 +2490,14 @@ def main():
                     "actualProductionAccounts": False,
                     "imagesOrSecretsExported": False,
                 }, indent=2), encoding="utf-8")
-            record("two independent real sources share one clean Reader without "
-                   "cross-source chapter identity or image mutation")
+            if complete_two_site:
+                record("two independent real sources share one clean Reader "
+                       "without cross-source chapter identity or image mutation")
+        if failed_sites:
+            STEP = "b2-independent-real-sources-not-all-verified"
+            raise AssertionError("G2 remains OPEN; real sources unavailable: " +
+                                 ", ".join(failed_sites) +
+                                 ". See individual sanitized site verdicts.")
         (ROOT / "results.json").write_text(json.dumps({
             "result": "PASS", "source_sha": __import__("os").environ.get("GITHUB_SHA", ""),
             "checks": CHECKS, "browser": "Android 35 emulator ADB real app",

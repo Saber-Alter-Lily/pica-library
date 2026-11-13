@@ -19,6 +19,16 @@
 - **本次下一完整 B2 验收程序**：复用已有 S3 原四标签/签名 Host/真实 JAR/逐页 Hash，不再因首个上游服务失败而不执行第二独立真实来源；每个站点都留下只含来源名称、阶段、白名单错误码的结果，成功过的离线章节再次确认未被另一源删除或改写；**只在双方同 SHA 全程成功时产出 `EMULATOR_TWO_INDEPENDENT_PUBLIC_SOURCES_PASS`，否则整个 B2 仍 FAIL**。这是减少无效重复构建的证据收集优化，不降任何真实来源/人工验收标准。
 - **边界不变**：B1 QA 工程包需实体确认；B2 两实际来源在冻结双端候选的完整稳定运行仍 OPEN，且未获授权的 Pica/JM/E-H 真实账号内容不冒称验收；B3 的真实带封面 1500 本、推荐/Visual/长任务/LAN/WebDAV 交叉功能和手机实机未验收；B4 真实旧用户资料备份/升级/故障回滚待授权；B5 42+12 逐行及正式签名发布审批未启动。仅 Draft #284，不动 `main`、Release/OTA/账户/生产资料。
 
+## 2026-11-13 B3 合批：清洁版离线推荐与大书库实际封面稳定性
+
+**问题直接来自现有产品源码，不新建引擎或抽象：**
+
+- **离线推荐真实阻断**：原 `NativeRecommendationJobs` 把所有推荐 WorkManager 请求设为 `NetworkType.CONNECTED`，但原清洁四标签 Android 的 `NativePortableRecommendationCycle` 只使用已经同步到本地的候选基础；离线进入推荐页后即使有有效候选包仍会一直等网络。现仅对 `BuildConfig.SOURCE_NEUTRAL_QA` 使用 `NetworkType.NOT_REQUIRED`，并只登记 CPU_ANALYSIS 资源；旧完整有源客户端仍要求网络及 PROVIDER_NETWORK，绝不暗中改旧账号、下载或来源逻辑。原推荐页等待文案明确区分两模式，真实离线生成/保存/暂停续跑需后续端到端实机确认。
+- **封面绑定/缓存安全**：原 `CoverRepository.load` 仅以 `comicId` 比对异步封面回调。同作品的封面 URL/时间戳变更或 RecyclerView 复用时，旧网络任务可错误地给新卡片绘上过时封面。复用原 SHA256 cache key 作为 ImageView binding tag，RecyclerView 回收时撤销 tag/释放旧 drawable；空条目也失效化旧请求。原磁盘缓存写入改为同目录原子替换（不在新版本写好之前先删旧缓存）。保留前一轮的采样解码和系统内存 trim 策略，不复制图片引擎。
+- **1,500 本真实位图路径，不冒充真实作品**：延长原 Android35 S3 当前 1500 synthetic-entry 书库测试，向**原 App 私有 `cover-cache-v2`** 写入 1500 个与已有 key 一致的、由标准库生成的 512×768 PNG（24 色组，无第三方漫画图像或用户账号）。继续真实 RecyclerView 滚动/列表搜索/三宽字体检查和原 Reader；测实际解码与图片绑定路径，比之前无封面的 1500 条元数据测试更接近真实用户大书库。模拟器的合成 PNG 不能替代 OEM 手机上 1500 部真实封面的 p95/内存/ANR 性能与人工验收。
+- **后台任务恢复体验**：原 TaskCenter 可能优先拿已经 FINISHED 的旧 `MobileTaskRegistryStore` UUID，遮住 WorkManager KEEP 的现行任务；改为优先实际 active WorkInfo，继续按既有唯一任务名、暂停标记与进度恢复，不引入新的任务队列。
+- **证据门禁**：这个整体产品批次只有实际对应 SHA 的 Android CI、原 R3 source-neutral 原产品边界、原 S3 流程通过才能称为工程 PASS；原 v0.5.0 升级身份/签名、真实 G1、双可用站点 G2、真实用户 G3、54 条 G4 均继续 OPEN；绝不合并 main、发布或更改任何真实用户资料。
+
 ## 0. 产品目标与冻结边界
 
 - **唯一开发与验收分支**：`codex/product-integration-r1-20261102`；唯一产品 PR：[Draft #284](https://github.com/Saber-Alter-Lily/pica-library/pull/284)。截至建档基线为 `d9813ea92c86c9beb01faaa4f90b48b301bff9cf`，以后必须按**最新实际 SHA**逐次更新，不把此 SHA 当恒定当前版本。

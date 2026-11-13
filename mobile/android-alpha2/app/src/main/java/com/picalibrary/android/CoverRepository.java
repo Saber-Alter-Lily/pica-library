@@ -73,18 +73,30 @@ final class CoverRepository {
         return IN_FLIGHT.computeIfAbsent(cacheKey,k->CompletableFuture.supplyAsync(()->cacheNow(app,entry),POOL).whenComplete((bitmap,error)->IN_FLIGHT.remove(k)));
     }
 
+    // Bind against the exact cover revision, not only the comic ID.
+    // A recycled ImageView must never accept stale async source pixels.
+    static String bindingTag(UnifiedCatalogStore.Entry entry){
+        return entry==null||entry.id==null||entry.id.isEmpty()
+            ?"":"cover-cache:"+key(entry);
+    }
+    static void clearBinding(ImageView target,int placeholderColor){
+        target.setTag(null);
+        target.setImageDrawable(new ColorDrawable(placeholderColor));
+    }
     static void load(Activity activity,ImageView target,UnifiedCatalogStore.Entry entry,int placeholderColor){
-        if(entry==null||entry.id==null||entry.id.isEmpty()){target.setImageDrawable(new ColorDrawable(placeholderColor));return;}
-        String cacheKey=key(entry),tag="cover-comic:"+entry.id;target.setTag(tag);
+        String tag=bindingTag(entry);
+        if(tag.isEmpty()){clearBinding(target,placeholderColor);return;}
+        target.setTag(tag);
+        String cacheKey=key(entry);
         Bitmap hit=memory(cacheKey);if(hit!=null){target.setImageBitmap(hit);return;}
         target.setImageDrawable(new ColorDrawable(placeholderColor));
-        loadFuture(activity,entry).thenAccept(bitmap->{if(bitmap==null||activity.isFinishing()||activity.isDestroyed())return;activity.runOnUiThread(()->{Object current=target.getTag();if(current!=null&&tag.equals(current.toString()))target.setImageBitmap(bitmap);});});
+        loadFuture(activity,entry).thenAccept(bitmap->{if(bitmap==null||activity.isFinishing()||activity.isDestroyed())return;activity.runOnUiThread(()->{if(tag.equals(target.getTag()))target.setImageBitmap(bitmap);});});
     }
 
     static void prefetch(Context context,UnifiedCatalogStore.Entry entry){if(entry==null||entry.id==null||entry.id.isEmpty())return;String cacheKey=key(entry);if(memory(cacheKey)!=null||disk(context,cacheKey).isFile())return;loadFuture(context,entry);}
 
     private static Bitmap decode(HttpURLConnection c,long limit) throws Exception {int status=c.getResponseCode();if(status<200||status>=300)throw new IOException("cover HTTP "+status);String type=String.valueOf(c.getContentType()).toLowerCase(Locale.ROOT);if(!type.startsWith("image/"))throw new IOException("cover is not an image");try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[16384];int n;while((n=in.read(b))>0){if(out.size()+n>limit)throw new IOException("cover too large");out.write(b,0,n);}byte[] data=out.toByteArray();BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(data,0,data.length,bounds);if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("invalid cover dimensions");BitmapFactory.Options sampled=new BitmapFactory.Options();sampled.inSampleSize=ReaderPolicy.sampleSize(bounds.outWidth,bounds.outHeight,512);Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length,sampled);if(bitmap==null)throw new IOException("invalid cover");return bitmap;}}
-    private static void save(Context context,String cacheKey,Bitmap bitmap){File target=disk(context,cacheKey),tmp=null;try{tmp=File.createTempFile("cover-",".tmp",target.getParentFile());try(OutputStream out=new FileOutputStream(tmp)){if(!bitmap.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("compress failed");}if(target.exists()&&!target.delete())throw new IOException("replace failed");if(!tmp.renameTo(target))throw new IOException("rename failed");trim(context,target);}catch(Exception ignored){if(tmp!=null)tmp.delete();}}
+    private static void save(Context context,String cacheKey,Bitmap bitmap){File target=disk(context,cacheKey),tmp=null;try{tmp=File.createTempFile("cover-",".tmp",target.getParentFile());try(OutputStream out=new FileOutputStream(tmp)){if(!bitmap.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("compress failed");}try{java.nio.file.Files.move(tmp.toPath(),target.toPath(),java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}catch(java.nio.file.AtomicMoveNotSupportedException unsupported){java.nio.file.Files.move(tmp.toPath(),target.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);}trim(context,target);}catch(Exception ignored){if(tmp!=null)tmp.delete();}}
     private static synchronized void trim(Context context,File active){File[] files=dir(context).listFiles();if(files==null)return;Arrays.sort(files,Comparator.comparingLong(File::lastModified));long total=0;for(File f:files)if(f.isFile())total+=f.length();long limit=StorageSettings.coverLimitBytes(context);if(limit==Long.MAX_VALUE)return;for(File f:files)if(total>limit&&f.isFile()&&!f.equals(active)){long n=f.length();if(f.delete())total-=n;}}
     static long diskBytes(Context context){File[] files=dir(context).listFiles();long total=0;if(files!=null)for(File f:files)if(f.isFile())total+=f.length();return total;}
     static int memoryBytes(){synchronized(MEMORY){return MEMORY.size();}}

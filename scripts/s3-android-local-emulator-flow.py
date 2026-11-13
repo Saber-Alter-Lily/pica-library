@@ -21,6 +21,8 @@ import time
 import xml.etree.ElementTree as ET
 import zipfile
 import zlib
+import io
+import tarfile
 from pathlib import Path
 
 QA_PACKAGE = "com.picalibrary.android.localcore.qa"
@@ -281,8 +283,7 @@ def until_data(path, valid, seconds=30):
     raise AssertionError(f"{STEP}: {path} did not reach expected state; last={str(last)[:250]}")
 
 
-def original_png(red, green, blue):
-    width, height = 180, 240
+def original_png(red, green, blue, width=180, height=240):
     rows = []
     for y in range(height):
         rows.append(b"\x00" + bytes((red, green, blue)) * width)
@@ -1655,6 +1656,7 @@ def original_large_shelf_flow():
         fake_entries.append({
             "id": comic_id, "title": title, "author": "QA author",
             "favorite": True, "favoriteRank": index, "inShelf": True,
+            "updatedAt": timestamp,
             "tags": ["QA load"], "categories": ["Synthetic QA"]
         })
         fake_items.append({
@@ -1712,7 +1714,45 @@ def original_large_shelf_flow():
             raise AssertionError("Original app private store changed during QA write")
     write_private("unified-catalog-v1.json", catalog)
     write_private("portable-shelves-v1.json", shelves)
-    record("actual original clean app-private catalog/shelf schema seeded with exactly 1500 synthetic works")
+
+    # Reuse the ORIGINAL CoverRepository disk-cache path, not a mock view.
+    # Every catalog ID has a real 512x768 PNG bitmap to be decoded by the
+    # actual app; 24 generated palettes avoid copyright or account content.
+    # Engineering emulator evidence != 1500 real artwork handset performance.
+    STEP = "b3-1500-generated-raster-covers"
+    cover_variants = [
+        original_png((37+i*11)%256,(78+i*19)%256,(113+i*23)%256,
+                     512,768) for i in range(24)
+    ]
+    packed_stream = io.BytesIO()
+    expected_cover_keys = set()
+    with tarfile.open(fileobj=packed_stream,mode="w") as archive:
+        for index in range(1500):
+            comic_id = f"qa-load:{index:04d}"
+            cache_key = hashlib.sha256(
+                (comic_id+"\n"*5+timestamp).encode("utf-8")).hexdigest()
+            expected_cover_keys.add(cache_key)
+            bitmap_bytes = cover_variants[index%len(cover_variants)]
+            item = tarfile.TarInfo(cache_key)
+            item.size = len(bitmap_bytes)
+            item.mode = 0o600
+            archive.addfile(item,io.BytesIO(bitmap_bytes))
+    adb("shell","run-as",PACKAGE,"mkdir","-p","files/cover-cache-v2")
+    extraction = subprocess.run(
+        ["adb","shell","-T","run-as",PACKAGE,"tar","-xf","-",
+         "-C","files/cover-cache-v2"],
+        input=packed_stream.getvalue(),stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,timeout=120)
+    if extraction.returncode:
+        raise AssertionError("Original app raster cover cache staging failed: "
+                             +extraction.stderr.decode(errors="replace")[-350:])
+    observed_cover_keys = set(adb("exec-out","run-as",PACKAGE,
+                                  "ls","files/cover-cache-v2").split())
+    if not expected_cover_keys.issubset(observed_cover_keys):
+        raise AssertionError("Generated cover cache incomplete: " +
+                             str(len(expected_cover_keys-observed_cover_keys)))
+    record("1500 original app-owned generated 512x768 PNG covers staged "
+           "for real CoverRepository bitmap rendering; no site images used")
 
     STEP = "r3-1500-original-home-open"
     adb("shell", "am", "start", "-W", "-n",
@@ -1801,6 +1841,8 @@ def original_large_shelf_flow():
     (ROOT / "r3-original-1500-shelf-load.json").write_text(json.dumps({
         "result": "EMULATOR_UI_PASS", "originalApp": CLEAN_PACKAGE,
         "catalogRowsSynthetic": 1500, "largeShelfMembers": 1500,
+        "generatedRasterCoverEntries": len(expected_cover_keys),
+        "rasterCoverPx": [512,768], "distinctGeneratedPaletteCovers": len(cover_variants),
         "smallShelfMembers": 5, "originalShelfStoreUsed": True,
         "originalUnifiedCatalogUsed": True, "originalRecyclerViewUsed": True,
         "openLargeShelfMsObserved": open_ms,
@@ -1811,7 +1853,7 @@ def original_large_shelf_flow():
         "libraryAndShelvesUseIndependentViewports": True,
         "original1500LibrarySearchAndListVisible": True,
         "returnToOriginalLibraryMsObserved": library_ms,
-        "actualRealBooksUsed": False,
+        "actualRealBooksUsed": False, "actualRealUserCoversUsed": False,
         "actualPhysicalDeviceUsed": False, "performanceBudgetApproved": False,
         "syncedOrUserProfilesTouched": False
     }, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1903,6 +1945,7 @@ def original_home_responsive_matrix():
         json.dumps({"result": "EMULATOR_ENGINEERING_PASS",
                     "cases": completed, "actualPhysicalDevice": False,
                     "real1500CoversUsed": False,
+                    "syntheticRasterCoverEntriesSeeded": 1500,
                     "userAccountsOrProfilesTouched": False},
                    indent=2), encoding="utf-8")
 

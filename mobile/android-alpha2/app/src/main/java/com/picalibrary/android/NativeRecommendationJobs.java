@@ -10,12 +10,17 @@ final class NativeRecommendationJobs {
     private NativeRecommendationJobs(){}
 
     private static OneTimeWorkRequest request(){
-        Constraints constraints=new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
-        return AndroidTaskResources.tag(
+        // The physically source-free build generates from the synced local
+        // portable reservoir. It does not need network to rebuild a batch.
+        boolean localOnly=BuildConfig.SOURCE_NEUTRAL_QA;
+        Constraints constraints=new Constraints.Builder().setRequiredNetworkType(
+            localOnly?NetworkType.NOT_REQUIRED:NetworkType.CONNECTED).build();
+        OneTimeWorkRequest.Builder builder=AndroidTaskResources.tag(
             new OneTimeWorkRequest.Builder(NativeRecommendationWorker.class),
-            AndroidTaskResources.PROVIDER_NETWORK,
             AndroidTaskResources.CPU_ANALYSIS
-        ).setConstraints(constraints)
+        );
+        if(!localOnly)AndroidTaskResources.tag(builder,AndroidTaskResources.PROVIDER_NETWORK);
+        return builder.setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS)
             .addTag(TAG).build();
     }

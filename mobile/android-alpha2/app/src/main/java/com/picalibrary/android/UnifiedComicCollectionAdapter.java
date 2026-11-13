@@ -46,6 +46,10 @@ final class UnifiedComicCollectionAdapter extends RecyclerView.Adapter<UnifiedCo
         if(list)card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));else card.addView(copy);return new Holder(card,cover,title,author,tags,state);
     }
     @Override public void onBindViewHolder(Holder h,int position){UnifiedCatalogStore.Entry item=items.get(position);boolean chosen=selection!=null&&selection.selected(item.id);h.itemView.setBackground(Ui.rounded(chosen?Ui.PRIMARY_SOFT:Ui.SURFACE,14,activity));h.itemView.setActivated(chosen);h.title.setText(item.title);h.author.setText(item.displayAuthor());String tags=tagLine(item);h.tags.setText(tags);h.tags.setVisibility(tags.isEmpty()||mode==MODE_GRID_SMALL?View.GONE:View.VISIBLE);String state=availability(item);h.state.setText(state);h.state.setVisibility(mode==MODE_GRID_SMALL?View.GONE:View.VISIBLE);h.itemView.setOnLongClickListener(v->{if(selection==null)return false;selection.start(item);return true;});h.itemView.setOnClickListener(v->{if(selection!=null&&selection.active()){selection.toggle(item);return;}if(open!=null)open.open(item);else{Intent i=new Intent(activity,UnifiedComicDetailActivity.class);i.putExtra("comicId",item.id);i.putExtra("title",item.title);i.putExtra("author",item.displayAuthor());activity.startActivity(i);}});CoverRepository.load(activity,h.cover,item,Ui.PLACEHOLDER);}
+    @Override public void onViewRecycled(Holder holder){
+        CoverRepository.clearBinding(holder.cover,Ui.PLACEHOLDER);
+        super.onViewRecycled(holder);
+    }
     private int coverHeight(int type){int width=activity.getResources().getDisplayMetrics().widthPixels-Ui.dp(activity,24);int span=Math.max(1,type);int cell=Math.max(Ui.dp(activity,58),width/span-Ui.dp(activity,10));return Math.max(Ui.dp(activity,86),(int)(cell*1.42f));}
     private float titleSize(int type){return type==MODE_LIST?16:type==MODE_GRID_LARGE?15:type==MODE_GRID_MEDIUM?13.5f:11.5f;}
     private float metaSize(int type){return type==MODE_LIST?12.5f:type==MODE_GRID_SMALL?10:11.5f;}

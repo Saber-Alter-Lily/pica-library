@@ -40,7 +40,10 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
 
     private WorkInfo currentWork(List<WorkInfo> values,String scope,String id){
         String expected=MobileTaskRegistryStore.workId(this,scope,id);
-        if(expected!=null&&!expected.isEmpty())for(WorkInfo value:values)if(value.getId().toString().equals(expected))return value;
+        // KEEP may retain an older active WorkInfo. Ignore stale finished
+        // registry IDs so the running/paused task stays visible and actionable.
+        if(expected!=null&&!expected.isEmpty())for(WorkInfo value:values)
+            if(value.getId().toString().equals(expected)&&active(value))return value;
         for(WorkInfo value:values)if(active(value)){
             MobileTaskRegistryStore.setWorkId(this,scope,id,value.getId());
             return value;

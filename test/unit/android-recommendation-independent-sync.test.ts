@@ -6,6 +6,16 @@ const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('Android independent recommendation runtime and sync UI', () => {
+    it('schedules clean portable batches offline without claiming provider network use', () => {
+        const jobs=read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationJobs.java')
+        const engine=read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java')
+        const progress=read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationProgressPanel.java')
+        expect(jobs).toContain('localOnly?NetworkType.NOT_REQUIRED:NetworkType.CONNECTED')
+        expect(jobs).toContain('if(!localOnly)AndroidTaskResources.tag(builder,AndroidTaskResources.PROVIDER_NETWORK)')
+        expect(engine).toContain('NativePortableRecommendationCycle.build(context,progress,control)')
+        expect(progress).toContain('同步候选可离线生成')
+    })
+
     it('keeps Library actions visible instead of hiding them behind an overflow menu', () => {
         const home = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'

@@ -36,30 +36,31 @@ final class CoverRepository {
     private static File disk(Context context,String cacheKey){return new File(dir(context),cacheKey);}
     private static Bitmap memory(String cacheKey){synchronized(MEMORY){return MEMORY.get(cacheKey);}}
     private static void remember(String cacheKey,Bitmap bitmap){if(cacheKey==null||cacheKey.isEmpty()||bitmap==null)return;synchronized(MEMORY){MEMORY.put(cacheKey,bitmap);}}
-    private static Bitmap diskHit(Context context,String cacheKey){File file=disk(context,cacheKey);if(!file.isFile())return null;Bitmap bitmap=BitmapFactory.decodeFile(file.getPath());if(bitmap==null){file.delete();return null;}file.setLastModified(System.currentTimeMillis());remember(cacheKey,bitmap);return bitmap;}
+    private static Bitmap diskHit(Context context,String cacheKey){File file=disk(context,cacheKey);if(!file.isFile())return null;BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);if(bounds.outWidth<=0||bounds.outHeight<=0){file.delete();return null;}BitmapFactory.Options sampled=new BitmapFactory.Options();sampled.inSampleSize=ReaderPolicy.sampleSize(bounds.outWidth,bounds.outHeight,512);Bitmap bitmap=BitmapFactory.decodeFile(file.getPath(),sampled);if(bitmap==null){file.delete();return null;}file.setLastModified(System.currentTimeMillis());remember(cacheKey,bitmap);return bitmap;}
 
     static Bitmap cacheNow(Context context,UnifiedCatalogStore.Entry entry){
         if(entry==null||entry.id==null||entry.id.isEmpty())return null;String cacheKey=key(entry);Bitmap hit=memory(cacheKey);if(hit!=null)return hit;hit=diskHit(context,cacheKey);if(hit!=null)return hit;
-        Bitmap bitmap=null;
-        if(entry.desktopCoverPath!=null&&!entry.desktopCoverPath.isEmpty()&&BridgeStore.paired(context)){
+        Bitmap bitmap=null;com.picalibrary.android.sources.SourceAccessPolicy.Permit sourcePermit=null;
+        if(entry.localImported){File cover=LocalComicStore.cover(context,entry.id);if(cover!=null){BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;BitmapFactory.decodeFile(cover.getPath(),options);options.inSampleSize=ReaderPolicy.sampleSize(options.outWidth,options.outHeight,512);options.inJustDecodeBounds=false;bitmap=BitmapFactory.decodeFile(cover.getPath(),options);}}
+        if(bitmap==null&&entry.desktopCoverPath!=null&&!entry.desktopCoverPath.isEmpty()&&BridgeStore.paired(context)){
             try{bitmap=BridgeClient.bitmap(context,entry.desktopCoverPath);}catch(Exception ignored){}
         }
         if(bitmap==null&&entry.remoteCoverPath!=null&&!entry.remoteCoverPath.isEmpty()&&RemoteConfigStore.load(context).configured()){
             HttpURLConnection c=null;try{c=new RemoteLibraryClient(context).open(entry.remoteCoverPath,"image/*");bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
         }
-        if(bitmap==null&&entry.ehCoverUrl!=null&&!entry.ehCoverUrl.isEmpty()){
-            HttpURLConnection c=null;try{c=new EhClient(context).thumbnail(entry.ehCoverUrl);bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
+        if(!BuildConfig.SOURCE_NEUTRAL_QA&&bitmap==null&&entry.ehCoverUrl!=null&&!entry.ehCoverUrl.isEmpty()){
+            HttpURLConnection c=null;try{EhClient client=new EhClient(context);sourcePermit=client.access;c=client.thumbnail(entry.ehCoverUrl);bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
         }
-        if(bitmap==null&&entry.picaCoverUrl!=null&&!entry.picaCoverUrl.isEmpty()){
-            HttpURLConnection c=null;try{c=new PicaClient(context).media(entry.picaCoverUrl);bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
+        if(!BuildConfig.SOURCE_NEUTRAL_QA&&bitmap==null&&entry.picaCoverUrl!=null&&!entry.picaCoverUrl.isEmpty()){
+            HttpURLConnection c=null;try{if(entry.id.startsWith("jm:")){sourcePermit=SourceAccess.bind(context,"jm");c=SourceMedia.thumbnail(entry.picaCoverUrl,sourcePermit);}else{PicaClient client=new PicaClient(context);sourcePermit=client.access;c=client.media(entry.picaCoverUrl);}bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
         }
-        if(bitmap==null&&EhClient.isEhId(entry.id)){
-            try{EhClient client=new EhClient(context);EhClient.Comic comic=client.comic(entry.id);UnifiedCatalogStore.Entry refreshed=UnifiedEhCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.thumbnail(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}catch(Exception ignored){}
+        if(!BuildConfig.SOURCE_NEUTRAL_QA&&bitmap==null&&ComicIdFormat.isEhId(entry.id)){
+            try{EhClient client=new EhClient(context);sourcePermit=client.access;EhClient.Comic comic=client.comic(entry.id);UnifiedCatalogStore.Entry refreshed=UnifiedEhCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.thumbnail(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}catch(Exception ignored){}
         }
-        if(bitmap==null&&!EhClient.isEhId(entry.id)&&PicaClient.available(context)){
-            try{PicaClient client=new PicaClient(context);PicaClient.Comic comic=client.comic(entry.id);if(comic!=null&&!comic.id.isEmpty()){UnifiedCatalogStore.Entry refreshed=UnifiedPicaCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.media(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}}catch(Exception ignored){}
+        if(!BuildConfig.SOURCE_NEUTRAL_QA&&bitmap==null&&!entry.id.contains(":")&&PicaClient.available(context)){
+            try{PicaClient client=new PicaClient(context);sourcePermit=client.access;PicaClient.Comic comic=client.comic(entry.id);if(comic!=null&&!comic.id.isEmpty()){UnifiedCatalogStore.Entry refreshed=UnifiedPicaCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.media(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}}catch(Exception ignored){}
         }
-        if(bitmap!=null){remember(cacheKey,bitmap);save(context,cacheKey,bitmap);}return bitmap;
+        if(bitmap!=null){final String readyKey=cacheKey;final Bitmap ready=bitmap;try{SourceAccess.commit(sourcePermit,()->{remember(readyKey,ready);save(context,readyKey,ready);return null;});}catch(com.picalibrary.android.sources.SourceAccessPolicy.Disabled stopped){return null;}}return bitmap;
     }
 
     static boolean prefetchDesktop(Context context,String comicId,String path){
@@ -72,18 +73,30 @@ final class CoverRepository {
         return IN_FLIGHT.computeIfAbsent(cacheKey,k->CompletableFuture.supplyAsync(()->cacheNow(app,entry),POOL).whenComplete((bitmap,error)->IN_FLIGHT.remove(k)));
     }
 
+    // Bind against the exact cover revision, not only the comic ID.
+    // A recycled ImageView must never accept stale async source pixels.
+    static String bindingTag(UnifiedCatalogStore.Entry entry){
+        return entry==null||entry.id==null||entry.id.isEmpty()
+            ?"":"cover-cache:"+key(entry);
+    }
+    static void clearBinding(ImageView target,int placeholderColor){
+        target.setTag(null);
+        target.setImageDrawable(new ColorDrawable(placeholderColor));
+    }
     static void load(Activity activity,ImageView target,UnifiedCatalogStore.Entry entry,int placeholderColor){
-        if(entry==null||entry.id==null||entry.id.isEmpty()){target.setImageDrawable(new ColorDrawable(placeholderColor));return;}
-        String cacheKey=key(entry),tag="cover-comic:"+entry.id;target.setTag(tag);
+        String tag=bindingTag(entry);
+        if(tag.isEmpty()){clearBinding(target,placeholderColor);return;}
+        target.setTag(tag);
+        String cacheKey=key(entry);
         Bitmap hit=memory(cacheKey);if(hit!=null){target.setImageBitmap(hit);return;}
         target.setImageDrawable(new ColorDrawable(placeholderColor));
-        loadFuture(activity,entry).thenAccept(bitmap->{if(bitmap==null||activity.isFinishing()||activity.isDestroyed())return;activity.runOnUiThread(()->{Object current=target.getTag();if(current!=null&&tag.equals(current.toString()))target.setImageBitmap(bitmap);});});
+        loadFuture(activity,entry).thenAccept(bitmap->{if(bitmap==null||activity.isFinishing()||activity.isDestroyed())return;activity.runOnUiThread(()->{if(tag.equals(target.getTag()))target.setImageBitmap(bitmap);});});
     }
 
     static void prefetch(Context context,UnifiedCatalogStore.Entry entry){if(entry==null||entry.id==null||entry.id.isEmpty())return;String cacheKey=key(entry);if(memory(cacheKey)!=null||disk(context,cacheKey).isFile())return;loadFuture(context,entry);}
 
-    private static Bitmap decode(HttpURLConnection c,long limit) throws Exception {int status=c.getResponseCode();if(status<200||status>=300)throw new IOException("cover HTTP "+status);String type=String.valueOf(c.getContentType()).toLowerCase(Locale.ROOT);if(!type.startsWith("image/"))throw new IOException("cover is not an image");try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[16384];int n;while((n=in.read(b))>0){if(out.size()+n>limit)throw new IOException("cover too large");out.write(b,0,n);}byte[] data=out.toByteArray();Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length);if(bitmap==null)throw new IOException("invalid cover");return bitmap;}}
-    private static void save(Context context,String cacheKey,Bitmap bitmap){File target=disk(context,cacheKey),tmp=null;try{tmp=File.createTempFile("cover-",".tmp",target.getParentFile());try(OutputStream out=new FileOutputStream(tmp)){if(!bitmap.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("compress failed");}if(target.exists()&&!target.delete())throw new IOException("replace failed");if(!tmp.renameTo(target))throw new IOException("rename failed");trim(context,target);}catch(Exception ignored){if(tmp!=null)tmp.delete();}}
+    private static Bitmap decode(HttpURLConnection c,long limit) throws Exception {int status=c.getResponseCode();if(status<200||status>=300)throw new IOException("cover HTTP "+status);String type=String.valueOf(c.getContentType()).toLowerCase(Locale.ROOT);if(!type.startsWith("image/"))throw new IOException("cover is not an image");try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[16384];int n;while((n=in.read(b))>0){if(out.size()+n>limit)throw new IOException("cover too large");out.write(b,0,n);}byte[] data=out.toByteArray();BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(data,0,data.length,bounds);if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("invalid cover dimensions");BitmapFactory.Options sampled=new BitmapFactory.Options();sampled.inSampleSize=ReaderPolicy.sampleSize(bounds.outWidth,bounds.outHeight,512);Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length,sampled);if(bitmap==null)throw new IOException("invalid cover");return bitmap;}}
+    private static void save(Context context,String cacheKey,Bitmap bitmap){File target=disk(context,cacheKey),tmp=null;try{tmp=File.createTempFile("cover-",".tmp",target.getParentFile());try(OutputStream out=new FileOutputStream(tmp)){if(!bitmap.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("compress failed");}try{java.nio.file.Files.move(tmp.toPath(),target.toPath(),java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}catch(java.nio.file.AtomicMoveNotSupportedException unsupported){java.nio.file.Files.move(tmp.toPath(),target.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);}trim(context,target);}catch(Exception ignored){if(tmp!=null)tmp.delete();}}
     private static synchronized void trim(Context context,File active){File[] files=dir(context).listFiles();if(files==null)return;Arrays.sort(files,Comparator.comparingLong(File::lastModified));long total=0;for(File f:files)if(f.isFile())total+=f.length();long limit=StorageSettings.coverLimitBytes(context);if(limit==Long.MAX_VALUE)return;for(File f:files)if(total>limit&&f.isFile()&&!f.equals(active)){long n=f.length();if(f.delete())total-=n;}}
     static long diskBytes(Context context){File[] files=dir(context).listFiles();long total=0;if(files!=null)for(File f:files)if(f.isFile())total+=f.length();return total;}
     static int memoryBytes(){synchronized(MEMORY){return MEMORY.size();}}

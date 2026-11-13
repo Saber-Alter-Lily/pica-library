@@ -8,6 +8,7 @@ import { retrieveCandidatesV3 } from '../../src/recommendation-v3/retriever-v3'
 import type { Pica } from '../../src/sdk'
 import type { StoredComic } from '../../src/library/types'
 import type { EhProvider } from '../../src/providers/eh-provider'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const dirs: string[] = []
 afterEach(() => { for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true }) })
@@ -18,7 +19,7 @@ describe('E-H cross-source Recommendation V3', () => {
   it('persists E-H provider identity through ProviderService recommendation search', async () => {
     const db = database()
     const fakeEh = { id: 'eh', capabilities: {}, search: async () => [{ providerId: 'eh', providerRemoteId: '123456:abcdef1234', comicId: 'eh:123456:abcdef1234', title: 'Fixture', alternateTitles: ['別名'], author: 'Artist', authors: ['Artist'], circle: 'Circle', description: '', chineseTeam: '', categories: ['Doujinshi'], tags: ['tag'], canonicalTags: [], completionStatus: 'UNKNOWN', pagesCount: 12, epsCount: 1, rating: 4.5, providerMetadata: { rawTags: ['artist:Artist'] } }], details: async () => { throw new Error('unused') }, episodes: async () => [], pages: async () => [], fetchPage: async () => { throw new Error('unused') }, fetchCover: async () => { throw new Error('unused') } } as unknown as EhProvider
-    const service = new ProviderService(async () => ({} as Pica), db, fakeEh)
+    const service = new ProviderService(async () => ({} as Pica), db, fakeEh, undefined, enabledFixtureSources())
     const records = await service.search({ keyword: 'tag', limit: 10 }, ['eh'], 'recommendations')
     expect(records[0]).toMatchObject({ providerId: 'eh', completionStatus: 'UNKNOWN', rating: 4.5 })
     expect(db.getComic('eh:123456:abcdef1234')).toMatchObject({ providerId: 'eh', providerRemoteId: '123456:abcdef1234', completionStatus: 'UNKNOWN', rating: 4.5 })
@@ -35,14 +36,18 @@ describe('E-H cross-source Recommendation V3', () => {
 
   it('wires both Desktop and Android V3 to bounded E-H recall without replacing Pica popularity', () => {
     const desktop = fs.readFileSync('src/library/service.ts', 'utf8')
+    const pipeline = fs.readFileSync('src/recommendation/build-pipeline.ts', 'utf8')
+    const retrieval = fs.readFileSync('src/services/recommendation-retrieval-adapter.ts', 'utf8')
     const mobile = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java', 'utf8')
-    expect(desktop).toContain("const sourceBudget: Record<'eh' | 'exh', number> = { eh: 4, exh: 2 }")
-    expect(desktop).toContain("externalSearch(query, 'keyword', 'eh')")
-    expect(desktop).toContain("externalSearch(query, 'keyword', 'exh')")
-    expect(desktop).toContain('preferenceSignals')
-    expect(desktop).toContain('!dislikedIds.has(comic.comicId)')
-    expect(desktop).toContain('comic.isFavorite ||')
-    expect(desktop).toContain('likedIds.has(comic.comicId)')
+    expect(desktop).toContain('buildRecommendationCycleV3(')
+    expect(desktop).toContain('recommendationBuildPortsV3({')
+    expect(retrieval).toContain("const budget: Record<'eh' | 'exh', number> = { eh: 4, exh: 2 }")
+    expect(retrieval).toContain("search(query, 'keyword', 'eh')")
+    expect(retrieval).toContain("search(query, 'keyword', 'exh')")
+    expect(pipeline).toContain('preferenceSignals')
+    expect(pipeline).toContain('!dislikedIds.has(comic.comicId)')
+    expect(pipeline).toContain('comic.isFavorite ||')
+    expect(pipeline).toContain('likedIds.has(comic.comicId)')
     expect(mobile).toContain('EH_MAX_REQUESTS=4,EXH_MAX_REQUESTS=2')
     expect(mobile).toContain('ehClient.search(q,"eh")')
     expect(mobile).toContain('ehClient.search(q,"exh")')
@@ -52,7 +57,7 @@ describe('E-H cross-source Recommendation V3', () => {
     const db = database()
     let observedSurface = ''
     const fakeEh = { id: 'eh', capabilities: {}, search: async (input: { surface?: string }) => { observedSurface = String(input.surface || ''); return [{ providerId: 'eh', providerRemoteId: '234567:abcdef1234', comicId: 'eh:234567:abcdef1234', title: 'ExH Fixture', alternateTitles: [], author: 'Artist', authors: ['Artist'], circle: null, description: '', chineseTeam: '', categories: ['Doujinshi'], tags: ['tag'], canonicalTags: [], completionStatus: 'UNKNOWN', pagesCount: 10, epsCount: 1, rating: 4.8, providerMetadata: { rawTags: [] } }] }, details: async () => { throw new Error('unused') }, episodes: async () => [], pages: async () => [], fetchPage: async () => { throw new Error('unused') }, fetchCover: async () => { throw new Error('unused') } } as unknown as EhProvider
-    const service = new ProviderService(async () => ({} as Pica), db, fakeEh)
+    const service = new ProviderService(async () => ({} as Pica), db, fakeEh, undefined, enabledFixtureSources())
     const records = await service.search({ keyword: 'tag', limit: 10 }, ['exh'], 'discover')
     expect(observedSurface).toBe('exh')
     expect(records[0]).toMatchObject({ comicId: 'eh:234567:abcdef1234', providerId: 'eh' })
@@ -66,7 +71,7 @@ describe('E-H cross-source Recommendation V3', () => {
       if (input.surface === 'exh') throw new Error('ExH unavailable')
       return [{ providerId: 'eh', providerRemoteId: '345678:abcdef1234', comicId: 'eh:345678:abcdef1234', title: 'Public Fixture', alternateTitles: [], author: 'Artist', authors: ['Artist'], circle: null, description: '', chineseTeam: '', categories: ['Manga'], tags: ['tag'], canonicalTags: [], completionStatus: 'UNKNOWN', pagesCount: 8, epsCount: 1, providerMetadata: { rawTags: [] } }]
     }, details: async () => { throw new Error('unused') }, episodes: async () => [], pages: async () => [], fetchPage: async () => { throw new Error('unused') }, fetchCover: async () => { throw new Error('unused') } } as unknown as EhProvider
-    const service = new ProviderService(async () => ({} as Pica), db, fakeEh)
+    const service = new ProviderService(async () => ({} as Pica), db, fakeEh, undefined, enabledFixtureSources())
     const mixed = await service.search({ keyword: 'tag', limit: 10 }, ['eh', 'exh'], 'discover')
     expect(mixed.map((item) => item.comicId)).toEqual(['eh:345678:abcdef1234'])
     await expect(service.search({ keyword: 'tag', limit: 10 }, ['exh'], 'discover')).rejects.toThrow('ExH unavailable')
@@ -76,7 +81,7 @@ describe('E-H cross-source Recommendation V3', () => {
   it('unions E-H and ExH bindings when both surfaces return the same canonical gallery', async () => {
     const db = database()
     const fakeEh = { id: 'eh', capabilities: {}, search: async (input: { surface?: string }) => [{ providerId: 'eh', providerRemoteId: '456789:abcdef1234', comicId: 'eh:456789:abcdef1234', title: 'Shared Gallery', alternateTitles: [], author: 'Artist', authors: ['Artist'], circle: null, description: '', chineseTeam: '', categories: ['Manga'], tags: ['tag'], canonicalTags: [], completionStatus: 'UNKNOWN', pagesCount: 12, epsCount: 1, rating: 4.9, providerMetadata: { rawTags: [], preferredSurface: input.surface, knownSurfaces: [input.surface] } }], details: async () => { throw new Error('unused') }, episodes: async () => [], pages: async () => [], fetchPage: async () => { throw new Error('unused') }, fetchCover: async () => { throw new Error('unused') } } as unknown as EhProvider
-    const service = new ProviderService(async () => ({} as Pica), db, fakeEh)
+    const service = new ProviderService(async () => ({} as Pica), db, fakeEh, undefined, enabledFixtureSources())
     const records = await service.search({ keyword: 'tag', limit: 10 }, ['eh', 'exh'], 'discover')
     expect(records).toHaveLength(1)
     expect([...(records[0].providerMetadata?.knownSurfaces as string[])].sort()).toEqual(['eh', 'exh'])

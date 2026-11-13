@@ -1,0 +1,66 @@
+{
+  "sourceSha": "2c3f7d647100441398b28fbdc0cc41a5e8ffd0cc",
+  "kind": "FROZEN_PREEXTRACTION_IDENTITY_VIEWS_COMMANDS_AND_TASK_SHARED_UNCHANGED_MATCHERS",
+  "methods": [
+    {
+      "name": "allComicsForIdentity",
+      "sha256": "4b56bdecf4e0aaa823c7d3418a0ab8e16351b865b9a9a09e4f6fb7942ecf3d77"
+    },
+    {
+      "name": "workVariantsForComic",
+      "sha256": "33f35c35ad1c18b664de4a24fa22ce4296eb210d8e4dc6bcbf9d1e71cf462fe3"
+    },
+    {
+      "name": "recommendationV5WorkIdentityAudit",
+      "sha256": "f7f6dc4303d1371da5e2414531b787c88d4977979e644c443249984e09769382"
+    },
+    {
+      "name": "recommendationV5WorkIdentityEvidence",
+      "sha256": "66b0ab24a54a9aa54060cf8d1b15186491cedca8943ed660ff6bcfc3abb7677f"
+    },
+    {
+      "name": "recommendationV5WorkIdentityReview",
+      "sha256": "8574e1b3b6b1b4bc20560ae16e26e48e92f4b206a9261bf0336b9f7d335c353e"
+    },
+    {
+      "name": "recommendationV5WorkIdentityMaterializationPlan",
+      "sha256": "65af8ca0dd74aa1502e1b900451fd2cfb61371d5611f38cbcf37851b5f5780b1"
+    },
+    {
+      "name": "recommendationV5WorkIdentityMaterializationRuns",
+      "sha256": "3060f0fc5e7fbe97b2d21fe921e302f3ef06d9396aa21d0aa68583a2dddac8e0"
+    },
+    {
+      "name": "recommendationV5RefreshWorkIdentityEvidence",
+      "sha256": "81626dd0d43a516bb162c8c1bf2dd6f25ca4ce2f2129facb714ad41b2950bda5"
+    },
+    {
+      "name": "prepareRecommendationV5WorkIdentityMaterialization",
+      "sha256": "963b45fdc737d44130199d20fb036af5bedf516073176a46a85cd0caecd85c8f"
+    },
+    {
+      "name": "updateRecommendationV5WorkIdentityDecision",
+      "sha256": "e985e419f888b7b7231f96897e33559760c562c274be2ddd8fdb4b8aa4ab67cd"
+    },
+    {
+      "name": "recommendationV5WorkIdentityEvidenceRefreshStatus",
+      "sha256": "73d1b8f997d37b932538e2b3bc9b71b50bbe8983db0dc9996068094969968fa3"
+    },
+    {
+      "name": "recommendationV5WorkIdentityEvidenceRefreshControl",
+      "sha256": "9597c0116bda9488d7a527eaa426b7b7795d6369bd48053b766713cb271f15f9"
+    },
+    {
+      "name": "workIdentityEvidenceRefreshCheckpoint",
+      "sha256": "9030025c0b3901949ad3739cdf8134a7d5884d265d0394d9050a066c9c780064"
+    },
+    {
+      "name": "finishWorkIdentityEvidenceRefreshControl",
+      "sha256": "1b686735e331d2ef84c1603cb1afcb6bc4b5a016936cf2e1db7cc6a80fd68108"
+    },
+    {
+      "name": "startRecommendationV5WorkIdentityEvidenceRefresh",
+      "sha256": "1f25e92f988635f6c80166995ca9b90ca31f0ed8c0e43e5a37cfb74646eba0e9"
+    }
+  ]
+}

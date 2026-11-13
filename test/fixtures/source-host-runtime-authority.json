@@ -1,0 +1,19 @@
+{
+  "repository": "Suwayomi/Suwayomi-Server",
+  "tag": "v2.4.2366",
+  "commit": "40bc5da57820324ed0ae724cbbc020cc4673b594",
+  "jar": {
+    "url": "https://github.com/Suwayomi/Suwayomi-Server/releases/download/v2.4.2366/Suwayomi-Server-v2.4.2366.jar",
+    "bytes": 182952426,
+    "sha256": "af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd"
+  },
+  "jvmTarget": 21,
+  "license": "MPL-2.0",
+  "source": "Official immutable Git blobs and Release metadata verified 2026-10-26; text intake hashes in isolated analysis receipts",
+  "builtInLocalSource": { "id": "0", "name": "Local source", "language": "localsourcelang" },
+  "chapterMetadata": { "unknownPageCount": -1, "source": "server/src/main/kotlin/suwayomi/tachidesk/manga/model/table/ChapterTable.kt", "gitBlobSha": "f6fd7be8a37a3dba07c13c99a442d98e69824085", "sha256": "97b4ddd2062282d2d7be2ef7d72405a8780005c4cdf1d41acc8544c1c425d714" },
+  "runtimeDistributedInPicaApplication": false,
+  "thirdPartyExtensionInstall": false,
+  "realPlatformOrCredentialAccess": false,
+  "doesNotCompleteSecondProviderAcceptance": true
+}

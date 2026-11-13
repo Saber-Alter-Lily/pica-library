@@ -1,0 +1,62 @@
+{
+  "sourceSha": "fe360d315d53c597042307a47e6e81fc14c9a1ef",
+  "kind": "FROZEN_PREEXTRACTION_METHODS_WITH_SHARED_UNCHANGED_ALGORITHMS_ONLY",
+  "methods": [
+    {
+      "name": "recommendationV5Snapshot",
+      "sha256": "ed39f829a4c507fa14212a9af79216c4155c63ac6b26b60112f185dfab7ac5ec"
+    },
+    {
+      "name": "recommendationV5AdvancedLearningGate",
+      "sha256": "0f029ec7a158ebba2cb2eda45f2e4f135b447de09346450472231bd5b69f8964"
+    },
+    {
+      "name": "recommendationV5BenchmarkVersions",
+      "sha256": "111346b3eb5901589141335b04bec617189e96822a128dcd441d14399325818e"
+    },
+    {
+      "name": "recommendationV5BenchmarkComparison",
+      "sha256": "644493d349fa1bb98520e783c0d5b789a1dbad3f76d983308e92cc3d7f2e35ca"
+    },
+    {
+      "name": "recommendationV5EvaluationSummary",
+      "sha256": "d06e7770422d51a30bbe14e553a4f10b6f0b94ccb73565f9d4021b79fa2cadeb"
+    },
+    {
+      "name": "recommendationV5SteerabilityAudit",
+      "sha256": "6626d4b7af05a88db702480846161571a750c687c6dd29fa959f2c130154ecd8"
+    },
+    {
+      "name": "recommendationV5RetrospectiveBenchmark",
+      "sha256": "552f912e68317f50dddcea72d9290bb423530691567d0f2aa31c9e4280938545"
+    },
+    {
+      "name": "recommendationV5VisualActivationGate",
+      "sha256": "cd82bbc13bbeb6f377d89ad49501604c3fc270fafb674d4d9797196bc4cedfd4"
+    },
+    {
+      "name": "recommendationV5P3PromotionGate",
+      "sha256": "68a9e17526426d7d9707cc9ff370d9061ef3609615f43a28348a1d9dc4d061b0"
+    },
+    {
+      "name": "recommendationV5ShadowRuns",
+      "sha256": "10068cb4356a0cca6dee0a1df40892d7b2757b2229dff4059a21b1effcb7f87d"
+    },
+    {
+      "name": "recommendationV5ProviderRoutes",
+      "sha256": "36a9c3bda7fc8cbb95e06cd99c28eb145a7a1098bcf4ff73e040d31255ed0c27"
+    },
+    {
+      "name": "recommendationV5CandidateChannels",
+      "sha256": "75aecbca8648f30b00e0148c82991dc24b1288a05c4a14ecb59010760f17d021"
+    },
+    {
+      "name": "recommendationV5PreferenceTimescales",
+      "sha256": "f41052cc0728a450728115d3b3096a6aeb2f25c9954ec984653c4f030a88b5ee"
+    },
+    {
+      "name": "recommendationV5BehaviorEvidence",
+      "sha256": "39feb732d96c03afce801dd66dc4aa25df7a711aaec436c563c061765b24133f"
+    }
+  ]
+}

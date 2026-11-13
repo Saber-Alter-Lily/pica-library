@@ -1,4 +1,5 @@
 import type { StoredComic } from '../library/types'
+import { projectComicTagSignalsV1 } from '../tags/policy'
 import type { ShadowRetrievedCandidateV5 } from './shadow-retrieval'
 import {
     projectShadowCandidateV5
@@ -222,13 +223,14 @@ export function rankShadowCandidatesV5(
     )
 
     const rows = candidates.map((candidate) => {
-        const projected = projectShadowCandidateV5(
+        const raw = projectShadowCandidateV5(
             candidate.comic,
             catalogById.get(
                 normalizePreferenceKey(candidate.comic.comicId)
             )
         )
-        const explicit = preferenceAdjustmentV5(projected, state)
+        const explicit = preferenceAdjustmentV5(raw, state)
+        const projected = projectComicTagSignalsV1(raw, state)
         const features: RelevanceFeaturesV5 = {
             channelPriority: clamp(
                 candidate.evidence.maxPriority / 120,

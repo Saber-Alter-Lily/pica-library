@@ -64,6 +64,18 @@ interface RuntimeResourceEvent {
     at: string
 }
 
+/** Opt-in Desktop upgrade freeze; ordinary scheduling is unchanged. */
+export class RuntimeResourceUpdateHandoffError extends Error {
+    constructor(readonly code:
+        'RUNTIME_UPDATE_BUSY' | 'RUNTIME_UPDATE_ALREADY_FROZEN'
+    ) {
+        super(code === 'RUNTIME_UPDATE_BUSY'
+            ? 'Wait for active and queued runtime tasks before updating.'
+            : 'Runtime task admission is already frozen for an update.')
+        this.name = 'RuntimeResourceUpdateHandoffError'
+    }
+}
+
 export class RuntimeResourceAcquireCancelledError extends Error {
     constructor() {
         super('Runtime resource acquisition was cancelled')
@@ -107,6 +119,58 @@ export class RuntimeResourceCoordinator {
     private readonly peakUsage = zeroUsage()
     private readonly recent: RuntimeResourceEvent[] = []
     private sequence = 0
+    private updateHandoffOwner: symbol | null = null
+    private readonly idleWaiters = new Set<() => void>()
+
+    /** Wait on the existing resource leases, including work outliving HTTP. */
+    waitForIdle(timeoutMs = 25_000): Promise<void> {
+        if (this.active.size === 0 && this.waiting.length === 0)
+            return Promise.resolve()
+        return new Promise<void>((resolve, reject) => {
+            const finish = () => {
+                clearTimeout(deadline)
+                this.idleWaiters.delete(finish)
+                resolve()
+            }
+            const deadline = setTimeout(() => {
+                this.idleWaiters.delete(finish)
+                reject(new Error('Timed out waiting for active library tasks to finish'))
+            }, timeoutMs)
+            this.idleWaiters.add(finish)
+        })
+    }
+
+    private notifyIdle() {
+        if (this.active.size !== 0 || this.waiting.length !== 0) return
+        for (const resolve of this.idleWaiters) resolve()
+        this.idleWaiters.clear()
+    }
+
+    /**
+     * Reuse the already-shared runtime coordinator for a strict admission
+     * barrier after the original Desktop request/activity preflight.
+     * Existing work is NEVER killed or silently cancelled. Handoff is
+     * refused if any active/waiting task remains (even in observe mode).
+     *
+     * The rollback closure is returned only for updater startup failure;
+     * after helper ACK it stays frozen until the original app exits.
+     */
+    freezeAcquisitionsForUpdate(): () => void {
+        if (this.updateHandoffOwner)
+            throw new RuntimeResourceUpdateHandoffError(
+                'RUNTIME_UPDATE_ALREADY_FROZEN')
+        if (this.active.size || this.waiting.length)
+            throw new RuntimeResourceUpdateHandoffError('RUNTIME_UPDATE_BUSY')
+        const token = Symbol('runtime-update-handoff')
+        this.updateHandoffOwner = token
+        let restored = false
+        return () => {
+            if (restored) return
+            restored = true
+            if (this.updateHandoffOwner === token)
+                this.updateHandoffOwner = null
+        }
+    }
 
     constructor(
         private readonly options: {
@@ -196,6 +260,7 @@ export class RuntimeResourceCoordinator {
                     at: new Date().toISOString()
                 })
                 this.drain()
+                this.notifyIdle()
             }
         }
     }
@@ -236,7 +301,7 @@ export class RuntimeResourceCoordinator {
     }
 
     private drain() {
-        if (this.mode === 'observe') return
+        if (this.updateHandoffOwner || this.mode === 'observe') return
         let advanced = true
         while (advanced) {
             advanced = false
@@ -252,6 +317,11 @@ export class RuntimeResourceCoordinator {
     }
 
     async acquire(input: RuntimeResourceRequest): Promise<RuntimeResourceLease> {
+        // In observe mode this is still a strict gate. New work must never
+        // start or queue while the existing updater prepares to replace code.
+        if (this.updateHandoffOwner)
+            throw new RuntimeResourceUpdateHandoffError(
+                'RUNTIME_UPDATE_ALREADY_FROZEN')
         if (!input.ownerId.trim()) throw new Error('Runtime resource ownerId is required')
         if (!input.taskType.trim()) throw new Error('Runtime resource taskType is required')
         if (input.signal?.aborted)
@@ -279,6 +349,7 @@ export class RuntimeResourceCoordinator {
             if (input.signal) {
                 waiting.abortHandler = () => {
                     this.removeWaiting(waiting)
+                    this.notifyIdle()
                     this.record({
                         type: 'cancelled',
                         leaseId: request.id,

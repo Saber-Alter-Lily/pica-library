@@ -346,6 +346,7 @@ body.reader-active .reader-header {
     bottom: 18px;
     z-index: 900;
     max-width: min(720px, calc(100vw - 32px));
+    overflow-wrap: anywhere;
     transform: translateX(-50%);
     padding: 8px 12px;
     border-radius: 999px;

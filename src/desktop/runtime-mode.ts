@@ -17,7 +17,7 @@ export function desktopRuntimeOptions(
         mode: headless ? 'headless' : 'interactive',
         openBrowser: !headless && !args.has('--no-open'),
         idleBrowserShutdown: !headless,
-        mobileBridge: !headless || args.has('--mobile-bridge'),
+        mobileBridge: args.has('--mobile-bridge'),
         remoteApi: headless && args.has('--remote-api')
     }
 }

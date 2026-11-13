@@ -1,0 +1,85 @@
+name: R3 Original Android source-neutral product boundary (unpublished)
+
+on:
+  push:
+    branches: [codex/product-integration-r1-20261102]
+    paths:
+      - '.github/workflows/r3-android-clean-source-qa.yml'
+      - 'scripts/ci/install-gradle-8.9-fallback.sh'
+      - 'scripts/verify-android-clean-source-apk.py'
+      - 'mobile/android-alpha2/app/build.gradle'
+      - 'mobile/android-alpha2/app/proguard-clean-source-qa.pro'
+      - 'mobile/android-alpha2/app/src/cleanSourceQa/**'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/**'
+      - 'mobile/android-alpha2/user-host-app/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r3-clean-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-product-source-boundary:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - id: gradle_setup
+        uses: gradle/actions/setup-gradle@v4
+        continue-on-error: true
+        with:
+          gradle-version: '8.9'
+      - name: Recover pinned Gradle 8.9 from official CDN on distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
+      - name: Assemble original four-tab source-neutral QA and optional signed Host
+        working-directory: mobile/android-alpha2
+        run: gradle :app:assembleCleanSourceQa :user-host-app:assembleDebug -PsourceNeutralQa=true --no-daemon --max-workers=2
+      - name: Verify actual APK and original app source boundary, not UI flags
+        working-directory: mobile/android-alpha2
+        run: |
+          set -euo pipefail
+          app=app/build/outputs/apk/cleanSourceQa/app-cleanSourceQa.apk
+          host=user-host-app/build/outputs/apk/debug/user-host-app-debug.apk
+          test -s "$app"
+          test -s "$host"
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$signer" verify --print-certs "$app" > "$RUNNER_TEMP/clean-certs.txt"
+          "$signer" verify --print-certs "$host" > "$RUNNER_TEMP/host-certs.txt"
+          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/clean-certs.txt" | head -1 | tr 'A-F' 'a-f')
+          host_cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/host-certs.txt" | head -1 | tr 'A-F' 'a-f')
+          test -n "$cert"
+          test "$cert" = "$host_cert"
+          "$aapt" dump badging "$app" | grep -F "package: name='com.picalibrary.android.cleanqa'"
+          "$aapt" dump badging "$app" | grep -F "launchable-activity: name='com.picalibrary.android.DisclaimerActivity'"
+          "$aapt" dump permissions "$app" > "$RUNNER_TEMP/clean-permissions.txt"
+          grep -F 'android.permission.INTERNET' "$RUNNER_TEMP/clean-permissions.txt"
+          grep -F 'com.picalibrary.android.remote.BIND_SOURCE' "$RUNNER_TEMP/clean-permissions.txt"
+          if grep -E 'android.permission.(REQUEST_INSTALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE)' "$RUNNER_TEMP/clean-permissions.txt"; then
+            echo 'Clean original-product QA requested a disallowed privilege' >&2
+            exit 1
+          fi
+          python3 ../../scripts/verify-android-clean-source-apk.py "$app" "app/build/outputs/mapping/cleanSourceQa/mapping.txt"
+      - name: Upload source-neutral original product and matching source-only Host only on actual audit PASS
+        if: success() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-r3-source-neutral-original-product-${{ github.sha }}
+          path: |
+            mobile/android-alpha2/app/build/outputs/apk/cleanSourceQa/app-cleanSourceQa.apk
+            mobile/android-alpha2/user-host-app/build/outputs/apk/debug/user-host-app-debug.apk
+          retention-days: 3
+          if-no-files-found: error

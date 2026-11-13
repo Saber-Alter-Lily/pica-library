@@ -8,7 +8,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 describe('owned-work exclusion and work-variant detail UX', () => {
     it('keeps Final V3 serving behind an ownership-aware work gate', () => {
         const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
+            'src/recommendation/queries.ts'
         )
         const database = read('src/library/database.ts')
         expect(coordinator).toContain('recommendationOwnershipState()')
@@ -26,24 +26,26 @@ describe('owned-work exclusion and work-variant detail UX', () => {
 
     it('exposes a read-only work-variant endpoint without auto-binding', () => {
         const service = read('src/library/service.ts')
+        const identity = read('src/identity/queries-v5.ts')
         const server = read('src/library/server.ts')
         const bridge = read('src/mobile/bridge-server.ts')
         expect(service).toContain('workVariantsForComic(comicId: string')
-        expect(service).toContain("'PROBABLE_SAME_WORK'")
-        expect(service).toContain('workIdentityCreatorBucketKeysV3(')
-        expect(service).toContain('workIdentityDetailEvidenceV3(')
-        expect(service).toContain('workIdentitySignalsV2(')
-        expect(service).toContain("embedding.embeddingKind === 'cover'")
-        expect(service).toContain("coverIdentityStage: 'REVIEW_CONFIRMATION'")
-        expect(service).toContain('favoriteCount')
-        expect(service).toContain('downloadedCount')
-        expect(service).toContain('count: rankedItems.length')
-        const variantsStart = service.indexOf('workVariantsForComic(')
-        const variantsEnd = service.indexOf(
-            '\n    recommendationV5WorkIdentityEvidenceRefreshStatus()',
+        expect(service).toContain('return this.workIdentityQueriesV5().workVariantsForComic(')
+        expect(identity).toContain("'PROBABLE_SAME_WORK'")
+        expect(identity).toContain('workIdentityCreatorBucketKeysV3(')
+        expect(identity).toContain('workIdentityDetailEvidenceV3(')
+        expect(identity).toContain('workIdentitySignalsV2(')
+        expect(identity).toContain("embedding.embeddingKind === 'cover'")
+        expect(identity).toContain("coverIdentityStage: 'REVIEW_CONFIRMATION'")
+        expect(identity).toContain('favoriteCount')
+        expect(identity).toContain('downloadedCount')
+        expect(identity).toContain('count: rankedItems.length')
+        const variantsStart = identity.indexOf('workVariantsForComic(')
+        const variantsEnd = identity.indexOf(
+            '\n    recommendationV5WorkIdentityAudit(',
             variantsStart
         )
-        const variants = service.slice(variantsStart, variantsEnd)
+        const variants = identity.slice(variantsStart, variantsEnd)
         expect(variants).toContain('getWorkIdentityBinding(id)')
         expect(variants).toContain('listWorkIdentityBindingsForWork(')
         expect(variants).toContain('listWorkIdentityDecisionsForComic(id)')
@@ -65,6 +67,7 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         expect(service).not.toMatch(
             /workVariantsForComic[\s\S]{0,800}saveWorkIdentityEvidence/
         )
+        expect(variants).not.toContain('saveWorkIdentityEvidence')
         expect(server).toContain('workVariantsRequest')
         expect(server).toContain('work-variants$')
         expect(bridge).toContain('workVariantsRoute')

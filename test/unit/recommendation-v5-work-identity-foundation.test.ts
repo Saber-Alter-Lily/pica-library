@@ -15,6 +15,7 @@ import {
 } from '../../src/recommendation-v5/work-identity-foundation'
 import { defaultPortablePolicyStateV5 } from '../../src/recommendation-v5/portable-policy'
 import { RecommendationPolicyStoreV5 } from '../../src/recommendation-v5/policy-store'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 function comic(
     input: Partial<StoredComic> & Pick<StoredComic, 'comicId' | 'title'>
@@ -371,7 +372,7 @@ describe('Canonical Work Identity foundation', () => {
                 ],
                 'test'
             )
-            const service = new LibraryService(database, dir)
+            const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
             const probable = service.workVariantsForComic('pica:1')
             expect(probable.count).toBe(1)
             expect(probable.items[0]).toMatchObject({
@@ -446,7 +447,7 @@ describe('Canonical Work Identity foundation', () => {
                 ],
                 'test'
             )
-            const service = new LibraryService(database, dir)
+            const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
             const fromPica = service.workVariantsForComic(
                 'pica:stolen-wife'
             )
@@ -526,7 +527,7 @@ describe('Canonical Work Identity foundation', () => {
                     metadata: {}
                 })
 
-            const service = new LibraryService(database, dir)
+            const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
             const value = service.workVariantsForComic('pica:cover-a')
             const linked = value.items.find(
                 (item) => item.comicId === 'eh:cover-b'

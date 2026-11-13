@@ -6,11 +6,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 describe('P2 D7C recommendation impression batching', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-p2d7c-'))
     const database = new LibraryDatabase(path.join(root, 'library.db'))
-    const service = new LibraryService(database, root)
+    const service = new LibraryService(database, root, undefined, undefined, undefined, enabledFixtureSources())
     let server: Server
     let url: string
 

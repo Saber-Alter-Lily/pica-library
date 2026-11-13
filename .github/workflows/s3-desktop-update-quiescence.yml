@@ -1,0 +1,48 @@
+name: S3 Desktop owned-update quiescence gate (unpublished)
+
+on:
+  push:
+    branches:
+      - codex/s3-desktop-update-quiescence-20261029
+    paths:
+      - '.github/workflows/s3-desktop-update-quiescence.yml'
+      - 'src/desktop/update-quiescence.ts'
+      - 'src/desktop/update-command.ts'
+      - 'src/desktop/main.ts'
+      - 'test/unit/desktop-update-quiescence.test.ts'
+      - 'test/unit/desktop-update-command.test.ts'
+      - 'src/desktop/instance.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s3-desktop-update-quiescence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-owner-and-active-task-admission:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck original Desktop and new admission port
+        run: pnpm type:check
+      - name: Real InstanceLock, active task refusal, existing update helper and process ownership
+        run: pnpm exec vitest run test/unit/desktop-update-quiescence.test.ts test/unit/desktop-update-command.test.ts test/unit/desktop-instance-ownership.test.ts test/unit/legacy-profile-preflight.test.ts test/unit/v050-historical-fixture-gate.test.ts

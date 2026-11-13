@@ -34,6 +34,10 @@ export function buildUpgradeAssistant(options: {
         options.sourceVersion,
         'Source version'
     )
+    // Never rebrand the historical PowerShell replacement engine as the newly
+    // accepted v0.5.0 transition. Its independent native binder has stricter inputs.
+    if (sourceVersion === '0.5.0')
+        throw new Error('Use buildLegacyTransitionAssistant with pinned source/target build authority')
     const targetVersion = stableVersion(
         options.targetVersion,
         'Target version'

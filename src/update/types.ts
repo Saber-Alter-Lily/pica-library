@@ -1,3 +1,8 @@
+import type { RuntimeModuleContracts } from '../modules/contracts'
+import type { RuntimeComposition } from '../modules/runtime-composition'
+import type { RuntimeChoiceReceipt } from './runtime-choice'
+import type { LegacyTransitionGuard } from './legacy-transition-guard'
+
 export type UpdatePackageType = 'incremental' | 'local-test'
 
 export interface UpdateManifestFile {
@@ -19,6 +24,10 @@ export interface UpdateManifest {
     appApiVersion: number
     databaseSchemaVersion: number
     requiresFullInstall: boolean
+    /** Optional for legacy packages. New builders bind this to the actual payload. */
+    moduleContracts?: RuntimeModuleContracts
+    /** Packaging facts bound to the actual payload; not source-enable state. */
+    runtimeComposition?: RuntimeComposition
     files: UpdateManifestFile[]
     deletions: string[]
 }
@@ -39,6 +48,8 @@ export interface StagedFullApplicationUpdate {
     directory: string
     targetVersion: string
     targetSourceSha: string
+    runtimeComposition: RuntimeComposition
+    runtimeChoice?: RuntimeChoiceReceipt
     stagedAt: string
 }
 
@@ -66,6 +77,10 @@ export interface UpdateProgress {
 }
 
 export interface UpdaterInstruction {
+    desktopHomeRoot: string
+    libraryDirectory: string
+    readyFile?: string
+    readyNonce?: string
     parentPid: number
     applicationRoot: string
     stagingRoot: string
@@ -80,6 +95,10 @@ export interface UpdaterInstruction {
 }
 
 export interface FullApplicationUpdaterInstruction {
+    /** Only the independently build-bound first-transition entry supplies this guard. */
+    legacyTransition?: LegacyTransitionGuard
+    readyFile?: string
+    readyNonce?: string
     parentPid: number
     applicationRoot: string
     stagedApplicationRoot: string
@@ -91,6 +110,10 @@ export interface FullApplicationUpdaterInstruction {
     progressFile: string
     targetVersion: string
     targetSourceSha: string
+    /** Optional only for legacy instructions; never an instruction to change components. */
+    runtimeComposition?: RuntimeComposition
+    /** Present only after a separate, explicit component preview/confirm command. */
+    runtimeChoice?: RuntimeChoiceReceipt
     previousUrl?: string
     healthTimeoutMs: number
 }

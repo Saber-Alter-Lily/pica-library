@@ -1,0 +1,372 @@
+name: Next consolidated acceptance (unpublished)
+
+on:
+  push:
+    branches: [codex/next-acceptance-sources-jm, codex/ux-tags-dual-onboarding-20261022, codex/reader-reliability-integration-20261025, codex/source-idle-boundary-20261025, codex/source-neutral-reading-library-20261025, codex/dev85-local-reader-runtime-fixes-20261025, codex/reader-core-upgrade-dev87-20261025]
+  pull_request:
+    paths:
+      - '.github/workflows/next-consolidated-acceptance.yml'
+      - 'source-jvm/**'
+      - 'src/providers/jm-*'
+      - 'src/providers/favorites-import.ts'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/Jm*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: next-acceptance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+env:
+  STABLE_VERSION: '0.5.0'
+  BASE_WINDOWS_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+  PICA_ANDROID_CANDIDATE_VERSION_CODE: '87'
+
+jobs:
+  web-and-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 after official distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm type:check && pnpm web:check && pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/linux-unit.json && pnpm build
+      - run: gradle -p source-jvm test bundle dependencyNotices --no-daemon
+      - run: bash scripts/run-web-browser-smoke.sh
+      - name: Retain source-side synthetic test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Source-Evidence
+          path: |
+            artifacts/linux-unit.json
+            test-results/
+          retention-days: 3
+          if-no-files-found: ignore
+
+  windows-unit:
+    needs: web-and-source
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-core-upgrade-dev87-20261025'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    env:
+      PICA_REQUIRE_JM_RUNTIME: '1'
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_WINDOWS_LAUNCHER_BASE_VERSION: '0.5.0'
+      PICA_WINDOWS_LAUNCHER_BASE_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: All Windows tests remain a required independent gate
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/windows-unit.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain Windows synthetic test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Windows-Unit-Evidence
+          path: artifacts/windows-unit.json
+          retention-days: 3
+          if-no-files-found: warn
+
+  windows:
+    needs: web-and-source
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022' || github.ref == 'refs/heads/codex/reader-reliability-integration-20261025' || github.ref == 'refs/heads/codex/source-idle-boundary-20261025' || github.ref == 'refs/heads/codex/source-neutral-reading-library-20261025' || github.ref == 'refs/heads/codex/dev85-local-reader-runtime-fixes-20261025' || github.ref == 'refs/heads/codex/reader-core-upgrade-dev87-20261025')
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+    timeout-minutes: 50
+    env:
+      PICA_REQUIRE_JM_RUNTIME: '1'
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_WINDOWS_LAUNCHER_BASE_VERSION: '0.5.0'
+      PICA_WINDOWS_LAUNCHER_BASE_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Download frozen Dev86 predecessor (candidate-only)
+        uses: actions/download-artifact@v4
+        with:
+          repository: Saber-Alter-Lily/pica-library
+          github-token: ${{ github.token }}
+          run-id: '40222828902'
+          name: Pica-Library-Next-Acceptance-Windows
+          path: artifacts/prior-dev86
+      - name: Require exact retained Dev86 payload and source
+        shell: pwsh
+        run: |
+          $prior='artifacts/prior-dev86/Pica-Library-Next-Acceptance-Windows-x64.zip'
+          if (-not (Test-Path -LiteralPath $prior -PathType Leaf)) { throw 'Frozen Dev86 artifact unavailable; do not substitute or skip' }
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $prior).Hash.ToLowerInvariant() -ne 'c716bc3d0ab001e34e5173a3caf8ee6412a9e8aa355eee2f84eccf3fdf604b9b') { throw 'Frozen Dev86 payload hash mismatch' }
+          if ((Get-Content -Raw -LiteralPath 'artifacts/prior-dev86/SOURCE_SHA.txt').Trim() -ne '4a18ba769fb3c8df1e6bd100293d38db3013b5dc') { throw 'Frozen Dev86 source mismatch' }
+      - shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Full Windows tests run in parallel in windows-unit. Both jobs are
+          # mandatory; this is not a skip or a successful overall acceptance.
+          ./scripts/build-windows-jm-runtime.ps1 -JdkDirectory $env:JAVA_HOME -GradleExecutable (Get-Command gradle.bat).Source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
+          $base='artifacts/release-base/Pica-Library-v0.5.0-windows-x64.zip'
+          Invoke-WebRequest -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.0/Pica-Library-v0.5.0-windows-x64.zip' -OutFile $base
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $base).Hash.ToLowerInvariant() -ne $env:BASE_WINDOWS_SHA256) { throw 'Released baseline hash mismatch' }
+          $version="0.5.0-postrc.$($env:GITHUB_SHA.Substring(0,12))"
+          $withJm='artifacts/Pica-Library-Next-Acceptance-With-JM-Windows-x64.zip'
+          ./scripts/build-windows-rc-package.ps1 -PostStable -RcVersion $version -Output $withJm -SourceRuntimes jm
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PICA_REQUIRE_JM_RUNTIME='0'
+          $zip='artifacts/Pica-Library-Next-Acceptance-Windows-x64.zip'
+          ./scripts/build-windows-rc-package.ps1 -PostStable -RcVersion $version -Output $zip -SourceRuntimes core
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $version -DesktopHomeName 'Pica Library Post Stable RC' -PortCollision -SetupPersistence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $version -DesktopHomeName 'Pica Library Post Stable RC' -LocalOnlySetup -ExpectedSourceRuntimes core
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-source-media.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-local-ingestion.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-sqlite-paths.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-recommendation-module.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-recommendation-audit.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-incremental-update.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-upgrade-diagnostics.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $prior='artifacts/prior-dev86/Pica-Library-Next-Acceptance-Windows-x64.zip'
+          ./scripts/test-windows-runtime-compositions.ps1 -CoreZip $zip -WithJmZip $withJm -ReleasedBaselineZip $base -FrozenDev86Zip $prior -ExpectedVersion $version -ExpectedSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/audit-released-upgrade-paths.mjs $base
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
+          Copy-Item -LiteralPath $zip -Destination candidate/windows/
+          Copy-Item -LiteralPath $withJm -Destination candidate/windows/
+          Copy-Item -LiteralPath docs/NEXT_ACCEPTANCE_EXECUTION.md -Destination candidate/windows/READ_ME_FIRST.md
+          $env:GITHUB_SHA | Set-Content -Encoding ascii candidate/windows/SOURCE_SHA.txt
+          $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          $jmHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $withJm).Hash.ToLowerInvariant()
+          @("$hash  Pica-Library-Next-Acceptance-Windows-x64.zip", "$jmHash  Pica-Library-Next-Acceptance-With-JM-Windows-x64.zip") | Set-Content -Encoding ascii candidate/windows/SHA256SUMS.txt
+          'UNPUBLISHED core and optional-JM applications. Synthetic fixture is separate and must not be installed. Legacy first-hop and explicit runtime-choice real HTTP gates remain separate; do not infer PASS here.' | Set-Content -Encoding utf8 candidate/windows/STATUS.txt
+      - name: Retain bounded synthetic upgrade diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Upgrade-Diagnostics-${{ github.run_attempt }}
+          path: |
+            artifacts/upgrade-diagnostics/
+            artifacts/runtime-composition-evidence/
+            artifacts/windows-smoke-evidence/
+          retention-days: 3
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Windows
+          path: candidate/windows/
+          retention-days: 1
+          if-no-files-found: error
+  legacy-fixture:
+    needs: web-and-source
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-core-upgrade-dev87-20261025'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
+          $base='artifacts/release-base/Pica-Library-v0.5.0-windows-x64.zip'
+          Invoke-WebRequest -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.0/Pica-Library-v0.5.0-windows-x64.zip' -OutFile $base
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $base).Hash.ToLowerInvariant() -ne $env:BASE_WINDOWS_SHA256) { throw 'Exact released baseline mismatch' }
+          ./scripts/build-windows-first-hop-fixture.ps1 -ExpectedSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain CI-only synthetic first-hop fixture separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Synthetic-First-Hop-NOT-FOR-INSTALLATION
+          path: artifacts/first-hop-fixture/
+          retention-days: 1
+          if-no-files-found: error
+
+  legacy-first-hop:
+    needs: legacy-fixture
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-core-upgrade-dev87-20261025'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [success, hash-mismatch, health-rollback, launch-rollback]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: Pica-Library-Synthetic-First-Hop-NOT-FOR-INSTALLATION
+          path: artifacts/first-hop-fixture/
+      - name: Exact old-controller first hop; never substitute current helper
+        shell: pwsh
+        env:
+          FIRST_HOP_SCENARIO: ${{ matrix.scenario }}
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
+          $base='artifacts/release-base/Pica-Library-v0.5.0-windows-x64.zip'
+          Invoke-WebRequest -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.0/Pica-Library-v0.5.0-windows-x64.zip' -OutFile $base
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $base).Hash.ToLowerInvariant() -ne $env:BASE_WINDOWS_SHA256) { throw 'Exact released baseline mismatch' }
+          node scripts/test-windows-old-client-first-hop.mjs $base artifacts/first-hop-fixture/SYNTHETIC-NOT-FOR-INSTALLATION.zip artifacts/first-hop-fixture/FIXTURE_BUILD_RECEIPT.json $env:GITHUB_SHA $env:FIRST_HOP_SCENARIO
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain genuine first-hop success/failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Legacy-First-Hop-${{ matrix.scenario }}-${{ github.run_attempt }}
+          path: artifacts/old-client-first-hop-evidence/
+          retention-days: 3
+          if-no-files-found: warn
+
+  android:
+    needs: web-and-source
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022' || github.ref == 'refs/heads/codex/reader-reliability-integration-20261025' || github.ref == 'refs/heads/codex/source-idle-boundary-20261025' || github.ref == 'refs/heads/codex/source-neutral-reading-library-20261025' || github.ref == 'refs/heads/codex/dev85-local-reader-runtime-fixes-20261025' || github.ref == 'refs/heads/codex/reader-core-upgrade-dev87-20261025')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 after official distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
+      - name: Tests, lint and shrinker compatibility before secrets
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon
+      - name: Retain synthetic unit-test evidence without account or signing secrets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Android-Evidence
+          path: mobile/android-alpha2/app/build/test-results/testDebugUnitTest/TEST-*.xml
+          retention-days: 1
+          if-no-files-found: ignore
+      - name: Fixed-signature side-by-side candidate only
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
+          test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
+          export PICA_ANDROID_VERSION_NAME="0.5.0-postrc.${GITHUB_SHA:0:12}"
+          export PICA_ANDROID_VERSION_CODE="$PICA_ANDROID_CANDIDATE_VERSION_CODE"
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-next-signing-XXXXXXXX")
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          trap 'rm -rf -- "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+          gradle :app:assembleDebug --no-daemon
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/next-cert.txt"
+          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/next-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$cert" = "$EXPECTED_CERT"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/next-package.txt"
+          grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/next-package.txt"
+          grep -q "versionCode='$PICA_ANDROID_CANDIDATE_VERSION_CODE'" "$RUNNER_TEMP/next-package.txt" || {
+            echo "::error::Dev manifest versionCode does not match expected $PICA_ANDROID_CANDIDATE_VERSION_CODE"
+            sed -n '/^package: /p' "$RUNNER_TEMP/next-package.txt"
+            exit 1
+          }
+          grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/next-package.txt"
+          mkdir -p candidate-next
+          cp "$apk" candidate-next/Pica-Library-Next-Acceptance-Android-Dev.apk
+          cp "$RUNNER_TEMP/next-package.txt" candidate-next/PACKAGE_INFO.txt
+          printf '%s\n' "$cert" > candidate-next/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$GITHUB_SHA" > candidate-next/SOURCE_SHA.txt
+          printf '%s\n' 'UNPUBLISHED. No uninstall or data copy. Stop on signing/version incompatibility. Device/provider QA PENDING.' > candidate-next/STATUS.txt
+          (cd candidate-next && sha256sum Pica-Library-Next-Acceptance-Android-Dev.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Android-Dev
+          path: mobile/android-alpha2/candidate-next/
+          retention-days: 1
+          if-no-files-found: error

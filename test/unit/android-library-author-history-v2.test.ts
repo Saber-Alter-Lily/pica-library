@@ -20,16 +20,30 @@ describe('Android Library / Author / History V2 contracts', () => {
     const home = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java','utf8')
     const shell = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ShellPolicy.java','utf8')
     const manifest = fs.readFileSync('mobile/android-alpha2/app/src/main/AndroidManifest.xml','utf8')
-    expect(home).toContain('compact("历史",v->startActivity(new Intent(this,HistoryActivity.class)))')
-    expect(home).toContain('compact("书架",v->{showingShelves=true;show();})')
-    expect(home).toContain('compact("显示",v->chooseCollectionMode())')
-    expect(home).toContain('Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新书库"')
+    expect(home).toContain('compact(LocalizedText.ui(this,"历史","History","履歴"),v->startActivity(new Intent(this,HistoryActivity.class)))')
+    expect(home).toContain('compact(LocalizedText.ui(this,"书架","Shelves","本棚"),v->{showingShelves=true;show();})')
+    expect(home).toContain('compact(LocalizedText.ui(this,"显示","Display","表示"),v->chooseCollectionMode())')
+    expect(home).toContain('Ui.iconButton(this,R.drawable.ic_refresh_24,LocalizedText.ui(this,"刷新书库","Refresh library","書庫を更新"')
     expect(home).not.toContain('compact("⋮",v->showLibraryMenu())')
     expect(home).toContain('UnifiedLibraryFilter.sortLabel(librarySpec.sort)+" ▾"')
     expect(home).toContain('private void chooseLibrarySort()')
+    expect(home).toContain('LocalizedText.ui(this,"我的书库","My library","マイライブラリ")')
+    expect(home).toContain('LocalizedText.ui(this,"书架","Shelves","本棚"),compact(LocalizedText.ui(this,"返回","Back","戻る")')
     expect(shell).toContain('{"书库","推荐","在线","设置"}')
     expect(shell).not.toContain('历史')
     expect(manifest).toContain('.HistoryActivity')
+  })
+
+  it('resets only the Library viewport when search, filter, sort or display mode changes', () => {
+    const home = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java','utf8')
+    const flow = fs.readFileSync('scripts/s3-android-local-emulator-flow.py','utf8')
+    expect(home).toContain('if(!nextQuery.equals(libraryQuery))resetLibraryViewportOnShow=true')
+    expect(home).toContain('next->{resetLibraryViewportOnShow=true;librarySpec=next')
+    expect(home).toContain('if(librarySpec.sort!=values[w])resetLibraryViewportOnShow=true')
+    expect(home).toContain('if(collectionMode!=modes[which]&&current==0&&!showingShelves)resetLibraryViewportOnShow=true')
+    expect(home).toContain('tabListPosition[0]=0;tabListOffset[0]=0;')
+    expect(flow).toContain('original1500LibrarySearchAndListVisible')
+    expect(flow).toContain('50b-original-clean-1500-library-search-and-list')
   })
 
   it('uses an auditable creator concept and two-stage creator navigation', () => {
@@ -417,7 +431,7 @@ describe('Android Library / Author / History V2 contracts', () => {
 
   it('keeps Reader completion evidence persistence off the UI thread', () => {
     const reader = fs.readFileSync(
-      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderActivity.java',
+      'mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderScreenActivity.java',
       'utf8'
     )
 
@@ -431,8 +445,21 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(helper).toContain('Context app=getApplicationContext();')
     expect(helper).toContain('String comicId=comic;')
     expect(helper).toContain('metadata.submit(()->{')
-    expect(helper).toContain('UnifiedCatalogStore.load(app).byId.get(comicId)')
-    expect(helper).toContain('RecommendationEvidenceStore.recordReaderComplete(')
+    expect(helper).toContain('if(!source.emitsRecommendationEvidence())return;')
+    expect(helper).toContain('recordReaderComplete(app,comicId);')
+    expect(helper).not.toContain('UnifiedCatalogStore.load(')
+    expect(helper).not.toContain('RecommendationEvidenceStore.recordReaderComplete(')
+    const factory = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderSourceFactory.java',
+      'utf8'
+    )
+    expect(factory).toContain('UnifiedCatalogStore.load(context).byId.get(comicId)')
+    expect(factory).toContain('RecommendationEvidenceStore.recordReaderComplete(')
+    const activityAdapter = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderActivity.java',
+      'utf8'
+    )
+    expect(activityAdapter).toContain('ReaderSourceFactory.recordReaderComplete(context,comicId);')
 
     expect(save).toContain('completionRecordedChapter=chapter;')
     expect(save).toContain('recordReaderCompleteAsync();')
@@ -441,10 +468,13 @@ describe('Android Library / Author / History V2 contracts', () => {
   })
 
   it('records session history separately from bookmarks and supports exact-date resume', () => {
-    const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
-    const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')
+    const progress = fs.readFileSync('mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderProgressLedger.java','utf8')
+    const store = fs.readFileSync('mobile/android-alpha2/local-storage/src/main/java/com/picalibrary/android/ReaderHistoryLedger.java','utf8')
     const history = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HistoryActivity.java','utf8')
-    expect(progress).toContain('ReadingHistoryStore.record(')
+    expect(progress).toContain('history.record(')
+    const appProgress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
+    expect(appProgress).toContain('ReadingHistoryStore.record(')
+    expect(appProgress).toContain('UnifiedCatalogStore.load(context).byId.get(id)')
     expect(progress).toContain('historyChapterId')
     expect(progress).toContain('seedOneShotPosition')
     expect(store).toContain('enum Range { TODAY, DAYS_7, DAYS_30, ALL }')
@@ -455,11 +485,11 @@ describe('Android Library / Author / History V2 contracts', () => {
   })
 
   it('groups mobile history by comic, shows covers and preserves chapter metadata', () => {
-    const reader = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderActivity.java','utf8')
-    const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
-    const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')
+    const reader = fs.readFileSync('mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderScreenActivity.java','utf8')
+    const progress = fs.readFileSync('mobile/android-alpha2/reader-view/src/main/java/com/picalibrary/android/ReaderProgressLedger.java','utf8')
+    const store = fs.readFileSync('mobile/android-alpha2/local-storage/src/main/java/com/picalibrary/android/ReaderHistoryLedger.java','utf8')
     const history = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HistoryActivity.java','utf8')
-    expect(reader).toContain('chapterAdvance.setText(LocalizedText.ui("下一章 · ")+target.title)')
+    expect(reader).toContain('chapterAdvance.setText(getString(R.string.reader_next_chapter_title,target.title))')
     expect(reader).toContain('progress.chapterMetadata(data.episode.id,data.episode.title,data.episode.order)')
     expect(reader).toContain('if(atChapterEnd())setChrome(true)')
     expect(progress).toContain('void chapterMetadata(String chapterId,String chapterTitle,int chapterOrder)')

@@ -8,12 +8,11 @@ const script = fs.readFileSync(
 
 describe('future Windows stable packaging contract', () => {
     it('accepts stable semver without hard-coding every release number', () => {
-        expect(script).toContain(
-            "$version -match '^\\d+\\.\\d+\\.\\d+$'"
-        )
-        expect(script).toContain(
-            '"Pica-Library-v$version-windows-x64"'
-        )
+        expect(script).toContain('Get-PicaWindowsPackageStem -Version $version -SourceRuntimes $picaRuntimeMode')
+        const names = fs.readFileSync('scripts/lib/source-runtime-build.ps1', 'utf8')
+        expect(names).toContain("$Version -match '^\\d+\\.\\d+\\.\\d+$'")
+        expect(names).toContain('"Pica-Library-v$Version"')
+        expect(names).toContain('"$stem-windows-x64"')
         expect(script).not.toContain("$version -eq '0.5.0'")
     })
 

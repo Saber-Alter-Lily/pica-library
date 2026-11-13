@@ -1,5 +1,7 @@
 # Pica Library Android 使用说明
 
+先看 [日常使用入门](DAILY_USE_GUIDE.zh-CN.md)；需要配置、画风或诊断时，再按章节查阅 [高级功能指南](ADVANCED_FEATURES_GUIDE.zh-CN.md)。软件内两套引导可在“设置 → 帮助与新手引导”打开。
+
 > 当前正式版本：**v0.5.0 · versionCode 55**。Android 版本未上架任何应用商店，请仅从本仓库正式 GitHub Release 下载 APK。
 
 ## 1. 下载与安装

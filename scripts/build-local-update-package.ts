@@ -12,7 +12,9 @@ import {
     updaterSelfReplacement
 } from '../src/update/path-safety'
 import { classifyUpdateCompatibility } from '../src/update/compatibility'
+import { MODULE_CONTRACT_PATH, parseModuleContracts, legacyModuleContracts } from '../src/modules/contracts'
 import { releasedUpdateBaseline } from '../src/update/released-baselines'
+import { compositionFromPayload, RUNTIME_COMPOSITION_PATH, runtimeCompositionSuffix, sameRuntimeComposition } from '../src/modules/runtime-composition'
 import type { UpdateManifest } from '../src/update/types'
 import {
     normalizeUpdateTarget,
@@ -26,6 +28,11 @@ function sha256(value: Buffer) {
 }
 
 function files(zip: AdmZip) {
+    for (const entry of zip.getEntries()) {
+        const name = entry.entryName.replaceAll('\\', '/')
+        if (!entry.isDirectory && name.toLowerCase() === MODULE_CONTRACT_PATH && name !== MODULE_CONTRACT_PATH)
+            throw new Error('Runtime module payload must use the canonical path case')
+    }
     return new Map(
         zip
             .getEntries()
@@ -84,10 +91,10 @@ function packageIdentity(file: string): {
 } {
     const basename = path.basename(file)
     const stable = basename.match(
-        /^Pica-Library-v(\d+\.\d+\.\d+)-(windows|macos|linux)-(x64|arm64)\.zip$/
+        /^Pica-Library-v(\d+\.\d+\.\d+)(?:-with-jm)?-(windows|macos|linux)-(x64|arm64)\.zip$/
     )
     const development = basename.match(
-        /^Pica-Library-v(.+)-(?:update-base|local-test)-(windows|macos|linux)-(x64|arm64)\.zip$/
+        /^Pica-Library-v(.+)-(?:update-base|local-test)(?:-with-jm)?-(windows|macos|linux)-(x64|arm64)\.zip$/
     )
     const match = stable ?? development
     if (!match)
@@ -117,6 +124,28 @@ export function buildLocalUpdatePackage(
     const targetVersion = target.version
     const sourceEntries = files(new AdmZip(sourceZipFile))
     const targetEntries = files(new AdmZip(targetZipFile))
+    const sourceComposition = compositionFromPayload(sourceEntries.keys(), sourceEntries.get(RUNTIME_COMPOSITION_PATH)?.toString('utf8'))
+    const targetComposition = compositionFromPayload(targetEntries.keys(), targetEntries.get(RUNTIME_COMPOSITION_PATH)?.toString('utf8'))
+    if (sourceEntries.has(RUNTIME_COMPOSITION_PATH) && !targetEntries.has(RUNTIME_COMPOSITION_PATH))
+        throw new Error('Removing runtime composition requires a complete application')
+    if (!sameRuntimeComposition(sourceComposition, targetComposition))
+        throw new Error('Optional source runtime composition changed; select a complete application explicitly')
+    for (const [file, entries, composition] of [[sourceZipFile, sourceEntries, sourceComposition], [targetZipFile, targetEntries, targetComposition]] as const) {
+        // Legacy archives retain their accepted names. Newly declared variants must be unambiguous.
+        if (entries.has(RUNTIME_COMPOSITION_PATH) && /-with-jm-(?:windows|macos|linux)-(?:x64|arm64)\.zip$/.test(path.basename(file)) !== Boolean(runtimeCompositionSuffix(composition)))
+            throw new Error('Package filename does not match its runtime composition')
+    }
+    if (targetEntries.has('app/runtime-assets/tag-runtime-v1/TAG_RUNTIME_MANIFEST.json') && [...targetEntries.keys()].some(name => name.startsWith(registrySourceRoot) || name.startsWith(registryMirrorRoot)))
+        throw new Error('A minimal tag runtime package must not reintroduce legacy reviewed evidence')
+    const sourceModules = sourceEntries.get(MODULE_CONTRACT_PATH)
+    const targetModules = targetEntries.get(MODULE_CONTRACT_PATH)
+    if (sourceModules && !targetModules)
+        throw new Error('Removing runtime module contracts requires a full application upgrade')
+    const sourceModuleContracts = sourceModules ? parseModuleContracts(sourceModules.toString('utf8')) : legacyModuleContracts()
+    const targetModuleContracts = targetModules ? parseModuleContracts(targetModules.toString('utf8')) : undefined
+    const moduleCompatibility = classifyUpdateCompatibility({ currentAppApiVersion: APP_API_VERSION, targetAppApiVersion: APP_API_VERSION, currentDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION, targetDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION, currentModuleContracts: sourceModuleContracts, targetModuleContracts: targetModuleContracts })
+    if (moduleCompatibility.kind !== 'INCREMENTAL')
+        throw new Error('Runtime module API changed; use the one-click full application upgrade path')
     const changed = incrementalChanges(sourceEntries, targetEntries)
     const deleted = [...sourceEntries.keys()].filter(
         (name) =>
@@ -185,6 +214,8 @@ export function buildLocalUpdatePackage(
         appApiVersion: APP_API_VERSION,
         databaseSchemaVersion: DATABASE_SCHEMA_VERSION,
         requiresFullInstall: false,
+        runtimeComposition: targetComposition,
+        ...(targetModuleContracts ? { moduleContracts: targetModuleContracts } : {}),
         files: changed.map(([name, value]) => ({
             path: normalizeUpdatePath(name),
             sha256: sha256(value),

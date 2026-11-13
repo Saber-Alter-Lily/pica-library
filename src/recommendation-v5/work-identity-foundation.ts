@@ -1,5 +1,5 @@
 import type { StoredComic } from '../library/types'
-import type { PortablePolicyStateV5 } from './portable-policy'
+import type { WorkIdentityPolicyFacts } from '../identity/types'
 import {
     normalizePreferenceKey,
     workIdentityKeys
@@ -54,7 +54,7 @@ function auditCandidate(
     left: StoredComic,
     right: StoredComic,
     selected: Map<string, WorkIdentityAuditCandidateV5>,
-    state: PortablePolicyStateV5
+    state: WorkIdentityPolicyFacts
 ): WorkIdentityAuditCandidateV5 | null {
     if (left.comicId === right.comicId) return null
     const key = stablePair(left.comicId, right.comicId)
@@ -102,7 +102,7 @@ function auditCandidate(
 function addPairs(
     bucket: StoredComic[],
     selected: Map<string, WorkIdentityAuditCandidateV5>,
-    state: PortablePolicyStateV5,
+    state: WorkIdentityPolicyFacts,
     limit: number
 ) {
     for (let leftIndex = 0; leftIndex < bucket.length; leftIndex++) {
@@ -190,7 +190,7 @@ function candidateAuditBuckets(
 
 export function buildWorkIdentityAuditV5(
     catalog: StoredComic[],
-    state: PortablePolicyStateV5,
+    state: WorkIdentityPolicyFacts,
     requestedLimit = 200
 ) {
     const limit = Math.max(1, Math.min(1000, Math.floor(requestedLimit)))
@@ -224,7 +224,7 @@ export interface WorkIdentityAuditProgressV5 {
 
 export async function buildWorkIdentityAuditAsyncV5(
     catalog: StoredComic[],
-    state: PortablePolicyStateV5,
+    state: WorkIdentityPolicyFacts,
     requestedLimit = 200,
     options: {
         checkpoint?: () => Promise<void>

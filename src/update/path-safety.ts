@@ -1,6 +1,7 @@
 import path from 'node:path'
 
 const allowedRoots = ['app/', 'web/', 'licenses/']
+export const forbiddenUpdatePayload = /(^|\/)(data|cache|downloads?|previews?|logs?|browser-lite)(\/|$)|\.(?:db|sqlite)(?:-|$)|(^|\/)\.env/i
 const allowedRootFiles = new Set([
     'LICENSE',
     'NOTICE.md',
@@ -53,6 +54,6 @@ export function resolveUpdatePath(root: string, raw: string): string {
 
 export function updaterSelfReplacement(paths: string[]) {
     return paths.some(
-        (value) => normalizeUpdatePath(value) === 'app/updater.js'
+        (value) => normalizeUpdatePath(value).toLowerCase() === 'app/updater.js'
     )
 }

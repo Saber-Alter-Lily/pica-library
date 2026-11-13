@@ -56,7 +56,9 @@ public final class NativeRecommendationWorker extends Worker {
     private ForegroundInfo foreground(String text,int done,int total){
         NotificationManager manager=(NotificationManager)getApplicationContext().getSystemService(Context.NOTIFICATION_SERVICE);
         if(Build.VERSION.SDK_INT>=26)manager.createNotificationChannel(new NotificationChannel(CHANNEL,"Pica Library 手机推荐",NotificationManager.IMPORTANCE_LOW));
-        Intent intent=new Intent(getApplicationContext(),MainActivity.class);intent.putExtra("openTab",1);
+        Intent intent=BuildConfig.SOURCE_NEUTRAL_QA
+            ?new Intent(getApplicationContext(),HomeActivity.class).putExtra("tab",1)
+            :new Intent(getApplicationContext(),MainActivity.class).putExtra("openTab",1);
         PendingIntent pending=PendingIntent.getActivity(getApplicationContext(),0x5531,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder b=new NotificationCompat.Builder(getApplicationContext(),CHANNEL).setSmallIcon(android.R.drawable.stat_notify_sync).setContentTitle("手机原生 Recommendation V3").setContentText(text).setContentIntent(pending).setOnlyAlertOnce(true).setOngoing(true);
         if(total>0)b.setProgress(total,Math.max(0,Math.min(done,total)),false);else b.setProgress(0,0,true);

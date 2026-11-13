@@ -43,6 +43,35 @@ function childResult(input: {
 }
 
 describe('Desktop native picker P4B-2', () => {
+    it('opens existing CBZ files (never a save dialog) on each supported picker backend', async () => {
+        for (const platform of ['win32','darwin','linux'] as const) {
+            const calls:Array<{command:string;args:string[]}>=[]
+            const picker=new DesktopNativePicker(platform,((command:string,args:string[])=>{
+                calls.push({command,args});return childResult({stdout:platform==='win32'?'C:\\fixture\\comic.cbz':'/fixture/comic.cbz'})
+            }) as never,(()=>syncResult(0)) as never)
+            expect(await picker.chooseComicArchive()).toContain('comic.cbz')
+            const invocation=calls[0].args.join(' ')
+            expect(invocation).not.toMatch(/SaveFileDialog|--save|--getsavefilename|choose file name/)
+            expect(invocation).toMatch(platform==='win32'?/OpenFileDialog/:platform==='darwin'?/choose file/:/--file-selection/)
+        }
+    })
+
+    it('opens the existing native OpenFileDialog for signed ZIP selection, never a save dialog', async () => {
+        for (const platform of ['win32', 'darwin', 'linux'] as const) {
+            const calls: string[] = []
+            const chosen = platform === 'win32' ? 'C:\\qa\\signed.zip' : '/qa/signed.zip'
+            const picker = new DesktopNativePicker(
+                platform, ((command: string, args: string[]) => {
+                    calls.push([command, ...args].join(' '))
+                    return childResult({ stdout: chosen })
+                }) as never, (() => syncResult(0)) as never
+            )
+            expect(await picker.chooseSignedSourceArchive()).toBe(chosen)
+            expect(calls[0]).not.toMatch(/SaveFileDialog|--save|--getsavefilename/)
+            expect(calls[0]).toMatch(/zip/i)
+        }
+    })
+
     it('detects Windows/macOS and Linux picker backends without claiming a missing Linux backend', () => {
         expect(desktopPickerStatus('win32')).toEqual({
             backend: 'windows-winforms',

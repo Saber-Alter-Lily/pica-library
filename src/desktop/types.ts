@@ -7,6 +7,10 @@ export interface DesktopConfig {
     openBrowser: boolean
     preferredPort: number
     proxyUrl?: string
+    externalSources?: import('../sources/source-policy').SourcePolicyV1
+    /** No listener is opened until the user explicitly opts in. Pairing records stay separate. */
+    mobileBridgeEnabled?: boolean
+    readerSettings?: import('../../web/reader-settings.js').ReaderSettings
 }
 
 export interface RemoteTargetStoredCredentials {
@@ -29,6 +33,9 @@ export interface StoredCredentials {
     ehPassHash?: string
     ehIgneous?: string
     ehCfClearance?: string
+    /** Optional remembered JM login, protected by the existing OS credential backend. */
+    jmUsername?: string
+    jmPassword?: string
 }
 
 export interface SetupInput {

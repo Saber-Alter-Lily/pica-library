@@ -15,6 +15,7 @@ final class PortableRecommendationPackageStore {
     static final class Candidate {
         final String comicId,providerId,title,author,canonicalAuthor,coverUrl;
         final List<String> tags,categories;
+        final List<String> providerRawTags=new ArrayList<>();
         final int pagesCount,totalLikes,totalViews,desktopPoolRank;
         final boolean visualAvailable;
         final double visualAffinity,visualConfidence;
@@ -196,6 +197,7 @@ final class PortableRecommendationPackageStore {
                 v==null?0d:v.optDouble("confidence",0d),
                 v==null?"":v.optString("sourceKind","")
             );
+            candidate.providerRawTags.addAll(strings(row.optJSONArray("providerRawTags")));
             out.candidates.add(candidate);out.candidateById.put(id,candidate);
         }
         return out;

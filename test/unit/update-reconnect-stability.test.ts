@@ -11,6 +11,7 @@ import {
     probeUpdateReconnect,
     waitForUpdateReconnect
 } from '../../web/update-reconnect.js'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 describe('post-v0.5.0 update reconnect stabilization', () => {
     it('requires both target capabilities and a loadable Web shell', async () => {
@@ -58,7 +59,7 @@ describe('post-v0.5.0 update reconnect stabilization', () => {
     it('withholds Desktop capabilities until startup is fully ready', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-update-ready-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
-        const service = new LibraryService(database, dir)
+        const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
         let startupReady = false
         const started = await startLibraryServer({
             database,

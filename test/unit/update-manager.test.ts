@@ -12,6 +12,7 @@ import {
 } from '../../src/app-capabilities'
 import type { UpdateManifest } from '../../src/update/types'
 import type { UpdateTarget } from '../../src/update/target'
+import { MODULE_CONTRACT_PATH, runtimeModuleContracts } from '../../src/modules/contracts'
 
 const tempDirs: string[] = []
 const sourceSha = '1'.repeat(40)
@@ -120,7 +121,46 @@ afterEach(() => {
         fs.rmSync(directory, { recursive: true, force: true })
 })
 
+describe('UpdateManager module payload boundary', () => {
+    it('rejects case-variant updater replacement and Windows file-plan collisions before staging',async()=>{
+        await expect(manager().stage('helper-case.zip',packageBuffer({}, {'SOURCE_SHA.txt':targetSourceSha,'app/UPDATER.JS':'changed helper'}).buffer)).rejects.toThrow(/Updater replacement requires a full install/)
+        await expect(manager().stage('duplicate-case.zip',packageBuffer({}, {'SOURCE_SHA.txt':targetSourceSha,'web/app.js':'a','web/APP.JS':'b'}).buffer)).rejects.toThrow(/Duplicate update path/)
+        await expect(manager().stage('delete-case.zip',packageBuffer({deletions:['web/APP.JS']}).buffer)).rejects.toThrow(/replaced and deleted/)
+    })
+    it('stages an adopted or unchanged module contract while retaining legacy update support', async () => {
+        for (const includeFile of [true, false]) {
+            const payload = { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, ...(includeFile ? { [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) } : {}) }
+            const update = packageBuffer({ moduleContracts: runtimeModuleContracts() }, payload)
+            await expect(manager().stage('module-update.zip', update.buffer)).resolves.toMatchObject({ requiresFullInstall: false })
+        }
+    })
+    it('rejects a module API change as incremental, but clearly identifies a full-upgrade handoff', async () => {
+        const target = runtimeModuleContracts(); target.apis.tags++
+        const payload = { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, [MODULE_CONTRACT_PATH]: JSON.stringify(target) }
+        await expect(manager().stage('bad-incremental.zip', packageBuffer({ moduleContracts: target }, payload).buffer)).rejects.toThrow(/full application install/)
+        const updater = manager()
+        const staged = await updater.stage('full-required.zip', packageBuffer({ moduleContracts: target, requiresFullInstall: true }, payload).buffer)
+        expect(staged.requiresFullInstall).toBe(true)
+        expect(() => updater.apply(staged.id)).toThrow(/full application upgrade path/)
+    })
+    it('rejects false, undeclared or removed module metadata rather than presenting a mixed application as updated', async () => {
+        const mismatch = runtimeModuleContracts(); mismatch.apis.reader++
+        await expect(manager().stage('mismatch.zip', packageBuffer({ moduleContracts: runtimeModuleContracts() }, { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, [MODULE_CONTRACT_PATH]: JSON.stringify(mismatch) }).buffer)).rejects.toThrow(/do not match/)
+        await expect(manager().stage('undeclared.zip', packageBuffer({}, { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) }).buffer)).rejects.toThrow(/not declared/)
+        await expect(manager().stage('wrong-case.zip', packageBuffer({}, { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, 'app/MODULE-CONTRACTS.json': JSON.stringify(runtimeModuleContracts()) }).buffer)).rejects.toThrow(/canonical path case/)
+        await expect(manager().stage('removed.zip', packageBuffer({ deletions: [MODULE_CONTRACT_PATH] }).buffer)).rejects.toThrow(/cannot be removed/)
+        await expect(manager().stage('invalid.zip', packageBuffer({ moduleContracts: { formatVersion: 2, apis: {} } as never }).buffer)).rejects.toThrow(/format/)
+    })
+})
+
 describe('UpdateManager', () => {
+    it('accepts the shipped isolated postrc version for local-test assets, never a stable installation',async()=>{
+        const version='0.5.0-postrc.0123456789ab'
+        const update=packageBuffer({sourceVersionRange:'='+version,targetVersion:version})
+        await expect(manager(version).stage('scoped-fixture.zip',update.buffer)).resolves.toMatchObject({requiresFullInstall:false,packageType:'local-test'})
+        await expect(manager('0.5.0').stage('scoped-fixture.zip',packageBuffer({sourceVersionRange:'=0.5.0',targetVersion:version}).buffer)).rejects.toThrow('Stable builds reject local-test')
+        await expect(manager(version).stage('scoped-fixture.zip',packageBuffer({sourceVersionRange:'='+version,targetVersion:'0.5.1'}).buffer)).rejects.toThrow('Stable builds reject local-test')
+    })
     it('rejects absolute, traversal and ADS paths', () => {
         for (const value of [
             'C:\\Windows\\system32\\bad.dll',

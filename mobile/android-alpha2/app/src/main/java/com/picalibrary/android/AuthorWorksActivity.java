@@ -80,7 +80,10 @@ public final class AuthorWorksActivity extends LocaleAwareActivity {
             true
         );
         bar.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
-        bar.addView(compact("↻", v -> refreshOnline()));
+        bar.addView(compact("↻", v -> {
+            if(BuildConfig.SOURCE_NEUTRAL_QA)loadLocalState(false);
+            else refreshOnline();
+        }));
         root.addView(bar);
 
         HorizontalScrollView scroller = new HorizontalScrollView(this);
@@ -94,7 +97,8 @@ public final class AuthorWorksActivity extends LocaleAwareActivity {
         addFilter(filters, "全部", "all");
         addFilter(filters, "Pica", "pica");
         addFilter(filters, "E-H", "eh");
-        if (EhCapabilityStore.load(this).available())
+        if (!BuildConfig.SOURCE_NEUTRAL_QA &&
+                EhCapabilityStore.load(this).available())
             addFilter(filters, "ExH", "exh");
         scroller.addView(filters);
         root.addView(scroller);
@@ -168,7 +172,8 @@ public final class AuthorWorksActivity extends LocaleAwareActivity {
                 localLoading = false;
                 applyLocalState(next);
                 renderWorks();
-                if (refreshAfterLoad) refreshOnline();
+                if (refreshAfterLoad && !BuildConfig.SOURCE_NEUTRAL_QA)
+                    refreshOnline();
             });
         });
     }
@@ -288,6 +293,11 @@ public final class AuthorWorksActivity extends LocaleAwareActivity {
     }
 
     private void refreshOnline() {
+        if(BuildConfig.SOURCE_NEUTRAL_QA){
+            // This original author directory still browses its cached
+            // authors/works. There is no hidden network query to site APIs.
+            return;
+        }
         if (
             refreshing ||
             localLoading ||

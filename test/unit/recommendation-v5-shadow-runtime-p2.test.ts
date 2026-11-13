@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { Pica } from '../../src/sdk'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const directories: string[] = []
 
@@ -24,7 +25,7 @@ function setup() {
     const service = new LibraryService(
         database,
         dataDir,
-        {} as unknown as Pica
+        {} as unknown as Pica, undefined, undefined, enabledFixtureSources()
     )
     return { database, service }
 }
@@ -138,6 +139,8 @@ describe('P2 H2A Recommendation V5 shadow background runtime', () => {
     it('detaches the Desktop endpoint and exposes status/control routes', () => {
         const server = fs.readFileSync('src/library/server.ts', 'utf8')
         const service = fs.readFileSync('src/library/service.ts', 'utf8')
+        const task = fs.readFileSync('src/recommendation/shadow-task-v5.ts', 'utf8')
+        const execution = fs.readFileSync('src/recommendation/shadow-execution-v5.ts', 'utf8')
         const dashboard = fs.readFileSync(
             'web/recommendation-v5-evaluation.js',
             'utf8'
@@ -161,11 +164,15 @@ describe('P2 H2A Recommendation V5 shadow background runtime', () => {
         expect(service).toContain(
             "recommendationV5ShadowControl(\n        action: 'pause' | 'resume' | 'cancel'"
         )
-        expect(service).toContain('recommendationV5ShadowCheckpoint()')
-        expect(service).toContain(
+        expect(service).toContain('this.recommendationShadowTaskV5.status()')
+        expect(service).toContain('this.recommendationShadowTaskV5.control(action)')
+        expect(service).toContain('this.recommendationShadowTaskV5.start(input)')
+        expect(task).toContain('private async checkpoint()')
+        expect(task).toContain('checkpoint: () => this.checkpoint()')
+        expect(execution).toContain(
             "executionAuthority: 'MANUAL_DESKTOP_ONLY' as const"
         )
-        expect(service).toContain("trigger: 'EXPLICIT_CONFIRMATION' as const")
+        expect(execution).toContain("trigger: 'EXPLICIT_CONFIRMATION' as const")
 
         expect(dashboard).toContain('evalPollShadowTask')
         expect(dashboard).toContain('evalRestoreShadowTask')

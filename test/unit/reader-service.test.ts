@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import AdmZip from 'adm-zip'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { ReaderService } from '../../src/services/reader-service'
 
@@ -52,11 +52,40 @@ function fixture(pages = 3) {
 }
 
 afterEach(() => {
+    vi.restoreAllMocks()
     for (const directory of directories.splice(0))
         fs.rmSync(directory, { recursive: true, force: true })
 })
 
 describe('ReaderService', () => {
+    it('keeps native shell launch outside core Reader and requires a trusted desktop opener', () => {
+        const { root, database, reader } = fixture(1)
+        const owned = path.join(root, 'downloads', '1.jpg')
+        expect(() => reader.openDefault(owned)).toThrow(
+            'External file opening is not configured'
+        )
+        const opener = { openDefault: vi.fn((_file: string) => ({ opened: true })) }
+        const withOpener = new ReaderService(database, root, opener)
+        expect(withOpener.openDefault(owned)).toEqual({ opened: true })
+        expect(opener.openDefault).toHaveBeenCalledWith(fs.realpathSync.native(owned))
+        expect(() => withOpener.openDefault(path.join(root, '..', 'outside.jpg')))
+            .toThrow('Downloaded page is unavailable')
+        expect(opener.openDefault).toHaveBeenCalledTimes(1)
+        database.close()
+    })
+
+    it('uses native canonical roots so Windows 8.3 aliases do not reject owned imported pages', () => {
+        const {root,database,reader}=fixture(1)
+        const original=fs.realpathSync,native=vi.fn(original.native)
+        const legacy=vi.spyOn(fs,'realpathSync').mockImplementation(((file:fs.PathLike)=>
+            String(file)===root ? path.join(root,'SHORT~1') : original(file)) as typeof fs.realpathSync)
+        Object.assign(legacy,{native})
+        expect(reader.chapter('reader-comic','episode-1').pages).toHaveLength(1)
+        expect(reader.picture('picture-0').data.toString()).toBe('page-1')
+        expect(legacy).not.toHaveBeenCalled()
+        expect(native).toHaveBeenCalledWith(root)
+        database.close()
+    })
     it('reads downloaded chapters and persists resume position', () => {
         const { database, reader } = fixture()
         expect(reader.chapters('reader-comic')[0]).toMatchObject({

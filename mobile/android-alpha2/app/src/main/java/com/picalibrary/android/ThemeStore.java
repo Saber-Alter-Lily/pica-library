@@ -26,7 +26,7 @@ final class ThemeStore {
     static void setMode(Context c,String mode){String value=normalizeMode(mode);c.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().putString(KEY_MODE,value).apply();applyPlatformNightMode(c,value);}
     static boolean isDark(Context c){String mode=mode(c);if(MODE_DARK.equals(mode))return true;if(MODE_LIGHT.equals(mode))return false;return (c.getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;}
     static String effectiveKey(Context c){Profile p=load(c);return p.mode+":"+(isDark(c)?"dark":"light")+":"+p.accent+":"+p.card+":"+p.density+":"+(SupporterEntitlement.themePacksEnabled(c)?ThemePackStore.activeId(c):"");}
-    static String label(Context c){String mode=mode(c);if(MODE_LIGHT.equals(mode))return "浅色";if(MODE_DARK.equals(mode))return "深色";return "跟随系统";}
+    static String label(Context c){String mode=mode(c);if(MODE_LIGHT.equals(mode))return LocalizedText.ui(c,"浅色","Light","ライト");if(MODE_DARK.equals(mode))return LocalizedText.ui(c,"深色","Dark","ダーク");return LocalizedText.ui(c,"跟随系统","Follow system","システムに従う");}
 
     static void applyPlatformNightMode(Context c,String mode){
         if(Build.VERSION.SDK_INT<31)return;

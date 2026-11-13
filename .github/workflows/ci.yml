@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # Only deduplicate the ongoing R1/R2 integration branch; never cancel main.
+  cancel-in-progress: ${{ github.head_ref == 'codex/product-integration-r1-20261102' || github.ref == 'refs/heads/codex/product-integration-r1-20261102' }}
 permissions:
   contents: read
 
@@ -42,6 +46,7 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -52,9 +57,137 @@ jobs:
         with:
           packages: platform-tools
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 after official distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
       - name: Test, lint and build Android
         working-directory: mobile/android-alpha2
-        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --stacktrace
+        timeout-minutes: 28
+        # Keep every test enabled; bound hangs and preserve verbose per-test progress.
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon --stacktrace --info --max-workers=2
+      - name: Assemble opt-in local-only Android draft and inspect its manifest
+        if: ${{ github.head_ref == 'codex/s3-android-local-only-draft-20261030' || github.head_ref == 'codex/s3-android-reader-view-module-20261030' || github.head_ref == 'codex/s3-android-reader-image-pipeline-20261030' || github.head_ref == 'codex/s3-android-reader-chapter-contract-20261030' || github.head_ref == 'codex/s3-android-reader-progress-module-20261030' }}
+        working-directory: mobile/android-alpha2
+        timeout-minutes: 10
+        env:
+          PICA_ANDROID_LOCAL_ONLY_DRAFT: '1'
+        run: |
+          gradle :app:assembleDebug --no-daemon --max-workers=2
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$aapt" dump badging "$apk" | grep -F "package: name='com.picalibrary.android.localdraft'"
+          "$aapt" dump badging "$apk" | grep -F "launchable-activity: name='com.picalibrary.android.DisclaimerActivity'"
+          if "$aapt" dump permissions "$apk" | grep -E 'android.permission.(INTERNET|CAMERA|REQUEST_INSTALL_PACKAGES)'; then
+            echo "Local-only APK still requests a forbidden runtime capability"
+            exit 1
+          fi
+      - name: Build user-owned Host Android APK without bundled site SDKs
+        working-directory: mobile/android-alpha2
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          gradle :user-host-app:assembleDebug --no-daemon --max-workers=2
+          apk=user-host-app/build/outputs/apk/debug/user-host-app-debug.apk
+          test -s "$apk"
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$aapt" dump badging "$apk" | grep -F "package: name='com.picalibrary.android.userhost.qa'"
+          if "$aapt" dump badging "$apk" | grep -F 'launchable-activity:'; then
+            echo 'Optional source component must not add another Reader/launcher icon'; exit 1
+          fi
+          "$aapt" dump permissions "$apk" | grep -F 'android.permission.INTERNET'
+          "$aapt" dump permissions "$apk" | grep -F 'com.picalibrary.android.remote.BIND_SOURCE'
+          if "$aapt" dump permissions "$apk" | grep -E 'android.permission.(CAMERA|REQUEST_INSTALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE)'; then
+            echo 'Unexpected permission in optional Host APK'; exit 1
+          fi
+          APK_PATH="$apk" python3 - <<'PY'
+          import os, re, zipfile
+          with zipfile.ZipFile(os.environ['APK_PATH']) as archive:
+              dexes = [archive.read(name) for name in archive.namelist()
+                       if re.fullmatch(r'classes[0-9]*\.dex', name)]
+          if not dexes: raise SystemExit('No compiled DEX files')
+          data = b''.join(dexes)
+          for forbidden in (b'Lio/github/jukomu/', b'PicaAccountActivity',
+                            b'EhAccountActivity', b'JmSourceActivity',
+                            b'PicaBrowseActivity', b'Lcom/picalibrary/android/PicaClient;',
+                            b'Lcom/picalibrary/android/EhClient;',
+                            b'LocalComicStore', b'LocalLibraryActivity',
+                            b'LocalReaderActivity', b'HostReaderActivity',
+                            b'ReaderScreenActivity', b'HostOfflineSaver'):
+              if forbidden in data:
+                  raise SystemExit('Provider, local Reader or storage leaked into source-only Host APK')
+          for needed in (b'HostSourceManager', b'HostBrowserActivity',
+                         b'ExternalSourceService', b'ISourceEndpoint'):
+              if needed not in data:
+                  raise SystemExit('Missing owned Host or original Reader: ' + str(needed))
+          print('PASS: source-only Host APK has Binder and no second Reader, library or site SDK')
+          PY
+      - name: Upload unsigned source-free user-Host QA APK (not Release)
+        if: success() && github.event.repository.private == false && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: r2-source-free-user-host-android-qa-${{ github.sha }}
+          path: mobile/android-alpha2/user-host-app/build/outputs/apk/debug/user-host-app-debug.apk
+          retention-days: 3
+          if-no-files-found: error
+      - name: Build and inspect physically source-free Android local QA APK
+        working-directory: mobile/android-alpha2
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          gradle :local-app:assembleDebug --no-daemon --max-workers=2
+          apk=local-app/build/outputs/apk/debug/local-app-debug.apk
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$aapt" dump badging "$apk" | grep -F "package: name='com.picalibrary.android.localcore.qa'"
+          "$aapt" dump badging "$apk" | grep -F "launchable-activity: name='com.picalibrary.android.LocalLibraryActivity'"
+          "$aapt" dump permissions "$apk" | grep -F 'com.picalibrary.android.remote.BIND_SOURCE'
+          if "$aapt" dump permissions "$apk" | grep -E 'android.permission.(INTERNET|CAMERA|REQUEST_INSTALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE)'; then
+            echo "Source-free APK requested a forbidden permission"
+            exit 1
+          fi
+          APK_PATH="$apk" python3 - <<'PY'
+          import os, re, zipfile
+          apk = os.environ["APK_PATH"]
+          forbidden = (
+              b"Lcom/picalibrary/android/Pica",
+              b"Lcom/picalibrary/android/Eh",
+              b"Lcom/picalibrary/android/Jm",
+              b"Lcom/picalibrary/android/Bridge",
+              b"Lcom/picalibrary/android/Host",
+              b"Lcom/picalibrary/android/OnlineReader",
+              b"Lcom/picalibrary/android/RemoteReader",
+              b"Lcom/picalibrary/android/ReaderSourceFactory",
+              b"Lio/github/jukomu/",
+          )
+          with zipfile.ZipFile(apk) as archive:
+              dexes = [name for name in archive.namelist()
+                       if re.fullmatch(r"classes[0-9]*\.dex", name)]
+              if not dexes:
+                  raise SystemExit("APK has no compiled DEX")
+              for name in dexes:
+                  contents = archive.read(name)
+                  hits = [item.decode() for item in forbidden if item in contents]
+                  if hits:
+                      raise SystemExit(f"Source SDK in {name}: {hits}")
+          print(f"PASS: standalone APK contains {len(dexes)} checked DEX files, no source SDK")
+          PY
+      - name: Upload unsigned local-core QA APK (not a Release)
+        if: success() && github.event.repository.private == false && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-free-local-qa-${{ github.run_id }}
+          path: mobile/android-alpha2/local-app/build/outputs/apk/debug/local-app-debug.apk
+          retention-days: 2
+          if-no-files-found: error
+      - name: Preserve actual Android JUnit results even on timeout
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-junit-${{ github.run_id }}-${{ github.job }}
+          path: mobile/android-alpha2/app/build/test-results/testDebugUnitTest/
+          retention-days: 1
+          if-no-files-found: warn

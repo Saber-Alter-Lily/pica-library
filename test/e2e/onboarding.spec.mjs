@@ -1,155 +1,124 @@
 import { expect, test } from '@playwright/test'
+import { guideCatalog } from '../../web/guide-catalog.js'
 
 async function boot(page, language = 'zh-CN', state = null) {
+    const errors = [], writes = []
+    page.on('pageerror', error => errors.push(String(error)))
     await page.addInitScript(({ language, state }) => {
         localStorage.setItem('pica-library-language', language)
-        localStorage.removeItem('pica-onboarding-state-v1')
-        sessionStorage.removeItem('pica-onboarding-session-dismissed-v1')
-        if (state) localStorage.setItem('pica-onboarding-state-v1', JSON.stringify(state))
+        if (state && !localStorage.getItem('pica-onboarding-state-v1')) localStorage.setItem('pica-onboarding-state-v1', JSON.stringify(state))
     }, { language, state })
-    await page.route('**/api/v1/**', async (route) => {
-        await route.fulfill({
-            status: 503,
-            contentType: 'application/json',
-            body: JSON.stringify({ error: 'onboarding-smoke-offline' })
-        })
+    await page.route('**/api/v1/**', async route => {
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())) writes.push(route.request().url())
+        await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'guide-offline-fixture' }) })
     })
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    const disclaimer = page.locator('#pica-disclaimer-gate')
-    if (await disclaimer.isVisible().catch(() => false)) {
-        await page.locator('#pica-disclaimer-check').check()
-        await page.locator('#pica-disclaimer-accept').click()
+    if (await page.locator('#pica-disclaimer-gate').isVisible().catch(() => false)) {
+        await page.locator('#pica-disclaimer-check').check(); await page.locator('#pica-disclaimer-accept').click()
     }
+    return { errors, writes }
 }
-
-test('first supported version prompts and Later only dismisses this session', async ({ page }) => {
-    await boot(page)
-    const dialog = page.locator('#pica-onboarding-welcome')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
-    await expect(dialog).toContainText('设置 → 帮助与新手引导')
-    await page.locator('#pica-onboarding-later').click()
-    await expect(dialog).toBeHidden()
-    expect(await page.evaluate(() => sessionStorage.getItem('pica-onboarding-session-dismissed-v1'))).toBe('2')
-    expect(await page.evaluate(() => localStorage.getItem('pica-onboarding-state-v1'))).toBeNull()
-})
-
-test('do-not-show persists but Settings replay remains available', async ({ page }) => {
-    await boot(page)
-    await expect(page.locator('#pica-onboarding-welcome')).toBeVisible({ timeout: 5000 })
-    await page.locator('#pica-onboarding-never').check()
-    await page.locator('#pica-onboarding-later').click()
-    const state = await page.evaluate(() => JSON.parse(localStorage.getItem('pica-onboarding-state-v1')))
-    expect(state.autoShow).toBe(false)
-    expect(state.dismissedVersion).toBe(2)
-
-    await page.locator('nav [data-view="maintenance"]').click()
-    await expect(page.locator('#a89-onboarding-panel')).toBeVisible()
-    await page.locator('#a89-onboarding-replay').click()
-    await expect(page.locator('.driver-popover')).toBeVisible()
-    await expect(page.locator('.pica-tour-skip')).toBeVisible()
-})
-
-test('tour completion records the onboarding version', async ({ page }) => {
-    await boot(page, 'en')
-    await expect(page.locator('#pica-onboarding-welcome')).toBeVisible({ timeout: 5000 })
-    await page.locator('#pica-onboarding-start').click()
-    await expect(page.locator('.driver-popover')).toBeVisible()
-
-    for (let i = 0; i < 20; i += 1) {
-        if (!(await page.locator('body').evaluate((body) => body.classList.contains('driver-active')))) break
-        const next = page.locator('.driver-popover-next-btn')
-        await expect(next).toBeVisible()
-        await next.click()
-        await page.waitForTimeout(460)
-    }
-    await expect(page.locator('body')).not.toHaveClass(/driver-active/)
-    const state = await page.evaluate(() => JSON.parse(localStorage.getItem('pica-onboarding-state-v1')))
-    expect(state.completedVersion).toBe(2)
-})
-
-test('tour Skip confirms replay location and records dismissedVersion', async ({ page }) => {
-    await boot(page, 'ja')
-    await expect(page.locator('#pica-onboarding-welcome')).toBeVisible({ timeout: 5000 })
-    await expect(page.locator('#pica-onboarding-start')).toHaveText('ガイドを開始')
-    await page.locator('#pica-onboarding-start').click()
-    await expect(page.locator('.pica-tour-skip')).toHaveText('スキップ')
+async function next(page) {
+    const title = await page.locator('.driver-popover-title').textContent()
+    await page.locator('.driver-popover-next-btn').click()
+    await expect(async () => {
+        if (await page.locator('.driver-popover-title').count()) expect(await page.locator('.driver-popover-title').textContent()).not.toBe(title)
+    }).toPass()
+}
+async function skip(page) {
     await page.locator('.pica-tour-skip').click()
-
-    const confirm = page.locator('#app-confirm-dialog')
-    await expect(confirm).toBeVisible()
-    await expect(confirm).toContainText('設定 → ヘルプと初回ガイド')
+    await expect(page.locator('#app-confirm-dialog')).toBeVisible()
     await page.locator('#app-confirm-submit').click()
     await expect(page.locator('body')).not.toHaveClass(/driver-active/)
-    const state = await page.evaluate(() => JSON.parse(localStorage.getItem('pica-onboarding-state-v1')))
-    expect(state.dismissedVersion).toBe(2)
-})
-
-for (const [language, start] of [
-    ['zh-CN', '开始引导'],
-    ['ja', 'ガイドを開始'],
-    ['en', 'Start tour']
-]) {
-    test(`welcome copy is localized in ${language}`, async ({ page }) => {
-        await boot(page, language)
-        await expect(page.locator('#pica-onboarding-welcome')).toBeVisible({ timeout: 5000 })
-        await expect(page.locator('#pica-onboarding-start')).toHaveText(start)
-    })
 }
 
-
-test('task tour keeps every late Settings step anchored to the correct visible panel', async ({ page }) => {
-    await boot(page, 'zh-CN')
-    await expect(page.locator('#pica-onboarding-welcome')).toBeVisible({ timeout: 5000 })
-    await page.locator('#pica-onboarding-start').click()
-
-    const steps = [
-        { title: '统一书库', view: 'library', target: 'nav [data-view="library"]' },
-        { title: '先同步收藏', view: 'library', target: '#sync-button' },
-        { title: '搜索与筛选', view: 'library', target: '#filter-text' },
-        { title: '建立书架', view: 'shelves', target: 'nav [data-view="shelves"]' },
-        { title: '新建与管理书架', view: 'shelves', target: '#shelf-create' },
-        { title: '推荐与在线发现', view: 'discover', target: 'nav [data-view="discover"]' },
-        { title: '专属推荐', view: 'discover', target: '#recommend-button' },
-        { title: '设置中心', view: 'maintenance', target: 'nav [data-view="maintenance"]' },
-        { title: '推荐与画风', view: 'maintenance', panel: 'recommendations', target: '#a87-recommendations-tab' },
-        { title: '画风接入模式', view: 'maintenance', panel: 'recommendations', target: '#visual-rerank-mode' },
-        { title: '画风影响强度', view: 'maintenance', panel: 'recommendations', target: '#visual-strength' },
-        { title: '连接与同步', view: 'maintenance', panel: 'connections', target: '#a87-connections-tab' },
-        { title: '先看连接状态', view: 'maintenance', panel: 'connections', target: '#a83-connections' },
-        { title: '手机直接读取电脑内容', view: 'maintenance', panel: 'connections', target: '#settings-mobile-bridge' },
-        { title: 'E-H 登录方式', view: 'maintenance', panel: 'general', target: '#settings-eh-account' },
-        { title: '语言与地区', view: 'maintenance', panel: 'general', target: '#a87-language-panel' },
-        { title: '软件更新', view: 'maintenance', panel: 'maintenance', target: '#software-updates' }
-    ]
-
-    for (let index = 0; index < steps.length; index += 1) {
-        const expected = steps[index]
-        await expect(page.locator('.driver-popover-title')).toHaveText(expected.title)
-        await expect(page.locator('#' + expected.view)).toHaveClass(/\bactive\b/)
-        if (expected.panel) {
-            await expect(page.locator('#a87-' + expected.panel + '-panel')).toBeVisible()
-            await expect(page.locator('#a87-' + expected.panel + '-tab')).toHaveAttribute('aria-selected', 'true')
-        }
-        const active = page.locator(expected.target)
-        await expect(active).toBeVisible()
-        await expect(active).toHaveClass(/driver-active-element/)
-        const box = await active.boundingBox()
-        expect(box, 'step ' + (index + 1) + ' should have a real spotlight target').not.toBeNull()
-        expect(box.width).toBeGreaterThan(0)
-        expect(box.height).toBeGreaterThan(0)
-
-        const before = await page.locator('.driver-popover-progress-text').textContent()
-        await page.locator('.driver-popover-next-btn').click()
-        await page.waitForTimeout(460)
-        if (index < steps.length - 1) {
-            const after = await page.locator('.driver-popover-progress-text').textContent()
-            expect(after).not.toBe(before)
-        }
-    }
-
-    await expect(page.locator('.driver-popover-title')).toHaveText('已经准备好了')
-    await page.locator('.driver-popover-next-btn').click()
-    await expect(page.locator('body')).not.toHaveClass(/driver-active/)
-    const state = await page.evaluate(() => JSON.parse(localStorage.getItem('pica-onboarding-state-v1')))
-    expect(state.completedVersion).toBe(2)
+test('welcome separates daily from optional advanced; Later is session-only', async ({ page }) => {
+    await boot(page)
+    await expect(page.locator('#pica-onboarding-welcome')).toBeVisible()
+    await expect(page.locator('#pica-onboarding-start')).toHaveText('日常使用入门')
+    await expect(page.locator('#pica-onboarding-advanced')).toHaveText('高级功能指南')
+    await page.locator('#pica-onboarding-later').click()
+    expect(await page.evaluate(() => sessionStorage.getItem('pica-onboarding-session-dismissed-v1'))).toBe('3')
+    expect(await page.evaluate(() => localStorage.getItem('pica-onboarding-state-v1'))).toBeNull()
+    await page.reload(); await expect(page.locator('#pica-onboarding-welcome')).toHaveCount(0)
 })
+
+test('old v2 completion is respected and both replays remain available', async ({ page }) => {
+    await boot(page, 'zh-CN', { completedVersion: 2, autoShow: false })
+    await page.locator('nav [data-view="maintenance"]').click()
+    await expect(page.locator('#a89-onboarding-replay')).toBeVisible()
+    await expect(page.locator('#a89-onboarding-auto')).not.toBeChecked()
+    await page.locator('#a89-onboarding-advanced').click()
+    await expect(page.locator('#pica-advanced-guide')).toBeVisible()
+    await expect(page.locator('[data-guide-chapter]')).toHaveCount(7)
+    await expect(page.locator('#pica-onboarding-welcome')).toHaveCount(0)
+})
+
+test('daily is short, never enters advanced controls or writes, and restores the original view', async ({ page }) => {
+    const evidence = await boot(page)
+    await expect(page.locator('#pica-onboarding-welcome')).toBeVisible()
+    const originalView = await page.locator('section.view.active').getAttribute('id')
+    await page.locator('#pica-onboarding-start').click()
+    for (const step of guideCatalog(zh => zh).daily) {
+        await expect(page.locator('.driver-popover-title')).toHaveText(step.title)
+        await expect(page.locator('#' + step.view)).toHaveClass(/\bactive\b/)
+        await expect(page.locator(step.selector)).toBeVisible()
+        await next(page)
+    }
+    await expect(page.locator('.driver-popover-title')).toHaveText('日常入门完成'); await next(page)
+    await expect(page.locator('body')).not.toHaveClass(/driver-active/)
+    await expect(page.locator('#' + originalView)).toHaveClass(/\bactive\b/)
+    const state = await page.evaluate(() => window.picaOnboarding.state())
+    expect(state.daily.completedVersion).toBe(3)
+    expect(Object.values(state.chapters).every(p => p.completedVersion === 0)).toBe(true)
+    expect(evidence.writes).toEqual([]); expect(evidence.errors).toEqual([])
+    await page.reload(); await expect(page.locator('#pica-onboarding-welcome')).toHaveCount(0)
+})
+
+test('advanced chapters locate their owners, complete independently and make no writes', async ({ page }) => {
+    test.setTimeout(90_000)
+    const evidence = await boot(page, 'zh-CN', { completedVersion: 2, autoShow: false })
+    for (const chapter of guideCatalog(zh => zh).chapters) {
+        await page.evaluate(() => window.picaOnboarding.advanced())
+        await page.locator(`[data-guide-chapter="${chapter.id}"]`).click()
+        for (const step of chapter.steps) {
+            await expect(page.locator('.driver-popover-title')).toHaveText(step.title)
+            await expect(page.locator('#' + step.view)).toHaveClass(/\bactive\b/)
+            if (step.panel) await expect(page.locator('#a87-' + step.panel + '-panel')).toBeVisible()
+            await expect(page.locator(step.selector)).toBeVisible()
+            await next(page)
+        }
+        await expect(page.locator('.driver-popover-title')).toHaveText('本章已读'); await next(page)
+        await expect(page.locator('body')).not.toHaveClass(/driver-active/)
+        expect(await page.evaluate(id => window.picaOnboarding.state().chapters[id].completedVersion, chapter.id)).toBe(3)
+    }
+    expect(evidence.writes).toEqual([]); expect(evidence.errors).toEqual([])
+})
+
+test('skip preserves position across reload; advanced never dismisses daily', async ({ page }) => {
+    await boot(page)
+    await expect(page.locator('#pica-onboarding-welcome')).toBeVisible()
+    await page.locator('#pica-onboarding-advanced').click(); await page.locator('[data-guide-chapter="preferences"]').click()
+    await next(page)
+    const title = await page.locator('.driver-popover-title').textContent(); await skip(page)
+    const state = await page.evaluate(() => window.picaOnboarding.state())
+    expect(state.daily.completedVersion).toBe(0); expect(state.daily.dismissedVersion).toBe(0)
+    expect(state.chapters.preferences.position).toBe(1); expect(state.chapters.preferences.completedVersion).toBe(0)
+    await page.reload(); await page.evaluate(() => window.picaOnboarding.advanced())
+    await page.locator('[data-guide-chapter="preferences"]').click()
+    await expect(page.locator('.driver-popover-title')).toHaveText(title); await skip(page)
+})
+
+for (const [language, start] of [['zh-CN','日常使用入门'], ['en','Daily-use tour'], ['ja','日常操作ガイド']]) {
+    test(`both guides are localized and fit a narrow viewport in ${language}`, async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 })
+        const evidence = await boot(page, language)
+        await expect(page.locator('#pica-onboarding-welcome')).toBeVisible()
+        await expect(page.locator('#pica-onboarding-start')).toHaveText(start)
+        await page.locator('#pica-onboarding-advanced').click(); await expect(page.locator('#pica-advanced-guide')).toBeVisible()
+        const box = await page.locator('#pica-advanced-guide').boundingBox()
+        expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(390)
+        await page.screenshot({ path: `${process.env.PICA_WEB_EVIDENCE_DIR || '_validation/ux-dual-onboarding-20261022'}/advanced-${language}.png` })
+        expect(evidence.errors).toEqual([])
+    })
+}

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Pica } from '../../src/sdk'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const roots: string[] = []
 
@@ -22,7 +23,7 @@ function fixture() {
     const provider = {
         fetchImage
     } as unknown as Pica
-    const service = new LibraryService(database, root, provider)
+    const service = new LibraryService(database, root, provider, undefined, undefined, enabledFixtureSources())
     return { root, database, service, fetchImage }
 }
 

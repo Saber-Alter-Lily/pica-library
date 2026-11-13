@@ -1,16 +1,33 @@
 param(
     [Parameter(Mandatory = $true)][string]$RcVersion,
-    [string]$Output = ''
+    [string]$Output = '',
+    [switch]$PostStable,
+    [string]$SourceRuntimes = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'lib/source-runtime-build.ps1')
+$picaRuntimeMode = Resolve-PicaSourceRuntimeMode -Requested $SourceRuntimes -RequireJm $env:PICA_REQUIRE_JM_RUNTIME
 $packageFile = Join-Path $root 'package.json'
 $stableVersion = [string]((Get-Content -Raw -LiteralPath $packageFile | ConvertFrom-Json).version)
-if ($stableVersion -ne '0.4.11') {
+$desktopHomeName = 'Pica Library P2 RC'
+$buildLabel = 'P2 RC'
+if ($PostStable) {
+    if ($stableVersion -notmatch '^\d+\.\d+\.\d+$') {
+        throw 'Post-stable RC requires unchanged stable repository metadata'
+    }
+    $expectedPattern = '^' + [regex]::Escape($stableVersion) + '-postrc\.[0-9a-f]{12}$'
+    if ($RcVersion -notmatch $expectedPattern) { throw 'Post-stable RC version does not match the repository baseline' }
+    if ($env:PICA_WINDOWS_LAUNCHER_BASE_VERSION -ne $stableVersion -or $env:PICA_WINDOWS_LAUNCHER_BASE_SHA256 -notmatch '^[0-9a-f]{64}$') {
+        throw 'Post-stable RC requires a checksum-pinned released launcher baseline matching the repository version'
+    }
+    $desktopHomeName = 'Pica Library Post Stable RC'
+    $buildLabel = 'POST-STABLE RC'
+} elseif ($stableVersion -ne '0.4.11') {
     throw "P2 RC builder requires repository stable metadata 0.4.11; observed $stableVersion"
 }
-if ($RcVersion -notmatch '^0\.4\.11-p2rc\.[0-9a-f]{7,12}$') {
+if (-not $PostStable -and $RcVersion -notmatch '^0\.4\.11-p2rc\.[0-9a-f]{7,12}$') {
     throw "RC version must match 0.4.11-p2rc.<commit>: $RcVersion"
 }
 
@@ -26,29 +43,53 @@ if ($gitSourceSha -notmatch '^[0-9a-f]{40}$') {
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') {
     throw 'Build provenance must be exactly 40 lowercase hex characters'
 }
-
-$requiredBase = Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.10-windows-x64.zip'
-if (-not (Test-Path -LiteralPath $requiredBase)) {
-    throw 'Official v0.4.10 Windows package is required under artifacts\release-base before building the P2 RC'
+if ($PostStable -and ($sourceSha -ne $gitSourceSha -or -not $RcVersion.EndsWith($sourceSha.Substring(0,12)))) {
+    throw 'Post-stable RC identity must match the exact checked-out commit'
 }
 
+$requiredBase = if ($PostStable) {
+    Join-Path $root "artifacts\release-base\Pica-Library-v$stableVersion-windows-x64.zip"
+} else {
+    Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.10-windows-x64.zip'
+}
+if (-not (Test-Path -LiteralPath $requiredBase)) {
+    throw "The checksum-pinned released Windows baseline is required: $requiredBase"
+}
+
+# The accepted-launcher hash lock protects *reuse of the released launcher*.
+# Post-stable RC performs a full, isolated replacement and compiles a separate
+# RC launcher below. Reusing the old stable launcher here would wrongly fail
+# after a legitimate launcher source change. Keep the official checksum-pinned
+# baseline validation above, and restore both build environment pins afterwards.
+$originalLauncherPinVersion = $env:PICA_WINDOWS_LAUNCHER_BASE_VERSION
+$originalLauncherPinHash = $env:PICA_WINDOWS_LAUNCHER_BASE_SHA256
 Push-Location $root
 try {
-    & (Join-Path $root 'scripts\build-windows-package.ps1')
+    if ($PostStable) {
+        Remove-Item Env:PICA_WINDOWS_LAUNCHER_BASE_VERSION -ErrorAction SilentlyContinue
+        Remove-Item Env:PICA_WINDOWS_LAUNCHER_BASE_SHA256 -ErrorAction SilentlyContinue
+    }
+    & (Join-Path $root 'scripts\build-windows-package.ps1') -SourceRuntimes $picaRuntimeMode
     if ($LASTEXITCODE -ne 0) {
-        throw 'Stable package assembly failed before RC repackaging'
+        throw 'Full-install RC staging failed before isolated RC repackaging'
     }
 } finally {
+    if ($PostStable) {
+        $env:PICA_WINDOWS_LAUNCHER_BASE_VERSION = $originalLauncherPinVersion
+        $env:PICA_WINDOWS_LAUNCHER_BASE_SHA256 = $originalLauncherPinHash
+    }
     Pop-Location
 }
 
-$stableZip = Join-Path $root 'artifacts\Pica-Library-v0.4.11-windows-x64.zip'
+$stableStem = Get-PicaWindowsPackageStem -Version $stableVersion -SourceRuntimes $picaRuntimeMode
+$stableZip = Join-Path $root "artifacts\$stableStem.zip"
 if (-not (Test-Path -LiteralPath $stableZip)) {
-    throw 'Stable package assembly did not produce the expected v0.4.11 ZIP'
+    throw 'Stable-layout package assembly did not produce the expected ZIP'
 }
 
 if ([string]::IsNullOrWhiteSpace($Output)) {
-    $Output = Join-Path $root "artifacts\Pica-Library-v$RcVersion-local-test-windows-x64.zip"
+    $runtimeSuffix = if ($picaRuntimeMode -eq 'jm') { '-with-jm' } else { '' }
+    $Output = Join-Path $root "artifacts\Pica-Library-v$RcVersion-local-test$runtimeSuffix-windows-x64.zip"
 } elseif (-not [IO.Path]::IsPathRooted($Output)) {
     $Output = Join-Path $root $Output
 }
@@ -99,21 +140,15 @@ try {
     Copy-Item -Path (Join-Path $root 'dist\*.js') -Destination (Join-Path $extract 'app') -Force
     Copy-Item -LiteralPath (Join-Path $root 'dist\licenses\THIRD_PARTY_LICENSES.txt') -Destination (Join-Path $extract 'licenses\THIRD_PARTY_LICENSES.txt') -Force
 
-    $csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-    if (-not (Test-Path -LiteralPath $csc)) {
-        throw 'The Windows .NET Framework compiler is unavailable'
-    }
-    & $csc /nologo /target:winexe /optimize+ /platform:x64 /reference:System.Windows.Forms.dll "/out:$extract\Pica Library.exe" (Join-Path $root 'packaging\windows\RcLauncher.cs')
-    if ($LASTEXITCODE -ne 0) {
-        throw 'RC launcher compilation failed'
-    }
+    & (Join-Path $root 'scripts\build-windows-rc-launcher.ps1') -Output (Join-Path $extract 'Pica Library.exe') -PostStable:$PostStable
 
     $readme = @"
-Pica Library $RcVersion — UNPUBLISHED P2 RC
+Pica Library $RcVersion — UNPUBLISHED $buildLabel
 
 Manual QA only. This package is not a GitHub Release and is not connected to the stable update channel.
-Its launcher isolates all Desktop state under %LOCALAPPDATA%\Pica Library P2 RC.
+Its launcher isolates all Desktop state under %LOCALAPPDATA%\$desktopHomeName.
 It does not read or migrate the normal %LOCALAPPDATA%\Pica Library data root.
+Post-stable RC builds also do not read or migrate historical Pica Library P2 RC data.
 
 1. Extract the entire ZIP.
 2. Double-click Pica Library.exe.
@@ -122,6 +157,8 @@ It does not read or migrate the normal %LOCALAPPDATA%\Pica Library data root.
 
 No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
 This unsigned build may show a Windows SmartScreen reputation warning.
+Source runtime composition: $picaRuntimeMode. This does not enable or sign in to a source.
+Local reading requires no Java or external account. Optional runtimes update with the application.
 "@
     [IO.File]::WriteAllText(
         (Join-Path $extract 'README-WINDOWS.txt'),
@@ -130,11 +167,12 @@ This unsigned build may show a Windows SmartScreen reputation warning.
     )
 
     $readmeZh = @"
-Pica Library $RcVersion — 未发布 P2 RC
+Pica Library $RcVersion — 未发布 $buildLabel
 
 仅用于手工测试。此包不是 GitHub Release，也不会进入稳定更新通道。
-启动器会把全部 Desktop 数据隔离到 %LOCALAPPDATA%\Pica Library P2 RC。
+启动器会把全部 Desktop 数据隔离到 %LOCALAPPDATA%\$desktopHomeName。
 它不会读取或迁移正式版 %LOCALAPPDATA%\Pica Library 数据目录。
+Post-stable RC 也不会读取或迁移历史 Pica Library P2 RC 测试数据。
 
 1. 完整解压 ZIP。
 2. 双击 Pica Library.exe。
@@ -143,6 +181,8 @@ Pica Library $RcVersion — 未发布 P2 RC
 
 无需另行安装 Node.js、npm、pnpm、Git，也不需要管理员权限。
 未签名构建可能触发 Windows SmartScreen 提示。
+来源运行时组成：$picaRuntimeMode；这不代表来源已启用或已登录。
+本地阅读不需要 Java 或外部账号；可选运行时随整个应用更新。
 "@
     [IO.File]::WriteAllText(
         (Join-Path $extract 'README-WINDOWS.zh-CN.txt'),
@@ -151,11 +191,11 @@ Pica Library $RcVersion — 未发布 P2 RC
     )
 
     @"
-UNPUBLISHED P2 RC
+UNPUBLISHED $buildLabel
 Version: $RcVersion
 Source SHA: $sourceSha
-Stable channel: v0.4.11
-Desktop home: %LOCALAPPDATA%\Pica Library P2 RC
+Stable channel: v$stableVersion (unchanged)
+Desktop home: %LOCALAPPDATA%\$desktopHomeName
 Stable data root is intentionally isolated.
 "@ | Set-Content -Encoding utf8 -LiteralPath (Join-Path $extract 'TEST_BUILD.txt')
 
@@ -204,7 +244,8 @@ Stable data root is intentionally isolated.
         source_sha = $sourceSha
         stable_repository_version = $stableVersion
         unpublished_rc = $true
-        desktop_home = '%LOCALAPPDATA%\Pica Library P2 RC'
+        desktop_home = "%LOCALAPPDATA%\$desktopHomeName"
+        source_runtimes = $picaRuntimeMode
     } | ConvertTo-Json
 
     $success = $true

@@ -9,6 +9,15 @@ public class CoverRepositoryPolicyTest {
 
     @Test public void sameComicMetadataKeepsStableCoverIdentity() throws Exception {UnifiedCatalogStore.Entry entry=new UnifiedCatalogStore.Entry("comic","Title","Author");entry.desktopCoverPath="/mobile/v1/covers/comic";entry.updatedAt="2026-09-09T00:00:00Z";assertEquals(key(entry),key(entry));}
 
+    @Test public void reusedCardRejectsOldCoverFromSameComic(){
+        UnifiedCatalogStore.Entry first=new UnifiedCatalogStore.Entry("comic","Title","Author");
+        first.remoteCoverPath="v1/cover.jpg";
+        UnifiedCatalogStore.Entry newer=new UnifiedCatalogStore.Entry("comic","Title","Author");
+        newer.remoteCoverPath="v2/cover.webp";
+        assertNotEquals(CoverRepository.bindingTag(first),CoverRepository.bindingTag(newer));
+        assertEquals("",CoverRepository.bindingTag(null));
+    }
+
     @Test public void providerCoverPathChangeInvalidatesIdentity() throws Exception {UnifiedCatalogStore.Entry before=new UnifiedCatalogStore.Entry("comic","Title","Author");before.remoteCoverPath="v1/comics/comic/cover.jpg";before.updatedAt="2026-09-09T00:00:00Z";UnifiedCatalogStore.Entry after=new UnifiedCatalogStore.Entry("comic","Title","Author");after.remoteCoverPath="v1/comics/comic/cover.webp";after.updatedAt=before.updatedAt;assertNotEquals(key(before),key(after));}
 
     @Test public void catalogRevisionInvalidatesStablePath() throws Exception {UnifiedCatalogStore.Entry before=new UnifiedCatalogStore.Entry("comic","Title","Author");before.desktopCoverPath="/mobile/v1/covers/comic";before.updatedAt="2026-09-09T00:00:00Z";UnifiedCatalogStore.Entry after=new UnifiedCatalogStore.Entry("comic","Title","Author");after.desktopCoverPath=before.desktopCoverPath;after.updatedAt="2026-09-10T00:00:00Z";assertNotEquals(key(before),key(after));}

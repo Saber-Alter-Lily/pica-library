@@ -1,4 +1,5 @@
 import type { StoredComic } from '../library/types'
+import { projectComicTagSignalsV1, tagControlParticipatesV1 } from '../tags/policy'
 import type { UserEvent } from '../recommendation-v3/types'
 import {
     buildBehaviorEvidenceLedgerV5,
@@ -346,6 +347,7 @@ export function buildPreferenceTimescalesV5(
     } = {}
 ) {
     const now = input.now ?? new Date()
+    catalog = catalog.map(comic => projectComicTagSignalsV1(comic, state))
     const catalogById = new Map(
         catalog.map((comic) => [
             normalizePreferenceKey(comic.comicId),
@@ -389,10 +391,10 @@ export function buildPreferenceTimescalesV5(
     }
 
     const persistentControls = state.controls.filter(
-        (control) => control.scope === 'PERSISTENT'
+        (control) => control.scope === 'PERSISTENT' && (control.direction === 'BLOCK' || !['TAG', 'FANDOM'].includes(control.targetType) || tagControlParticipatesV1(state, control.key))
     )
     const sessionControls = state.controls.filter(
-        (control) => control.scope === 'SESSION'
+        (control) => control.scope === 'SESSION' && (control.direction === 'BLOCK' || !['TAG', 'FANDOM'].includes(control.targetType) || tagControlParticipatesV1(state, control.key))
     )
     const blockControls = state.controls.filter(
         (control) => control.direction === 'BLOCK'

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 describe('P2 H2C Work Identity background runtime', () => {
     it('can cancel a detached evidence refresh before incomplete evidence is committed', async () => {
@@ -34,7 +35,7 @@ describe('P2 H2C Work Identity background runtime', () => {
             ],
             'test'
         )
-        const service = new LibraryService(database, dir)
+        const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
 
         const started =
             service.startRecommendationV5WorkIdentityEvidenceRefresh(500)

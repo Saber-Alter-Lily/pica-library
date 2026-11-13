@@ -95,31 +95,12 @@ then
 fi
 
 cp "$ROOT"/dist/*.js "$RESOURCES/app/"
+cp "$ROOT/src/modules/runtime-contracts.json" "$RESOURCES/app/module-contracts.json"
 cp "$ROOT/dist/licenses/THIRD_PARTY_LICENSES.txt" "$RESOURCES/licenses/THIRD_PARTY_LICENSES.txt"
 cp -R "$ROOT/web" "$RESOURCES/web"
 
-REGISTRY_SOURCE="$ROOT/src/data/registry-v3-final"
-REGISTRY_TARGET="$RESOURCES/src/data/registry-v3-final"
-REGISTRY_MIRROR="$RESOURCES/app/runtime-assets/registry-v3-final"
-mkdir -p "$REGISTRY_TARGET" "$REGISTRY_MIRROR"
-cp -R "$REGISTRY_SOURCE"/. "$REGISTRY_TARGET/"
-cp -R "$REGISTRY_SOURCE"/. "$REGISTRY_MIRROR/"
-
-REGISTRY_MANIFEST="$REGISTRY_TARGET/PICA_REGISTRY_V3_FINAL_MANIFEST.json"
-if [[ ! -f "$REGISTRY_MANIFEST" ]]; then
-  echo "Registry V3 runtime manifest is missing" >&2
-  exit 1
-fi
-RUNTIME_SEMANTIC_FILE="$(
-  "$RESOURCES/runtime/bin/node" -e     "const fs=require('fs');const m=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(String(m.runtime_semantic_file||''));"     "$REGISTRY_MANIFEST"
-)"
-for asset in   "PICA_REGISTRY_V3_FINAL_MANIFEST.json"   "$RUNTIME_SEMANTIC_FILE"   "PICA_ENTITY_REGISTRY_V3_FINAL.csv"   "PICA_TAG_ALIAS_MAP_V3_FINAL.json"   "PICA_TAG_UNRESOLVED_V3_FINAL_WATCHLIST.csv"   "PICA_TAG_LIBRARY_V2_REVIEWED.csv"   "PICA_TAG_ALIAS_MAP_V2.json"
-do
-  if [[ -z "$asset" || ! -f "$REGISTRY_TARGET/$asset" || ! -f "$REGISTRY_MIRROR/$asset" ]]; then
-    echo "Required Registry V3 runtime asset is missing: $asset" >&2
-    exit 1
-  fi
-done
+# One exact allowlist for every platform; reviewed examples are not runtime assets.
+(cd "$ROOT" && pnpm exec tsx scripts/stage-tag-runtime.ts "$RESOURCES")
 
 cp "$ROOT/LICENSE" "$RESOURCES/LICENSE"
 for notice in NOTICE.md UPSTREAM.md DISCLAIMER.md; do
@@ -214,7 +195,7 @@ cat > "$RESOURCES/PLATFORM_REQUIREMENTS.json" <<EOF
 EOF
 
 # Keep the existing CLI/debug surface without duplicating the canonical app payload.
-for item in app runtime web src licenses LICENSE NOTICE.md UPSTREAM.md DISCLAIMER.md SOURCE_SHA.txt PLATFORM_REQUIREMENTS.json; do
+for item in app runtime web licenses LICENSE NOTICE.md UPSTREAM.md DISCLAIMER.md SOURCE_SHA.txt PLATFORM_REQUIREMENTS.json; do
   ln -s "Pica Library.app/Contents/Resources/$item" "$STAGE/$item"
 done
 

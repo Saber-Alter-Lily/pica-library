@@ -52,6 +52,7 @@ public class PairingActivity extends LocaleAwareActivity {
         Ui.gap(root,this,14);
 
         scanButton=Ui.button(this,"扫一扫连接",v->scanPairingCode(),false);
+        scanButton.setTag(AndroidOnboarding.ADV_PAIR_SCAN);
         root.addView(scanButton);
         Ui.gap(root,this,18);
 
@@ -74,6 +75,7 @@ public class PairingActivity extends LocaleAwareActivity {
 
         Ui.gap(root,this,10);
         pairButton=Ui.button(this,"连接电脑",v->pair(),false);
+        pairButton.setTag(AndroidOnboarding.ADV_PAIR_MANUAL);
         root.addView(pairButton);
 
         status=Ui.text(this,"",13,Ui.MUTED,false);

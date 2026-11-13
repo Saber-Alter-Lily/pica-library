@@ -25,7 +25,7 @@ describe('P2 J8 controlled active-download latency harness', () => {
             'scripts/benchmark/desktop-download-load-harness.ts',
             'utf8'
         )
-        expect(j8).toContain('new LibraryService(database, root, provider)')
+        expect(j8).toContain('new LibraryService(database, root, provider, undefined, undefined, enabledFixtureSources())')
         expect(j8).toContain("service.enqueueDownload({ comicId: 'j8-load-comic' })")
         expect(j8).toContain('service.startLocalDownloadQueue({')
         expect(j8).toContain('globalMediaConcurrency: 1')

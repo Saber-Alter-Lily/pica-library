@@ -1,9 +1,35 @@
 import { createHash } from 'node:crypto'
 import pLimit from 'p-limit'
-import type { LibraryDatabase } from '../library/database'
 import type { Episode, Picture } from '../types'
-import type { ProviderService } from './provider-service'
-import type { PreviewCacheManager } from './preview-cache-manager'
+import { orderReaderProgress } from '../reader/progress-writes'
+
+export interface OnlineReaderState {
+    getAppState<T>(key: string): T | undefined
+    setAppState(key: string, value: unknown): void
+}
+export interface OnlineReaderCache {
+    get(key: string, fingerprint?: string): { data: Buffer; contentType: string } | null
+    put(key: string, data: Buffer, contentType: string, fingerprint?: string): unknown
+}
+export interface OnlineReaderSource {
+    cacheScope(comicId: string): string
+    prepareSource?(comicId: string): Promise<void>
+    getEpisodes(comicId: string): Promise<Episode[]>
+    getEpisodePages(comicId: string, episode: Episode): Promise<Picture[]>
+    fetchPage(locator: string): Promise<{ data: Buffer; contentType: string }>
+    /** Optional work-owned page boundary for adapters that know the comic identity. */
+    assertPageOwnedByComic?(comicId: string, locator: string): void
+    fetchPageForComic?(comicId: string, locator: string): Promise<{ data: Buffer; contentType: string }>
+}
+
+/** Application-owned ports, never accepted from a browser or a remote source descriptor. */
+export interface OnlineReaderContract {
+    comicId(value: string): string
+    episodeId(value: string): string
+    pageUrl(comicId: string, episodeId: string, index: number): string
+    progressKey: string
+    assertAccess(): void
+}
 
 /** Online metadata and bounded page cache; never creates a download job. */
 export class OnlineReaderService {
@@ -19,36 +45,47 @@ export class OnlineReaderService {
     private readonly imageLimit = pLimit(4)
 
     constructor(
-        private readonly database: LibraryDatabase,
-        private readonly provider: Pick<
-            ProviderService,
-            'getEpisodes' | 'getEpisodePages' | 'fetchPage' | 'cacheScope'
-        >,
-        private readonly cache: PreviewCacheManager
+        private readonly database: OnlineReaderState,
+        private readonly provider: OnlineReaderSource,
+        private readonly cache: OnlineReaderCache,
+        private readonly contract?: OnlineReaderContract
     ) {}
 
     private comicId(value: string) {
+        if (this.contract) return this.contract.comicId(value)
         if (
             !/^[a-zA-Z0-9_-]{1,128}$/.test(value) &&
-            !/^eh:\d+:[0-9a-f]{10}$/i.test(value)
+            !/^eh:\d+:[0-9a-f]{10}$/i.test(value) &&
+            !/^jm:[1-9]\d{0,14}$/.test(value)
         )
             throw new Error('无效的漫画标识')
         return value
     }
 
     private episodeId(value: string) {
-        if (!/^[a-zA-Z0-9_-]{1,128}$/.test(value))
+        if (this.contract) return this.contract.episodeId(value)
+        if (!/^[a-zA-Z0-9_-]{1,128}$/.test(value) && !/^jm-chapter:[1-9]\d{0,14}$/.test(value))
             throw new Error('无效的章节标识')
         return value
     }
 
+    private scope(comicId: string) {
+        this.contract?.assertAccess()
+        return this.provider.cacheScope(comicId)
+    }
+    private current(comicId: string, scope: string) {
+        if (this.scope(comicId) !== scope) throw new Error('Reader source session changed')
+    }
+
     async chapters(comicId: string) {
         this.comicId(comicId)
-        const scope = this.provider.cacheScope(comicId)
+        await this.provider.prepareSource?.(comicId)
+        const scope = this.scope(comicId)
         const albumKey = `${scope}\n${comicId}`
         let episodes = this.albums.get(albumKey)
         if (!episodes) {
             episodes = await this.provider.getEpisodes(comicId)
+            this.current(comicId, scope)
             episodes = episodes.map((episode) => ({
                 ...episode,
                 id: this.episodeId(episode.id || episode._id || '')
@@ -68,12 +105,12 @@ export class OnlineReaderService {
     private async metadata(comicId: string, episodeId: string) {
         this.comicId(comicId)
         this.episodeId(episodeId)
-        const scope = this.provider.cacheScope(comicId)
+        await this.chapters(comicId)
+        const scope = this.scope(comicId)
         const albumKey = `${scope}\n${comicId}`
         const key = `${scope}\n${comicId}\n${episodeId}`
         let value = this.chaptersCache.get(key)
         if (!value) {
-            await this.chapters(comicId)
             const episode = this.albums
                 .get(albumKey)
                 ?.find((entry) => entry.id === episodeId)
@@ -82,6 +119,7 @@ export class OnlineReaderService {
                 comicId,
                 episode
             )
+            this.current(comicId, scope)
             if (pictures.length > 10000)
                 throw new Error('章节过大，暂不支持在线阅读')
             value = { episode, pictures }
@@ -95,7 +133,10 @@ export class OnlineReaderService {
     }
 
     async chapter(comicId: string, episodeId: string) {
+        this.comicId(comicId); this.episodeId(episodeId)
+        const scope = this.scope(comicId)
         const { episode, pictures } = await this.metadata(comicId, episodeId)
+        this.current(comicId, scope)
         return {
             source: 'provider',
             episode: { id: episode.id, title: episode.title },
@@ -105,23 +146,32 @@ export class OnlineReaderService {
             ),
             pages: pictures.map((_, index) => ({
                 index,
-                url: `/api/v1/online-reader/comics/${encodeURIComponent(comicId)}/chapters/${encodeURIComponent(episodeId)}/pages/${index}`
+                url: this.contract?.pageUrl(comicId, episodeId, index) ?? `/api/v1/online-reader/comics/${encodeURIComponent(comicId)}/chapters/${encodeURIComponent(episodeId)}/pages/${index}`
             }))
         }
     }
 
     async picture(comicId: string, episodeId: string, index: number) {
+        this.comicId(comicId); this.episodeId(episodeId)
+        const scope = this.scope(comicId)
         const { pictures } = await this.metadata(comicId, episodeId)
+        this.current(comicId, scope)
         if (
             !Number.isSafeInteger(index) ||
             index < 0 ||
             index >= pictures.length
         )
             throw new Error('阅读页码无效')
+        // New work-owned transport must also provide a synchronous ownership
+        // validator; otherwise a cache hit would bypass the stronger transport.
+        if (this.provider.fetchPageForComic && !this.provider.assertPageOwnedByComic)
+            throw new Error('Source-owned page transport requires an ownership validator')
+        // Check even when a cache entry already exists: foreign-source pages fail closed.
+        this.provider.assertPageOwnedByComic?.(comicId, pictures[index].url)
         const key = `${comicId}:${episodeId}:${index}`
         const sourceFingerprint = createHash('sha256')
             .update(
-                `${this.provider.cacheScope(comicId)}\n${pictures[index].url}`
+                `${scope}\n${pictures[index].url}`
             )
             .digest('hex')
         const cached = this.cache.get(key, sourceFingerprint)
@@ -130,7 +180,11 @@ export class OnlineReaderService {
         const pending = this.pendingImages.get(pendingKey)
         if (pending) return pending
         const request = this.imageLimit(async () => {
-            const image = await this.provider.fetchPage(pictures[index].url)
+            this.current(comicId, scope)
+            const image = this.provider.fetchPageForComic
+                ? await this.provider.fetchPageForComic(comicId, pictures[index].url)
+                : await this.provider.fetchPage(pictures[index].url)
+            this.current(comicId, scope)
             this.cache.put(
                 key,
                 image.data,
@@ -148,33 +202,43 @@ export class OnlineReaderService {
     }
 
     async saveProgress(comicId: string, episodeId: string, index: number) {
-        const { pictures } = await this.metadata(comicId, episodeId)
-        if (
-            !Number.isSafeInteger(index) ||
-            index < 0 ||
-            index >= pictures.length
-        )
-            throw new Error('阅读页码无效')
-        const value = {
-            comicId,
-            episodeId,
-            pageIndex: index,
-            updatedAt: new Date().toISOString()
-        }
-        this.database.setAppState(
-            'online-reader-progress-v1',
-            [
-                value,
-                ...this.recentProgress().filter(
-                    (item) =>
-                        item.comicId !== comicId || item.episodeId !== episodeId
+        this.comicId(comicId); this.episodeId(episodeId)
+        const scope = this.scope(comicId)
+        return orderReaderProgress(
+            this.database,
+            this.contract?.progressKey ?? 'online-reader-progress-v1',
+            async () => {
+                this.current(comicId, scope)
+                const { pictures } = await this.metadata(comicId, episodeId)
+                this.current(comicId, scope)
+                if (
+                    !Number.isSafeInteger(index) ||
+                    index < 0 ||
+                    index >= pictures.length
                 )
-            ].slice(0, 100)
+                    throw new Error('阅读页码无效')
+                const value = {
+                    comicId,
+                    episodeId,
+                    pageIndex: index,
+                    updatedAt: new Date().toISOString()
+                }
+                this.database.setAppState(
+                    this.contract?.progressKey ?? 'online-reader-progress-v1',
+                    [
+                        value,
+                        ...this.recentProgress().filter(
+                            (item) => item.comicId !== comicId || item.episodeId !== episodeId
+                        )
+                    ].slice(0, 100)
+                )
+                return value
+            }
         )
-        return value
     }
 
     recentProgress() {
+        this.contract?.assertAccess()
         return (
             this.database.getAppState<
                 Array<{
@@ -183,7 +247,7 @@ export class OnlineReaderService {
                     pageIndex: number
                     updatedAt: string
                 }>
-            >('online-reader-progress-v1') ?? []
+            >(this.contract?.progressKey ?? 'online-reader-progress-v1') ?? []
         )
     }
 }

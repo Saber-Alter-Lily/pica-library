@@ -1,0 +1,145 @@
+name: R4 Public v0.5.0 Android same-signer in-place QA (unpublished)
+
+on:
+  push:
+    branches: [codex/product-integration-r1-20261102]
+    paths:
+      - '.github/workflows/r4-v050-android-signed-inplace-qa.yml'
+      - 'scripts/ci/install-gradle-8.9-fallback.sh'
+      - 'scripts/r4-v050-android-signed-inplace-flow.py'
+      - 'scripts/s3-android-local-emulator-flow.py'
+      - 'scripts/verify-android-clean-source-apk.py'
+      - 'mobile/android-alpha2/app/build.gradle'
+      - 'mobile/android-alpha2/app/proguard-clean-source-qa.pro'
+      - 'mobile/android-alpha2/app/src/cleanSourceQa/**'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SignedSourceLauncher.java'
+      - 'mobile/android-alpha2/user-host-app/src/main/AndroidManifest.xml'
+      - 'mobile/android-alpha2/user-host-app/src/main/java/com/picalibrary/android/HostBrowserActivity.java'
+      - 'mobile/android-alpha2/user-host-app/build.gradle'
+      - 'mobile/android-alpha2/signed-reader/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r4-public-v050-android-g3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public-v050-signed-inplace:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - id: gradle_setup
+        uses: gradle/actions/setup-gradle@v4
+        continue-on-error: true
+        with:
+          gradle-version: '8.9'
+      - name: Recover pinned Gradle 8.9 from official CDN on distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
+
+      - name: Pin released original v0.5.0 APK bytes, package and public certificate
+        run: |
+          set -euo pipefail
+          old="$RUNNER_TEMP/pica-public-v050-v55.apk"
+          curl --fail --location --retry 2 --retry-delay 3 --max-time 120 \
+            'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.0/Pica-Library-Android-v55.apk' \
+            --output "$old"
+          printf '%s  %s\n' '0bfe382b9026b7942309ac5a1e7cfefc676c0ea3e4e85f288d15d33fead8f598' "$old" | sha256sum --check -
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$aapt" dump badging "$old" > "$RUNNER_TEMP/pica-v050-badging.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='55'" "$RUNNER_TEMP/pica-v050-badging.txt"
+          "$signer" verify --verbose --print-certs "$old" > "$RUNNER_TEMP/pica-v050-cert.txt"
+          baseline_cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-v050-cert.txt" | head -1 | tr A-F a-f)
+          test "$baseline_cert" = '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+          echo 'PASS: checksum-pinned real public Android 0.5.0 v55 production identity'
+
+      - name: Build same production-ID clean v56 with retained signing key for emulator only
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}" && test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-r4-g3-signing-XXXXXXXX")
+          trap 'rm -rf -- "$signing_dir"' EXIT
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+          export PICA_ANDROID_VERSION_CODE=56
+          export PICA_ANDROID_VERSION_NAME='0.5.0-r4-g3-qa'
+          gradle :app:assembleCleanProductionUpgradeQa :user-host-app:assembleDebug -PsourceNeutralQa=true --no-daemon --max-workers=2
+          apk=app/build/outputs/apk/cleanProductionUpgradeQa/app-cleanProductionUpgradeQa.apk
+          test -s "$apk"
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$aapt" dump badging "$apk" > "$RUNNER_TEMP/pica-r4-g3-badging.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='56'" "$RUNNER_TEMP/pica-r4-g3-badging.txt"
+          if grep -q '^application-debuggable' "$RUNNER_TEMP/pica-r4-g3-badging.txt"; then
+            echo 'A production-ID QA package must not be debuggable' >&2
+            exit 1
+          fi
+          "$signer" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/pica-r4-g3-cert.txt"
+          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-r4-g3-cert.txt" | head -1 | tr A-F a-f)
+          baseline_cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-v050-cert.txt" | head -1 | tr A-F a-f)
+          test -n "$cert" && test "$cert" = "$baseline_cert"
+          # Use the SAME disposable trusted signer, but never publish this
+          # optional Host or either QA APK as a production distribution.
+          host_apk=user-host-app/build/outputs/apk/debug/user-host-app-debug.apk
+          test -s "$host_apk"
+          "$aapt" dump badging "$host_apk" > "$RUNNER_TEMP/pica-r4-host-badging.txt"
+          grep -q "package: name='com.picalibrary.android.userhost.qa'" "$RUNNER_TEMP/pica-r4-host-badging.txt"
+          "$signer" verify --verbose --print-certs "$host_apk" > "$RUNNER_TEMP/pica-r4-host-cert.txt"
+          host_cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-r4-host-cert.txt" | head -1 | tr A-F a-f)
+          test -n "$host_cert" && test "$host_cert" = "$baseline_cert"
+          echo 'PASS: separately installed optional Host shares actual public v0.5.0 signing certificate'
+          python3 ../../scripts/verify-android-clean-source-apk.py "$apk" \
+            app/build/outputs/mapping/cleanProductionUpgradeQa/mapping.txt
+          echo 'PASS: temporary QA APK has REAL v0.5.0 production package identity, fixed signing certificate, no bundled providers and no debugging; independent Host has the matching signer'
+          # Neither QA APK nor the keystore is uploaded, released or served by OTA.
+
+      - name: Require actual hardware-accelerated Android 35 emulator
+        run: |
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+
+      - name: Public v0.5.0 user shelf -> verified in-place clean upgrade -> restart
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: default
+          profile: pixel_2
+          ram-size: 3072M
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          emulator-boot-timeout: 600
+          disable-linux-hw-accel: false
+          script: |
+            python3 -c 'import ast,pathlib; ast.parse(pathlib.Path("scripts/r4-v050-android-signed-inplace-flow.py").read_text(encoding="utf-8")); print("PASS: signed migration UI Python syntax")'
+            python3 scripts/r4-v050-android-signed-inplace-flow.py "$RUNNER_TEMP/pica-public-v050-v55.apk" mobile/android-alpha2/app/build/outputs/apk/cleanProductionUpgradeQa/app-cleanProductionUpgradeQa.apk
+
+      - name: Publish only synthetic UI, version and diagnostic evidence, never candidate APK or signing material
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: r4-public-v050-real-id-signed-emulator-${{ github.sha }}
+          path: mobile/android-alpha2/r4-v050-upgrade-evidence/
+          retention-days: 1
+          if-no-files-found: warn

@@ -95,7 +95,11 @@ final class RecommendationProgressPanel extends LinearLayout {
             if(infos==null||infos.isEmpty())return null;WorkInfo chosen=null;for(WorkInfo info:infos)if(!info.getState().isFinished())chosen=info;if(chosen==null)chosen=infos.get(infos.size()-1);
             WorkInfo.State ws=chosen.getState();Data data=ws.isFinished()?chosen.getOutputData():chosen.getProgress();String text=data.getString(NativeRecommendationWorker.KEY_PHASE);int done=data.getInt(NativeRecommendationWorker.KEY_DONE,0),total=data.getInt(NativeRecommendationWorker.KEY_TOTAL,0);
             if(ws==WorkInfo.State.RUNNING)return new State(true,false,false,text==null||text.isEmpty()?"正在生成推荐…":text,progressDetail(done,total),done,total);
-            if(ws==WorkInfo.State.ENQUEUED)return new State(true,false,false,"等待开始生成…","正在等待网络或系统调度。",0,0);
+            if(ws==WorkInfo.State.ENQUEUED)return new State(true,false,false,
+                LocalizedText.ui(context,"等待开始生成…","Queued for generation…","生成開始待ち…"),
+                BuildConfig.SOURCE_NEUTRAL_QA
+                    ?LocalizedText.ui(context,"等待系统调度；同步候选可离线生成。","Waiting for Android scheduling; synced candidates work offline.","システムの実行待ちです。同期済み候補はオフライン生成できます。")
+                    :LocalizedText.ui(context,"正在等待网络或系统调度。","Waiting for network or system scheduling.","ネットワークまたはシステムの実行待ちです。"),0,0);
             if(ws==WorkInfo.State.BLOCKED)return new State(true,false,false,"等待任务条件…","满足运行条件后会自动继续。",0,0);
             if(ws==WorkInfo.State.FAILED)return new State(false,true,false,"",text==null?"":text,done,total);
             if(ws==WorkInfo.State.SUCCEEDED)return new State(false,false,true,"",text==null?"":text,done,total);

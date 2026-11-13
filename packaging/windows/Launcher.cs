@@ -13,15 +13,39 @@ internal static class Launcher
         {
             string root = AppDomain.CurrentDomain.BaseDirectory;
             string runtime = Path.Combine(root, "runtime", "node.exe");
-            string entry = Path.Combine(root, "app", "desktop.js");
+            // No-source modes are opt-in and never fall back to legacy.
+            // Default launch remains the official provider-enabled Desktop.
+            bool sourceFreePreview = args.Length > 0 &&
+                String.Equals(args[0], "--source-free-preview", StringComparison.Ordinal);
+            bool sourceFreeLocal = args.Length > 0 &&
+                String.Equals(args[0], "--source-free-local", StringComparison.Ordinal);
+            bool optionalHost = args.Length > 0 &&
+                String.Equals(args[0], "--source-free-user-host", StringComparison.Ordinal);
+            bool optionalHostPreview = args.Length > 0 &&
+                String.Equals(args[0], "--source-free-host-preview", StringComparison.Ordinal);
+            if ((sourceFreeLocal || optionalHost) && args.Length != 1)
+                throw new ArgumentException("Local / optional Host mode accepts no extra arguments.");
+            if (optionalHostPreview && (args.Length != 4 ||
+                !String.Equals(args[1], "--owned-temp-root", StringComparison.Ordinal) ||
+                !String.Equals(args[3], "--explicit-preview-only", StringComparison.Ordinal)))
+                throw new ArgumentException("Optional Host preview requires explicit owned temporary root.");
+            string entry = Path.Combine(root, "app",
+                optionalHost || optionalHostPreview ? "desktop-core-host-preview.mjs" :
+                sourceFreePreview || sourceFreeLocal ? "desktop-core-preview.mjs" : "desktop.js");
             if (!File.Exists(runtime) || !File.Exists(entry))
                 throw new FileNotFoundException("The packaged runtime is incomplete. Extract the entire ZIP before starting Pica Library.");
 
-            var quoted = args.Select(Quote);
+            var forwarded = optionalHost
+                ? new[] { "--persistent-local-profile", "--explicit-user-host-preview" }
+                : optionalHostPreview ? args.Skip(1).Concat(
+                    new[] { "--explicit-user-host-preview" }).ToArray()
+                : sourceFreeLocal ? new[] { "--persistent-local-profile" }
+                : sourceFreePreview ? args.Skip(1).ToArray() : args;
+            var quoted = forwarded.Select(Quote);
             var info = new ProcessStartInfo
             {
                 FileName = runtime,
-                Arguments = Quote(entry) + (args.Length == 0 ? "" : " " + String.Join(" ", quoted)),
+                Arguments = Quote(entry) + (forwarded.Length == 0 ? "" : " " + String.Join(" ", quoted)),
                 WorkingDirectory = root,
                 UseShellExecute = false,
                 CreateNoWindow = true,

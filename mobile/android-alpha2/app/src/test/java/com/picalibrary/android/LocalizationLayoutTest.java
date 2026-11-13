@@ -45,6 +45,25 @@ public class LocalizationLayoutTest {
     @Test @Config(qualifiers = "w360dp-h900dp-mdpi")
     public void en360() { runScenario(LocaleStore.EN, 360); }
 
+
+    @Test @Config(qualifiers = "w393dp-h900dp-mdpi")
+    public void zhCn393() { runScenario(LocaleStore.ZH_CN, 393); }
+
+    @Test @Config(qualifiers = "w393dp-h900dp-mdpi")
+    public void ja393() { runScenario(LocaleStore.JA, 393); }
+
+    @Test @Config(qualifiers = "w393dp-h900dp-mdpi")
+    public void en393() { runScenario(LocaleStore.EN, 393); }
+
+    @Test @Config(qualifiers = "w480dp-h900dp-mdpi")
+    public void zhCn480() { runScenario(LocaleStore.ZH_CN, 480); }
+
+    @Test @Config(qualifiers = "w480dp-h900dp-mdpi")
+    public void ja480() { runScenario(LocaleStore.JA, 480); }
+
+    @Test @Config(qualifiers = "w480dp-h900dp-mdpi")
+    public void en480() { runScenario(LocaleStore.EN, 480); }
+
     @Test @Config(qualifiers = "w412dp-h900dp-mdpi")
     public void zhCn412() { runScenario(LocaleStore.ZH_CN, 412); }
 
@@ -79,10 +98,16 @@ public class LocalizationLayoutTest {
 
         checkActivity(RecommendationStyleActivity.class, new Intent(app, RecommendationStyleActivity.class),
                 widthDp, language + "/recommendation-settings");
+        checkActivity(LocalComicImportActivity.class, new Intent(app, LocalComicImportActivity.class),
+                widthDp, language + "/local-import");
+        checkActivity(LocalComicExportActivity.class, new Intent(app, LocalComicExportActivity.class),
+                widthDp, language + "/local-export");
         checkActivity(PairingActivity.class, new Intent(app, PairingActivity.class),
                 widthDp, language + "/pairing");
         checkActivity(OnboardingSettingsActivity.class, new Intent(app, OnboardingSettingsActivity.class),
                 widthDp, language + "/onboarding-settings");
+        checkActivity(AdvancedGuideActivity.class, new Intent(app, AdvancedGuideActivity.class),
+                widthDp, language + "/advanced-guide");
     }
 
     private <T extends Activity> void checkActivity(

@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { AuthorIdentity } from './types'
+import { normalizeDisplay, normalizeAuthorKey } from './author-normalization'
+export { normalizeDisplay, normalizeAuthorKey } from './author-normalization'
 
 const genericCreatorKeys = new Set([
     'よろず',
@@ -12,18 +14,6 @@ const genericCreatorKeys = new Set([
     'アンソロジー',
     'n/a'
 ])
-
-export function normalizeDisplay(value: unknown): string {
-    return String(value ?? '')
-        .normalize('NFKC')
-        .replace(/[\u200B-\u200D\uFEFF]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-}
-
-export function normalizeAuthorKey(value: unknown): string {
-    return normalizeDisplay(value).toLocaleLowerCase('und')
-}
 
 export function authorIdForKey(key: string): string {
     return `author_${createHash('sha1').update(key).digest('hex').slice(0, 16)}`

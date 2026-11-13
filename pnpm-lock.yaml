@@ -96,6 +96,9 @@ importers:
       mime:
         specifier: ^4.0.1
         version: 4.0.1
+      opencc-js:
+        specifier: 1.0.5
+        version: 1.0.5
       ora:
         specifier: ^8.0.1
         version: 8.0.1
@@ -1625,6 +1628,9 @@ packages:
   onetime@6.0.0:
     resolution: {integrity: sha512-1FlR+gjXK7X+AsAHso35MnyN5KqGwJRi/31ft6x0M194ht7S+rWAvd7PHss9xSKMzE0asv1pyIHaJYq+BbacAQ==}
     engines: {node: '>=12'}
+
+  opencc-js@1.0.5:
+    resolution: {integrity: sha512-LD+1SoNnZdlRwtYTjnQdFrSVCAaYpuDqL5CkmOaHOkKoKh7mFxUicLTRVNLU5C+Jmi1vXQ3QL4jWdgSaa4sKjg==}
 
   optionator@0.9.3:
     resolution: {integrity: sha512-JjCoypp+jKn1ttEFExxhetCKeJt9zhAgAve5FXHixTvFDW/5aEktX9bufBKLRRMdU7bNtpLfcGu94B3cdEJgjg==}
@@ -3536,6 +3542,8 @@ snapshots:
   onetime@6.0.0:
     dependencies:
       mimic-fn: 4.0.0
+
+  opencc-js@1.0.5: {}
 
   optionator@0.9.3:
     dependencies:

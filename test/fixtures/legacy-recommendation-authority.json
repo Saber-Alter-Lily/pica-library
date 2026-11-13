@@ -1,0 +1,112 @@
+{
+  "sourceSha": "3ce697566f379fef2dc566af9e91f3ee183c2d21",
+  "recommendationHelperTextSha256": "3dfe48757dd589f1f8a063bbce1cef8b965d7f9b94b5c4b00f7b25dd39d63d59",
+  "methods": [
+    {
+      "owner": "FrozenLegacyRecall",
+      "name": "preferenceViewState",
+      "sha256": "7f3e533c421da27244c1a8e083ddb6a69a91f80edb188f79e313c3d4851c1141"
+    },
+    {
+      "owner": "FrozenLegacyRecall",
+      "name": "recommendations",
+      "sha256": "86dcd9b1e939acbf2b7558df8d57f48a3b407b8d1e1901758c9ae9c213d8591f"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "state",
+      "sha256": "f1949e17a5607100852b6209d6edf3d942209bdd51d4cac681ac196599ee3579"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "saveState",
+      "sha256": "703176b484297e92b8504a6488b2ada095bee7897e2cc03919c8d5a55db8245e"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "response",
+      "sha256": "bb6b248e50b30f16d2065d4c01a1cd4f4e3739f4c80d9ebbce6d4ba9e9df1e72"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "generateSession",
+      "sha256": "812df3539894e1b014d49d64ca986508ada130cdc699050bd3e02b606a81b23b"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "ensureInitialPrepared",
+      "sha256": "21214e323c3619d48f460d894f57705450da661d02eb14ac29be4a6377284030"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "prewarmNextSession",
+      "sha256": "a0dd7d6b6ad28970aa99c3dda6af655b6c831e40af5abc1b9618ce2bd5b363ba"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "nextSession",
+      "sha256": "574aa3a5e3c03f1792f938c347769c95316de61538682469c3cd8a420affc956"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "advanceSession",
+      "sha256": "131cb27ac09f56583404b912c8d47372d82f0c3e720406a18b3d993dbdde1fca"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "recordBatch",
+      "sha256": "05629ba4886b8b92419762866697723d63df4f3176277ad8f622a7b1c0a8e004"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "restartCycle",
+      "sha256": "28fc5c3d7be030170e8c119cb9601c8526c2cb8e0854717a109b0f85a2e0cd45"
+    },
+    {
+      "owner": "RecommendationService",
+      "name": "currentState",
+      "sha256": "f94dfc04c191900a7de2d533d4866d212a3f0e93e8f0bfcfccf3fb60981bdaa3"
+    },
+    {
+      "owner": "AdaptiveRecommendationSession",
+      "name": "state",
+      "sha256": "ee35799044ffe1256094c0c0decfdc10aa56da4577b21faa0a48f97411517ead"
+    },
+    {
+      "owner": "AdaptiveRecommendationSession",
+      "name": "saveState",
+      "sha256": "53128a8f7ce6361c11000d8c933ad156dbcf0864d7ad863563ac8884597ecb22"
+    },
+    {
+      "owner": "AdaptiveRecommendationSession",
+      "name": "ensurePool",
+      "sha256": "6e482a1d28c7e93f8b22528fe79fedcc339ca8630d81981323d533ee62e11944"
+    },
+    {
+      "owner": "AdaptiveRecommendationSession",
+      "name": "nextBatch",
+      "sha256": "53e2254f4e63e628f1841531860a652863d0ff9e5df9cc283a4ea83e4a06c8e9"
+    },
+    {
+      "owner": "AdaptiveRecommendationSession",
+      "name": "restart",
+      "sha256": "6d4717edfbb5a46da268ea2b150c7792999dbe7b7f0556209b90ceac092b3f3d"
+    },
+    {
+      "owner": "AdaptiveRecommendationSession",
+      "name": "status",
+      "sha256": "9b3f936e35030dec42438ead96a96d97f140583f6c8ccc7de6034f682e80565f"
+    }
+  ],
+  "converterSha256": "0e8dbe25a434b0d4e50748a29df557b2ad125b859164f4852b122614ed6878b6",
+  "classes": [
+    {
+      "name": "RecommendationService",
+      "sha256": "cc62ea689c6d5726900239740ff0a9cd5b7db95b677473ada9e710e28dfdd177"
+    },
+    {
+      "name": "AdaptiveRecommendationSession",
+      "sha256": "643f4e9637b03479932d21d2294f789e03894b2ecf03e9a1741811d545274e76"
+    }
+  ]
+}

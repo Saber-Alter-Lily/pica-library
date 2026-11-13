@@ -38,6 +38,7 @@ public final class OnboardingSettingsActivity extends LocaleAwareActivity {
             startActivity(intent);
             finish();
         }));
+        content.addView(SettingsRow.row(this,getString(R.string.advanced_guide_title),getString(R.string.advanced_guide_summary),v->startActivity(new Intent(this,AdvancedGuideActivity.class))));
 
         CheckBox automatic=new CheckBox(this);
         automatic.setText(getString(R.string.onboarding_auto));

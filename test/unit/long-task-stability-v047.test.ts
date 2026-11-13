@@ -6,6 +6,16 @@ const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('v0.4.7 long-task stability contract', () => {
+    it('keeps current WorkManager tasks ahead of stale IDs while retaining failures and offline status', () => {
+        const center=read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/TaskCenterActivity.java')
+        expect(center).toContain('WorkInfo terminalFallback=null')
+        expect(center).toContain('if(active(value))return value')
+        expect(center).toContain('return terminalFallback;')
+        expect(center).toContain('rec.getState()==WorkInfo.State.ENQUEUED')
+        expect(center).toContain('同步候选可离线生成')
+        expect(center).toContain('WorkInfo.State.FAILED||rec.getState()==WorkInfo.State.CANCELLED')
+    })
+
     it('makes Desktop recommendation generation observable and controllable', () => {
         const service = read('src/library/service.ts')
         const server = read('src/library/server.ts')
@@ -25,7 +35,7 @@ describe('v0.4.7 long-task stability contract', () => {
     it('bounds provider failures and preserves the last usable recommendation cycle', () => {
         const sdk = read('src/sdk.ts')
         const retriever = read('src/recommendation-v3/retriever-v3.ts')
-        const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')
+        const coordinator = read('src/recommendation/cycle-commands.ts')
         expect(sdk).toContain('const PICA_API_TIMEOUT_MS = 15000')
         expect(retriever).toContain("stoppedBy = 'PROVIDER_FAILURE_BUDGET'")
         expect(retriever).toContain('consecutiveProviderFailures >= 3')

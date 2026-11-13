@@ -6,6 +6,16 @@ const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('Android independent recommendation runtime and sync UI', () => {
+    it('schedules clean portable batches offline without claiming provider network use', () => {
+        const jobs=read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationJobs.java')
+        const engine=read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java')
+        const progress=read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationProgressPanel.java')
+        expect(jobs).toContain('localOnly?NetworkType.NOT_REQUIRED:NetworkType.CONNECTED')
+        expect(jobs).toContain('if(!localOnly)AndroidTaskResources.tag(builder,AndroidTaskResources.PROVIDER_NETWORK)')
+        expect(engine).toContain('NativePortableRecommendationCycle.build(context,progress,control)')
+        expect(progress).toContain('同步候选可离线生成')
+    })
+
     it('keeps Library actions visible instead of hiding them behind an overflow menu', () => {
         const home = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
@@ -14,13 +24,13 @@ describe('Android independent recommendation runtime and sync UI', () => {
             home.indexOf('private void library()'),
             home.indexOf('private void chooseLibrarySort()')
         )
-        expect(library).toContain('compact("书架"')
-        expect(library).toContain('compact("显示"')
+        expect(library).toContain('compact(LocalizedText.ui(this,"书架","Shelves","本棚"')
+        expect(library).toContain('compact(LocalizedText.ui(this,"显示","Display","表示"')
         expect(library).toContain(
-            'Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新书库"'
+            'Ui.iconButton(this,R.drawable.ic_refresh_24,LocalizedText.ui(this,"刷新书库","Refresh library","書庫を更新"'
         )
         expect(library).toContain(
-            'titleRow(p,"我的书库",history,shelfButton,display,refresh)'
+            'titleRow(p,LocalizedText.ui(this,"我的书库","My library","マイライブラリ"),history,shelfButton,display,refresh)'
         )
         expect(library).not.toContain('compact("⋮"')
         expect(library).not.toContain('showLibraryMenu()')
@@ -170,7 +180,7 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(dialog).toContain('重复上传')
         expect(dialog).toContain('暂时不想看（30 天）')
         expect(detail).toContain('RecommendationItemControlDialog.show')
-        expect(home).toContain('⚙ 调节')
+        expect(home).toContain('LocalizedText.ui(this,"调节偏好","Adjust preferences","好みを調整")')
         expect(home).toContain(
             'RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen"'
         )

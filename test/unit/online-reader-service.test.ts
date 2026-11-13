@@ -44,6 +44,26 @@ function fixture() {
 }
 afterEach(() => cleanup.splice(0).forEach((fn) => fn()))
 describe('independent online reader', () => {
+    it('reads namespaced JM chapters, refreshes worker-session metadata, and rejects foreign chapters', async () => {
+        const { db, dir } = fixture()
+        let epoch = 'worker-1'
+        const provider = {
+            prepareSource: vi.fn(async () => {}), cacheScope: () => `jm:${epoch}`,
+            getEpisodes: vi.fn(async () => [{ id: 'jm-chapter:42', title: 'JM chapter', order: 1 }] as Episode[]),
+            getEpisodePages: vi.fn(async () => [{ url: 'jm-page:42:1' }] as Picture[]),
+            fetchPage: vi.fn(async () => ({ data: Buffer.from('fixture'), contentType: 'image/png' }))
+        }
+        const reader = new OnlineReaderService(db, provider, new PreviewCacheManager(path.join(dir, 'jm-cache')))
+        expect((await reader.chapter('jm:123', 'jm-chapter:42')).pages).toHaveLength(1)
+        await reader.picture('jm:123', 'jm-chapter:42', 0)
+        expect(provider.fetchPage).toHaveBeenCalledWith('jm-page:42:1')
+        epoch = 'worker-2'
+        await reader.chapter('jm:123', 'jm-chapter:42')
+        expect(provider.getEpisodePages).toHaveBeenCalledTimes(2)
+        expect(provider.prepareSource).toHaveBeenCalled()
+        await expect(reader.chapter('jm:123', 'jm-chapter:99')).rejects.toThrow('不存在')
+        await expect(reader.chapters('unknown:123')).rejects.toThrow('无效')
+    })
     it('can prepare never-downloaded comics, exposes local URLs only, does not eagerly fetch images', async () => {
         const { reader, provider, db } = fixture()
         expect(await reader.chapters('new-comic')).toEqual([
@@ -117,5 +137,51 @@ describe('independent online reader', () => {
         await expect(
             reader.picture('comic', 'episode-1', 0)
         ).resolves.toMatchObject({ contentType: 'image/png' })
+    })
+
+    it('uses source-owned page transport and checks ownership even on cache hits', async () => {
+        const {db,dir,provider}=fixture()
+        const source={
+            ...provider,
+            assertPageOwnedByComic:vi.fn(),
+            fetchPageForComic:vi.fn(async()=>({
+                data:Buffer.from('owner-bound-page'),contentType:'image/png'
+            }))
+        }
+        const reader=new OnlineReaderService(
+            db,source,new PreviewCacheManager(path.join(dir,'owned-cache'))
+        )
+        await reader.picture('pica-work','episode-1',0)
+        expect(source.assertPageOwnedByComic).toHaveBeenCalledWith(
+            'pica-work','https://media.example/static/demo.png'
+        )
+        expect(source.fetchPageForComic).toHaveBeenCalledWith(
+            'pica-work','https://media.example/static/demo.png'
+        )
+        expect(source.fetchPage).not.toHaveBeenCalled()
+        source.assertPageOwnedByComic.mockImplementationOnce(()=>{
+            throw new Error('Page source does not match comic source')
+        })
+        await expect(reader.picture('pica-work','episode-1',0)).rejects.toThrow(
+            'Page source does not match comic source'
+        )
+        expect(source.fetchPageForComic).toHaveBeenCalledTimes(1)
+    })
+
+    it('rejects a partial work-owned transport contract before cached image access', async () => {
+        const {db,dir,provider}=fixture()
+        const cache=new PreviewCacheManager(path.join(dir,'partial-contract-cache'))
+        const partial={
+            ...provider,
+            fetchPageForComic:vi.fn(async()=>({
+                data:Buffer.from('image'),contentType:'image/png'
+            }))
+        }
+        const reader=new OnlineReaderService(db,partial,cache)
+        await expect(reader.picture('comic','episode-1',0)).rejects.toThrow(
+            'Source-owned page transport requires an ownership validator'
+        )
+        expect(partial.fetchPageForComic).not.toHaveBeenCalled()
+        expect(partial.fetchPage).not.toHaveBeenCalled()
     })
 })

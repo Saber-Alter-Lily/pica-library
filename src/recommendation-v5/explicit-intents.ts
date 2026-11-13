@@ -1,4 +1,5 @@
 import type { RecommendationIntentV3 } from '../recommendation-v3/intent-planner-v3'
+import { tagControlParticipatesV1 } from '../tags/policy'
 import type {
     PortablePolicyStateV5,
     PreferenceControlV5,
@@ -16,12 +17,13 @@ function facetFor(type: PreferenceTargetType) {
     return 'STYLE_FAMILY'
 }
 
-function intentFor(control: PreferenceControlV5): RecommendationIntentV3 | null {
+function intentFor(control: PreferenceControlV5, state: PortablePolicyStateV5): RecommendationIntentV3 | null {
     if (
         control.direction !== 'MORE' ||
         control.targetType === 'STYLE_FAMILY'
     )
         return null
+    if (['TAG', 'FANDOM'].includes(control.targetType) && !tagControlParticipatesV1(state, control.key)) return null
     const creator = control.targetType === 'AUTHOR'
     const type: RecommendationIntentV3['type'] = creator
         ? 'CREATOR'
@@ -86,7 +88,7 @@ function targetIntent(state: PortablePolicyStateV5) {
         scope: 'SESSION',
         source: target.source,
         updatedAt: target.updatedAt
-    })
+    }, state)
 }
 
 export function explicitRetrievalIntentsV5(
@@ -122,7 +124,7 @@ export function explicitRetrievalIntentsV5(
                 a.key.localeCompare(b.key)
         )
     for (const control of controls) {
-        const intent = intentFor(control)
+        const intent = intentFor(control, state)
         if (!intent) continue
         if (
             values.some(

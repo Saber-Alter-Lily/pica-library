@@ -1,0 +1,21 @@
+plugins { id 'com.android.library' }
+
+// Physically reuse the one ReaderScreenActivity + LocalComicStore stack.
+// The signing-checked AIDL transport lives here; no provider SDK or network
+// permission is added to either consuming application by this module.
+android {
+    namespace 'com.picalibrary.android.signedreader'
+    compileSdk 35
+    defaultConfig { minSdk 28 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation project(':local-core')
+    implementation project(':local-storage')
+    implementation project(':reader-view')
+    implementation project(':source-bridge')
+}

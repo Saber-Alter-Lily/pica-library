@@ -2,10 +2,12 @@ package com.picalibrary.android;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import java.util.HashSet;
+import java.util.Set;
 
 /** Versioned onboarding state. Later is session-only; Skip/Done are version-scoped and Replay is always available. */
 final class OnboardingStore {
-    static final int CURRENT_VERSION=2;
+    static final int CURRENT_VERSION=3;
     private static final String PREFS="pica-onboarding-v1";
     private static final String COMPLETED="completedVersion";
     private static final String DISMISSED="dismissedVersion";
@@ -16,8 +18,9 @@ final class OnboardingStore {
 
     static boolean autoShow(Context c){return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getBoolean(AUTO,true);}
     static void setAutoShow(Context c,boolean value){c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putBoolean(AUTO,value).apply();}
-    static int completedVersion(Context c){return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getInt(COMPLETED,0);}
-    static int dismissedVersion(Context c){return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getInt(DISMISSED,0);}
+    private static int inherited(int value){return value>=2&&value<CURRENT_VERSION?CURRENT_VERSION:value;}
+    static int completedVersion(Context c){return inherited(c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getInt(COMPLETED,0));}
+    static int dismissedVersion(Context c){return inherited(c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getInt(DISMISSED,0));}
 
     static boolean shouldPrompt(Context c){
         return autoShow(c)&&!sessionDismissed&&Math.max(completedVersion(c),dismissedVersion(c))<CURRENT_VERSION;
@@ -27,4 +30,12 @@ final class OnboardingStore {
     static void complete(Context c){c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putInt(COMPLETED,CURRENT_VERSION).putInt(DISMISSED,0).apply();}
     static void neverAuto(Context c){c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putBoolean(AUTO,false).putInt(DISMISSED,CURRENT_VERSION).apply();}
     static void replay(){sessionDismissed=false;}
+
+    // Only guide-reading state belongs here, never account/recommendation configuration.
+    static int advancedPosition(Context c){return Math.max(0,Math.min(7,c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getInt("advancedPosition",0)));}
+    static void advancedPosition(Context c,int position){c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putInt("advancedPosition",Math.max(0,Math.min(7,position))).apply();}
+    static Set<String> advancedRead(Context c){return new HashSet<>(c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getStringSet("advancedRead-v3",new HashSet<>()));}
+    static void markAdvancedRead(Context c,int chapter){if(chapter<0||chapter>7)return;Set<String> read=advancedRead(c);read.add(String.valueOf(chapter));c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putStringSet("advancedRead-v3",read).apply();}
+    static void completeAdvanced(Context c){c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putInt("advancedSpotlightVersion",CURRENT_VERSION).apply();}
+    static void skipAdvanced(Context c){c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putInt("advancedSpotlightDismissedVersion",CURRENT_VERSION).apply();}
 }

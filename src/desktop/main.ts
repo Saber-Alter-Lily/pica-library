@@ -1,10 +1,15 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import { applyUpdateAndScheduleShutdown } from './update-command'
+import { collectDesktopUpgradeWorkLeases, requireDesktopUpgradeQuiescence } from './update-quiescence'
+import { DesktopHttpHandoffFence } from './update-http-fence'
+import { exportRecommendationAuditV5 } from '../services/recommendation-audit-export'
 import path from 'node:path'
 import type { Server } from 'node:http'
 import AdmZip from 'adm-zip'
 import { LibraryDatabase } from '../library/database'
+import { coreLocalDirectoryPath } from '../library/core-local-platform'
 import {
     startLibraryServer,
     type DesktopServerController
@@ -14,7 +19,9 @@ import { startMobileBridge, type MobileBridgeController } from '../mobile/bridge
 import { serializeBrowserLiteDataPackage } from '../library/bundle-export'
 import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
+import { installedRuntimeComposition } from '../runtime/installed-runtime-composition'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
+import { coreRemoteStorageDispatch, coreRemoteStorageStatus } from '../remote-storage/core-action-port'
 import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
 import { desktopRuntimeTaskDiagnostics } from '../runtime/desktop-task-diagnostics'
 import {
@@ -26,13 +33,18 @@ import { remoteApiConfiguration } from '../remote-api/config'
 import { UpdateManager } from '../update/manager'
 import { updateTargetFromRuntime } from '../update/target'
 import { EcosystemPackStore } from '../ecosystem/pack-store'
-import { PersonalizationService } from '../services/personalization-service'
+import type { PersonalizationService } from '../services/personalization-service'
+import { initializeOwnedDesktopProfile } from './profile-initialization'
 import { GitHubAccountAuthService } from '../services/github-account-auth'
 import { DesktopEhWebLogin, type EhCapturedSession } from './eh-web-login'
 import {
-    buildConfig,
+    buildSettingsConfig,
+    hasStoredCredentials,
+    buildLocalConfig,
+    mergePicaSetupCredentials,
     connectionProxy,
     credentialedProxy,
+    connectionEnvironment,
     loadConfig,
     saveConfig
 } from './config'
@@ -52,9 +64,22 @@ import {
 import { connectionCredentials } from './connection'
 import { desktopPlatformCapabilities } from './platform'
 import { desktopRuntimeOptions } from './runtime-mode'
+import { mobileBridgeOptIn, parseMobileBridgeChoice } from './mobile-bridge-policy'
+import { normalizeReaderSettings, parseReaderSettings } from '../../web/reader-settings.js'
 import { DesktopNativePicker } from './pickers'
 import { findManagedBrowser } from './managed-browser'
 import { assertLibraryChangeAllowed } from './lifecycle'
+import { SourceRuntime } from '../sources/source-policy'
+import { sourcePolicyForConfig } from './config'
+import { saveSourceChoices } from './source-settings'
+import { SourceHostInspector } from '../source-hosts/inspector'
+import { sourceHostHttp } from '../source-hosts/http-transport'
+import { SourceHostError } from '../source-hosts/contract'
+import { SourceHostConnections } from '../source-hosts/connections'
+import { sourceHostStore } from './source-host-store'
+import { HostedLibraryReader } from '../source-hosts/library-reader'
+import { PreviewCacheManager } from '../services/preview-cache-manager'
+import { LocalLibraryIngestion } from '../local-library/ingestion'
 import {
     isLoopbackListening,
     knownProxyPorts,
@@ -92,20 +117,8 @@ const updateManager = new UpdateManager({
     target: updateTargetFromRuntime()
 })
 const ecosystemPacks = new EcosystemPackStore(paths.packs, PRODUCT_VERSION)
-const personalization = new PersonalizationService(
-    path.join(paths.runtimeState, 'personalization'),
-    path.join(applicationRoot, 'web')
-)
+let personalization: PersonalizationService
 const githubAccountAuth = new GitHubAccountAuthService()
-for (const directory of [
-    paths.root,
-    paths.data,
-    paths.cache,
-    paths.packs,
-    paths.logs,
-    paths.runtimeState
-])
-    fs.mkdirSync(directory, { recursive: true })
 const log = new DesktopLog(paths.logs)
 const credentialBackend = credentialStoreForPlatform(paths.credentials)
 const credentialsStore = credentialBackend.store
@@ -118,10 +131,29 @@ const platformCapabilities = {
     managedEhWebLogin: Boolean(managedEhBrowser)
 }
 const instance = new InstanceLock(paths.lock, paths.instance)
+const updateHttpFence = new DesktopHttpHandoffFence()
+// All Desktop-owned HTTP listeners share one in-flight request counter.
+// Only the original loopback server can use updater-control exemptions.
+const externalUpdateIngress = {
+    enter: (method: string, pathname: string) =>
+        updateHttpFence.enter(method, pathname, false)
+}
 let config = loadConfig(paths.config)
+const sources = new SourceRuntime(sourcePolicyForConfig(config))
+// Constructor performs no network, discovery, process launch or persistence.
+const sourceHostInspector = new SourceHostInspector(sourceHostHttp)
+const sourceHostConnections = new SourceHostConnections(
+    sourceHostStore(path.join(path.dirname(paths.config), 'source-hosts.json')),
+    sourceHostInspector,
+    () => randomUUID()
+)
 let credentials: StoredCredentials | null = null
+let hostedReader: HostedLibraryReader | null = null
 let server: Server | null = null
 let mobileBridge: MobileBridgeController | null = null
+let mobileBridgeEpoch = 0
+let mobileBridgeSettingsBusy = false
+let engineReady = false
 let remoteApiGateway: RemoteApiGateway | null = null
 let database: LibraryDatabase | null = null
 let service: LibraryService | null = null
@@ -160,6 +192,9 @@ function mobileBridgeHasActiveLease(now = Date.now()) {
 
 function activeDesktopWorkLeases() {
     const leases: string[] = []
+    if (sourceHostInspector.busy) leases.push('source-host-inspection')
+    if (sourceHostConnections.busy) leases.push('saved-source-host-inspection')
+    if (hostedReader?.busy) leases.push('host-library-reader')
     if (
         database?.hasActiveDownloadJobs('LOCAL') ||
         service?.localDownloadRuntime().running
@@ -175,9 +210,12 @@ function activeDesktopWorkLeases() {
         )
     )
         leases.push('remote-sync')
+    if (remoteStorageManager?.busy)
+        leases.push('remote-storage-write')
     if (browserLiteExportProgress.state === 'running')
         leases.push('browser-lite-export')
     if (mobileBridgeHasActiveLease()) leases.push('mobile-bridge-activity')
+    if (mobileBridgeSettingsBusy) leases.push('mobile-bridge-settings')
     for (const task of service?.runtimeResourceProfile().active ?? [])
         leases.push(`runtime:${task.taskType}`)
     return [...new Set(leases)]
@@ -325,7 +363,13 @@ async function shutdownStep(
 }
 
 async function closeEngine() {
+    engineReady = false
+    mobileBridgeEpoch++
     const errors: string[] = []
+    sourceHostInspector.cancel()
+    sourceHostConnections.cancel()
+    await shutdownStep('Hosted local downloads', async () => { await hostedReader?.close() }, errors)
+    hostedReader = null
 
     log.write('Shutdown: closing Remote API gateway')
     await shutdownStep(
@@ -346,26 +390,6 @@ async function closeEngine() {
         errors
     )
     mobileBridge = null
-
-    log.write('Shutdown: closing managed E-H login')
-    await shutdownStep(
-        'managed E-H login',
-        async () => {
-            await ehWebLogin?.cancel()
-        },
-        errors
-    )
-    ehWebLogin = null
-
-    log.write('Shutdown: quiescing local downloads')
-    await shutdownStep(
-        'local download quiesce',
-        async () => {
-            await service?.quiesceLocalDownloads()
-            log.write('Shutdown: local downloads quiesced')
-        },
-        errors
-    )
 
     if (server) {
         log.write('Shutdown: closing local HTTP server')
@@ -396,6 +420,50 @@ async function closeEngine() {
         )
     }
     server = null
+
+    log.write('Shutdown: draining WebDAV mutations')
+    await shutdownStep(
+        'remote storage quiesce',
+        async () => { await remoteStorageManager?.quiesce() },
+        errors
+    )
+
+    log.write('Shutdown: closing managed E-H login')
+    await shutdownStep(
+        'managed E-H login',
+        async () => {
+            await ehWebLogin?.cancel()
+        },
+        errors
+    )
+    ehWebLogin = null
+
+    log.write('Shutdown: quiescing detached library tasks')
+    await shutdownStep(
+        'library background tasks',
+        async () => { await service?.quiesceBackgroundTasks() },
+        errors
+    )
+
+    log.write('Shutdown: quiescing local downloads')
+    await shutdownStep(
+        'local download quiesce',
+        async () => {
+            await service?.quiesceLocalDownloads()
+            log.write('Shutdown: local downloads quiesced')
+        },
+        errors
+    )
+
+    await shutdownStep(
+        'provider runtime cleanup',
+        () => { service?.closeSources() },
+        errors
+    )
+    // The original shared scheduler owns foreground sync/build/download leases.
+    // These can continue after their initiating HTTP connection closes.
+    log.write('Shutdown: waiting for existing resource-backed work')
+    await service?.waitForRuntimeIdle()
 
     log.write('Shutdown: closing database')
     await shutdownStep(
@@ -430,6 +498,8 @@ async function stop(exitCode = 0) {
         return
     }
     stopping = true
+    sourceHostInspector.close()
+    sourceHostConnections.close()
     cancelBrowserCloseShutdown()
     process.exitCode = exitCode
 
@@ -482,11 +552,7 @@ function applyCredentials(
     delete process.env.PICA_ACCOUNT
     delete process.env.PICA_PASSWORD
     delete process.env.PICA_PROXY
-    if (!value) return
-    process.env.PICA_ACCOUNT = value.account
-    process.env.PICA_PASSWORD = value.password
-    const proxy = credentialedProxy(valueConfig?.proxyUrl, value)
-    if (proxy) process.env.PICA_PROXY = proxy
+    Object.assign(process.env, connectionEnvironment(valueConfig, value))
 }
 
 function friendlyConnectionError(error: unknown) {
@@ -502,6 +568,62 @@ function friendlyConnectionError(error: unknown) {
     if (/network|socket|connect|dns|tls/i.test(message))
         return 'NETWORK_FAILED: The provider could not be reached. Check your network or proxy.'
     return 'PROVIDER_UNEXPECTED: The provider returned an unexpected error.'
+}
+
+async function startSelectedMobileBridge() {
+    if (mobileBridge) return
+    if (stopping || updateHttpFence.frozen || !database || !service || !mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode))
+        throw new Error('Mobile Bridge is not explicitly enabled or the library is not ready')
+    const epoch = mobileBridgeEpoch, owner = database
+    const started = await startMobileBridge({
+        database,
+        service,
+        host: '0.0.0.0',
+        port: 7788,
+        stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
+        requestAdmission: externalUpdateIngress,
+        accountStatus: () => ({
+            pica: { enabled: sources.isEnabled('pica'), configured: Boolean(sources.isEnabled('pica') && credentials?.account?.trim() && credentials?.password) },
+            eh: { enabled: sources.isEnabled('eh'), configured: Boolean(sources.isEnabled('eh') && credentials?.ehMemberId && credentials?.ehPassHash) }
+        })
+    })
+    if (stopping || epoch !== mobileBridgeEpoch || database !== owner || !mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode)) {
+        await started.close()
+        throw new Error('Mobile Bridge activation was cancelled')
+    }
+    mobileBridge = started
+    const mobile = started.status()
+    log.write(`Mobile Bridge started at ${mobile.addresses.join(', ') || `port ${mobile.port}`}`)
+}
+
+async function setMobileBridgeEnabled(input: Record<string, unknown>) {
+    const enabled = parseMobileBridgeChoice(input)
+    if (!config || !service || !engineReady || stopping) throw new Error('Configure a ready local library before enabling LAN sharing')
+    if (enabled && runtimeOptions.mode === 'headless' && !runtimeOptions.mobileBridge)
+        throw new Error('Headless LAN sharing also requires --mobile-bridge')
+    if (mobileBridgeSettingsBusy) throw new Error('Mobile Bridge settings are already being changed')
+    mobileBridgeSettingsBusy = true
+    try {
+        const next = { ...config, mobileBridgeEnabled: enabled }
+        mobileBridgeEpoch++
+        if (enabled) {
+            saveConfig(paths.config, next)
+            config = next
+            await startSelectedMobileBridge()
+        }
+        else {
+            // A failed config write must not leave a user-disabled listener open.
+            config = next
+            await mobileBridge?.close()
+            mobileBridge = null
+            // Other settings can be saved while close() awaits active requests.
+            // Persist current configuration, not the pre-close snapshot.
+            const latest = { ...config, mobileBridgeEnabled: false }
+            saveConfig(paths.config, latest)
+            config = latest
+        }
+        return { success: true, enabled, running: Boolean(mobileBridge) }
+    } finally { mobileBridgeSettingsBusy = false }
 }
 
 async function testConnection(input: Record<string, unknown>) {
@@ -524,6 +646,7 @@ async function testConnection(input: Record<string, unknown>) {
         mobileBridge.rotatePairingCode()
         return { success: true }
     }
+    if (mobileAction) throw new Error('Unsupported Mobile Bridge action')
     const { account, password } = connectionCredentials(input, credentials)
     if (!account || !password)
         throw new Error('Enter account and password first')
@@ -536,7 +659,8 @@ async function testConnection(input: Record<string, unknown>) {
         )
         if (proxyUrl) process.env.PICA_PROXY = proxyUrl
         else delete process.env.PICA_PROXY
-        await new Pica().login(account, password)
+        // First-run account setup is an explicit opt-in; saved choices always win later.
+        await new Pica({ sourceAccess: config ? sources.acquire : undefined }).login(account, password)
         return { success: true }
     } catch (error) {
         throw new Error(friendlyConnectionError(error))
@@ -549,6 +673,7 @@ async function testConnection(input: Record<string, unknown>) {
 let registrationInFlight = false
 let lastRegistrationStarted = 0
 async function registerAccount(input: Record<string, unknown>) {
+    if (config) sources.acquire('pica')
     if (registrationInFlight || Date.now() - lastRegistrationStarted < 30000)
         throw new Error('注册请求正在处理或刚刚提交，请先检查结果，不要重复提交。')
     const proxyUrl = connectionProxy(
@@ -559,7 +684,7 @@ async function registerAccount(input: Record<string, unknown>) {
     registrationInFlight = true
     lastRegistrationStarted = Date.now()
     try {
-        return await new Pica({ proxyUrl: proxyUrl || false }).register(input)
+        return await new Pica({ proxyUrl: proxyUrl || false, sourceAccess: config ? sources.acquire : undefined }).register(input)
     } finally {
         registrationInFlight = false
     }
@@ -629,8 +754,7 @@ function openDirectory(kind: string) {
             ? { 'browser-lite-export': lastBrowserLiteExportDirectory }
             : {})
     }
-    const directory = allowed[kind]
-    if (!directory) throw new Error('Unknown directory')
+    const directory = coreLocalDirectoryPath(kind, allowed)
     fs.mkdirSync(directory, { recursive: true })
     let launchError: unknown = null
     const started = launchDirectory(directory, (error) => {
@@ -645,6 +769,7 @@ function openDirectory(kind: string) {
 }
 
 async function persistEhSession(candidate: EhCapturedSession) {
+    const lease = sources.acquire('eh')
     if (!service) throw new Error('Library is not ready')
     if (!candidate.memberId || !candidate.passHash)
         throw new Error('E-H 登录会话不完整')
@@ -660,6 +785,7 @@ async function persistEhSession(candidate: EhCapturedSession) {
     service.setEhSession(candidate)
     try {
         await service.verifyEhAccount()
+        lease.check()
     } catch (error) {
         service.setEhSession(previousSession)
         throw error
@@ -692,7 +818,8 @@ async function startEngine(preferredPort: number) {
         dataDir,
         undefined,
         undefined,
-        runtimeResources
+        runtimeResources,
+        sources
     )
     ehWebLogin = new DesktopEhWebLogin(
         path.join(paths.runtimeState, 'eh-web-login'),
@@ -711,6 +838,7 @@ async function startEngine(preferredPort: number) {
               }
             : null
     )
+    service.setJmCredentials(credentials?.jmUsername, credentials?.jmPassword)
     remoteStorageManager = new RemoteStorageDesktopManager(
         paths.remoteStorageConfig,
         credentialsStore,
@@ -721,10 +849,27 @@ async function startEngine(preferredPort: number) {
         runtimeResources
     )
     const csrfToken = randomBytes(32).toString('base64url')
+    const hostLocalIngestion = new LocalLibraryIngestion(database, dataDir)
+    hostedReader = new HostedLibraryReader(sourceHostConnections, database, () => new PreviewCacheManager(path.join(paths.cache, 'host-reader'), { maxBytes: 256 * 1024 * 1024, ttlMs: 24 * 60 * 60 * 1000 }), undefined, undefined,
+        { saveChapter: input => hostLocalIngestion.importGeneratedChapter(input), resources: runtimeResources })
     let startupReady = false
     const desktop: DesktopServerController = {
         csrfToken,
+        hostedReader,
+        inspectSourceHost: async (input, signal) => {
+            if (!config || !service || !startupReady) throw new SourceHostError('SOURCE_HOST_UNAVAILABLE')
+            return sourceHostInspector.inspect(input, signal)
+        },
+        sourceHostConnections: (input) => {
+            if (!config || !service || !startupReady) throw new SourceHostError('SOURCE_HOST_UNAVAILABLE')
+            return sourceHostConnections.command(input)
+        },
+        inspectSavedSourceHost: async (input, signal) => {
+            if (!config || !service || !startupReady) throw new SourceHostError('SOURCE_HOST_UNAVAILABLE')
+            return sourceHostConnections.inspect(input, signal)
+        },
         startEhWebLogin: async () => {
+            sources.acquire('eh')
             if (!ehWebLogin) throw new Error('E-H 网页登录不可用')
             return await ehWebLogin.start()
         },
@@ -737,8 +882,17 @@ async function startEngine(preferredPort: number) {
             ehWebLogin
                 ? await ehWebLogin.cancel()
                 : { state: 'cancelled', message: '网页登录已取消' },
-        configured: () => Boolean(config && credentials),
+        configured: () => Boolean(config),
+        chooseLocalComic: async (kind) => kind === 'folder'
+            ? nativePicker.chooseFolder('选择一本本地漫画文件夹 / Choose one local comic folder')
+            : nativePicker.chooseComicArchive(),
         status: () => ({
+            sourceHostInspection: { available: true, reader: false, libraryImport: false, extensionInstall: false, persisted: false },
+            sourceHostConnections: { available: true, storage: sourceHostConnections.snapshot().storage, scope: 'inspect-only', reader: false },
+            hostedLibraryReader: { available: true, scope: 'explicit-session-library-read', providerSearch: false, libraryImport: false, extensionInstall: false, downloads: Boolean(hostedReader?.localDownloadsAvailable), native: false },
+            hostedSourceBrowser: { available: true, scope: 'explicit-session-selected-source-search-read', providerSearch: true, libraryImport: false, extensionInstall: false, downloads: Boolean(hostedReader?.localDownloadsAvailable), native: false },
+            externalSources: sources.snapshot(),
+            sourcePolicyOrigin: config?.externalSources ? 'explicit' : config ? 'legacy-compatible' : 'new-local',
             startupReady,
             runtime: runtimeOptions,
             platform: platformCapabilities,
@@ -760,6 +914,9 @@ async function startEngine(preferredPort: number) {
             lastExportAt: lastBrowserLiteExportAt,
             browserLiteExportProgress,
             mobileBridge: mobileBridge?.status() ?? null,
+            mobileBridgePreference: mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode),
+            runtimeComposition: installedRuntimeComposition(applicationRoot),
+            readerSettings: normalizeReaderSettings(config?.readerSettings),
             remoteApi: remoteApiGateway
                 ? {
                       enabled: true,
@@ -784,12 +941,14 @@ async function startEngine(preferredPort: number) {
                       webPwa: false,
                       activeWebSessions: 0
                   },
-            remoteStorage: remoteStorageManager?.status() ?? { configured: false, kind: 'webdav' },
+            remoteStorage: coreRemoteStorageStatus(remoteStorageManager),
             ehAccount: {
+                enabled: sources.isEnabled('eh'),
                 configured: Boolean(
                     credentials?.ehMemberId && credentials?.ehPassHash
                 )
             },
+            picaAccount: { configured: Boolean(credentials?.account?.trim() && credentials?.password), enabled: sources.isEnabled('pica') },
             personalization: {
                 ...personalization.status(),
                 themePacks: personalization.listThemePacks()
@@ -808,6 +967,50 @@ async function startEngine(preferredPort: number) {
             }
         },
         save: async (input) => {
+            if (input.mobileBridgeAction !== undefined) return await setMobileBridgeEnabled(input)
+            if (input.readerSettingsAction !== undefined) {
+                if (!config || input.readerSettingsAction !== 'save' ||
+                    Object.keys(input).some(key => !['readerSettingsAction', 'readerSettings'].includes(key)))
+                    throw new Error('Invalid reader settings action')
+                const readerSettings = parseReaderSettings(input.readerSettings)
+                const next = { ...config, readerSettings }
+                saveConfig(paths.config, next)
+                config = next
+                return { success: true, readerSettings }
+            }
+            if (input.sourceAction !== undefined) {
+                if (input.sourceAction !== 'save' || !config || !service) throw new Error('Configure a local library before choosing sources')
+                if (Object.keys(input).some(key => !['sourceAction', 'enabled', 'expectedRevision'].includes(key))) throw new Error('Unsupported source settings field')
+                const saved = saveSourceChoices(paths.config, config, sources, input.enabled, input.expectedRevision)
+                config = saved.config
+                service.sourceChoicesApplied(saved.disabled)
+                // Saving the policy is synchronous; no new request can slip through this await.
+                if (saved.disabled.includes('eh')) await ehWebLogin?.cancel()
+                return { success: true, externalSources: sources.snapshot() }
+            }
+            const jmAccountAction = String(input.jmAccountAction ?? '')
+            if (jmAccountAction) {
+                if (!service) throw new Error('Library is not ready')
+                if (jmAccountAction === 'login') {
+                    const username = String(input.username ?? '').trim(), password = String(input.password ?? '')
+                    const identity = await service.jmLogin(username, password)
+                    const remember = input.remember === true
+                    const next: StoredCredentials = { ...(credentials ?? { account: '', password: '' }), jmUsername: remember ? username : undefined, jmPassword: remember ? password : undefined }
+                    if (remember || credentials?.jmUsername) {
+                        try { credentialsStore.save(next); credentials = next }
+                        catch { await service.jmClearAccount(); throw new Error('JM 安全凭据保存失败，当前会话已退出，请重试') }
+                    }
+                    service.setJmCredentials(remember ? username : undefined, remember ? password : undefined)
+                    return { ...identity, remembered: remember }
+                }
+                if (jmAccountAction === 'logout') {
+                    const next: StoredCredentials = { ...(credentials ?? { account: '', password: '' }), jmUsername: undefined, jmPassword: undefined }
+                    if (credentials?.jmUsername) { credentialsStore.save(next); credentials = next }
+                    await service.jmClearAccount()
+                    return { configured: false }
+                }
+                throw new Error('Unknown JM account action')
+            }
             const ehAccountAction = String(input.ehAccountAction ?? '')
             if (ehAccountAction) {
                 if (!service) throw new Error('Library is not ready')
@@ -900,36 +1103,11 @@ async function startEngine(preferredPort: number) {
                     theme: personalization.themeDescriptor(String(input.themeId ?? ''))
                 }
             }
-            const remoteAction = String(input.remoteStorageAction ?? '')
-            if (remoteAction === 'save') {
-                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
-                return remoteStorageManager.save(input)
-            }
-            if (remoteAction === 'sync') {
-                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
-                return await remoteStorageManager.sync(input)
-            }
-            if (
-                remoteAction === 'pause-sync' ||
-                remoteAction === 'resume-sync' ||
-                remoteAction === 'cancel-sync'
-            ) {
-                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
-                return {
-                    success: true,
-                    syncProgress: remoteStorageManager.syncControl(
-                        remoteAction === 'pause-sync'
-                            ? 'pause'
-                            : remoteAction === 'resume-sync'
-                              ? 'resume'
-                              : 'cancel'
-                    )
-                }
-            }
-            if (remoteAction === 'delete-remote') {
-                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
-                return await remoteStorageManager.deleteCopies(input)
-            }
+            const remoteStorageCommand = await coreRemoteStorageDispatch(
+                input, remoteStorageManager
+            )
+            if (remoteStorageCommand.handled)
+                return remoteStorageCommand.value
             const personalizationAction = String(input.personalizationAction ?? '')
             if (personalizationAction === 'verify-star')
                 throw new Error('公开用户名 Star 验证已停用，请使用 GitHub 账号认证')
@@ -974,7 +1152,21 @@ async function startEngine(preferredPort: number) {
                     personalization: personalization.installEntitlement(text)
                 }
             }
-            const wasConfigured = Boolean(config && credentials)
+            const wasConfigured = Boolean(config)
+            if (input.setupMode !== undefined && input.setupMode !== 'local')
+                throw new Error('Unsupported setup mode')
+            if (input.setupMode === 'local') {
+                const next = buildLocalConfig({ libraryDirectory: String(input.libraryDirectory ?? config?.libraryDirectory ?? paths.data), profile: String(input.profile ?? config?.profile ?? 'balanced') as SetupInput['profile'] }, config)
+                const dataChanged = config?.libraryDirectory !== next.libraryDirectory
+                if (service) assertLibraryChangeAllowed(service, config?.libraryDirectory, next.libraryDirectory)
+                saveConfig(paths.config, next)
+                config = next
+                sources.apply(sourcePolicyForConfig(config))
+                // Do not read/write/delete credentials, verify providers or generate recommendations.
+                if (!wasConfigured) desktop.csrfToken = randomBytes(32).toString('base64url')
+                if (dataChanged) void restartEngine()
+                return { success: true, restarting: dataChanged, localOnly: true }
+            }
             const previousCredentials = credentials
             const setup: SetupInput = {
                 account: String(input.account ?? previousCredentials?.account ?? ''),
@@ -983,7 +1175,7 @@ async function startEngine(preferredPort: number) {
                 profile: String(input.profile ?? config?.profile ?? 'balanced') as SetupInput['profile'],
                 proxyUrl: input.proxyUrl === undefined ? config?.proxyUrl : String(input.proxyUrl)
             }
-            const built = buildConfig(setup)
+            const built = buildSettingsConfig(setup, config)
             const dataChanged = config?.libraryDirectory !== built.config.libraryDirectory
             if (service)
                 assertLibraryChangeAllowed(
@@ -991,27 +1183,16 @@ async function startEngine(preferredPort: number) {
                     config?.libraryDirectory,
                     built.config.libraryDirectory
                 )
-            if (
-                built.config.proxyUrl === config?.proxyUrl &&
-                !built.credentials.proxyUsername &&
-                !built.credentials.proxyPassword
-            ) {
-                built.credentials.proxyUsername = previousCredentials?.proxyUsername
-                built.credentials.proxyPassword = previousCredentials?.proxyPassword
-            }
-            built.credentials.remoteStorageUsername = previousCredentials?.remoteStorageUsername
-            built.credentials.remoteStoragePassword = previousCredentials?.remoteStoragePassword
-            built.credentials.ehMemberId = previousCredentials?.ehMemberId
-            built.credentials.ehPassHash = previousCredentials?.ehPassHash
-            built.credentials.ehIgneous = previousCredentials?.ehIgneous
-            built.credentials.ehCfClearance = previousCredentials?.ehCfClearance
+            built.credentials = mergePicaSetupCredentials(built.credentials, previousCredentials, built.config.proxyUrl === config?.proxyUrl)
             const picaCredentialsChanged =
                 previousCredentials?.account !== built.credentials.account ||
                 previousCredentials?.password !== built.credentials.password
-            credentialsStore.save(built.credentials)
+            const nextCredentials = previousCredentials || hasStoredCredentials(built.credentials) ? built.credentials : null
+            if (nextCredentials) credentialsStore.save(nextCredentials)
             saveConfig(paths.config, built.config)
             config = built.config
-            credentials = built.credentials
+            sources.apply(sourcePolicyForConfig(config))
+            credentials = nextCredentials
             applyCredentials(credentials, config)
             if (picaCredentialsChanged) service?.resetPicaSession()
             if (!wasConfigured)
@@ -1043,116 +1224,24 @@ async function startEngine(preferredPort: number) {
         },
         exportRecommendationAudit: async (input = {}) => {
             if (!database || !service) throw new Error('Library is not ready')
-            const generatedAt = new Date().toISOString()
-            const appSessionId = String(input.appSessionId ?? '').trim() || null
-            const events = database.listUserEvents({ limit: 10000 })
-            const catalog = database.listComics({ limit: 10000 }).map((comic) => ({
-                comicId: comic.comicId,
-                title: comic.title,
-                author: comic.author,
-                canonicalAuthor: comic.canonicalAuthor ?? null,
-                tags: comic.tags,
-                categories: comic.categories,
-                providerId: comic.providerId ?? null,
-                isFavorite: comic.isFavorite,
-                inLibrary: comic.inLibrary,
-                downloadedPictures: comic.downloadedPictures,
-                firstSeenAt: comic.firstSeenAt,
-                lastSeenAt: comic.lastSeenAt
-            }))
-            const policy = service.recommendationV5Snapshot()
-            const timescales = service.recommendationV5PreferenceTimescales(
-                appSessionId,
-                10000
-            )
-            const behavior = service.recommendationV5BehaviorEvidence(10000)
-            const channels = service.recommendationV5CandidateChannels(
-                appSessionId,
-                10000
-            )
-            const servingComposition =
-                service.recommendationServingCompositionV3()
-            const shadowRuns = service.recommendationV5ShadowRuns(500)
-            const evaluation = service.recommendationV5EvaluationSummary(
-                500,
-                30,
-                3,
-                50
-            )
-            const manifest = {
-                schemaVersion: 2,
-                kind: 'pica-library-recommendation-audit',
-                generatedAt,
+            const library = database, app = service
+            return exportRecommendationAuditV5({
                 productVersion: PRODUCT_VERSION,
-                sourceSha: currentSourceSha ?? null,
-                appSessionId,
-                includes: [
-                    'manifest.json',
-                    'policy_snapshot.json',
-                    'preference_timescales.json',
-                    'candidate_channels.json',
-                    'serving_composition.json',
-                    'behavior_evidence_v5.json',
-                    'user_events.json',
-                    'shadow_runs.json',
-                    'evaluation_snapshot.json',
-                    'catalog_minimal.json',
-                    'README.txt'
-                ],
-                excludes: [
-                    'pica_password',
-                    'pica_token',
-                    'eh_cookies',
-                    'github_token',
-                    'webdav_credentials',
-                    'comic_images',
-                    'downloaded_files'
-                ]
-            }
-            const zip = new AdmZip()
-            const addJson = (name: string, value: unknown) =>
-                zip.addFile(
-                    name,
-                    Buffer.from(JSON.stringify(value, null, 2), 'utf8')
-                )
-            addJson('manifest.json', manifest)
-            addJson('policy_snapshot.json', policy)
-            addJson('preference_timescales.json', timescales)
-            addJson('candidate_channels.json', channels)
-            addJson('serving_composition.json', servingComposition)
-            addJson('behavior_evidence_v5.json', behavior)
-            addJson('user_events.json', events)
-            addJson('shadow_runs.json', shadowRuns)
-            addJson('evaluation_snapshot.json', evaluation)
-            addJson('catalog_minimal.json', catalog)
-            zip.addFile(
-                'README.txt',
-                Buffer.from(
-                    [
-                        'Pica Library Recommendation Audit Export',
-                        '',
-                        'This package contains allowlisted recommendation and interaction audit data only.',
-                        'preference_timescales.json is generated for the appSessionId recorded in manifest.json when the export is requested from the active Web session.',
-                        'candidate_channels.json describes the V5 shadow planner and is not the serving recommendation batch.',
-                        'serving_composition.json describes the persisted Final V3 serving batch without allocating or regenerating a recommendation batch.',
-                        'It intentionally excludes account passwords, provider tokens/cookies, GitHub credentials, WebDAV credentials, comic images, and downloaded manga files.',
-                        'Share this ZIP only when you intentionally want another person or analysis tool to review recommendation behavior.',
-                        ''
-                    ].join('\n'),
-                    'utf8'
-                )
-            )
-            const buffer = zip.toBuffer()
-            const file = await chooseRecommendationAuditPath(generatedAt)
-            if (!file) return { success: false, cancelled: true }
-            fs.writeFileSync(file, buffer)
-            return {
-                success: true,
-                fileName: path.basename(file),
-                generatedAt,
-                sizeBytes: buffer.byteLength,
-                sha256: createHash('sha256').update(buffer).digest('hex')
-            }
+                sourceSha: currentSourceSha,
+                appSessionId: input.appSessionId,
+                choosePath: chooseRecommendationAuditPath,
+                read: {
+                    userEvents: limit => library.listUserEvents({limit}),
+                    catalog: limit => library.listComics({limit}),
+                    policySnapshot: () => app.recommendationV5Snapshot(),
+                    preferenceTimescales: (session, limit) => app.recommendationV5PreferenceTimescales(session, limit),
+                    behaviorEvidence: limit => app.recommendationV5BehaviorEvidence(limit),
+                    candidateChannels: (session, limit) => app.recommendationV5CandidateChannels(session, limit),
+                    servingComposition: () => app.recommendationServingCompositionV3(),
+                    shadowRuns: limit => app.recommendationV5ShadowRuns(limit),
+                    evaluationSummary: (limit, horizon, step, targets) => app.recommendationV5EvaluationSummary(limit, horizon, step, targets)
+                }
+            })
         },
         syncAndExportBrowserLitePackage: async () => {
             if (!database || !service) throw new Error('Library is not ready')
@@ -1201,18 +1290,49 @@ async function startEngine(preferredPort: number) {
         openDirectory,
         ecosystemPackInventory: () => ecosystemPacks.inventory(),
         checkForUpdate: async () => updateManager.checkForUpdate(),
+        planRuntimeChoice:(choice,signal)=>updateManager.planRuntimeChoice(choice,signal),
+        prepareRuntimeChoice:(id,download,signal)=>updateManager.prepareRuntimeChoice(id,download,signal),
         stageUpdate: async (name, value) => updateManager.stage(name, value),
         stageFullUpdate: async (version, name, value) =>
             updateManager.stageFullApplication(version, name, value),
-        applyUpdate: async (id) => {
-            const result = updateManager.apply(id, {
+        applyUpdate: (id) => applyUpdateAndScheduleShutdown(updateManager,id,{
                 desktopHomeRoot: paths.root,
                 libraryDirectory: config?.libraryDirectory ?? paths.data,
                 currentUrl
-            })
-            setTimeout(() => void stop(), 150)
-            return result
-        },
+            },stop,() => {
+                const ready = () => requireDesktopUpgradeQuiescence({
+                    ownership: instance,
+                    engineReady,
+                    stopping,
+                    hasDatabase: database !== null,
+                    hasService: service !== null,
+                    activeWorkLeases: () => collectDesktopUpgradeWorkLeases(
+                        activeDesktopWorkLeases(),
+                        service?.runtimeTaskDiagnostics(),
+                        service?.runtimeResourceProfile()
+                    )
+                })
+                // No await can allow a new local HTTP request between the
+                // first activity check, admission freeze, and second check.
+                ready()
+                const restoreHttp = updateHttpFence.freezeForHandoff()
+                let restoreResources: (() => void) | undefined
+                try {
+                    // This is the SAME runtime resource coordinator already
+                    // passed to LibraryService, WebDAV and host-library tasks.
+                    // It blocks new/queued leases in BOTH observe/enforce modes.
+                    restoreResources = runtimeResources.freezeAcquisitionsForUpdate()
+                    ready()
+                    return () => {
+                        restoreResources?.()
+                        restoreHttp()
+                    }
+                } catch (error) {
+                    restoreResources?.()
+                    restoreHttp()
+                    throw error
+                }
+            }),
         updateProgress: () => updateManager.progress(),
         runtimeTasks: () => {
             if (!service)
@@ -1251,7 +1371,8 @@ async function startEngine(preferredPort: number) {
             host: '127.0.0.1',
             port: preferredPort,
             desktop,
-            cacheDir: paths.cache
+            cacheDir: paths.cache,
+            requestAdmission: updateHttpFence
         })
         server = started.server
         currentUrl = started.url
@@ -1259,7 +1380,8 @@ async function startEngine(preferredPort: number) {
         if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error
         database.close()
         database = new LibraryDatabase(path.join(dataDir, 'library.db'))
-        service = new LibraryService(database, dataDir)
+        service = new LibraryService(database, dataDir, undefined, undefined, runtimeResources, sources)
+        service.setJmCredentials(credentials?.jmUsername, credentials?.jmPassword)
     service.setEhSession(
         credentials?.ehMemberId && credentials?.ehPassHash
             ? {
@@ -1272,7 +1394,7 @@ async function startEngine(preferredPort: number) {
     )
         remoteStorageManager = new RemoteStorageDesktopManager(
             paths.remoteStorageConfig, credentialsStore, credentials, database, dataDir,
-            (value) => { credentials = value }
+            (value) => { credentials = value }, runtimeResources
         )
         const started = await startLibraryServer({
             database,
@@ -1280,7 +1402,8 @@ async function startEngine(preferredPort: number) {
             host: '127.0.0.1',
             port: 0,
             desktop,
-            cacheDir: paths.cache
+            cacheDir: paths.cache,
+            requestAdmission: updateHttpFence
         })
         server = started.server
         currentUrl = started.url
@@ -1297,6 +1420,7 @@ async function startEngine(preferredPort: number) {
             allowedOrigins: remoteApiSettings.allowedOrigins,
             webSessions: remoteApiSettings.webSessions,
             webRoot: path.join(applicationRoot, 'web', 'remote'),
+            requestAdmission: externalUpdateIngress,
             onAudit: (event) =>
                 log.write(
                     `Remote API ${event.method} ${event.path} -> ${event.status} [${event.remoteAddress}]`
@@ -1308,45 +1432,20 @@ async function startEngine(preferredPort: number) {
     } else {
         remoteApiGateway = null
     }
-    if (runtimeOptions.mobileBridge) {
+    if (mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode)) {
         try {
-            mobileBridge = await startMobileBridge({
-                database: database!,
-                service: service!,
-                host: '0.0.0.0',
-                port: 7788,
-                stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
-                accountStatus: () => ({
-                    pica: {
-                        configured: Boolean(
-                            credentials?.account?.trim() &&
-                                credentials?.password
-                        )
-                    },
-                    eh: {
-                        configured: Boolean(
-                            credentials?.ehMemberId &&
-                                credentials?.ehPassHash
-                        )
-                    }
-                })
-            })
-            const mobile = mobileBridge.status()
-            log.write(
-                `Mobile Bridge started at ${
-                    mobile.addresses.join(', ') || `port ${mobile.port}`
-                }`
-            )
+            await startSelectedMobileBridge()
         } catch (error) {
             mobileBridge = null
             log.write(`Mobile Bridge unavailable: ${String(error)}`)
         }
     } else {
         mobileBridge = null
-        log.write('Mobile Bridge disabled in headless mode; pass --mobile-bridge to enable it')
+        log.write('Mobile Bridge disabled; explicitly enable LAN sharing in Settings (or --mobile-bridge before a choice is saved)')
     }
     instance.publish(currentUrl)
     startupReady = true
+    engineReady = true
     log.write(
         `Desktop engine ${PRODUCT_VERSION} started at ${currentUrl} [${runtimeOptions.mode}]`
     )
@@ -1354,15 +1453,20 @@ async function startEngine(preferredPort: number) {
 
 async function restartEngine() {
     if (stopping) return
-    const previousUrl = currentUrl
-    await closeEngine()
-    if (stopping) return
-    const port = currentUrl
-        ? Number(new URL(currentUrl).port)
-        : config?.preferredPort ?? 4789
-    await startEngine(port || config?.preferredPort || 4789)
-    if (await waitForHealth(currentUrl)) {
-        if (currentUrl !== previousUrl) browser(currentUrl)
+    try {
+        const previousUrl = currentUrl
+        await closeEngine()
+        if (stopping) return
+        const port = currentUrl
+            ? Number(new URL(currentUrl).port)
+            : config?.preferredPort ?? 4789
+        await startEngine(port || config?.preferredPort || 4789)
+        if (await waitForHealth(currentUrl)) {
+            if (currentUrl !== previousUrl) browser(currentUrl)
+        }
+    } catch (error) {
+        log.write(`Restart failed: ${shutdownReason(error)}`)
+        await stop(1)
     }
 }
 
@@ -1375,6 +1479,11 @@ async function main() {
         }
         throw new Error('Another Pica Library instance is starting')
     }
+    personalization = initializeOwnedDesktopProfile(
+        instance,
+        paths,
+        path.join(applicationRoot, 'web')
+    )
     try {
         const assistant = updateManager.preparePersistentUpgradeAssistant({
             verifyExisting: false
@@ -1398,7 +1507,7 @@ async function main() {
     }
     applyCredentials(credentials, config)
     await startEngine(config?.preferredPort ?? 4789)
-    browser(config && credentials ? currentUrl : `${currentUrl}/setup`)
+    browser(config ? currentUrl : `${currentUrl}/setup`)
     process.on('SIGINT', () => { void stop() })
     process.on('SIGTERM', () => { void stop() })
     process.on('uncaughtException', (error) => {

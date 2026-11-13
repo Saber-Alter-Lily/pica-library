@@ -12,6 +12,7 @@ import { assertLibraryChangeAllowed } from '../../src/desktop/lifecycle'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import type { Pica } from '../../src/sdk'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const directories: string[] = []
 afterEach(() => {
@@ -177,7 +178,7 @@ describe('desktop remediation boundaries', () => {
         const service = new LibraryService(
             database,
             dataDir,
-            provider as unknown as Pica
+            provider as unknown as Pica, undefined, undefined, enabledFixtureSources()
         )
         const job = service.enqueueDownload({ comicId: 'shutdown-comic' })
         const running = service.runDownloadQueue({
@@ -275,7 +276,7 @@ describe('desktop remediation boundaries', () => {
         const service = new LibraryService(
             database,
             dataDir,
-            provider as unknown as Pica
+            provider as unknown as Pica, undefined, undefined, enabledFixtureSources()
         )
         const job = service.enqueueDownload({ comicId: 'timeout-comic' })
         const running = service.runDownloadQueue({
@@ -305,11 +306,34 @@ describe('desktop remediation boundaries', () => {
         database.close()
     })
 
+    it('settles detached library work before its SQLite owner closes', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-detached-stop-'))
+        directories.push(root)
+        const database = new LibraryDatabase(path.join(root, 'library.db'))
+        database.importCatalog([{
+            comicId: 'owned-local-work',
+            title: 'Owned local work',
+            author: 'Author',
+            categories: [],
+            tags: [],
+            finished: true
+        }])
+        const service = new LibraryService(
+            database, root, {} as Pica, undefined, undefined, enabledFixtureSources()
+        )
+        expect(service.startLibraryOrganize().started).toBe(true)
+        await service.quiesceBackgroundTasks()
+        expect(service.libraryOrganizeStatus().state).toBe('cancelled')
+        expect(() => service.startLibraryOrganize()).toThrow('shutting down')
+        expect(() => service.startMaintenanceRepairScan()).toThrow('shutting down')
+        database.close()
+    })
+
     it('detects local active jobs before a library directory switch', () => {
         const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-switch-'))
         directories.push(dataDir)
         const database = new LibraryDatabase(path.join(dataDir, 'library.db'))
-        const service = new LibraryService(database, dataDir, {} as Pica)
+        const service = new LibraryService(database, dataDir, {} as Pica, undefined, undefined, enabledFixtureSources())
         service.enqueueDownload({ comicId: 'queued-local' })
         expect(service.hasActiveLocalDownloads()).toBe(true)
         database.close()

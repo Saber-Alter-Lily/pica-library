@@ -9,7 +9,8 @@ describe('v0.4.3 visible support hotfix', () => {
     it('shows project support from the Android main Settings tab', () => {
         const home = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java')
         const support = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SupportActivity.java')
-        expect(home).toContain('SettingsRow.row(this,"支持项目","爱赞助 / GitHub · 支持开源开发"')
+        expect(home).toContain('LocalizedText.ui(this,"支持项目","Support the project","プロジェクトを支援")')
+        expect(home).toContain('LocalizedText.ui(this,"爱赞助 / GitHub · 支持开源开发","Azz.net / GitHub · support open source","Azz.net / GitHub · オープンソースを支援")')
         expect(home).toContain('new Intent(this,SupportActivity.class)')
         expect(support).toContain('https://azz.net/PicaLibrary')
     })

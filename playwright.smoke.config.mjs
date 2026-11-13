@@ -11,6 +11,9 @@ export default defineConfig({
         baseURL:
             process.env.PICA_WEB_SMOKE_URL || 'http://127.0.0.1:4173',
         headless: true,
+        launchOptions: process.env.PICA_WEB_SMOKE_BROWSER_PATH
+            ? { executablePath: process.env.PICA_WEB_SMOKE_BROWSER_PATH }
+            : {},
         trace: 'retain-on-failure',
         screenshot: 'only-on-failure'
     }

@@ -1,5 +1,6 @@
 import { PRODUCT_VERSION } from './version'
 import { latestMigrationVersion } from './storage/sqlite/migrations'
+import { runtimeModuleContracts, type RuntimeModuleContracts } from './modules/contracts'
 
 export const APP_API_VERSION = 2
 export const DATABASE_SCHEMA_VERSION = latestMigrationVersion
@@ -31,12 +32,14 @@ export interface AppCapabilities {
     bundleFormatVersion: number
     updateManifestVersion: number
     readerApiVersion: number
+    moduleContracts: RuntimeModuleContracts
     features: {
         providerFavoriteMutation: boolean
         browserLite: boolean
         shelves: boolean
         reader: boolean
         archiveReader: boolean
+        localFileImport: boolean
         updatePackages: boolean
         recommendationSessions: boolean
         previewPages: boolean
@@ -286,12 +289,15 @@ export function appCapabilities(
         bundleFormatVersion: BUNDLE_FORMAT_VERSION,
         updateManifestVersion: UPDATE_MANIFEST_VERSION,
         readerApiVersion: READER_API_VERSION,
+        moduleContracts: runtimeModuleContracts(),
         features: {
             providerFavoriteMutation,
             browserLite: true,
             shelves: true,
             reader: true,
             archiveReader: false,
+            // Import-to-owned-storage, not direct archive streaming. No server-path input API.
+            localFileImport: nativeFolderPicker.available && mode === 'interactive',
             updatePackages: selfUpdate.available,
             recommendationSessions: true,
             previewPages: true,

@@ -1,4 +1,4 @@
-import { parseEhTag } from '../providers/eh-provider'
+import { parseEhTag } from '../providers/eh-tags'
 import type {
     EhSurface,
     SearchRequest
@@ -234,7 +234,7 @@ export function compileCandidateProviderRoutesV5(
         if (!channel.enabled) continue
 
         if (
-            channel.family === 'REDISCOVERY' &&
+            (channel.family === 'REDISCOVERY' || channel.providerAllocations.every(allocation => allocation.surface === 'local')) &&
             channel.localCandidateIds?.length
         ) {
             routes.push({

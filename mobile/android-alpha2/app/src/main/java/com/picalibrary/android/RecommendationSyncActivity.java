@@ -14,6 +14,7 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
     private static String lastPromptSignature="";
     private LinearLayout content;
     private JSONObject preview;
+    private String tagPolicyResolution="";
     private boolean loading,destroyed;
 
     @Override public void onCreate(Bundle state){
@@ -62,9 +63,9 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
             return;
         }
 
-        int android=preview.optInt("androidControlChanges",0)+preview.optInt("feedbackChanges",0)+preview.optInt("eventChanges",0)+preview.optInt("suppressChanges",0)+preview.optInt("tasteExclusionChanges",0)+preview.optInt("dispositionChanges",0)+preview.optInt("catalogEvidenceChanges",0);
+        int android=preview.optInt("androidControlChanges",0)+preview.optInt("feedbackChanges",0)+preview.optInt("eventChanges",0)+preview.optInt("suppressChanges",0)+preview.optInt("tasteExclusionChanges",0)+preview.optInt("dispositionChanges",0)+preview.optInt("catalogEvidenceChanges",0)+(preview.optBoolean("tagPolicyChanged",false)?1:0);
         int desktop=preview.optInt("desktopControlChanges",0);
-        JSONArray conflicts=preview.optJSONArray("conflicts");int conflictCount=conflicts==null?0:conflicts.length();
+        JSONArray conflicts=preview.optJSONArray("conflicts");int conflictCount=(conflicts==null?0:conflicts.length())+(preview.optJSONObject("tagPolicyConflict")==null?0:1);
         JSONObject remote=preview.optJSONObject("remotePackage"),foundation=remote==null?null:remote.optJSONObject("foundation");
         PortableRecommendationPackageStore.Snapshot local=PortableRecommendationPackageStore.load(this);
         String remotePolicy=foundation==null?"":foundation.optString("portablePolicyGeneration","");
@@ -131,6 +132,13 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
     }
 
     private void resolveAndApply(){
+        if(preview!=null&&preview.optJSONObject("tagPolicyConflict")!=null&&tagPolicyResolution.isEmpty()){
+            new AlertDialog.Builder(this).setTitle(LocalizedText.ui(this,"标签方案冲突","Tag scheme conflict","タグ設定の競合"))
+                .setMessage(LocalizedText.ui(this,"两端都修改了标签参与范围或私人标签。选择保留哪一整套方案；取消不会丢弃手机待同步修改。","Both devices changed tag scope or private labels. Choose the complete scheme to keep; cancel preserves pending edits.","両端でタグ範囲・個人タグを変更しました。採用する設定を選択してください。キャンセルしても未同期の変更は残ります。"))
+                .setNegativeButton(LocalizedText.ui(this,"取消","Cancel","キャンセル"),(d,w)->{})
+                .setNeutralButton(LocalizedText.ui(this,"使用电脑方案","Use Desktop scheme","PC の設定を使う"),(d,w)->{tagPolicyResolution="DESKTOP";resolveAndApply();})
+                .setPositiveButton(LocalizedText.ui(this,"使用手机方案","Use phone scheme","スマホの設定を使う"),(d,w)->{tagPolicyResolution="ANDROID";resolveAndApply();}).show();return;
+        }
         JSONArray conflicts=preview==null?null:preview.optJSONArray("conflicts");
         if(conflicts==null||conflicts.length()==0){apply(new JSONArray());return;}
         if(conflicts.length()==1){
@@ -193,11 +201,12 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
 
     private void apply(JSONArray resolutions){
         if(loading)return;loading=true;render();
+        if(!tagPolicyResolution.isEmpty())resolutions.put(resolution("TAG_POLICY_V1",tagPolicyResolution));
         new Thread(()->{
             try{
                 JSONObject result=BridgeClient.syncRecommendationState(this,false,resolutions);
                 if(result.optBoolean("requiresResolution",false))throw new IllegalStateException("仍有未解决的推荐偏好冲突");
-                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,LocalizedText.ui("推荐知识与人工调整已同步；两端当前推荐周期保持独立"),Toast.LENGTH_LONG).show();loadPreview();});
+                runOnUiThread(()->{if(destroyed)return;loading=false;tagPolicyResolution="";Toast.makeText(this,LocalizedText.ui("推荐知识与人工调整已同步；两端当前推荐周期保持独立"),Toast.LENGTH_LONG).show();loadPreview();});
             }catch(Exception e){
                 runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?LocalizedText.ui("推荐同步失败"):e.getMessage(),Toast.LENGTH_LONG).show();render();});
             }
@@ -226,6 +235,8 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
     ){
         JSONArray conflicts=value.optJSONArray("conflicts");
         StringBuilder conflictIds=new StringBuilder();
+        if(value.optJSONObject("tagPolicyConflict")!=null)conflictIds.append("TAG_POLICY_V1|");
+        if(value.optBoolean("tagPolicyChanged",false))conflictIds.append("TAG_POLICY_CHANGED|");
         if(conflicts!=null)for(int i=0;i<conflicts.length();i++){
             JSONObject row=conflicts.optJSONObject(i);
             if(row!=null)conflictIds.append(row.optString("identity","")).append('|');
@@ -262,8 +273,8 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
                     (!remoteBehavior.isEmpty()&&!remoteBehavior.equals(local.behaviorGeneration))
                 );
                 JSONArray conflicts=value.optJSONArray("conflicts");
-                int conflictCount=conflicts==null?0:conflicts.length();
-                int changes=value.optInt("androidControlChanges",0)+value.optInt("desktopControlChanges",0)+value.optInt("feedbackChanges",0)+value.optInt("eventChanges",0)+value.optInt("suppressChanges",0)+value.optInt("tasteExclusionChanges",0)+value.optInt("dispositionChanges",0)+value.optInt("catalogEvidenceChanges",0);
+                int conflictCount=(conflicts==null?0:conflicts.length())+(value.optJSONObject("tagPolicyConflict")==null?0:1);
+                int changes=value.optInt("androidControlChanges",0)+value.optInt("desktopControlChanges",0)+value.optInt("feedbackChanges",0)+value.optInt("eventChanges",0)+value.optInt("suppressChanges",0)+value.optInt("tasteExclusionChanges",0)+value.optInt("dispositionChanges",0)+value.optInt("catalogEvidenceChanges",0)+(value.optBoolean("tagPolicyChanged",false)?1:0);
                 if(changes==0&&!packageChanged&&conflictCount==0)return;
                 if(conflictCount>0){
                     if(!RecommendationSyncPreferences.alertConflicts(activity))return;

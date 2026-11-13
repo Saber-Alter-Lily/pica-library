@@ -96,10 +96,19 @@ jobs:
             'X-GitHub-Api-Version' = '2022-11-28'
             'User-Agent' = 'pica-library-p2-hardening-gate'
           }
-          $releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=100'
+          # Some API/cache paths return an empty result for per_page=100 even
+          # while the default-size pages and direct tag lookups remain available.
+          # Enumerate bounded smaller pages; never turn lookup failure into PASS.
+          $releases = @()
+          for ($page = 1; $page -le 20; $page++) {
+            $batch = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=30&page=$page"
+            $releases += $batch
+            if ($batch.Count -lt 30) { break }
+            if ($page -eq 20) { throw 'Accepted release enumeration exceeded the safe page limit' }
+          }
           $candidates = @(
             $releases | ForEach-Object {
-              if ([string]$_.tag_name -match '^v(\d+\.\d+\.\d+)$') {
+              if (-not $_.draft -and -not $_.prerelease -and [string]$_.tag_name -match '^v(\d+\.\d+\.\d+)$') {
                 $candidate = [version]$Matches[1]
                 if ($candidate -lt $current) {
                   [pscustomobject]@{ Version=$candidate; Release=$_ }
@@ -115,7 +124,19 @@ jobs:
           if (-not $asset) { throw "Previous accepted Windows asset missing: $assetName" }
           $baseDir = 'artifacts\release-base'
           New-Item -ItemType Directory -Force -Path $baseDir | Out-Null
-          Invoke-WebRequest -Headers $headers -Uri $asset.browser_download_url -OutFile (Join-Path $baseDir $assetName)
+          # GitHub's release download CDN intermittently returns HTTP 504.
+          # Retry the same selected asset only; never substitute a new release.
+          $destination = Join-Path $baseDir $assetName
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Remove-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue
+            try {
+              Invoke-WebRequest -Headers $headers -Uri $asset.browser_download_url -OutFile $destination -ErrorAction Stop
+              break
+            } catch {
+              if ($attempt -eq 3) { throw }
+              Start-Sleep -Seconds (2 * $attempt)
+            }
+          }
           Write-Host "Prepared accepted launcher baseline: v$baseVersion"
       - name: Build and smoke current Windows package
         shell: pwsh
@@ -143,9 +164,14 @@ jobs:
         with:
           packages: platform-tools
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 after official distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
       - name: Run Android unit/lint/release + performance harness build
         working-directory: mobile/android-alpha2
         run: |
@@ -170,9 +196,14 @@ jobs:
         with:
           packages: platform-tools
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 after official distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -209,9 +240,14 @@ jobs:
         with:
           packages: platform-tools
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: gradle_setup
+        continue-on-error: true
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Recover checksum-pinned Gradle 8.9 after official distribution outage
+        if: steps.gradle_setup.outcome == 'failure'
+        run: bash scripts/ci/install-gradle-8.9-fallback.sh
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

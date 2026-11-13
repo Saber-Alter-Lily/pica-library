@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const root = path.resolve(import.meta.dirname, '../..')
 const app = fs.readFileSync(path.join(root, 'web/app.js'), 'utf8')
+const viewport = fs.readFileSync(path.join(root, 'web/reader-viewport.js'), 'utf8')
 const html = fs.readFileSync(path.join(root, 'web/index.html'), 'utf8')
 const css = fs.readFileSync(path.join(root, 'web/styles.css'), 'utf8')
 
@@ -21,11 +22,13 @@ describe('dev.2 connected Web lifecycle contracts', () => {
     })
 
     it('reader_progress_vertical_visible_window', () => {
-        expect(app).toContain("'IntersectionObserver' in window")
-        expect(app).toContain("rootMargin: '-45% 0px -45% 0px'")
-        expect(app).toContain('entry.boundingClientRect.top')
-        expect(app).toContain('queueReaderProgress(nearest.pageIndex)')
-        expect(app).toContain('document.elementFromPoint(x, y)')
+        expect(viewport).toContain("'IntersectionObserver' in browser")
+        expect(viewport).toContain("rootMargin: '-45% 0px -45% 0px'")
+        expect(viewport).toContain('if (session.interacted) queueSample()')
+        expect(viewport).toContain('ready(image)')
+        expect(viewport).toContain('record(Number(image.dataset.readerPage))')
+        expect(viewport).toMatch(/document\s*\.elementFromPoint\(x, y\)/)
+        expect(app).toContain('onPage: queueReaderProgress')
         expect(app).not.toContain("$('[data-reader-page]')")
         expect(app).not.toContain('image.getBoundingClientRect().top')
     })
@@ -39,7 +42,8 @@ describe('dev.2 connected Web lifecycle contracts', () => {
 
     it('reader_vertical_tracking_cleanup', () => {
         expect(app).toContain('function resetReaderViewportTracking()')
-        expect(app).toContain('readerPageObserver?.disconnect()')
+        expect(app).toContain('readerViewportTracker.stop()')
+        expect(viewport).toContain('previous.observer?.disconnect()')
         expect(app).toMatch(
             /async function exitReader\(\)[\s\S]*resetReaderViewportTracking\(\)/
         )
@@ -73,25 +77,25 @@ describe('dev.2 connected Web lifecycle contracts', () => {
         'reader_resume_clamps_removed_page'
     ])('%s', () => {
         expect(app).toContain("'/api/v1/online-reader' : '/api/v1/reader'")
-        expect(app).toContain('api(`${root}/progress`)')
+        // The same Reader uses the original local/online roots and an optional,
+        // CSRF-scoped signed-session root. Signed read options must not be
+        // accidentally removed when extending the shared progress endpoint.
+        expect(app).toContain('api(`${root}/progress`, signedReadOptions)')
+        expect(app).toContain('const signedReadOptions = signedSessionId ? { headers:')
+        expect(app).toContain("'x-pica-csrf': signedCsrfToken || desktop?.csrfToken || ''")
         expect(app).toContain('chapter.progress?.pageIndex || 0')
         expect(app).toContain('Math.max(0, chapter.pages.length - 1)')
     })
 
-    it('reader_vertical_resume_scrolls_to_saved_page_before_observing', () => {
+    it('reader_vertical_resume_waits_for_image_before_positioning_and_writing', () => {
         expect(app).toContain('const resumePage = reader.pageIndex')
-        expect(app).toContain(
-            '.querySelector(`[data-reader-page="${resumePage}"]`)'
-        )
-        expect(app).toContain("?.scrollIntoView({ block: 'center' })")
-        const tracker = app.slice(
-            app.indexOf('function observeVerticalReaderProgress'),
-            app.indexOf('function renderReaderPages')
-        )
-        expect(tracker.indexOf('scrollIntoView')).toBeGreaterThanOrEqual(0)
+        expect(viewport).toMatch(/target\.querySelector\(\s*`\[data-reader-page="\$\{resumePage\}"\]`/)
+        expect(viewport).toContain('!ready(anchor)')
+        expect(viewport).toContain("anchor.scrollIntoView({ block: 'center', behavior: 'instant' })")
+        expect(viewport).toContain('if (!session.interacted) record(resumePage)')
         expect(
-            tracker.indexOf('readerPageObserver = new IntersectionObserver')
-        ).toBeGreaterThan(tracker.indexOf('scrollIntoView'))
+            viewport.indexOf('record(resumePage)')
+        ).toBeGreaterThan(viewport.indexOf('anchor.scrollIntoView'))
         expect(app).toContain("t('reader.resume'")
     })
 

@@ -1,0 +1,30 @@
+{
+  "sourceSha": "f4e2c2ba8cb147292e4c344c59ca1619766a4380",
+  "kind": "FROZEN_PREEXTRACTION_SHADOW_PIPELINE_AND_TASK_WITH_SHARED_UNCHANGED_ALGORITHMS",
+  "methods": [
+    {
+      "name": "recommendationV5ShadowStatus",
+      "sha256": "50b99e2d135ebbbb64a88a404b4fa9dcd1f8c959f28544c550fa06747294b3ed"
+    },
+    {
+      "name": "recommendationV5ShadowControl",
+      "sha256": "92b3e2f2b888861dca2e7b0313fce54108c549b389eaf4a9ec946e0053bb0913"
+    },
+    {
+      "name": "recommendationV5ShadowCheckpoint",
+      "sha256": "573f964d4b9e6ca8c8082c04bb1765b8b36b8a61f40d75613b5651357910a068"
+    },
+    {
+      "name": "finishRecommendationV5ShadowControl",
+      "sha256": "1e252867bf6e28d491b1a9339539633731994ae618ccf6bc5adb7c0a74e39298"
+    },
+    {
+      "name": "startRecommendationV5ShadowRetrieval",
+      "sha256": "d314d771df1d2b26926598f0f8ac883efefe0dadb9e046677313ccc345f74874"
+    },
+    {
+      "name": "runRecommendationV5ShadowRetrieval",
+      "sha256": "6ea766953240d899e5cebf7f8cd94541082bd154e1c33280acecae97ac77c148"
+    }
+  ]
+}

@@ -1,37 +1,45 @@
-import { copy as t, currentLanguage } from './locale-runtime.js'
+import { copy as t } from './locale-runtime.js'
+import { GUIDE_VERSION, normalizeGuideState, shouldPromptDaily, updateGuideProgress } from './onboarding-state.js'
+import { guideCatalog } from './guide-catalog.js'
 
-const TOUR_VERSION = 2
+const TOUR_VERSION = GUIDE_VERSION
 const STATE_KEY = 'pica-onboarding-state-v1'
 const SESSION_DISMISSED_KEY = 'pica-onboarding-session-dismissed-v1'
 let activeDriver = null
+let activeCleanup = null
 let promptScheduled = false
 let welcomeCheckTimer = null
 let welcomeReadinessObserver = null
+let activeGuide = { track: 'daily', chapter: null }
+let dismissedInMemory = false
 
 function readState() {
     try {
         const value = JSON.parse(localStorage.getItem(STATE_KEY) || '{}')
-        return {
-            completedVersion: Number(value.completedVersion || 0),
-            dismissedVersion: Number(value.dismissedVersion || 0),
-            autoShow: value.autoShow !== false
-        }
+        return normalizeGuideState(value)
     } catch {
-        return { completedVersion: 0, dismissedVersion: 0, autoShow: true }
+        return normalizeGuideState()
     }
 }
 function writeState(next) {
-    localStorage.setItem(STATE_KEY, JSON.stringify({ ...readState(), ...next }))
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(normalizeGuideState({ ...readState(), ...next }))) }
+    catch { dismissedInMemory = true }
     renderSettingsPanel()
     if (!shouldPrompt()) stopWelcomeReadinessWatch()
 }
 function shouldPrompt() {
-    const state = readState()
-    return (
-        state.autoShow &&
-        Math.max(state.completedVersion, state.dismissedVersion) < TOUR_VERSION &&
-        sessionStorage.getItem(SESSION_DISMISSED_KEY) !== String(TOUR_VERSION)
-    )
+    let sessionDismissed = dismissedInMemory
+    try { sessionDismissed ||= sessionStorage.getItem(SESSION_DISMISSED_KEY) === String(TOUR_VERSION) } catch { /* unavailable storage */ }
+    return shouldPromptDaily(readState(), sessionDismissed)
+}
+function saveGuideProgress(patch) {
+    writeState(updateGuideProgress(readState(), activeGuide.track, activeGuide.chapter, patch))
+}
+function closeGuide(driver) {
+    const cleanup = activeCleanup
+    driver.destroy()
+    // Driver may omit onDestroyed when completing during its final animation.
+    cleanup?.()
 }
 function appReadyForTour() {
     const disclaimer = document.querySelector('#pica-disclaimer-gate')
@@ -39,11 +47,6 @@ function appReadyForTour() {
     const setup = document.querySelector('#setup')
     if (setup?.classList.contains('active')) return false
     return Boolean(document.querySelector('.app-nav, #home'))
-}
-function openSettingsPanel(id = 'general') {
-    document.querySelector('nav [data-view="maintenance"]')?.click()
-    const tab = document.querySelector(`#a87-${id}-tab`)
-    tab?.click()
 }
 const TOUR_TARGETS = [
     ['nav [data-view="library"]', 'library-nav'],
@@ -81,13 +84,13 @@ function markTourTargets(root = document) {
 
 function welcomeCopy() {
     return {
-        title: t('欢迎使用新版 Pica Library','Welcome to the new Pica Library','新しい Pica Library へようこそ'),
+        title: t('先学日常使用，进阶功能按需查看','Daily use first; advanced help when needed','日常操作から、高度な機能は必要な時に'),
         body: t(
-            '花几分钟完成一次真实使用流程：同步收藏、建立书架、生成和调整推荐、检查连接与画风设置。引导可以随时跳过；之后也可以在“设置 → 帮助与新手引导”重新查看。',
-            'Spend a few minutes walking through a real workflow: sync favorites, create shelves, generate and tune recommendations, then check connections and visual-style settings. You can skip at any time and replay it later from Settings → Help & Onboarding.',
-            '数分で実際の利用手順を確認します：お気に入り同期、本棚作成、おすすめ生成・調整、接続状態と画風設定。いつでもスキップでき、後から「設定 → ヘルプと初回ガイド」で再表示できます。'
+            '日常版只介绍找书、阅读、推荐和下载。高级版按章节介绍账号、偏好、画风、连接和诊断；不会自动开始高级教程，也不会执行同步、下载或改变设置。两套指南都可从“设置 → 帮助与新手引导”重新查看。',
+            'The daily tour covers finding, reading, recommendations and downloads. Advanced chapters explain accounts, preferences, visual style, connections and diagnostics. Advanced tours never start automatically; guides do not sync, download or change settings. Replay either from Settings → Help & Onboarding.',
+            '日常ガイドは作品探し・閲覧・おすすめ・ダウンロードを紹介します。高度なガイドはアカウント・嗜好・画風・接続・診断を章ごとに紹介します。自動開始や同期・取得・設定変更は行いません。「設定 → ヘルプと初回ガイド」で再表示できます。'
         ),
-        start: t('开始引导','Start tour','ガイドを開始'),
+        start: t('日常使用入门','Daily-use tour','日常操作ガイド'),
         later: t('稍后再看','Later','後で見る'),
         never: t('不再自动提示','Do not show automatically again','今後は自動表示しない')
     }
@@ -111,6 +114,7 @@ function ensureWelcomeDialog() {
         <label class="pica-onboarding-checkbox"><input id="pica-onboarding-never" type="checkbox"><span>${copy.never}</span></label>
         <div class="pica-onboarding-welcome-actions">
             <button id="pica-onboarding-later" type="button">${copy.later}</button>
+            <button id="pica-onboarding-advanced" type="button">${t('高级功能指南','Advanced feature guide','高度な機能ガイド')}</button>
             <button id="pica-onboarding-start" type="button" class="primary">${copy.start}</button>
         </div>
     </div>`
@@ -122,13 +126,17 @@ function ensureWelcomeDialog() {
         dialog.close()
         startTour({ replay: false })
     }
+    dialog.querySelector('#pica-onboarding-advanced').onclick = () => {
+        dismissWelcome(dialog.querySelector('#pica-onboarding-never').checked)
+        showAdvancedGuide()
+    }
     return dialog
 }
 
 function dismissWelcome(neverAgain) {
     const dialog = document.querySelector('#pica-onboarding-welcome')
-    if (neverAgain) writeState({ autoShow: false, dismissedVersion: TOUR_VERSION })
-    else sessionStorage.setItem(SESSION_DISMISSED_KEY, String(TOUR_VERSION))
+    if (neverAgain) writeState({ ...updateGuideProgress(readState(), 'daily', null, { dismissedVersion: TOUR_VERSION }), autoShow: false })
+    else { dismissedInMemory = true; try { sessionStorage.setItem(SESSION_DISMISSED_KEY, String(TOUR_VERSION)) } catch { /* session only */ } }
     if (dialog?.open) dialog.close()
 }
 
@@ -196,46 +204,6 @@ function scheduleWelcome() {
     queueWelcomeReadinessCheck(650)
 }
 
-function stepText() {
-    return {
-        libraryTitle: t('统一书库','Unified library','統合ライブラリ'),
-        libraryBody: t('Pica、E-H、本地下载和远程副本都在这里统一整理。点击“下一步”会真正打开书库。','Organize Pica, E-H, local downloads and remote copies in one library. Next opens the library itself.','Pica、E-H、ローカルダウンロード、リモートコピーを1つのライブラリで整理します。「次へ」で実際にライブラリを開きます。'),
-        syncTitle: t('先同步收藏','Sync favorites first','まずお気に入りを同期'),
-        syncBody: t('普通“更新收藏”先核对总数和最近变化，能确认时只做增量同步；只有数量/顺序无法安全对上或需要定期校验时才回退完整扫描。同步过程中可以看到页数、进度，并可暂停或取消。','Normal Sync Favorites checks counts and recent changes first and uses an incremental reconciliation when safe. It falls back to a full scan only when count/order cannot be reconciled safely or a periodic audit is due. Progress is visible and the task can be paused or cancelled.','通常の「お気に入りを同期」は件数と最近の変更を先に確認し、安全に判断できる場合は差分同期します。件数や順序を安全に照合できない場合、または定期監査時のみ全件確認へ切り替わります。進捗を確認でき、一時停止やキャンセルも可能です。'),
-        filterTitle: t('搜索与筛选','Search & filters','検索と絞り込み'),
-        filterBody: t('可以按标题、作者、标签、来源、存储位置等缩小范围。','Narrow the library by title, author, tags, provider, storage location and more.','タイトル、作者、タグ、配信元、保存場所などで絞り込めます。'),
-        shelvesTitle: t('建立书架','Create shelves','本棚を作成'),
-        shelvesBody: t('书架用于你自己的分类，不会改变原网站收藏。下一步会进入书架页。','Shelves are your own organization layer and do not change provider favorites. Next opens Shelves.','本棚は自分用の整理機能で、配信元のお気に入り状態は変更しません。「次へ」で本棚を開きます。'),
-        shelfCreateTitle: t('新建与管理书架','Create and manage shelves','本棚を作成・管理'),
-        shelfCreateBody: t('可以建立多个书架，把书库、搜索或推荐中的作品批量加入；之后也能重命名、移出或删除书架。','Create multiple shelves and batch-add works from Library, Search or Recommendations; shelves can later be renamed, edited or deleted.','複数の本棚を作成し、ライブラリ・検索・おすすめから作品をまとめて追加できます。後から名前変更、作品の移動、本棚の削除もできます。'),
-        discoverTitle: t('推荐与在线发现','Recommendations & discovery','おすすめとオンライン発見'),
-        discoverBody: t('推荐与在线搜索共用同一套书库身份。下一步会打开推荐页。','Recommendations and online search share the same library identities. Next opens discovery.','おすすめとオンライン検索は同じライブラリIDを共有します。「次へ」で発見ページを開きます。'),
-        recommendTitle: t('专属推荐','Personal recommendations','パーソナルおすすめ'),
-        recommendBody: t('推荐结合长期收藏、最近行为、显式偏好和本次想看。一个推荐周期会提前生成多批结果，每批通常 12 本；切换批次不会重新读取全部收藏。喜欢/不喜欢会写入行为证据，人工调整则用于更明确地改变长期或本次偏好。','Recommendations combine long-term favorites, recent behavior, explicit preferences and current-session intent. A cycle prepares multiple batches, typically 12 works each; switching batches does not reread the whole favorite library. Like/dislike records behavioral evidence, while manual tuning expresses stronger durable or session-specific intent.','おすすめは長期のお気に入り、最近の行動、明示的な嗜好、今回見たいものを組み合わせます。1サイクルで複数バッチ（通常12作品ずつ）を準備し、バッチ切替でお気に入り全体を再読込しません。好き/苦手は行動証拠として記録され、手動調整は長期または今回の嗜好を明示します。'),
-        settingsTitle: t('设置中心','Settings hub','設定センター'),
-        settingsBody: t('语言、推荐、连接、外观、存储和更新都集中在这里。','Language, recommendations, connections, appearance, storage and updates live here.','言語、おすすめ、接続、外観、保存先、更新をここで管理します。'),
-        recSettingsTitle: t('推荐与画风','Recommendations & visual style','おすすめと画風'),
-        recSettingsBody: t('这里可以查看推荐画像和实际构成，用 0–10 档调整作者/标签等偏好，设置屏蔽或“本次想看”，并管理与手机之间的推荐同步。','Inspect the recommendation profile and serving composition here, tune author/tag preferences on a 0–10 scale, block targets or set current-session intent, and manage recommendation sync with Android.','おすすめプロフィールと実際の構成を確認し、作者・タグなどを0–10で調整、ブロックや「今回見たい」を設定し、Androidとのおすすめ同期を管理できます。'),
-        connectionsTitle: t('连接与同步','Connections & sync','接続と同期'),
-        connectionsBody: t('这里管理 Android 配对、跨端同步和 WebDAV。下一步会打开连接设置。','Manage Android pairing, cross-device sync and WebDAV here. Next opens connection settings.','Android ペアリング、端末間同期、WebDAV を管理します。「次へ」で接続設定を開きます。'),
-        visualModeTitle: t('画风接入模式','Visual-style mode','画風連携モード'),
-        visualModeBody: t('OFF 表示完全不影响常规推荐；SHADOW 只分析不改变排序；LIVE 才会把电脑端预计算的画风相似度加入最终排序。','OFF leaves normal ranking untouched; SHADOW analyzes without changing ranking; LIVE adds Desktop-precomputed visual affinity to final ranking.','OFF は通常順位に影響せず、SHADOW は分析のみ、LIVE で Desktop 側の画風類似度を最終順位に反映します。'),
-        visualStrengthTitle: t('画风影响强度','Visual influence strength','画風の影響強度'),
-        visualStrengthBody: t('强度只调节画风在总分中的权重，不会替代作者、标签、最近行为和本次 Session。建议先用标准强度，再根据结果调整。','Strength changes only the visual contribution to the total score; it does not replace author, tag, recent-behavior or session signals. Start with Standard and adjust after observing results.','強度は総合スコア内の画風寄与だけを調整し、作者・タグ・最近の行動・Session を置き換えません。まず標準から試すのがおすすめです。'),
-        connectionStatusTitle: t('先看连接状态','Check connection state','接続状態を確認'),
-        connectionStatusBody: t('Pica、E-H/ExH、WebDAV 和手机局域网分别显示“已配置”和当前可用性。某个模块失败不会再把整套应用误判成 Browser Lite。','Pica, E-H/ExH, WebDAV and Phone LAN show configuration and current reachability separately. A failure in one optional module no longer downgrades the whole app to Browser Lite.','Pica、E-H/ExH、WebDAV、スマートフォンLANは設定状態と現在の利用可否を個別表示します。任意機能の失敗でアプリ全体が Browser Lite に誤降格することはありません。'),
-        ehTitle: t('E-H 登录方式','E-H login modes','E-H ログイン方法'),
-        ehBody: t('推荐的“网页登录并自动回传”会打开独立官方登录窗口，检测到会话后自动验证、保存并更新这里的状态；手动官网登录只是普通链接，不会自动回传登录结果。','Recommended managed web login opens an isolated official login window, captures the session after login, verifies and saves it, then updates status here. The manual official-site link is just a normal browser link and cannot return login state automatically.','推奨の管理Webログインは独立した公式ログイン画面を開き、ログイン後にセッションを検出・検証・保存して状態を更新します。手動リンクは通常のブラウザリンクなのでログイン結果を自動反映できません。'),
-        mobileTitle: t('手机直接读取电脑内容','Read Desktop content on your phone','スマートフォンからPCの内容を読む'),
-        mobileBody: t('同一局域网配对后，手机可以直接读取电脑已经下载的漫画，不必重复下载。','After LAN pairing, Android can read comics already downloaded on Desktop without downloading another copy.','同じLANでペアリングすると、Desktopでダウンロード済みの作品をスマートフォンから直接読めます。'),
-        languageTitle: t('语言与地区','Language & Region','言語と地域'),
-        languageBody: t('界面可以随时切换简体中文、日本語和 English，修改会立即保存。','Switch between Simplified Chinese, 日本語 and English at any time; changes are saved immediately.','简体中文・日本語・English をいつでも切り替えられ、変更はすぐに保存されます。'),
-        updateTitle: t('软件更新','Software update','ソフトウェア更新'),
-        updateBody: t('正式版本可以从这里检查更新。以后想重新看本引导，可回到“设置 → 帮助与新手引导”。','Check formal releases here. You can replay this tour later from Settings → Help & Onboarding.','正式版の更新をここで確認できます。このガイドは後から「設定 → ヘルプと初回ガイド」で再表示できます。'),
-        doneTitle: t('已经准备好了','You are ready','準備完了'),
-        doneBody: t('主要功能已经介绍完毕。以后随时可以从设置重新打开本引导。','That covers the main features. You can replay this tour from Settings at any time.','主な機能の説明は以上です。設定からいつでもこのガイドを再表示できます。')
-    }
-}
 
 function visibleTarget(selector) {
     const element = typeof selector === 'string'
@@ -282,6 +250,8 @@ function prepareSettingsOwner(panelId, selector, disclosureSelector = null) {
         const disclosure = document.querySelector(disclosureSelector)
         if (disclosure instanceof HTMLDetailsElement) disclosure.open = true
     }
+    for (let parent = document.querySelector(selector)?.parentElement; parent; parent = parent.parentElement)
+        if (parent instanceof HTMLDetailsElement) parent.open = true
 }
 
 function viewStep(viewId, selector, popover, extra = {}) {
@@ -311,59 +281,31 @@ function settingsStep(panelId, selector, popover, disclosureSelector = null, ext
     }
 }
 
-function makeSteps() {
-    const copy = stepText()
-    return [
-        viewStep('library','nav [data-view="library"]',
-            { title: copy.libraryTitle, description: copy.libraryBody }),
-        viewStep('library','[data-tour="library-sync"]',
-            { title: copy.syncTitle, description: copy.syncBody }),
-        viewStep('library','[data-tour="library-filter"]',
-            { title: copy.filterTitle, description: copy.filterBody }),
-        viewStep('shelves','nav [data-view="shelves"]',
-            { title: copy.shelvesTitle, description: copy.shelvesBody }),
-        viewStep('shelves','[data-tour="shelf-create"]',
-            { title: copy.shelfCreateTitle, description: copy.shelfCreateBody }),
-        viewStep('discover','nav [data-view="discover"]',
-            { title: copy.discoverTitle, description: copy.discoverBody }),
-        viewStep('discover','[data-tour="recommend-run"]',
-            { title: copy.recommendTitle, description: copy.recommendBody }),
-        viewStep('maintenance','nav [data-view="maintenance"]',
-            { title: copy.settingsTitle, description: copy.settingsBody }),
-        settingsStep('recommendations','#a87-recommendations-tab',
-            { title: copy.recSettingsTitle, description: copy.recSettingsBody }),
-        settingsStep('recommendations','#visual-rerank-mode',
-            { title: copy.visualModeTitle, description: copy.visualModeBody },
-            '#ux-visual-settings',
-            { skipMissingElement: true }),
-        settingsStep('recommendations','#visual-strength',
-            { title: copy.visualStrengthTitle, description: copy.visualStrengthBody },
-            '#ux-visual-settings',
-            { skipMissingElement: true }),
-        settingsStep('connections','#a87-connections-tab',
-            { title: copy.connectionsTitle, description: copy.connectionsBody }),
-        settingsStep('connections','#a83-connections',
-            { title: copy.connectionStatusTitle, description: copy.connectionStatusBody },
-            null,
-            { skipMissingElement: true }),
-        settingsStep('connections','#settings-mobile-bridge',
-            { title: copy.mobileTitle, description: copy.mobileBody },
-            null,
-            { skipMissingElement: true }),
-        settingsStep('general','#settings-eh-account',
-            { title: copy.ehTitle, description: copy.ehBody },
-            null,
-            { skipMissingElement: true }),
-        settingsStep('general','#a87-language-panel',
-            { title: copy.languageTitle, description: copy.languageBody }),
-        settingsStep('maintenance','#software-updates',
-            { title: copy.updateTitle, description: copy.updateBody }),
-        { popover: { title: copy.doneTitle, description: copy.doneBody,
-            onNextClick: (_e,_s,opts) => {
-                writeState({ completedVersion: TOUR_VERSION, dismissedVersion: 0 })
-                opts.driver.destroy()
-            } } }
-    ]
+function makeSteps(track = 'daily', chapter = null) {
+    const catalog = guideCatalog(t)
+    const definition = track === 'advanced'
+        ? catalog.chapters.find((item) => item.id === chapter)?.steps
+        : catalog.daily
+    if (!definition) return []
+    return [...definition.map((item, index) => {
+        const popover = { title: item.title, description: item.body }
+        const result = item.panel
+            ? settingsStep(item.panel, item.selector, popover, item.disclosure)
+            : viewStep(item.view, item.selector, popover)
+        const prepare = result.onHighlightStarted
+        result.onHighlightStarted = (element, step, opts) => {
+            saveGuideProgress({ position: index })
+            prepare?.(element, step, opts)
+        }
+        return result
+    }), { popover: {
+        title: track === 'daily' ? t('日常入门完成', 'Daily tour complete', '日常ガイド完了') : t('本章已读', 'Chapter read', 'この章は読了'),
+        description: t('指南进度与实际配置分开记录。你可以从帮助中重看；读完不会启动任务，也不代表账号、同步或模型已配置成功。', 'Guide progress is separate from actual configuration. Replay from Help. Finishing starts no tasks and does not verify accounts, sync or models.', '読了状態と実際の設定は別管理です。ヘルプから再表示でき、読了してもタスクの開始やアカウント・同期・モデルの検証は行いません。'),
+        onNextClick: (_e, _s, opts) => {
+            saveGuideProgress({ completedVersion: TOUR_VERSION, dismissedVersion: 0, position: 0 })
+            closeGuide(opts.driver)
+        }
+    } }]
 }
 
 function skipCopy() {
@@ -385,11 +327,17 @@ async function confirmSkip(driver) {
         ? await window.picaConfirmAction(copy.body, copy.title)
         : window.confirm(`${copy.title}\n\n${copy.body}`)
     if (!confirmed) return
-    writeState({ dismissedVersion: TOUR_VERSION })
-    driver.destroy()
+    saveGuideProgress({ dismissedVersion: TOUR_VERSION })
+    closeGuide(driver)
 }
 
 function addSkipButton(popover, opts) {
+    const element = opts.driver.getActiveElement?.()
+    if (element?.id === 'driver-dummy-element') {
+        const description = popover.description || popover.wrapper.querySelector('.driver-popover-description')
+        if (description && opts.driver.getActiveIndex() < opts.driver.getConfig().steps.length - 1)
+            description.append(document.createTextNode(t(' 当前模式未显示此控件；本步骤只介绍用途，不代表功能已连接或可用。', ' This control is not shown in the current mode; this explanation does not mean it is connected or available.', ' 現在のモードでは操作項目が表示されていません。説明は接続済み・利用可能という意味ではありません。')))
+    }
     if (popover.footerButtons.querySelector('.pica-tour-skip')) return
     const button = document.createElement('button')
     button.type = 'button'
@@ -400,19 +348,43 @@ function addSkipButton(popover, opts) {
     popover.closeButton.setAttribute('aria-label', skipCopy().skip)
 }
 
-function startTour({ replay = false } = {}) {
+function startTour({ track = 'daily', chapter = null, restart = false } = {}) {
     ensureSettingsPanel()
     markTourTargets()
     const factory = window.driver?.js?.driver
     if (typeof factory !== 'function') return false
-    if (activeDriver?.isActive?.()) activeDriver.destroy()
-    const steps = makeSteps()
+    if (activeDriver?.isActive?.()) return false
+    if (!['daily', 'advanced'].includes(track)) return false
+    if (track === 'advanced' && !guideCatalog(t).chapters.some((item) => item.id === chapter)) return false
+    activeGuide = { track, chapter }
+    const steps = makeSteps(track, chapter)
+    const state = readState()
+    const progress = track === 'daily' ? state.daily : state.chapters[chapter]
+    const position = restart || progress.completedVersion >= TOUR_VERSION ? 0 : Math.min(progress.position, steps.length - 1)
+    const originalView = document.querySelector('section.view.active')?.id
+    const originalTab = document.querySelector('.a87-hub-nav [aria-selected="true"]')?.id
+    const originalFocus = document.activeElement
+    const disclosures = [...document.querySelectorAll('details')].map((element) => [element, element.open])
+    let restored = false
+    const cleanup = () => {
+        if (restored) return
+        restored = true
+        activeDriver = null
+        activeCleanup = null
+        if (originalTab) document.getElementById(originalTab)?.click()
+        if (originalView) ensureView(originalView)
+        for (const [element, open] of disclosures) if (element.isConnected) element.open = open
+        if (originalFocus instanceof HTMLElement && originalFocus.isConnected) originalFocus.focus({ preventScroll: true })
+        renderSettingsPanel()
+    }
+    activeCleanup = cleanup
     activeDriver = factory({
         steps,
         animate: true,
         smoothScroll: true,
         allowClose: true,
         allowScroll: true,
+        disableActiveInteraction: true,
         overlayClickBehavior: 'none',
         showProgress: true,
         progressText: t('{{current}} / {{total}}','{{current}} / {{total}}','{{current}} / {{total}}'),
@@ -423,23 +395,53 @@ function startTour({ replay = false } = {}) {
         stagePadding: 8,
         stageRadius: 12,
         waitForElement: 2500,
-        skipMissingElement: true,
+        skipMissingElement: false,
         onPopoverRender: addSkipButton,
         onDestroyStarted: (_element,_step,opts) => void confirmSkip(opts.driver),
-        onDestroyed: () => { activeDriver = null }
+        onDestroyed: cleanup
     })
-    if (replay) sessionStorage.removeItem(SESSION_DISMISSED_KEY)
-    activeDriver.drive()
+    dismissedInMemory = true
+    try { sessionStorage.setItem(SESSION_DISMISSED_KEY, String(TOUR_VERSION)) } catch { /* optional help persistence */ }
+    activeDriver.drive(position)
     return true
 }
 
 function settingsCopy() {
     return {
         title: t('帮助与新手引导','Help & Onboarding','ヘルプと初回ガイド'),
-        text: t('可以随时重新查看完整任务引导：收藏同步、书架、推荐、画风和连接。关闭自动提示后，仍然可以手动启动。','Replay the full task-oriented tour at any time: favorite sync, shelves, recommendations, visual style and connections. Turning off automatic prompts never disables manual replay.','お気に入り同期、本棚、おすすめ、画風、接続を含む完全なタスクガイドをいつでも再表示できます。自動表示をオフにしても手動再生は利用できます。'),
-        replay: t('重新查看新手引导','Replay onboarding','初回ガイドをもう一度見る'),
-        auto: t('自动显示新版功能引导','Show new-feature onboarding automatically','新機能ガイドを自動表示')
+        text: t('日常版只介绍找书、阅读、推荐与下载；高级版分章节说明配置方法和边界。可随时跳过、继续或重新查看，不执行同步、下载、删除或模型任务。','The daily guide covers finding, reading, recommendations and downloads. Advanced chapters explain configuration and limits. Skip, continue or replay without executing sync, downloads, deletion or model jobs.','日常版は作品探し・閲覧・おすすめ・取得を紹介し、高度な版は設定手順と制約を章ごとに説明します。同期・取得・削除・モデル処理を実行せず、中断・再開・再表示できます。'),
+        replay: t('日常使用入门','Daily-use tour','日常操作ガイド'),
+        auto: t('首次自动提示日常引导','Offer the daily guide automatically','日常ガイドを自動案内')
     }
+}
+function showAdvancedGuide() {
+    if (activeDriver?.isActive?.()) return
+    let dialog = document.querySelector('#pica-advanced-guide')
+    if (!dialog) {
+        dialog = document.createElement('dialog')
+        dialog.id = 'pica-advanced-guide'
+        document.body.appendChild(dialog)
+    }
+    const state = readState()
+    dialog.innerHTML = `<div class="pica-onboarding-welcome-shell">
+        <h2>${t('高级功能指南', 'Advanced feature guide', '高度な機能ガイド')}</h2>
+        <p>${t('选择需要的一章。阅读进度单独记录；已读不代表已配置。指南不会执行登录、同步、下载、更新、删除或模型任务。', 'Choose a chapter. Reading progress is separate from configuration. Guides never execute login, sync, downloads, updates, deletion or model jobs.', '必要な章を選択します。読了と設定状態は別で、ログイン・同期・取得・更新・削除・モデル処理は実行しません。')}</p>
+        <div class="pica-guide-chapters">${guideCatalog(t).chapters.map((chapter) => {
+            const entry = state.chapters[chapter.id]
+            const completed = entry.completedVersion >= TOUR_VERSION
+            const status = completed ? t('已读，可重看', 'Read · replay', '読了・再表示可能') : entry.position > 0
+                ? t(`可继续 · 第 ${entry.position + 1} 步`, `Continue · step ${entry.position + 1}`, `再開・ステップ ${entry.position + 1}`)
+                : t('尚未阅读', 'Not read yet', '未読')
+            return `<button type="button" data-guide-chapter="${chapter.id}"><strong>${chapter.title}</strong><span>${status}</span></button>`
+        }).join('')}</div>
+        <div class="pica-onboarding-welcome-actions"><button id="pica-guide-close" type="button">${t('关闭', 'Close', '閉じる')}</button></div>
+    </div>`
+    dialog.querySelector('#pica-guide-close').onclick = () => dialog.close()
+    for (const button of dialog.querySelectorAll('[data-guide-chapter]')) button.onclick = () => {
+        dialog.close()
+        startTour({ track: 'advanced', chapter: button.dataset.guideChapter, replay: true })
+    }
+    if (!dialog.open) dialog.showModal()
 }
 function ensureSettingsPanel() {
     const general = document.querySelector('#a87-general-panel')
@@ -462,9 +464,11 @@ function renderSettingsPanel() {
     panel.innerHTML = `<h3>${copy.title}</h3><p>${copy.text}</p>
         <div class="a89-actions">
             <button id="a89-onboarding-replay" type="button">${copy.replay}</button>
+            <button id="a89-onboarding-advanced" type="button">${t('高级功能指南 · 按章节','Advanced guide · chapters','高度なガイド・章を選択')}</button>
             <label class="a89-auto"><input id="a89-onboarding-auto" type="checkbox" ${state.autoShow ? 'checked' : ''}><span>${copy.auto}</span></label>
         </div>`
     panel.querySelector('#a89-onboarding-replay').onclick = () => startTour({ replay: true })
+    panel.querySelector('#a89-onboarding-advanced').onclick = showAdvancedGuide
     panel.querySelector('#a89-onboarding-auto').onchange = (event) => {
         writeState({ autoShow: event.target.checked })
     }
@@ -542,11 +546,13 @@ function bootstrap() {
     })
     window.picaOnboarding = {
         version: TOUR_VERSION,
-        start: () => startTour({ replay: true }),
+        start: (options = {}) => startTour({ ...options, replay: true }),
+        advanced: showAdvancedGuide,
         state: () => ({ ...readState() }),
         resetForTesting: () => {
             localStorage.removeItem(STATE_KEY)
             sessionStorage.removeItem(SESSION_DISMISSED_KEY)
+            dismissedInMemory = false
         }
     }
 }

@@ -1,0 +1,26 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Only user-authorized external Host transport requests INTERNET.
+         No Reader, LocalComicStore, broad storage or source provider SDK. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="com.picalibrary.android.remote.BIND_SOURCE"/>
+    <queries>
+        <package android:name="com.picalibrary.android"/>
+        <package android:name="com.picalibrary.android.localcore.qa"/>
+        <package android:name="com.picalibrary.android.dev"/>
+        <package android:name="com.picalibrary.android.cleanqa"/>
+    </queries>
+    <application android:allowBackup="false" android:usesCleartextTraffic="true"
+        android:label="Pica Library Sources QA"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+        <service android:name="com.picalibrary.android.ExternalSourceService"
+            android:exported="true"
+            android:permission="com.picalibrary.android.remote.BIND_SOURCE">
+            <intent-filter><action android:name="com.picalibrary.android.remote.BIND_SOURCE"/></intent-filter>
+        </service>
+        <!-- Expose one Reader launcher only. Its same-signer UI may open
+             this permission-protected source settings Activity explicitly. -->
+        <activity android:name="com.picalibrary.android.HostBrowserActivity"
+            android:exported="true"
+            android:permission="com.picalibrary.android.remote.BIND_SOURCE"/>
+    </application>
+</manifest>

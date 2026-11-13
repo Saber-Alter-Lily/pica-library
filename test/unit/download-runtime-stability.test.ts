@@ -7,6 +7,7 @@ import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
 import type { Pica } from '../../src/sdk'
 import type { Comic, Episode, Picture } from '../../src/types'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const directories: string[] = []
 
@@ -82,7 +83,7 @@ function setupBlockedDownload() {
     const service = new LibraryService(
         database,
         dataDir,
-        provider as unknown as Pica
+        provider as unknown as Pica, undefined, undefined, enabledFixtureSources()
     )
     return { dataDir, database, service, release }
 }
@@ -144,7 +145,7 @@ describe('post-v0.4.7 Desktop download runtime stability', () => {
         database.close()
 
         database = new LibraryDatabase(path.join(dataDir, 'library.db'))
-        const service = new LibraryService(database, dataDir)
+        const service = new LibraryService(database, dataDir, undefined, undefined, undefined, enabledFixtureSources())
 
         expect(database.getDownloadJob(preparing.id)).toMatchObject({
             status: 'QUEUED',

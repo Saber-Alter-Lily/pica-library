@@ -1,5 +1,7 @@
 # Pica Library Desktop / Web 使用说明
 
+先看 [日常使用入门](DAILY_USE_GUIDE.zh-CN.md)；需要配置、画风或诊断时，再按章节查阅 [高级功能指南](ADVANCED_FEATURES_GUIDE.zh-CN.md)。软件内两套引导可在“设置 → 帮助与新手引导”打开。
+
 > 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.5.0**。
 
 ## 1. 安装与启动

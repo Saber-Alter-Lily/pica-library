@@ -1,12 +1,1551 @@
 # Pica Library Development Task Log
 
+### 2026-11-07 | R2/R4 integration checkpoint — original signed upgrade and offline Host-bookmark discovery (Draft #284)
+
+- **No release / no production mutation**: stable main remains `095d6910` / v0.5.0; use the sole integration branch `codex/product-integration-r1-20261102`. Real user profiles, source credentials, OTA, production release/tag and main are untouched. Engineering acceptance does not close physical G1, provider-content G2, real-profile G3 or signed-release G4.
+- **Verified previous baseline, not inherited by new code**: `1819df98` had successful *push* [S3 Android35 original Reader/Host E2E #42196949734](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42196949734) and actual published-v0.5.0 → same-production-ID/signer v56 [R4 #42196949643](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42196949643). A duplicate PR-triggered S3 job was intentionally SKIPPED; it was not a product failure. Three external Suwayomi extension JARs already passed real loading, source-ID registration and explicit uninstall 3/3 [#42196506959](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42196506959); real comic site search/chapters/pages are not verified.
+- **R4 actual old-user-preference retention, implemented**: commit [`29166f01`](https://github.com/Saber-Alter-Lily/pica-library/commit/29166f01f286ba8d2b1bedf4621797a670026386) extends the *existing* public-v0.5.0 APK Android35 workflow. In the original v55 native UI, create a shelf, select dark appearance, enable recommendation feedback-reason preference; confirm these settings after an old-app restart, Android PackageManager in-place same-ID/same-cert installation of physically clean original v56, and another offline cold restart. The old shelf and new preferences must all persist. Read only native settings/shelf UI; no `run-as`, no production user content and no new migration framework. Dedicated exact-commit [R4 #42445938301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42445938301) launched; mark **CI_PENDING** until terminal verdict (do not equate successful signing/build with the full UI flow passing).
+- **R2 original source-only Android Host useful offline workflow, implemented**: commit [`684768b0`](https://github.com/Saber-Alter-Lily/pica-library/commit/684768b06256b2d36c663d410e44f4aef7464bc9) adds user-initiated title/Host-name filtering and clearing to existing `HostBrowserActivity` saved online bookmarks. It uses the existing bounded `HostSavedBooks` metadata (max 500), the current 20-row pager, native controls and zh/en/ja labels. Works offline without source session or site calls, never modifies bookmark storage or imported pages. Filtered pagination and empty-match messages are handled in original UI. Existing full Android CI and actual signed Host Android35 [S3 #42446305833](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42446305833) were triggered; **CI_PENDING** until their exact-HEAD conclusions.
+- **Next cohesive product gates**: verify both new real UI journeys on their correct commit SHAs and repair actual failures; then exercise real lawful source chapters/images in the original Windows and Android Readers (two independent providers, with proof beyond JAR registration), obtain physical Android 360/393/480dp and ~1500-work performance evidence, and finalize authorized v0.5.0 profile-safe backup/diff/rollback and same-signer release. Keep this a single Draft integration branch rather than new micro PRs.
+
+### 2026-11-02 | R1 first integrated dual-platform local-core candidate (Draft #284)
+
+- Integration engineering baseline: previous #284 `245933d2` reached 28/28 Actions SUCCESS; **not** physical/UX acceptance. New R1 code shares the same original full-Web/native-Windows local Reader and Android local-core/local-storage/reader-view; no new Reader, database, test framework or source SDK.
+- Windows first build at `e65f2860bd126d8c885a8d01973b037e361981cf`: [real Windows ZIP build + extracted run #41433611974](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41433611974) SUCCESS; full-Web QA archive artifact `13135855970`, ~35.7MB, expires 2026-11-05 UTC. Source-free only, unsigned, isolated `%LOCALAPPDATA%/Pica Library Local`, **not** Release/OTA/legacy migration.
+- Source-free Android QA APK still uses existing CI artifact for exact PR SHA; new integration-branch Android 35 real SAF/shelves/Reader/force-stop workflow added. The older `e65f2860` [emulator run #41433612006](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41433612006) was IN_PROGRESS when checked; not counted as PASS. The exact next HEAD reruns both Windows and emulator acceptance to avoid borrowing historical checks.
+- Candidate and explicit manual physical-device workflow: [R1 dual-platform acceptance](docs/R1_LOCAL_CORE_DUAL_PLATFORM_CANDIDATE_20261102.md). Keep G1–G4 OPEN, no main merge, Release/OTA, old profile/data or real user account mutation.
+
+> **2026-11-02 product integration route:** [R0–R4 delivery roadmap](docs/PRODUCT_INTEGRATION_DELIVERY_20261102.md). Stop isolated micro-PR churn. Use a single Draft product-integration branch rooted at #282 (`27ce6f8b`) and deliver complete Windows/Android user journeys. S0–S6, 42+new cases, all historic failures and G1–G4 OPEN remain authoritative. Production main/Release/OTA/user profiles unchanged.
+
+### 2026-11-02 | S3 CORE-HOST-24: one original Web reading-library for local + authorized Host (stacked Draft #282)
+
+- Parent #281 exact head `98980f4b41e2ceaa3dc605790f81bb5e8d5c158c` is **24/24 Actions SUCCESS** (full Android/Web/Desktop, original browser and runtime gates). It is still Draft, unmerged and unpublished.
+- Real product gap: the original full Web already includes `installReadingLibrary`, but the source-free local/optional Suwayomi Desktop server returned **405** for its query, making recent local/selected Host books inaccessible through the unified UI. Reused **original** `ReadingLibrary` and `catalogueReadingPort` with the existing `LibraryDatabase.recentReadingProgress`; optional user-owned Host uses **existing** `HostedLibraryReader.readingLibraryRows(sessionId)`, local-only otherwise. No network, metadata fetch or source activation occurs when querying saved reading history.
+- Added only `POST /api/v1/desktop/reading-library/query` inside existing isolated full Web HTTP server under the original loopback + owned cookie + Origin/CSRF gate. Body accepts only `query` and (when an opt-in Host runtime exists) a validated volatile `hostSessionId`. Original shared library handles query validation, source filters, sorting, bounded pagination, partial source failures; Host revocation keeps local history. The ordinary default core still has **zero executable SourceHost dependencies**.
+- Original `web/reading-library.js` is unchanged and now renders the actual saved source-free local and explicitly selected Host items; original local and Hosted Reader routes are reused for resume. No new frontend page, DB/schema, recommendation pass, custom Host parser, plugin SDK, dependency, test runner or extra defensive framework.
+- Targeted extensions to **existing** real HTTP tests for local saved progress, selected Host, mixed reading library, rejection of foreign origin/CSRF and invalid Host session, no passive network, source disable while local survives. Added a single actual existing Playwright Chromium original Web assertion for display/loaded state. Synthetic Suwayomi upstream only, not real account/network content.
+- OSS references: [Suwayomi](https://github.com/Suwayomi/Suwayomi-Server) owned Host and [Mihon](https://github.com/mihonapp/mihon) decoupled sources; implementation directly reuses project code and does not copy third-party sources.
+- **Status EXACT_HEAD_CI_PENDING / DRAFT / NO_USER_ACCEPTANCE / NOT_RELEASED**. Release gates G1 real Android/Windows UX, G2 actual signed source publisher and OS/Binder, G3 legacy v0.5.0 profile upgrade/rollback and G4 signed official release remain OPEN. No merge main, no OTA, no actual user profile mutation. Details `docs/S3_CORE_HOST_READING_LIBRARY_20261102.md` and [PR #282](https://github.com/Saber-Alter-Lily/pica-library/pull/282).
+
+### 2026-11-01 | S3 CORE-HOST-23 — standalone source-free Desktop with optionally user-owned Suwayomi Host (Draft #281)
+
+- **Larger product batch** stacked on #280 (25/25 GitHub Actions at pinned parent `9357b8d`), with a new explicit user-owned Host Web/Reader runtime, not new QA-only browsing buttons. Normal source-free Windows preview, offline CLI, original provider-enabled v0.5.0, real profile, main and OTA unchanged.
+- Direct OSS/code reuse: the existing [Suwayomi](https://github.com/Suwayomi/Suwayomi-Server) standard GraphQL adapter via original `SourceHostInspector`, `SourceHostConnections`, `HostedLibraryReader`, `sourceHostStore`, `PreviewCacheManager`, `OnlineReaderService`; original `app.js`, `host-library.js`, `source-hosts.js`, `saved-source-hosts.js`, `ReaderService`, `LibraryDatabase`, `LocalLibraryIngestion` and native pickers. Mihon source-as-optional-extension model is UX context only. No new Host parser, source-market SDK, site provider, account bridge, Reader, data schema, download engine or runtime dependency beyond already installed `p-limit`.
+- The user-host alternative compiles as a **separate** `desktop-core-host-preview.mjs`, explicitly requires the `--explicit-user-host-preview` argument and a sentinel-owned OS-temp/isolated marked local profile. User-host management records are stored under this owned profile, host passwords only in the existing short-lived Reader session. The original zero-Host `desktop-core-preview.mjs` remains an executable-only entry with no exported runtime entry or Host module dependency.
+- Staged original full Web HTML has two SHA-verified modes: normal offline with original four top-level scripts and no Host management; optional Host mode includes only original `source-hosts.js`, `saved-source-hosts.js`, `host-library.js`. Both explicitly deny Pica/E-H/JM executable account/source scripts. The original `app.js` already statically imports the passive `host-library.js` helper, which is **not** a Host network initializer; neither normal configuration nor simple page opening contacts the Host.
+- The existing source-free localhost HTTP controller gains only app-injected typed Host ports, with explicit management and chapter/image/progress routes reusing existing Host service. Requests remain behind exact loopback origin, session cookie, CSRF and selected Host permission; native image requests receive a scoped same-origin Referer and image-destination exception. No general proxy, filesystem access, source installation, self-start or remote code execution.
+- Focused exact HTTP/Reader regressions added in `test/unit/offline-user-host-http.test.ts` including source-free default/Host variant dependency graphs, original stage assets, user-managed consent/enable/session, actual localhost HTTP search/selection/chapters/image/progress, forged/cookie-less requests and disable/revoke without deleting local media. No real Suwayomi server/provider or user's account used in this round; remote payloads are deterministic synthetic fixtures.
+- **Observed early CI failures retained:** initial `de0fd57` Web/Desktop CI failed 7 of 2904 unit tests despite tsc passing: normal verifier had classified the already present passive `host-library.js` import as Host-initializer; the original zero-export core candidate gained a named ESM export due to shared composition. Fixed by extracting the exported composition to `core-preview-runtime.ts`, leaving the standard default entry executable-only, and distinguishing passive Host library from explicitly loaded management scripts. Historical failed run is not a PASS.
+- Status is **IMPLEMENTED_IN_DRAFT / EXACT-HEAD_FULL_CI_PENDING / PHYSICAL_WINDOWS_PENDING / G1–G4 OPEN / NOT_DISTRIBUTABLE**. Real Suwayomi interop exists separately in earlier project QA, but this distinct source-free full Web composition has NOT yet been exercised with an actual remote user Host or physical Windows GUI. No merge, Release, OTA, live credentials or migration.
+- See `docs/S3_CORE_HOST_STANDALONE_20261101.md` and [Draft PR #281](https://github.com/Saber-Alter-Lily/pica-library/pull/281).
+
+### 2026-11-01 | S3 SIGNED-SRC-10 — complete user-initiated source search → original Web Reader (Draft, unpublished)
+
+- Stacked Draft on #279 `c5a7f72a` after that head passed **21/21 GitHub Actions**. New code is independent and requires its own exact-head CI.
+- Reused **existing EhProvider.search** in the already separately bundled anonymous `eh-public-reader` worker. No new scraper, provider authentication, source SDK, UI framework, Reader, downloader or database. The worker only receives a bounded explicit `query` via the prior trusted Node IPC. Search is not run on startup, open settings, refresh inventory, connect or passive status.
+- Added optional `ExternalReaderTransport.search`, `TrustedSourceProcess.search` and signed Desktop `command(operation:'search', sessionId, query)`. The app validates 2–120 character queries, at most 25 unique work-scoped results, exact IPC shape and an unchanged live signed session after awaiting the operation. A trusted Desktop identity bridge alone maps the E-H worker alias back to existing `eh:<gid>:<token>` catalogue IDs. Raw image URL, provider token, script path, publisher key and network URL never become HTTP search input.
+- Reused **original `web/source-choices.js` settings UI** (only visible with trusted controller) for an explicit source-local search form and bounded selectable result list. Selection dispatches a limited custom event to the **unchanged `web/app.js openReaderComic`**, retaining original chapters/image/scroll/progress route and source-specific isolation. Disable/uninstall/disconnect clear visible search results, and no content is added to the library merely by search.
+- Focused existing tests cover real Node child-process signed E-H Provider parser with **network responses simulated locally**, real authorized loopback HTTP search and hostile commands, synthetic owner mismatch, saved progress, source-off revocation, signed fixture worker and original Web reader wiring. No genuine E-H internet interaction, external customer account or actual signed first-party release executed.
+- OSS-first references: Mihon optional reading-source extension lifecycle and Suwayomi user-selected source browsing, but actual implementation reuses Pica Library contracts; **no third-party source code copied**.
+- Engineering acceptance still **CI_PENDING** until latest exact-head all required jobs close. Important **OPEN**: audited production publisher key and protected installation root, Android Binder/service, genuine network end-to-end on a user-chosen source, Windows physical UI, v0.5.0 old profile upgrade/rollback, G1–G4. No main merge, Release, OTA, actual user data or credentials accessed. See `docs/S3_SIGNED_SOURCE_SEARCH_READER_20261101.md`.
+
+### 2026-11-01 | S3 CORE-ANDROID-22: production local-library browse with shared source-neutral policy (Draft #279)
+
+- Parent #278 latest `1b1ee620afb665066ab1b53fc447953380996a73`: 21/21 workflows **SUCCESS** after repairing the pre-existing Android 35 E2E's ambiguous work-label long-press. The earlier `82539e0` emulator run was a genuine **FAIL**: a screenshot and native UI XML proved it opened full-screen Reader by long-pressing top **Continue reading · S3-QA-Comic** instead of the actual comic row; the fixture, import, shelf tombstone, read filter and saved-page continuation had passed. The script now targets the actual four-page row; the old failure remains recorded, not reclassified.
+- Stacked Draft #279 physically adds `:local-storage/LocalLibraryBrowse` (single source-neutral read-only policy) and makes both original installed `app/LocalComicImportActivity` and isolated `:local-app/LocalLibraryActivity` use the same local-inventory/real-session merge, title search, three sorts and visited/not-visited filter. Original installed App reads its **existing** `ReadingHistoryStore` profile; isolated QA reads **only** its own `ReaderHistoryLedger.localFile`.
+- Original app now exposes search, sort, read-state filter, latest Continue Reading, per-book resume using original `ReaderProgressLedger`/ReaderActivity, and long-press add-to-existing-or-new shelf using original `ShelfStore`/UnifiedCatalog metadata. Existing original SAF stage/confirm, original CBZ exporter and delete confirmation remain intact. Search filters the full inventory before rendering up to 100 cards instead of hard-stopping the first unfiltered 100.
+- OSS-first references: Mihon [repository](https://github.com/mihonapp/mihon), Kavita [repository](https://github.com/Kareadita/Kavita). Actual code reuses existing Pica Library modules and Android platform controls. No copied third-party code, second Reader, database, network permissions or storage schema.
+- Only one existing Robolectric test extended: synthetic imported local comic, original production history saved, read/unread/title query and same input page bytes. Existing TS source contract changes expected ID variable from `comic.id` to the same true `book.id`; original export authority preserved.
+- Current #279 state **IMPLEMENTED_IN_DRAFT / CI_PENDING / DEVICE_PENDING / USER_NOT_ACCEPTED / UNPUBLISHED**. Do not borrow parent CI. G1 (real UX/visual phone), G2 (trusted true external source and Android IPC), G3 (real v0.5.0 data upgrade), G4 (signed release) remain OPEN. No production login, data mutation, merge main or OTA.
+- Exact code changes and gate: `docs/S3_ANDROID_PRODUCTION_LOCAL_BROWSE_20261101.md`.
+
+### 2026-11-01 | S3 CORE-ANDROID-21: local catalogue browse, resume and shelf workflow (stacked Draft)
+
+- Implemented together in the **existing** source-free Android `:local-app`: local-title live search; recently imported/title/page-count sort; all/read/unread filter; most recently read quick resume and per-row resume; direct long-press add to a named shelf alongside original CBZ export/removal. Uses original `LocalComicReaderPort` immutable manifests, `ReaderHistoryLedger` session order, `ReaderProgressLedger` page restore and `ShelfLedger.setMembership` tombstone semantics, not duplicate storage or Reader.
+- Native Android `EditText`/dialog/buttons only. OSS design references: Mihon categories/read/unread filters; Kavita library sorting. No upstream source code copied, no additional packages/test frameworks/network/source SDK.
+- Expanded **one existing** Android 35 SAF/Reader/restart emulator flow to exercise revived shelf membership, saved-page quick resume and read-state filter; retains the existing real image byte and import/export proof rather than adding test scaffolds.
+- Code checkpoint `b563683411deb788232e31feea4e7c86d188d6d6`. **PENDING** exact-head full CI, independent QA APK six-DEX/Manifest source absence, Android 35 E2E. Do not infer PASS from previous #277 green. G1 physical UX, G2 external providers, G3 actual v0.5.0 old data migration and G4 signed release remain OPEN. No main merge, publication, OTA or production user-data mutation.
+- Technical delivery and boundary: `docs/S3_ANDROID_LOCAL_LIBRARY_BROWSE_20261101.md`.
+
+### 2026-11-01｜S3 SIGNED-SRC-09：本地可信 ZIP 安装复用原签名模块和原生选择器（隔离 Draft）
+
+- **复用优先**：原 `SignedWorkerStore.install`（应用预置 Ed25519 公钥与 SHA256、按代安装）、原 `TrustedSourceProcess`、`DesktopNativePicker` Windows WinForms / macOS AppleScript / Linux 原生 OpenFileDialog，以及已有 `adm-zip`；不创造新的插件 ABI、压缩器或来源市场。
+- 新 `LocalSignedSourceInstaller` 只读取用户经原生文件选择器明确选出的本机 ZIP，要求恰好两个成员 `release.json` 与 `worker.cjs`，限制压缩与解压大小，由原 Store 验证签名/完整性后安装，不自动启动、启用或联网。公钥来自应用可信注入的 Store，不能随 ZIP 或 HTTP 传入；取消返回 cancelled。
+- 原受控 `SignedSourceDesktopReader` 增可信可选 installer 能力；`{operation:'install',consent:true}` 不带 path/bytes/key 才可执行；原库存 `installAvailable` 只在本机能力实际注入时 true。原 Web 设置新增三语言“选择本地已签名来源 ZIP”按钮，明确确认后经操作系统文件选择；普通正式 Desktop 未注入该控制器，按钮不出现；核心无来源客户端静态资产不加载源 UI。
+- 现有 `signed-worker-lifecycle`、`signed-source-desktop-http`、`desktop-native-pickers` 的单测覆盖真实 ZIP、伪签名/额外 ZIP 成员拒绝、取消、受控 HTTP 安装后原 Reader 与停用；原 `source-choices` Playwright 真实页面点击安装、确认浏览器只传 `consent`。验收必须按精确新提交 CI。
+- 仍缺正式发行者公钥、受保护 OS 安装根、跨平台发布、真实 E-H/Pica/JM 来源和 Android Service/Binder；不可把该工程候选说成公众可安全安装任意代码。G1–G4 仍 OPEN，main/Release/OTA/用户资料不动。
+
+
+### 2026-11-01｜S3 SIGNED-SRC-08：可信签名来源接入原 Desktop 来源管理界面（隔离 Draft）
+
+- **第二轮独立源无关回归失败**：`446ef216` [CI #41323223846](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41323223846) 与新增浏览器用例提交 `f190f2a5` [CI #41323475391](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41323475391) Web/Desktop 实测都在旧 `reading-library-shell.test.ts` 的受控 VM 环境中失败：传入简化的 `document` 对象，但没有 `getElementById`（TypeError）；366/367 测试文件 PASS，故此处不是签名来源/服务错误。精确只补 `typeof document.getElementById === 'function'` 后再处理可选管理面板，其他启动/书库 API 不改，不替换或跳过现有测试。
+
+- 真实入口验收限于**一个已有 Playwright Browser Smoke 案例**：普通源设置页下签名面板默认隐藏；配置端注入可信控制器后，模拟原签名 HTTP 命令的返回，在 390px 英文原设置页实际点击展开→已验证来源列表→启用→连接→停用→确认卸载，确保页面无 JS error、无横向溢出，且展开之前没有任何 `signed-reader` 调用。继续通过原 `scripts/run-web-browser-smoke.sh` 运行，不建立新的浏览器测试框架；该案例仍属于模拟 HTTP，不替代真实签名二进制/物理 Windows 安装及真机 G1/G2。
+
+
+- **保留首轮失败并精准修复**：`32342add` [完整 CI #41322889664](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41322889664) 的 Web/Desktop 测试 366/367 文件通过、单个 `test/unit/web-source-free-bootstrap.test.ts` 失败：不带 DOM 的实际 `loadDesktop()` 初始化路径捕获了原 Desktop status 404，而新 UI 在 catch 使用 `# Pica Library Development Task Log
+
+ 导致 `ReferenceError: $ is not defined`；这是抽取函数的旧测试中真实发现的无源启动兼容倒退。只把该 catch 分支改为 DOM 存在时关闭签名面板，完全保留旧无源 capabilities fallback、Reader 和来源权限。未新增测试框架或放宽测试断言；以精确新提交重新验收。
+
+- **实际交互衔接补齐**：签名来源管理明确启用/连接/停用时，原统一阅读历史 `reading-library.js` 现复用既有 `scopeChanged` 逻辑，收到 `pica-signed-reading-scope-changed` 后刷新当前可见阅读路线，避免旧连接被撤销仍显示可阅读或已连接却没有同步原记录；此事件不会启动来源或全量重算。即使命令可能已生效、只是后续库存刷新失败，UI 改为“无法确认，请刷新状态”，不虚报操作未发生。
+
+
+- **实际使用缺口**：上一阶段签名来源 `SignedWorkerStore` 具备安装、启用、回滚、停用、卸载，但原 Web 设置页没有查看已安装组件和操作入口；只靠 QA 手写 HTTP 命令无法算用户可用。复用原 `web/index.html` 的「外部漫画来源」区域、`source-choices.js` 的三语言/状态交互、原受控 `/api/v1/desktop/signed-reader`，不建立新应用、插件市场、压缩/阅读器或 source SDK。
+- `SignedWorkerStore.installedSources` 只读列举原应用已安装且签名/哈希验证的版本目录，不运行 worker、不扫描互联网、不下载；原 `SignedSourceDesktopReader` 增 `inventory` 命令，包含版本、激活与运行状态；客户端通过已存在的 `activate/rollback/disable/connect/disconnect/uninstall` 控制。卸载按钮仅允许非当前启用版本且需要用户在系统对话框确认，不传脚本、安装路径、公钥、账户或内容到 HTTP。
+- **明确能力暴露**：只有 Desktop Composition 真实注入 `signedSourceReader` 时 `/api/v1/desktop/status` 才返回 `signedSourceManagement.available=true`，原 `web/app.js` 才展示高级折叠面板；普通正式程序没有注入该控制器，因此默认完全隐藏，不能仅凭来源 manifest 开启。打开设置和仅加载页面不发起来源进程/网络请求。原 Core-only Web QA 继续裁剪 `source-choices.js`，避免纯核心被拉入来源管理依赖。
+- 原签名生命周期单元测试加空库存及真实已安装签名版本映射；原 Desktop HTTP 集成测试验证已注入权限状态与零请求库存结果。尚待同一精确 HEAD 的完整 CI、实际 Chromium UI 与 Windows 可信发布根物理操作。**不宣称正式版已支持用户自行安装插件或真实来源帐号；G2、Android Service/Binder、正式签名、旧资料迁移和 G1–G4 继续 OPEN。** 保持 Draft，不合并 main/发布/OTA/真实用户资料。
+
+
+### 2026-10-31｜S3 SIGNED-SRC-07：已签名漫画源版本的真实列举与显式卸载（隔离 Draft）
+- 首轮精确 `d04e62b` 的 [CI #41281284735](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41281284735) Web/Desktop 作业 **FAIL** 于 TypeScript 语法解析：新增 HTTP 集成测试中 `expect((await removed.json()).toMatchObject(...)` 少一个右括号（TS1005 两处），还未运行至功能回归。只修正为 `expect(await removed.json()).toMatchObject(...)`，且测试自己经原真实章节/进度 POST 写入一条记录后再检验卸载保留，而不是依赖前一测试的持久化结果；不修改生产签名卸载逻辑或门禁。
+
+
+- 参考上游 [Mihon 扩展更新/管理](https://mihon.app/download/) 与 [Suwayomi 可选扩展](https://github.com/Suwayomi/Suwayomi-Server/wiki/Getting-Extensions) 的扩展生命周期语义，**直接复用**本项目已存在 `SignedWorkerStore` (Ed25519 签名、版本目录、启用/停用/回滚、只在明确连接时启动的 Node worker) 及 `SignedSourceDesktopReader` 原同源 CSRF HTTP 控制器，不另造插件宿主或执行格式。
+- 修复既有实际缺口：`installedVersions(sourceId)` 列举每个已验证的本地版本，不启动服务或访问网络；`uninstall(sourceId,version,expectedRevision)` 真正移除**非当前启用的**签名版本目录。仍拒绝直接删除运行中的当前版本，必须先用户停用。对旧版本卸载不改正在使用版本的指针/revision、不会中断已有 Reader 请求或删除图片、进度与标签数据。
+- 原受控 `/api/v1/desktop/signed-reader` 新增仅 `versions` 与带 `consent:true` 的 `uninstall` 两个命令；不得由浏览器指定执行文件路径、签名公钥、下载安装 URL；签名发布者必须由未来正式应用构建预先固定。常规正式 Desktop **未注入该签名控制器，仍不可通过此实验入口安装来源或执行任意代码**。
+- 仅补原 `signed-worker-lifecycle.test.ts` 与 `signed-source-desktop-http.test.ts` 定向回归，覆盖旧版本移除不影响现有 Reader、禁用后当前版本可删、磁盘版本清单、浏览器拒绝未确认命令及旧进度保留。精确新 SHA 的全量 CI 和 Windows 签名阶段仍需跑完；当前只为 S3 生命周期的一个工程薄片，G2、正式发行公钥/OS 安装权限、真实第二来源及 Android 服务依旧 OPEN。不动 main、Release、OTA、真实用户数据或授权源登录。
+
+
+### 2026-10-31｜S3 CORE-DESKTOP-20：复用系统“另存为”，完成无源 Windows 漫画导出用户流程
+- 本轮补原用户可见导出反馈：沿用 `#reader-message` 增加中英日“正在准备导出档案”，一次导出期间临时禁用原两个 ZIP/CBZ 按钮，成功/主动取消/失败都在同一 `finally` 恢复；防止双击出现并行的原同步 ZIP 工作。无新任务模型、Worker 或 UI 面板。现有 HTTP 回归的取消分支同步修正为导出前后文件字节真正比较，不做自比较。
+
+
+- 在已通过 24/24 GitHub Actions 的 Draft #274 后继续原功能，不新起压缩器/文件管理器。正式 Web 阅读器已有 ZIP/CBZ 按钮；原 `DesktopNativePicker.chooseSaveFile` 已支持 Windows WinForms、macOS 原生和 Linux 可用桌面文件选择器。只给原 `CoreLocalPicker` 增加一项信任域内 `chooseSaveArchive` 可选能力，并从 `core-preview-main.ts` 真实注入。
+- Source-free Full-Web 的原 `/api/v1/reader/export-zip|cbz` 请求继续严格保留会话 Cookie、Origin、CSRF、LOCAL 作品/章节关系、不可传文件路径；获用户系统保存位置后调用原 `ReaderService.exportZip/exportCbz`，以 `fs.promises.copyFile` 将**已生成的应用私有漫画页面档案**复制到用户确选目标。取消选择立即返回 `cancelled`，不会先生成文件。无头 QA 未提供保存器时保留旧的隔离私有导出方式。
+- 原 Web 仅识别 `cancelled` 并用现有中英日 i18n 提示“未保存”；正式含源 Desktop 原导出和外部文件打开询问不改。路径仍由系统原生弹窗决定，不以 HTTP 中的路径字符串为准；原长路径换行继续有效。
+- 仅在原 `offline-full-web-http.test.ts` 加一条真实 PNG→原 CBZ→受控系统保存目标的字节检查、未授权/任意路径拒绝、用户取消无虚假成功。真实 Windows 文件对话框人工验收、大文件同步 ZIP 性能、断电时目标文件完整性、正式 v0.5.0 迁移和 G1–G4 仍 OPEN。Draft 未发布、main/OTA/正式用户资料不动。
+
+
+### 2026-10-31｜S3 CORE-DESKTOP-19：无源 Windows 阅读器接通原 ZIP/CBZ 导出按钮
+- 实际显示验收时注意到原 `#reader-message` 是最大宽 720px 的固定提示条，核心模式新显示的 Windows 长目录路径可能溢出；直接复用其现有 CSS，单加 `overflow-wrap: anywhere`，不增加新对话框/布局系统或影响正常按钮功能。
+
+
+- **实际功能缺口**：Source-free Windows 的完整正式 Web UI 已展示 Reader “导出 ZIP/CBZ”按钮，而 source-free HTTP 仅处理 Reader 查询/阅读进度，点按钮返回 405。复用原正式 `ReaderService.exportZip/exportCbz`、现有 `AdmZip` 和应用私有 `exports/archives`，只在独立 Full-Web Local Core 显式 POST 时开放相同的原接口；零来源本地书库不带 Pica/E-H/JM、Host 或源 SDK。
+- 原 `qa-http.ts` 保留 cookie、loopback、Origin、CSRF 与 4096B JSON 界限；仅接受已知 `local:<sha>` 漫画与对应 `local:<sha>:chapter:<sha>`，不接收客户端传来的文件路径或远程 ID。旧正式 Desktop 的已有路由、Writer/Reader 模块及格式不变，无新压缩器/运行框架。
+- Full-Web Core 的保存成功状态显示真实目录路径，不再询问“用默认程序打开”这种当前 source-free OS opener 根本不支持的动作；正式 Desktop 保持原按钮行为。导出仅漫画页不是私人书架/历史/账号备份。
+- 仅在已有 Full-Web HTTP 集成测试内追加一次源无关 CBZ/ZIP 出口、真实 1 页字节、登录/CSRF 与非 LOCAL ID 拒绝回归。不声称大章节同步 ZIP 打包不会阻塞，性能/取消用户验收继续 OPEN；当前代码只在隔离 Draft，无 main/Release/OTA/正式用户 Profile 或真实账号接触。
+
+
+### 2026-10-31｜S3 CORE-ANDROID-18：无源 Android 本地书库共享正式版 CBZ 导出
+- **真实截图/Android UI 层级定位并修复第三轮模拟器选择失败**：精确源 `bc7d3d3` 的 [Android35 #41261400635](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41261400635) FAIL；`Download/S3-QA-Folder` 的系统 DocumentsUI 网格确有导出文件，原测试已改为点确切文件文本，然而网格中该 TextView 的中心实际落在屏幕底部导航区域（ADB 记录 y=1226），于是误触返回上层 `Download`，应用没有收到 URI。真实失败截图及 XML 已读取，**不是文件不存在或导出器数据损坏的证据**。当前只复用 Android 原生 DocumentsUI 右上「List view」按钮先切列表显示，再点确切文件名；保留原四张 PNG 字节对照。未改任何生产 Reader/导出/文件所有权权限或引入测试框架。原完整 CI #41261400692 SUCCESS 不能代替此修正后的精确提交。
+
+- **第三次精确模拟器失败记录（不隐去）**：`d42a0f0` 的 [完整 CI #41222583049](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222583049) SUCCESS；但 [真实 Android35 #41222583055](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222583055) FAIL。系统已实际列出 `Comic-S3-QA-Comic.cbz`（1.04 kB）；原有 `locate_document` 宽松模糊匹配先选中 `Preview the file Comic-S3-QA-Comic.cbz` 内容描述，点的是系统预览图标，不是精确文件行；故导入确认页从未出现。当前只改这**一个测试选取动作**为对真实文件文本 `exact=True`，继续要求重新导入后四张原图按字节一致。没有改文件数据、安全规则、模拟器工作流框架或产品端实现。
+
+- **第二次精确模拟器失败（保留 FAIL）**：测试 `87a6550` 的 Android35 [run #41222007662](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41222007662) 仍成功走完原导入、Reader、历史、书架及系统 SAF 的 `SAVE`，原 app 显示已导出四页及 SHA-256；但 `adb shell find /sdcard` 未找到文件。Android 文档提供者可能把用户创建的文件保存在 shell 不可枚举的位置。**导出数据可用性尚未经外部重新读取验收**；仅调整现有模拟器脚本：在系统 `ACTION_OPEN_DOCUMENT` 中重新选取刚写出的 CBZ，调用原 `LocalComicStore` 再导入，然后从本 QA 私有页面数据逐页与初始 fixture 按字节比较。禁止把 UI 完成提示当成文件字节通过；不新增导出实现、直接访问外部提供者私有目录或更改正常用户存储权限。
+
+- **模拟器真实截图的直接 UI 修正**：此前本地作品行仍写「长按删除」，但当前长按已是「导出 CBZ／删除」双选项；同步改成「长按操作」，保留三语言和原长按确认删除，并给导出成功回执的页码补空格。以原 Android 35 截图为缺陷证据，不新增截图框架或业务流程。
+
+- **第一次精确 SHA 验收回执**：`e0b62c9` 的完整 Android/Web/Desktop [CI #41221408228](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41221408228) 两项 SUCCESS，Android 原生构建/测试与独立无源 APK Manifest/DEX 检查均通过；但 Android35 [模拟器 #41221408290](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41221408290) 明确 FAIL。模拟器实操通过原 CBZ 导入、书架、Reader、重启恢复、文件夹导入，并在导出时成功点击系统保存键、实际 UI 显示 `CBZ exported`；失败源于验收脚本随后假定文件一定保存到 `/sdcard/Download`，`adb pull` 返回文件不存在。**不能凭 UI 成功把实体 ZIP 已读取验证说成 PASS**。只修正既有脚本在 Android 系统用户可访问文档根实际查找指定导出文件，再独立拉回校验四张 PNG 与 ZIP 清单。没有修改导出应用代码、安全权限或放宽 ZIP 内容要求。
+
+
+- 接续 #272 精确源 `f4e40d5a`（21/21 GitHub Actions SUCCESS），从正式 Android 的 `app/LocalComicExports` **原样物理迁移**到 `:local-storage`；原 app 的 `LocalComicExportActivity` / `LocalComicExportTest` 原有接口不变，导出器仍是已存在的纯 Java `:local-core/LocalComicExporter`，**绝不开发第二套压缩器或备份系统**。
+- 给真实可独立安装 `:local-app` 的本地作品长按菜单加入「导出 CBZ／删除副本」，使用 Android 系统 `ACTION_CREATE_DOCUMENT` 明确选保存位置，只传所选作品 ID；仍采用同一源文件/CRC/长度校验、私有暂存、export lease、SHA-256 回执、按块可取消写入。不索取网络/存储广域权限，不读旧正式用户资料。
+- 原书架/历史/阅读器不变；CBZ **只包含页面，不是个人书架/历史/标签/偏好备份**。取消或写出失败不删除用户选择的外部目标，提示可能存在不完整文件；原已导入漫画和历史不因导出改变。
+- 在现有 `native-local-export-contract` 调整被迁移的文件定位并断言 QA 真正调用共享导出；Android/Web/Desktop 原 CI/纯核心 APK 依赖闭包、已有 Android35 模拟器 SAF→导出 ZIP 实体校验必须按**新精确 SHA**执行。不引入第二套测试框架。此分支仅 Draft，G1–G4、正式用户资料迁移/回滚、来源独立安装撤销与正式发布仍 OPEN。
+
+
+### 2026-10-31｜S1/S2 CORE-ANDROID-17：复用原本地拷贝逐页进度，正式版/无源 QA 均显示实际导入进度
+
+- 首个带真实进度的源码 `1cd3dbec` 经确切 [CI #41193119984](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41193119984) Android 全量测试/构建通过，但 Web/Desktop 旧 `native-local-export-contract.test.ts` 对原 `LocalComicImporter.prepare` 的冻结库存排序片段哈希仍从原方法入口连续截取；新增可选 Progress 重载虽未改变原库存算法，却被包含进片段导致哈希不匹配。**保留原 authoritative SHA 和原前缀/尾部安全哈希完全不改**，只在旧断言内精确核对并剥离新增进度入口后继续校验原清单/自然排序片段的旧哈希，同时确认真正的 `copyPages(...,progress)`。未删旧测试、未换哈希或放宽路径/图像安全。新提交继续完整 CI/Android 实机模拟回归。
+
+
+- 同轮补充取消提示语义：正式 Android 用户主动取消时，沿用原 CANCEL 路径与清理，但完成后显示三语“导入已取消”，不再把主动取消错误归类为导入失败；真实损坏/权限/CRC 错误仍保留原失败说明。\n
+
+- 上游 `LocalComicImporter.Progress.page(complete,total)` 已存在、原大多数普通导入却丢掉回调。本轮只补两个保留旧签名的重载，folder/CBZ 原复制完成后真实页数直达正式版保留态 Session 和无源 local-app；复用原验证/CRC/原子 manifest，无第二套上传/调度任务、无新框架。
+- 正式 Android `LocalComicImportActivity` 显示原生水平进度和三语 `N/总数`，导入时允许主动取消，旧 Session 旋转保留与完成阶段不变。独立本地 APK 显示相同真实页数及细水平进度条，当前按钮/Reader/历史/书架保持不变。回调按首/末/每8页更新可见 UI，数据实际每页都由核心计算。
+- 只在现有 `LocalComicImportTest` 增一条真实 DocumentsProvider 回调序列与取消后不写入书库验证。当前属于实现候选，**新提交的 CI/DEX/模拟器不得借用 #271 旧成功记录**。真实手机/大文件耗时、旧版升级和来源外置发布仍需独立核验。
+
+### 2026-10-31｜S1/CORE-ANDROID-16：Reader 唯一界面物理三语资源修正
+
+- `9d68f0b` 的原 Android 构建/Web Desktop 主测试仍通过；S3 实际模拟器英文窄屏检查在进入 Reader 后被 Android 35 原生首次沉浸式全屏教育 `Viewing full screen / Got it` 遮挡，`Next`/ `Settings` 文本并未在该失败 UI 树出现，因此**不能**据此判定翻译或布局失败。将已有同一 ADB 脚本的阅读按钮定位改为：进入 Reader 时关闭系统一次性浮层、从**同一份 native UI hierarchy 快照**同时确认短 `Settings` 和 `Next`，随后直接点击英文 Next；如果原 Reader 自动隐藏控件，复用已有点击阅读画面中心显示控件的行为。无需 App 权限、业务或界面回退，不添加测试框架。必须在新精确 SHA 模拟器实际 PASS/截图后才关闭此项工程薄片。
+
+
+- 原首次三语 Reader 提交 `cbaac6d` 已经 **21/21 Actions SUCCESS**，Android 35 emulator 真正点击英文 `Next` 并完成 S3 全链路。人工目测其 360dp 截图发现底部 `Reading settings` 因长度换行，影响按钮占位；仅将按钮语义文案单独缩为英文 `Settings`、日文 `設定`，弹窗完整标题仍为 `Reading settings`，中文保持 `阅读设置`。沿用 Android 原有 R.string，不增加新 UI/库/框架，现有模拟器脚本仅核对窄屏存在 `Settings` Button 后继续点 `Next`，真实视觉整体 G1 仍需后续多屏/真机。
+
+
+- #270 `a0a1fcd254f7cf70c7650b1428a3850c5729f3a7` 精确提交 21/21 Actions SUCCESS，真实 Android 35 emulator `S3 LOCAL END-TO-END PASS`。实际截图检查发现独立 local-app 系统语言英语，但唯一原 Reader 主界面导航及选项存在中文控件；旧 Reader 引导使用字符串字面量，不能假装全部三语一致。
+- 只在已有 `:reader-view` 加 Android 原生 `values/values-en/values-ja` 字符串资源，并替换原 Reader 主控件、模式、预载/页码、章节/失败等 42 组文案；对 full app 继续使用已有 `LocaleStore.wrap`，对 local-only APK 使用系统语言。无新翻译系统、没有第二个 Reader 或新 SDK。
+- 旧源码契约只修正一个章节标题断言，原 Android35 操作脚本把实际下一页动作断言升级为英文系统下精确 `Next` Button；继续对真实 CBZ/文件夹/历史/书架重跑原闭环，不新建大量快照。此项新增代码提交前尚未得到 CI、英文 Reader 截图或窄屏/日文验收，不声称 G1 PASS。全部生产 main/Release/OTA/真实用户数据保持未操作。
+
+### 2026-10-30｜S3 CORE-ANDROID-15：给独立 Android APK 实际导入/阅读/重启闭环提供模拟器证据
+
+- **第七次真实 Android 模拟器阶段验证**：run [41173063767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41173063767) 继续确认 CBZ/书架/原 Reader/会话历史/强制停止后恢复/移出书架墓碑与原文件仍在全部 PASS；系统 SAF 文件夹已从 `Download` 进入 `S3-QA-Folder` 并点击 `USE THIS FOLDER`。最后 Android 系统原生授权弹窗标题 `Allow Pica Library Local QA ...` 被脚本模糊匹配，误点标题而未按下原 `ALLOW` 按钮，文件夹导入未执行。仅将 ADB 定位改成精确 Button，无业务端、权限或数据逻辑变更；必须在下一精确 SHA 真正导入成功后才能标完整 PASS。
+
+
+- **第六次模拟器阶段性实际验收**：run [41172551035](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172551035) 再次真实 PASS CBZ 四页导入、原 Shelf 创建加入、Reader 翻至第二页、历史与强制停止后恢复、系统 `Got it` 全屏指引消除，且新增 PASS **长按移出书架写原 schema2 tombstone，同时原已导入文件仍存在**。最后一步 Android35 文件夹 SAF 选择器根目录显示 `Download`（单数），脚本只识别 `Downloads` 而未进入测试目录；后续文件夹导入未执行。修正仅扩展系统原生目录的已见标签，不触碰应用代码/数据/权限，不冒充整套 PASS。
+
+
+- **第五次真实 Android 35 模拟器阶段性验收**：run [41172161597](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41172161597) 已实际 PASS 系统 SAF 选 CBZ/原四页两章 manifest、书架创建+加入及 schema2 成员持久化、原 Reader 图片翻至第2页、原历史会话落盘、强制停止/重启后从历史恢复同章节第2页。退出时 Android 系统首次沉浸式全屏教育层 `Viewing full screen / Got it` 拦截 BACK，后续书架移出及文件夹导入未执行；仅修改 ADB 脚本显式关闭系统提示并确认回到书库，不改应用 Reader/UI。该 run 的真正成功阶段与后续未完成阶段分别记录，不冒充完整 PASS。
+
+
+- **第三次模拟器验收细节**：run [41171776774](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171776774) 已真正完成系统 SAF → CBZ 预览确认 → 原 `local-comics-v1` 四页 manifest 校验 **PASS**。之后 ADB 脚本用模糊文本定位误点 `Create shelf` 对话框标题而非 `CREATE` 确认键，未发生真实书架提交；截图/UI 树显示标题、输入文本、CANCEL/CREATE 原样，属脚本误判。仅对原生 Button 精确匹配并等待持久化列表行；不改任何应用生产代码。此 run 的书架/Reader/历史/目录等后续验证仍未完成。
+
+
+- **既有 CI 仓库规范回归**：在 `ffe8c728` 上，原 Android CI 全部通过；Web/Desktop 唯一失败来自现有 `test/unit/workflow-entrypoint.test.ts` 强制每个 Actions 工件 `retention-days: 1`，而新 S3 证据工作流误设为 2。现仅将该工作流改回 `1`，不删除/禁用旧约束，不影响真实产品代码。该失败与前述瞬时 UI 文案误判分开记录；须以新精确提交重新确认完整 CI 和实际模拟器。
+
+
+- **第二轮真实模拟器结果**：run [41171406333](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41171406333) 已用 Android 系统 SAF 成功导入四页 CBZ，UI 明确显示 `Imported comics:1` 和 `S3-QA-Comic / 4 pages`，证明先前 Android App 私有目录别名路径错误已经修复；但旧脚本等待毫秒级 `Import complete` 瞬时提示，正常刷新为书库数量后发生测试误判。更正仅改 UI 验收为稳定四页/两页书库条目 + 原 manifest，并适配原 Reader 自动隐藏工具栏；不修改应用源、数据格式或回退安全规则。此轮的书架/Reader/历史/重启/目录导入仍**尚未执行**，待下次实际作业证据。
+
+
+- **首次真实模拟器失败并保留证据**：GitHub Actions run [41170950196](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41170950196) 已用系统 SAF 真实选中 `S3-QA-Comic.cbz`，但原 `LocalComicStore.inside` 的 `getAbsoluteFile()==getCanonicalFile()` 绝对等式将 Android 系统级 `/data/user/0` 别名误判为非法路径，页面明确显示 `Import failed: Unsafe owned comic path`，所以 CBZ 导入失败，后续书架/阅读/历史/文件夹流程**未执行**。修复同时覆盖 `deleteTree`，避免同一系统别名导致合法取消/删除清理失败；只比较 App 自有目录内部相对路径的规范化结果并检查实际下级 symlink。已有 `LocalComicImportTest` 增加唯一一项系统别名可用、目录内部 symlink 仍拒绝且不跟随删除的定向回归；不关闭路径安全规则或新增解析器。
+
+
+- #269 `987223346dd19f108e044b92483f7b5f12c6ff89` 的 20/20 Actions 已重新核实 SUCCESS，正式 main 仍为 v0.5.0 基线。前阶段实现的原书架、阅读、历史、无源 DEX 验收仍有效。
+- 只新增一条针对 `:local-app` 的 Android 35 UI 模拟器 workflow，重用现有 Gradle/Android Emulator/KVM，不依赖 Appium、Espresso 新套件、额外服务或模拟 Reader；从系统 SAF 导入原 PNG/CBZ 和文件夹，操作书架、阅读页、历史、退出重启恢复、移出书架 tombstone，记录截图/UI 树和真实原数据文件，不触碰用户或正式安装。
+- 证据边界：只有 GitHub exact-head workflow + 真实运行截图/UI/原 ledger 校验均过才能声称 emulator 操作 PASS；即使通过也不会自动关掉真实物理手机 G1/G2、v0.5.0 迁移 G3、正式发布 G4。失败需针对缺陷修复，避免造轮子。
+### 2026-10-30｜S3 CORE-ANDROID-14：原 ShelfStore 数据模型及操作移入共享 core
+
+- 真正的 `:local-storage/ShelfLedger` 承接正式版原 `portable-shelves-v1.json` schema 2、命名/成员 CRUD 和删除 tombstone；`app/ShelfStore` 保留原 Context 接口、统一目录副作用及 Desktop 互同步，避免另造数据库或丢失原元信息。无新库/框架，保持原旧版键/字段及迁移能力。
+- 独立 local-app 新增可用书架页与本地书库按钮（创建/重命名/删除书架、已导入作品加入/移出、直接继续原 Reader），书架/漫画数据根独立于已安装 v0.5.0。只新增一项旧 Android 集成回归；不扩大无关测试。
+- **初次提交状态：实现已写入 Draft，精确提交 Android/Web/Desktop CI、独立 APK/DEX 均等待实际结果；未发布、未进入真机 G1/G2、旧用户 G3 或发布 G4 验收。**
+
+### 2026-10-30｜S3 CORE-ANDROID-13：统一原阅读会话历史到 source-neutral Android 存储
+
+- 首轮确切提交 `2b3764b7` 的 Android CI **FAIL（保留证据）**：新加的 Robolectric 单条测试使用 JDK `Files.readString(Path)`，Android 编译 API 上无法解析。使用仓库既有 `Files.readAllBytes` + `StandardCharsets.UTF_8` 替换这一处测试表达式；不更改任何生产逻辑、测试要求或安全门禁。新 SHA 的完整 CI / APK / DEX 结果重新判断，不借用失败头或旧 #267 的 green。
+
+
+- 依据 #267 的 20/20 Actions 成功和真实 APK 6 DEX 无具体来源 SDK 证据继续。旧 `ReadingHistoryStore` 已拆为 `:local-storage/ReaderHistoryLedger` 唯一 JSON v1 存储/日期筛选实现，原 App 仅保留历史外置目录定位、旧 Pica/E-H/Unified Catalog Legacy 迁移和原 API 兼容。旧用户资料未移动；完全延用 `reading-history-v1.json` 的字段、排序、限制与 session 语义。
+- 独立 `:local-app` Reader 的历史回调从空实现改为写入同一 v1 Ledger 的自有文件；新增轻量 QA 历史查看和实际章节/页恢复界面，入口属于本地书库，不接云端或漫画源。仅在原已有 Robolectric 测试内加一项隔离文件/原版路径不变化检查，旧 TS 合同指向真实模块实现。无第二套 DB/Reader 或新框架/依赖。
+- **当前状态：代码候选，精确提交 CI / 实际 `:local-app` 构建及 DEX 检查待验收。** 真机 G1/G2、完整生产历史页界面、G3 数据迁移/回滚、可信可选来源及 G4 发布仍 OPEN，禁止直接 merge/main/Release/OTA。
+
+### 2026-10-30｜S3 CORE-ANDROID-12：真正 source-SDK-free 独立 Android QA APK
+
+- #266 `6ca0aec9fb07e34bf68347755331cf4d0b16d732` 所有 20/20 GitHub Actions 工作流已独立核实 SUCCESS。以此为准确父提交继续开发。
+- 已新增 `:local-app` 标准 Android 应用；`build.gradle` 仅依赖现有 `:local-core`/`:local-storage`/`:reader-view`；独立 ID/数据根/SAF 导入/书库/同一个 Reader/按 page ID 保存和恢复，不调用原 `:app`，不拷贝第三方源或重复造导入器/Viewer。
+- 原独立 localdraft 只是无网络权限但仍包含旧 SDK；本候选将用实际 **APK classes*.dex / aapt manifest** 的明确排除清单验收“物理无源”，而非只凭 Gradle 文本或隐藏页面。原 CI 增加一个实际 assemble + DEX/Manifest 检查、可选极短期 Debug 工件，没有新增工作流或大型测试框架。精确最终 CI 待运行，不能宣称通过。
+- G1/G2 真机、完整会话历史与高级功能、旧资料迁移/回滚和 G3/G4 仍 OPEN。下一任务若本包通过，优先在真机/安装包实际导入和阅读回归中核对，再抽取原共享 ReadingHistoryStore 等剩余原功能，避免留下第二套历史实现。
+
+### 2026-10-30｜S3 CORE-ANDROID-11：原 ReaderActivity UI 和交互迁入 reader-view（叠加 Draft #265）
+
+- 原生产 `ReaderActivity` 的 Viewer/章节/分页/连续阅读/失败处理/书签保存/手势的唯一实现已直接移到 `:reader-view/ReaderScreenActivity`；保留原 `.ReaderActivity` Manifest 入口作为 12 个明确的 App 适配方法与旧三语/账户/推荐连接，不复制界面或数据库。既有 `:local-core`/`:local-storage`、ReaderImageLoader/ProgressLedger 直接复用，AndroidX 原依赖版本不变。
+- 将原 unit 源码契约中的 Reader UI 路径更正为模块路径，同时检查推荐完成事件还经原 App `ReaderSourceFactory`，没有降低原异步保存、章节历史断言。完整 CI/Android lint 及可选 local-only APK 必须在当前 SHA 上独立核对，现阶段不宣称通过。
+- 首个 #266 精确提交 `32f76bbc` 由真实 Android Macrobenchmark/K3/完整 CI 编译发现 `:reader-view/ReaderScreenActivity.java` 两处残余 `Ui.text`（`Ui` 属于 App 工具类，Viewer 不应导入）；这些 workflow 的 FAIL 保留，不计为通过。本修正只给 Viewer 增加一个调用原 App `Ui.text` 的文本控件适配，保留旧三语、本机样式和字重，不复制 `Ui`、不放宽构建约束。须以本修正的新精确 SHA 重新执行旧 CI、原 local-only APK 和 Android benchmark 编译。
+- 下一修正：`558ff423` Macrobenchmark 编译成功；Web/Desktop 实际 2881 PASS / 1 FAIL / 14 SKIP，失败仅为旧 `android-user-host-contracts` 将 `ReaderActivity` 完成证据检查继续定位到 App 源文件。保持 Host 不写推荐完成证据的断言，改为读取物理迁移后的 `:reader-view/ReaderScreenActivity.java`，不删除测试或放宽规则；需本次新精确头重新执行。
+- 下一产品硬关口：真实**独立 APK 的 Gradle/Dex 无来源 SDK**，在一套本地 Home/Import/Reader 完成文件夹/CBZ/翻页/进度与重启恢复，然后真机 G1/G2 和旧资料 G3/G4。绝不能因为 `:reader-view` 单独编译就声称整包 clean。无额外测试框架、新阅读器或正式版数据修改。
+
+### 2026-10-30｜S3 CORE-ANDROID-10：显示设置与手势面板物理隔离（叠加 #264）
+
+- 新 `:reader-view/ReaderDisplaySettings` 实现原 `ReaderSettingsStore` 的本地 SharedPreferences 读写及远端回写数据承接；原应用类仅保留 WebDAV timestamp reconcile/线程入口，`ReaderSettingsStore.Snapshot` 原调用形状不变。
+- 新 `:reader-view/ReaderGesturePanel` 物理接管旧 Android Switch/RadioGroup 选项及即时应用，原 `ReaderGestureOptions` 只传入现有三语文字解析；没有新 UI 框架、重写 Reader、复制第三方代码或新增测试套件。
+- 验收按本 Draft 精确 SHA 的旧 CI、已有 local-only APK 编译/Manifest 检查；真无源 APK、`ReaderActivity` 完整模块移入和 G1–G4 仍 OPEN，保持未发布。下一切口拆出原 ReaderActivity UI 的实际 Android View/RecyclerView/ViewPager2，同时继续把来源权限、Local/Remote 配置与推荐触发留在 App 适配层。
+
+### 2026-10-30｜S3 CORE-ANDROID-07–09：补齐 Draft #262–#264 实际进度记录
+
+- [Draft #262](https://github.com/Saber-Alter-Lily/pica-library/pull/262) 原 `ReaderImages` 的图片加载、解码、预载、取消和缓存行为迁入 `:reader-view/ReaderImageLoader`；缓存写授权仍走原来源适配。
+- [Draft #263](https://github.com/Saber-Alter-Lily/pica-library/pull/263) 原章节/页面/阅读进度等通用接口迁入 `:reader-view/ReaderChapterSource`，来源权限留在 App 的 `ReaderSource`。
+- [Draft #264](https://github.com/Saber-Alter-Lily/pica-library/pull/264) 原书签、历史、revision/ack、远程合并迁入 `:reader-view/ReaderProgressLedger`，旧存储仍由 `ReaderHistoryPort` 适配；其精确提交 `ca74d0e` 的完整 CI Android/Web/Desktop 与 Macrobenchmark Build、内存限制、Worker 恢复 Actions 已成功。这不是实体真机或最终包验收。
+
+### 2026-10-30｜S3 CORE-ANDROID-06：原 Reader 缩放手势 UI 物理模块化（Draft #261）
+
+- [Draft #261](https://github.com/Saber-Alter-Lily/pica-library/pull/261) 继续 #260 的来源诊断/推荐 UI 解耦，**开源优先但复用本仓库已存在的真正产品能力**：参考 Mihon Reader viewer/gesture 拆分设计（Apache-2.0，仅结构参考、没有复制代码），实际复用原 Java `ZoomImageView`、`ReaderGestureSettings`、`ReaderGesturePolicy`、`ReaderTouchSession` 及原 Android `GestureDetector`/`ScaleGestureDetector`/AndroidX；不再引入大图/翻页/图片缓存新库。
+- 新标准 Android Library `:reader-view` 物理承接原 `ZoomImageView.java` 与 `ReaderGestureSettings.java`，原两份纯 Java 手势类物理迁入已有 `:local-core`。**4 份源码在移动前后 Git Blob SHA 均相同**，即核心触控与缩放行为未改；`:reader-view` 只依赖 `:local-core`，正式 Android 和独立本地 Draft 同用原组件。旧 `compileReaderGestureBoundary` 临时 JavaCompile 脚本删除（正式 Gradle 编译已覆盖），原标签测试与 Android `ZoomImageViewTest`、手势测试均保留。
+- **阶段限制**：完成的是缩放/手势 UI 的模块，不是整个 `ReaderActivity` 或 Reader 缓存/来源许可的物理解离；原正式 Android 仍包含具体来源 SDK。#261 最终源码 CI 必须独立验证，不借用 #260 绿色。待后续将原 ReaderActivity/ReaderImages/ReaderProgress 逐步以最小代价组合进入无漫画源 SDK 的真实独立 APK，再做 Android 实体/数据验收。G1–G4 OPEN；main/Release/OTA/用户资料不变。
+
+
+### 2026-10-30｜S3 CORE-ANDROID-05：原 Android Reader UI 去除具体来源类/诊断/推荐引用（Draft #260）
+
+- [Draft #260](https://github.com/Saber-Alter-Lily/pica-library/pull/260) 叠加 20/20 CI SUCCESS 的 #259。按照执行计划中**开源优先、不重复造轮子**规则，参考 Mihon 的 Reader model/loader/viewer 分离设计但**不复制其代码**；只复用原 `ReaderActivity`、`ReaderImages`、`ReaderSource`、全部来源适配器、`RecommendationEvidenceStore` 与 AndroidX 阅读 UI，零新依赖。
+- 原 `ReaderSource` 增加最小的状态显示与可选故障诊断接口：各原适配器负责返回既有“本地/手机/WebDAV/Pica/E-H/JM/Host/电脑”显示文字；E-H 原适配器继续执行原 `EhClient.isEhId`、`EhReaderResolver.locator`、`resolver.diagnose`，其他来源默认无额外诊断。原 `ReaderActivity` 不再直接依赖具体在线来源类型；`ReaderImages` 去除 `EhReaderSource` 的直接类型判断，仍保留原来源缓存写入授权。
+- 旧 UI 的推荐完成仍由现有 `metadata` 线程池提交，`ReaderSourceFactory.recordReaderComplete`（原应用层）负责使用原 catalog 与 `RecommendationEvidenceStore` 写入；Host 禁推荐证据条件不变。既有 `LocalComicImportTest`、`ReaderImagesSourceAccessTest` 和原 async source contract 定向扩展，不增加新框架。
+- 下一步重点是原 Reader UI 的**物理模块迁移与真来源依赖排除**，而不是重做页面/缓存/推荐。当前正式 Android App 依然编译旧在线 SDK，不能宣称 clean APK；#260 CI 按源码终态分别核对。G1–G4 OPEN，main/Release/OTA/真实资料未更动。
+
+
+### 2026-10-30｜所有 S0–S6 任务统一执行原则：开源优先、避免重复造轮子（用户明确要求）
+
+- **强制执行：先检查本项目现有实现，再参考相关成熟 OSS，再决定复用/改造/新增。** 本仓库已有 Reader、文件夹/CBZ 导入、章节与书签、原生 AndroidX、SQLite/WebDAV、升级助手等实现，默认保留和复用，不为模块化另起一套应用或功能。
+- 每项任务/PR 留下最小决策记录：原有可复用文件、相关开源项目/对应链接与许可证、为何采用或仅借鉴、真正的剩余功能差距、最终用户可用性及必要验证。具体 S0–S6 规则和验收标准已写入 [产品恢复执行计划顶部](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md#全阶段工程硬规则开源优先与禁止重复造轮子2026-10-30-起适用于-s0s6)。
+- 当前 Android Reader 架构参考：[Mihon](https://github.com/mihonapp/mihon)（Apache-2.0，Reader/来源扩展分离）、[Mihon 本地指南](https://mihon.app/docs/guides/local-source/)、[Mihon 大图组件](https://github.com/mihonapp/subsampling-scale-image-view)，但本轮优先复用原 `ReaderActivity`、`ViewPager2`、`RecyclerView`、`LocalComicReaderPort`；[Kotatsu](https://github.com/KotatsuApp/Kotatsu) GPL-3.0 已归档，仅分析思路，不复制其源码。未引入新外部依赖，尚不宣称最终无源 APK。
+- **当前实际工作：** 接续已经 20/20 工作流成功的 #258，把 `BridgeClient.ChapterItem/PageItem/ChapterData` 等仅承载章节/图片页的通用模型转为纯 Java 共享定义，同时保留旧来源调用兼容与真实 Reader 功能；优先最小改动、少量原套件回归。G1–G4 继续 OPEN，不能因参考 OSS 或 CI 自动视作完成。
+
+### 2026-10-30｜S3 CORE-ANDROID-03：Reader 通用接口与在线来源实现分文件（Draft #258）
+
+- [Draft #258](https://github.com/Saber-Alter-Lily/pica-library/pull/258) 叠加 #257，在不改变 Reader UI、来源 API 或任何网络处理逻辑的条件下，将原 `ReaderSource.java` 中混放的 Desktop、WebDAV、Pica 三个具体类，原样移到独立 `OnlineReaderSources.java`；原文件只留下现有 `ReaderSource` 接口及原方法签名。这是可复用 Reader 物理构建边界的必要准备，不复制源功能、不开新 SDK。
+- **边界真实状态**：当前 ReaderSource 方法仍引用 BridgeClient 的旧章节/页面 DTO 和 SourceAccessPolicy 接口，故还不能被独立无漫画源 Android 应用完整编译；本步骤仅从接口所在源文件排除具体网络实现，不宣称干净 APK。完成旧 Reader UI 的数据契约迁移后才能把核心 UI 真正外置。此 PR 不新增测试，使用原 Android CI 验证。
+- #257 的本地独立 Port 和原 Reader 适配继续保留。G1–G4 OPEN，正式 v0.5.0、main、Release、OTA、用户资料均不动。
+
+
+### 2026-10-30｜S3 CORE-ANDROID-02：Android 本地 Reader 数据与来源接口解耦（Draft #257）
+
+- [Draft #257](https://github.com/Saber-Alter-Lily/pica-library/pull/257) 叠加通过 21/21 CI 的 #256。基于既有 `:local-storage` 实际增加 **LocalComicReaderPort**，直接复用已搬迁的 `LocalComicStore` 与 `ReaderPolicy`，提供应用私有漫画列表、封面、按原章节顺序分组、本地 `file://` 页清单和按原页面 ID 恢复书签。端口不引用 BridgeClient、Pica/E-H/JM、Desktop、WebDAV、HTTP 或网络来源 SDK，源代码是真正的独立模块业务路径。
+- 原 `LocalComicReaderSource` 收缩为 Port → 旧 `BridgeClient.ChapterItem/PageItem/ChapterData` 的轻量适配，供**同一个旧 ReaderActivity** 使用；漫画内容、原文件、阅读 UI、缩放、章节切换和进度存储逻辑不变。无第二个 Reader、无第二个导入器或数据库。只在既有 `LocalComicImportTest` 使用真实合成 SAF 文件新增 1 项导入→章节→文件页→重建 Reader Port→原适配层书签一致性的回归。
+- 当前完整 Android App 仍编译 Pica/E-H/JM 来源实现，仅本地章节/页面数据访问已物理解耦。完整无源 APK、用户数据迁移与真机 G1–G4 验收仍未完成；#257 当前源码 CI 独立判定，绝不借父分支通过结果。main/Release/OTA 不动。
+
+
+### 2026-10-30｜S3 CORE-ANDROID-01：原生本地导入与持久化存储实际模块拆分（Draft #256）
+
+- [Draft #256](https://github.com/Saber-Alter-Lily/pica-library/pull/256) 叠加 #255；不新增 Reader/Importer，**原生产文件实际移动到模块各自的 `src/main/java`**：`LocalComicImporter.java`、`LocalComicExporter.java`、`ReaderPolicy.java` 进入 Gradle 官方 `java-library` 的 `:local-core`；`LocalComicStore.java`、`DeviceIdentity.java` 进入官方 `com.android.library` 的 `:local-storage`。五份文件 Git Blob SHA 与原文件逐一相同（内容没有改写），原 App 旧文件位置删除、由 Gradle 依赖共享。同一份代码不重复编译。原 `compileLocalImportBoundary` 自定义 JavaCompile task 删除。
+- 同步拆分 `:local-storage` 标准 Android Library，直接复用原 `LocalComicStore.java`、`DeviceIdentity.java`，仅依赖上面的 `:local-core` 和原已使用的 AndroidX DocumentFile；源代码不复制，正式客户端及独立本地 Draft APK 共同复用。旧 `:app` 显式排除这些类的原路径，避免重复编译。现有导入、存储清单、页面、书架与阅读逻辑不改。
+- 验收以**原 CI 的真实 Android Gradle 编译与测试**为准，不创建新测试框架/矩阵。#255 的最新 21/21 工作流已 SUCCESS；#256 的准确源码另行确认，不能沿用父 PR 结果。真正无源独立 APK/Reader 剩余依赖、旧版原数据迁移、G1–G4 仍待后续。main/Release/OTA/用户资料保持不动。
+
+
+### 2026-10-30｜S3 Android 本地书库独立安装试验｜Draft #255
+
+- [Draft #255](https://github.com/Saber-Alter-Lily/pica-library/pull/255) 叠加已通过 24/24 工作流的 Windows #254。按**功能优先**继续 Android：通过明确环境变量 `PICA_ANDROID_LOCAL_ONLY_DRAFT=1` 编译独立 `com.picalibrary.android.localdraft` 开发 APK，其 Android 私有漫画、书架、书签和收藏记录与正式包、日常 Dev 包隔离。普通 Android Gradle 构建/签名/默认包名不改。
+- **复用旧产品功能**：原 `HomeActivity`、`ShellNavigation`、`LocalComicImportActivity`（SAF 文件夹/CBZ）、`LocalComicStore`、`UnifiedCatalogStore`、`ShelfStore` 和 `ReaderActivity`。本地模式只显示已导入本地作品、书架和基本设置；点击直接进入原 Reader，本地刷新不访问 Desktop/WebDAV/在线源，Reader source 仅接受 `local`，显示设置不进行云端对账。原免责声明仍在首次启动时显示。
+- 该开发 APK 的 Manifest overlay 删除 INTERNET/CAMERA/安装权限等，仅保留本地用户选择；`PicaLibraryApp` 不启动来源/bootstrap/支持者同步/OTA 后台任务。现有 CI 的 Android job 对该草稿分支额外编译实际 local-only APK，并用 Android `aapt` 验证不同包名、真正启动 Activity 和无联网权限；没有单独测试框架或 UI 重写。
+- **明确阶段限制**：Android 当前仍复用原 App 的完整 Java 编译，故仍包含旧 Pica/E-H/JM SDK 类型和依赖。现在是**离线可用、不同包名的数据隔离开发构建**，而不是实体上已经排除漫画源 SDK 的可发布 clean APK。下一步需要物理拆包/独立源中立 Android 构建并实际检查 dex/lib/资源依赖清单；绝不可宣传已彻底解离或具有版权豁免。CI 未终态前不宣布通过；正式 v0.5.0/main/OTA/用户资料均不变，G1–G4 OPEN。
+
+
+### 2026-10-30｜S3 CORE-LIB-04e：Windows 无源持久个人书库与启动入口（Draft #254）
+
+- [Draft #254](https://github.com/Saber-Alter-Lily/pica-library/pull/254) 基于已通过全量 CI 的 #253。实际完成：旧 Windows Launcher 新增**显式** `--source-free-local`，复用原独立 `desktop-core-preview.mjs`、完整正式 Web、`LibraryDatabase`、Reader/书架及上一轮原生 Folder/CBZ 导入；普通 `Pica Library.exe` 启动路径完全不改。新模式首次创建并在后续启动复用 `%LOCALAPPDATA%/Pica Library Local`，独立于既有 `%LOCALAPPDATA%/Pica Library`；真实持久 SQLite 书库与单实例锁都复用旧实现。显式模式自动打开原 Web，本地文件不依赖在线账号/漫画源。
+- 新目录必须由本模式独占创建并含固定身份标记，旧/外部/非本模式目录不会被自动当成数据源；未进行 v0.5.0 原用户资料迁移，也未装载原账号或内容。仅在既有 `core-desktop-preview-entry.test.ts` 添加 **1 项**“写入→关闭→重开、旧目录字节不变、拒绝认领不明目录”的实际 SQLite 回归，物理无源依赖图白名单只扩展这一小型 profile 模块，禁止原 Provider/Host/JM/E-H/Pica/额外依赖。
+- 现有 Windows Full-Web QA ZIP 加入双击用 `Start-Local-Only-Draft.cmd` 与简明使用说明，直接调用同一个原 Windows Launcher；不新造可执行核心、安装程序或 GUI。复用既有 Windows Portable workflow 检查物理包。
+- 首次源码 CI [#41018450901](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41018450901) **Android PASS / Web-Desktop FAIL**：仅 1 条旧隔离预览拒绝测试因启动验证顺序变化而失败。`4d49540081b488567484e21a111aa7414353e88b` 已恢复原临时目录先验证的行为，同时仍坚持新持久模式先校验完整 Web 再创建 profile；最终全 CI/Windows 包另行核定，不借旧版本绿色。
+- 本轮属于 Draft 功能候选，CI 和 Windows 实体启动证据按当前源码单独核定；**不合并 main、不发布/安装、不改正式 OTA**。G1–G4 仍 OPEN。下一步以可用的独立 Windows 无源客户端、Android 纯核心与可选来源适配为主，避免新增无必要的测试框架.
+
+
+### 2026-10-29｜S3 CORE-LIB-04d：无源 Desktop 原生文件夹/CBZ 导入（Draft #253）
+
+- [Draft #253](https://github.com/Saber-Alter-Lily/pica-library/pull/253) 叠加 #252。**功能直接接线**：旧 `DesktopNativePicker` → 旧 `CoreLocalImportController`/`LocalLibraryIngestion` → 原始 Web 的 `web/local-import.js` 按钮，源中立核心允许预览、明确确认导入、刷新书库和立即阅读本地 Folder/CBZ。复用旧 Session/Origin/CSRF；Web 请求绝不接收绝对路径。开启条件仅是明确启动的 source-free OS Temp 预览、实际原生选择器可用；无源认证/推荐仍保持禁用。
+- 仅在原 `offline-full-web-http.test.ts` 增加 **1 项**真实本地临时图片的选取→预览→确认→LOCAL DB 测试；更新既有物理 bundle 依赖名单，仍禁止 Pica/E-H/JM、Host、在线 SDK 和未知 npm 依赖。没有新的 UI/导入器/Reader/框架。**#253 CI 待终态验证**。
+- #252 核心全 CI #41005347254 已 SUCCESS；当次独立 Android Memory/Background #41005347415 为 FAILURE，日志显示 Android emulator/adb 初始化问题，不能称“全部工作流成功”；未针对无关 CI 基建引入额外防御性代码。G1–G4 仍 OPEN，无正式 Release/OTA/用户旧资料变动。
+
+
+### 2026-10-29｜CORE-LIB-04c-02c-02b-02c：原资源租约完成后关闭 SQLite（Draft #252）
+
+- [Draft #252](https://github.com/Saber-Alter-Lily/pica-library/pull/252) 叠加 #251；**实际功能改动**：将旧本地 HTTP 监听关闭前移到后台任务收尾前；原 `RuntimeResourceCoordinator` 增加等待 active/waiting lease 清空的通知（复用 lease.release/等待取消，不建新调度器/轮询）；真实 `LibraryService` 暴露该共享租约等待，原 `closeEngine()` 在所有已登记资源任务退出后才显式关闭 SQLite。旧实例无法完成停机时不打开新数据库主人；重启失败走原停止机制。
+- #251 可执行源码 `48aafdf29` 的 [全量 CI #41004589204](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/41004589204) **Android/Web/Desktop 均 SUCCESS**，不能将该结果当作 #252 的验收。#252 只在旧 `runtime-resource-coordinator.test.ts` 增补 1 项在途+排队 lease 顺序完成测试，既有 CI 将单独判定；未增加依赖、测试矩阵或第二 Reader。
+- **尚需**：不经共享 lease 的来源异步请求/外部 writer、源外置完整双端安装、实际用户资料迁移及受保护回滚；G1–G4 全 OPEN。main/Release/OTA 不动；继续功能优先，停止无限扩张防御工程。
+
+
+### 2026-10-29｜CORE-LIB-04c-02c-02b-02b：原书库后台任务停止并等待实际完成（Draft #251）
+
+- [Draft #251](https://github.com/Saber-Alter-Lily/pica-library/pull/251) 叠加 #250。直接修正式 Desktop `closeEngine()` 和旧 `LibraryService`：利用既有 cancel/checkpoint/任务 Promise，停机时取消且等待书库整理、维护更新/修复扫描、V5 推荐 Shadow 和 Work Identity 刷新结束后再关闭 SQLite；同时请求终止正在运行的收藏同步/推荐构建，并关闭原 JM provider runtime。两个 V5 任务类仅补 `quiesce()` 和停止后禁止重新启动，3 个原脱离请求的后台任务入口也禁止停机后新建。普通使用逻辑与任务队列保持不变。
+- 在原 `desktop-remediation.test.ts` 只加 **1 项**真实 `LibraryService` 停止整理任务回归；不引入新框架、工作流或依赖。**本轮 CI 待最终核对**，不得将先前 #250 的绿灯套用至 #251。
+- 该提交尚不是全应用写入屏障；其他前台异步/来源回调、独立 source worker、外部卷、真正用户数据升级与受保护回滚仍需进一步处理。G1–G4 均 OPEN，保持 Draft，不合并 main/Release/OTA。
+
+
+### 2026-10-29｜CORE-LIB-04c-02c-02b-02a：WebDAV 实际写任务收尾（Draft #250）
+
+- [Draft #250](https://github.com/Saber-Alter-Lily/pica-library/pull/250) 叠加 #249，以**功能优先、少量回归**方式改动原 `RemoteStorageDesktopManager` 与 `src/desktop/main.ts`：远端副本删除现在使用已有共享 `RuntimeResourceCoordinator` 计入真实活动任务；原 Desktop 更新前检查通过 `busy` 同时覆盖同步/删除；停机时先通知 WebDAV 取消同步并等待在途写任务结算，再关闭 SQLite；备用监听端口也共享同一资源协调器。未创建独立任务系统、备份器、Updater 或新依赖。
+- 只在已有 `remote-selected-copies.test.ts` 补一项延迟真实 `deleteComic` 的定向回归，验证等待、旧应用拒绝新同步与本地副本保留；不增专用 workflow/测试矩阵。**CI 待核实**，不得直接声称已通过。
+- 下一步按实际写入路径继续处理 **非 HTTP 启动的本地后台任务和独立 source worker**；生产级一致性备份/退出回执、Android Service/Binder、真实 v0.5.0 更新仍未验收。G1–G4 OPEN，main/Release/OTA/用户资料不变。
+
+
+
+### 2026-10-29｜CORE-LIB-04c-02c-02b-01：原 Mobile Bridge 与 Remote API 接入同一升级冻结（Draft #249）
+
+- [Draft PR #249](https://github.com/Saber-Alter-Lily/pica-library/pull/249) 基于 #248，针对真实 Windows Desktop 的两个**独立 HTTP 监听器**：`src/mobile/bridge-server.ts` 的手机配对、书库/在线阅读/同步，以及 `src/remote-api/gateway.ts` 的远程会话、限流、健康和反向代理。二者原本不经过本机 `src/library/server.ts` 的更新冻结；这轮复用 **同一个** `DesktopHttpHandoffFence`，使真实在途请求也计入旧 UpdateManager 的 helper 交接前检查，不再新造服务或任务系统。
+- 原 `DesktopHttpHandoffFence.enter` 增加可信原生 Desktop 控制例外开关，独立 Mobile/Remote 入口强制 `allowDesktopControl=false`，避免通过伪造健康或 update/apply 同名路径绕过冻结。原主程序 `main.ts` 将同一 `externalUpdateIngress` 注入实际两个服务；Mobile Bridge 设置变更计入旧活跃任务，冻结后不得新增 Mobile listener。所有原 Host/Origin/CSRF、配对 token、Remote API 授权、原 WebDAV/Provider/Reader 与本地 HTTP 行为均保留。
+- 真实 Node HTTP 请求采用 `response.once('finish')`/`close` 幂等释放；冻结阶段 Mobile/Remote 普通新请求均返回有界 503、稳定 code、Retry-After=2、关闭连接。原 helper 启动失败按照 #248 的已有 rollback 闭包恢复原服务；ACK 后继续冻结等待原 shutdown/进程交接。不读取、不公开真实账户或内容。
+- 新 `test/unit/desktop-external-http-handoff.test.ts` 真正启动两套现有网络服务，使用 OS Temp 合成书库和 loopback；在**未传完的手机配对请求**及**被延迟的真实远程代理请求**仍执行时验证拒绝升级；冻结时验证配对、手机书库/状态、远程 API/health/bootstrap/网页都不能再产生新工作；解冻后能够恢复，并静态确认所有实际启动入口接线。
+- 初始生产功能源码 `5f7f4698` 的 [Linux/Windows 专项 #40986598520](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40986598520) **2/2 SUCCESS**：Linux 64/64、Windows 63 PASS+1 POSIX-only SKIP，但其 [完整 CI #40986649175](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40986649175) **Web/Desktop FAILURE：旧 AST+VM 测试夹具漏注入新增 `updateHttpFence` 依赖，导致 6 项失败**，原失败保留。已**不改生产安全判断**而补齐旧 VM 的合成 `updateHttpFence`/`externalUpdateIngress`，并增加“冻结后不启动 Mobile Listener”回归，同时扩展专项运行到该原测试。修后精确代码+测试+工作流 `35b9a8e7415b1c4f4f8b2491e5f738b2ab9bf981` 的 [双平台 #40987086618](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40987086618) **2/2 SUCCESS：Linux 83/83，Windows 82 PASS+1 POSIX-only SKIP**。[完整 Android/Web/Desktop #40987068615](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40987068615) **Android 与 Web/Desktop 两项均 SUCCESS**：原 Web/Desktop 367/367 文件、2877 PASS/14 SKIP，真实浏览器 61 PASS；Android 的测试/Lint/构建 BUILD SUCCESSFUL；精确业务和测试 SHA 为 `9c92e97688450e23858cd2b604862210eb194363`，后加的专用 workflow 不改源码。本轮工程专项与全 CI 可标 PASS，但正式 G1–G4 仍 OPEN。完整技术说明：[S3_MOBILE_REMOTE_SHARED_UPDATE_FENCE_20261029.md](docs/S3_MOBILE_REMOTE_SHARED_UPDATE_FENCE_20261029.md)。
+- **明确未完成**：这是三套 Desktop HTTP 服务和 RuntimeResourceCoordinator 的单进程准入，不能阻断所有后台 fire-and-forget、独立来源 Worker、他进程外置网盘/媒体写入，尚无全局 SQLite+文件冻结、可信停写/退出回执、OS 受保护备份/失败回滚；S5/G3 和 G1/G2/G4 继续 OPEN。下一步 `04c-02c-02b-02` 核查非 HTTP writer、真实数据库与媒体 mutation barrier、drain 及版本化收据，然后才评估生产迁移。保持 Draft，不合并 `main`，不发布安装包/OTA，不碰用户资料。
+
+
+
+### 2026-10-29｜CORE-LIB-04c-02c-02a｜真实 Desktop HTTP 与共享资源协调器的升级交接冻结（Draft PR #248）
+
+- [Draft #248](https://github.com/Saber-Alter-Lily/pica-library/pull/248) 叠加 #247：**改动原正式版业务入口** `src/library/server.ts`、`src/desktop/main.ts`、`src/desktop/update-command.ts` 和原 `RuntimeResourceCoordinator`，不是新增独立 QA 小阅读器。保留原书库、书架、Reader、推荐、网盘和更新器，不碰正式 `main`、Release、OTA 或用户数据。
+- 增加 `DesktopHttpHandoffFence`，通过 **原本机 HTTP Server** 请求入口 after Host/Origin/CSRF 授权、before 实际业务路由接受请求；活动 HTTP 请求包含 GET/POST 等，响应 `finish/close` 幂等释放。升级前活动请求大于 0 时拒绝 helper；冻结后所有普通 API、Reader/网页新请求返 503（含稳定 code），仅原已授权的 update/apply、实际 Desktop health 的 GET `/api/v1/desktop/status` 及 GET `/api/v1/update/progress` 两个诊断入口保留；无关 `/status` 网页回退路径也冻结。原 source-free Core 不注入此端口则完全不受影响。
+- 扩展旧 `applyUpdateAndScheduleShutdown` 的可选 preflight 返回失败恢复回调：收到现有 `UpdateManager.apply` 的真正 helper ACK 前，HTTP 及共享资源准入一直冻结；helper 拒绝启动时撤销两层冻结、不触发退出并允许重试；已接受时保持冻结等待旧 OS shutdown/process-proof。不会自己实现第二套升级器。
+- 真实 `RuntimeResourceCoordinator.freezeAcquisitionsForUpdate()` 同步拒绝活动/等待 lease；冻结后 `acquire/withLease` 在 observe/enforce 两种旧模式均 fail-closed；原定时队列、优先级、正常模式、资源释放及取消行为未重写。旧 `startEngine` 的同一个 `runtimeResources` 已用于 Service、RemoteStorage 和 Host 任务，因此不依赖另造任务调度。
+- Linux/Windows 初轮仅 HTTP 精确源码 `06000c802` 的 [专项 #40981591695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40981591695) **2/2 SUCCESS，各79/79**；审计发现没有 HTTP 请求仍可取得新的 runtime lease，故补更严格的真实资源准入，而不能借用79项绿灯。增加真实 HTTP 文件夹选择器保持 in-flight 的并发模拟，并将冻结期间可访问诊断缩减为仅 Desktop 状态和更新进度两种 GET。最终精确可执行/测试源码 `ee6722585c6da942d0dd9bbe2dfc4097cd6abea1` 的 [Linux/Windows 专项 #40982432823](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40982432823) **两平台 2/2 SUCCESS，各 89/89 项测试全部通过**，包含原 HTTP CSRF/真实在途请求与升级冻结、helper 失败恢复、RuntimeResourceCoordinator 等；[完整 Android/Web/Desktop CI #40982438311](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40982438311) 仍需按终态单独核实，不能借用专项绿色。原中间 #40981944161 亦为 89/89 双平台 SUCCESS，但不覆盖末次代码。
+- OSS 复用证据：[Node.js HTTP Response finish/close](https://nodejs.org/api/http.html)、SQLite [Online Backup](https://www.sqlite.org/backup.html)/[WAL](https://www.sqlite.org/wal.html)、原项目 InstanceLock/HTTP/RuntimeResourceCoordinator/UpdateManager。详见 [S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md](docs/S3_DESKTOP_HTTP_RESOURCE_FREEZE_20261029.md)。
+- **不视为全部应用已停止写入**：Mobile Bridge、独立来源进程/外置 WebDAV 写方、异步 fire-and-forget、非资源调度路径仍可能绕过这两层准入；没有持久停写/退出成功收据，没有 SQLite+媒体同一事务、DPAPI、加密备份/回滚或真实用户升级。下一子项 `CORE-LIB-04c-02c-02b` 逐入口整合非 HTTP writer、等待有界 drain、实际进程退出与资料一致性验证，继续 G1–G4 OPEN。
+
+
+
+### 2026-10-29｜CORE-LIB-04c-02c-01｜真实 Desktop 更新入口的活动/锁所有权门禁（Draft #247）
+
+#### 2026-10-29 追加工程审计｜原 idle-browser 任务占用表不足以证明更新安全
+
+- 复查真实 `LibraryService.runtimeTaskDiagnostics()` 发现维护更新/修复、书库整理、Recommendation V5 shadow 和 Work Identity 证据刷新不一定出现在原 `activeDesktopWorkLeases()` 的专有条目中，且 `RuntimeResourceCoordinator.waiting` 可能存在未获 lease 的待运行写任务。继续只用旧列表将出现**漏判**。
+- 将原 Collector 与服务已有完整任务诊断 + 活动及等待资源快照合并到同一纯函数 `collectDesktopUpgradeWorkLeases`，并在原 `main.ts` update handler 接线。拒绝 active/waiting/running/pausing/paused/cancelling/unknown 状态及无效诊断；`failed` 仅在不活跃且未持资源时视为已终止，避免一个历史失败任务永久阻止正常升级。不新造任务存储系统；UI 只返回统一错误，不泄漏任务名称和隐私。
+- 新增真实任务诊断和资源队列的回归测试，期间修正了一次夹具 TypeScript readonly 参数及断言括号错误。**这属于真实功能代码更新，前述 `eb61cd748` 57/57 绿色结果不能代表最新版本。** 最新精确业务/测试源码为 `572d6758bf95d21c58244123b23bf43e290d5e59`，其 [Linux/Windows 专项 #40975511400](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975511400) 已核实 **双平台 2/2 SUCCESS，双方各 67/67 单元及锁/升级助手回归 PASS**；[完整 Android/Web/Desktop CI #40975519327](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40975519327) **尚排队/未判定**，不能借用先前完整 CI。所有 PR 仍 Draft，G1–G4 OPEN。
+
+
+
+- 新建 [Draft #247](https://github.com/Saber-Alter-Lily/pica-library/pull/247)，基于 #246；不是 main/Release/OTA。此前 #246 完整 Android/Web/Desktop [CI #40922712429](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922712429) 已核实 Android + Web/Desktop **SUCCESS**，补齐上一轮未完成的报告状态。
+- **改动原应用而非 QA 小产品**：增加 `src/desktop/update-quiescence.ts`，要求真实 `InstanceLock.assertHeld()` 先后两次通过、实际 Desktop engine/database/service 就绪、非停止状态、原 `activeDesktopWorkLeases()` 返回零活动任务。下载、本地书库操作、远端同步、来源检查、推荐/收藏同步、移动配对、资源租约等仍使用**原来用于自动退出判断的同一批业务状态**，不额外发明进程扫描器或第二套任务队列。
+- 修改原 `src/desktop/update-command.ts` 增加可选同步预检，在旧 `UpdateManager.apply` 及 helper startup **之前**拒绝活跃任务，拒绝情况下不启动 helper、不触发延迟退出；原去重/ACK/超时逻辑保留。原正式 `src/desktop/main.ts` 的 `applyUpdate` 现真实绑定此门禁，未改正常 Reader/Provider 行为。
+- 旧真实 `InstanceLock` 临时沙箱测试覆盖活动/暂停/未知状态，锁所有权在采样时丢失，未加载库、重试、重复点击、拒绝时的零副作用与主程序入口确实接线。新增 [Linux/Windows 专项](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/s3-desktop-update-quiescence.yml)。首轮 [#40974599032](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974599032) 因夹具误把第二次 owner assertion 当成第二条事件导致 56/57，通过修正**夹具计数**，不删断言或放宽生产门禁。正确源码 `eb61cd748` 的 [双平台 #40974706377](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974706377) **Linux 57/57 + Windows 57/57 SUCCESS**。完整 [Android/Web/Desktop CI #40974712298](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40974712298) 要按最终终态另行回读。
+- **明确不可提前宣布“安全备份/完整停写”**：这只是 helper 启动前的即时状态检查，后续新 HTTP/后台任务仍可能被接纳；旧 `stop()` 的硬超时及分项清理失败也尚无可验证的持久成功凭据；原 #243 SQLite Online Backup 本身不保证数据库与漫画图片跨文件原子性。下一项 `CORE-LIB-04c-02c-02`：统一写入准入屏障 + 有界 drain/abort + 所有服务关闭确认 + 进程退出/数据快照身份验证，然后才谈受保护备份/回滚。
+- 开源复用决策：重用原 `InstanceLock`、活动任务快照、旧 `applyUpdateAndScheduleShutdown` 和 SQLite Online Backup，未引入 Litestream/restic/第二数据库/更新器。独立审计 [S3_DESKTOP_UPDATE_QUIESCENCE_GATE_20261029.md](docs/S3_DESKTOP_UPDATE_QUIESCENCE_GATE_20261029.md)。G1–G4 继续 OPEN，正式 v0.5.0 与用户资料不变。
+
+
+
+### S3 2026-10-29｜CORE-LIB-04c-02b-03b-02 官方历史迁移与媒体边界（Draft PR #246）
+
+- 新建 [Draft #246](https://github.com/Saber-Alter-Lily/pica-library/pull/246)，叠加 #245，未合并 main/Release/OTA。两个工作簿共用新增 `scripts/qa/v050-release-identity.ts` 固定官方 `v0.5.0` commit `bec7f9f` 与五项 blob 身份，避免重复造仓库资格校验。
+- `scripts/qa/v050-official-migration-matrix.ts` 通过真实发布版 `runMigrations` 生成 schema 5/11/13 的合成 SQLite 和合成旧收藏/书架/章节/阅读/下载记录；随后实际调用发布版 `LibraryDatabase` 的原 `backupBeforeMigration` 与 `runMigrations` 升至 schema14，核查升级前 `.pre-migration-v14.bak`、前后原本存在的行、SQLite 完整性及外键与新只读预检。不会因为 schema5 原本不存在 schema6/8/12 的业务行而错误要求凭空出现。
+- `src/desktop/v050-owned-media-inventory-qa.ts` 为**QA-only 元数据检查**：必须先通过历史合成结构门禁，仅扫描 OS Temp sentinel 内拥有权明确的 `data` 与可选 `cache`；限制文件数/递归深度/尺寸，分列原 SQLite 备份与漫画媒体；对外置引用只做词法资格判断不读取，拒绝硬链接/符号链接/目录联接及字节大小不匹配、缺失正文。**不读取媒体内容、不宣称哈希已验或 SQLite+媒体跨文件原子性**。
+- 新 `test/unit/v050-owned-media-inventory-qa.test.ts` 与 [双平台独立门禁](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/s3-v050-historical-schema-media-qa.yml) 覆盖正常/外置/缺文件/大小不符/硬链接/目录联接/超限/锁/禁止写入；未安装新框架。开源复用：原生 SQLite Backup+integrity/foreign_key_check、Room MigrationTestHelper“旧版生成→新版验证”方法、微软 NTFS reparse 说明；没有引入 Litestream 进程或重写备份引擎。独立审计：[S3_V050_HISTORICAL_SCHEMA_MEDIA_QA_20261029.md](docs/S3_V050_HISTORICAL_SCHEMA_MEDIA_QA_20261029.md)。
+- 实际失败保留：[#40921581059](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40921581059) 首轮发现旧 schema5 测试把后世才存在的业务行当作必须保留；后续运行的媒体测试发现无效测试 comicID `synthetic:`（项目明确只允许 pica/eh/jm/local）以及原 SQLite 迁移备份误算漫画文件。分别修正为来源中立 `local:`、按起始 schema 验证、原 SQLite 辅助备份单独登记。精确业务/测试代码 `80ded46b5` 的 [双平台专项 #40922700787](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922700787) **Linux + Windows 2/2 SUCCESS**；两平台实际输出官方 schema 5/11/13→14 三路径成功与升级前备份校验，各自 28/28 unit PASS（含媒体链接/大小/预算）；完整项目 [CI #40922712429](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40922712429) 仍须单独核对终态。原始失败不回写成 PASS。
+- 本轮仅合成 OS Temp 数据，不读取个人下载、凭据、书库，未迁移正式库，未触碰更新助手、签名或生产目录；G1 Android 视觉、G2 真来源外置、G3 生产一致性/恢复、G4 双端人工验收均 OPEN。后续先按精确 SHA 核实专项+完整 CI，随后做 NTFS 特殊 reparse、外置媒体用户单独授权/大规模资料真实工序和应用全局冻结/失败注入；禁止用 QA 成功替代正式升级验收。
+
+
+
+### 2026-10-29｜CORE-LIB-04c-02b-03b-01：真实 v0.5.0 正式源码生成历史测试资料（Draft #245）
+
+- 新建 [Draft #245](https://github.com/Saber-Alter-Lily/pica-library/pull/245)，以 #244 的真实只读历史检查器为基础，**没有变更 main、正式 v0.5.0、用户资料或 OTA**。新增 `scripts/qa/v050-release-tag-interoperability.ts`，单独 checkout 真实官方发布提交 `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`（同时固定原 `LibraryDatabase/config/types/paths/migrations` 五个 Git blob），**真正执行该发布源码**生成合成资料，不再由现行数据库实现冒充历史版本。
+- Open-source 方案复用：官方 SQLite Online Backup API + 既有 Node 24 `node:sqlite` 与 #243 WAL 验证；Android Room MigrationTestHelper 借用其“旧版生成→新版验证”方法；Litestream 仅调研持续 WAL 复制的局限，当前不引入后台复制守护进程、新库或额外迁移引擎。技术审计：[S3_V050_OFFICIAL_TAG_FIXTURE_QA_20261029.md](docs/S3_V050_OFFICIAL_TAG_FIXTURE_QA_20261029.md)。
+- 旧版发布 `buildConfig/saveConfig/LibraryDatabase` 依次生成真实 migration-14 SQLite、合成收藏/作者标签/章节、伪造下载页、书架和阅读进度；新检查器只读校验文件完整性、结构、旧 source-policy 字段缺失与非泄密结果。补充九个正常/异常资料场景：conservative/balanced/fast，旧代理、未授权外置路径、后发来源字段、旧版可读取但缺少 GUI 字段、实例锁、WAL 标记。旧版真实帐号/DPAPI/网络/外部目录均不触达。
+- 首轮 [Linux/Windows CI #40914858557](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40914858557) **2/2 SUCCESS**（3 个场景、两系统各20项原回归）；扩展精确源码 `2abcc1f6` 的 [九场景 Linux/Windows #40915400620](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915400620) **2/2 SUCCESS**，完整 [Android/Web/Desktop CI #40915411308](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40915411308) **Android 与 Web/Desktop 两 job 均 SUCCESS**（精确可执行代码 `2abcc1f6`）；后续仅文档更新未改变可执行文件。此为合成工程验证，不是生产迁移。
+- **范围不扩大**：测试资料仅由临时 OS Temp mkdtemp 创建，凭据是不可解析合成字节，回包仅报告非敏感结构状态，退出仅删除自己的临时资料；不产出 Release/可执行包，不操作旧安装或真正用户目录。真实 v0.5.0 移动/外置资料、大库体量、应用停写、跨文件快照、DPAPI、加密备份和回滚、升级助手与 Android source-free APK 仍 OPEN；G1–G4 不能结案。
+- **下一项 CORE-LIB-04c-02b-03b-02**：基于官方发行版原 Migration 的 5/11/13→14 历史结构路径、带外置/缺字段的只读分类，严查媒体路径边界与体量、Windows 符号链接/硬链接/目录联接，保持“仅识别，不迁移”。再评估生产级停写/备份机制与许可协议，避免重复造轮子。
+
+
+
+### 2026-10-29｜CORE-LIB-04c-02b-03a 历史 v0.5.0 发行结构资格（Draft #244）
+
+- 已读取真实 `v0.5.0` 标签并核对源：`src/storage/sqlite/migrations.ts` 与 `src/desktop/paths.ts` Git blob 分别 `4a98683f`、`f4cf5e3f`，与当前叠加分支一致；旧 `src/desktop/types.ts` 则**不存在**新版 `externalSources/mobileBridgeEnabled/readerSettings`。这些是源码连续性证据，不是对真实用户数据的迁移验收。
+- 新建 [Draft #244](https://github.com/Saber-Alter-Lily/pica-library/pull/244)，基于仍未合并的 #243。加入 `src/desktop/v050-historical-fixture-gate.ts`：只接受带独立 sentinel 的 OS Temp 合成资料，复用旧只读预检，严格审查 release 型 Config、迁移 1–14 和 11 类核心表/列、只读 SQLite integrity/foreign key；外置/自定义目录、锁、WAL/SHM、软链接、未知字段一律拒绝或要求复核，绝不读凭据/运行迁移/扫描用户目录。
+- 新 `test/unit/v050-historical-fixture-gate.test.ts` 锁定发行 Git Blob SHA、真实暂存 SQLite、迁移历史错误、外置路径、锁/sidecar、配置异常及写入禁令。新 [Linux/Windows 独立门禁](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/s3-v050-historical-fixture-qa.yml) 与原 Android/Web/Desktop CI 分开。
+- 首轮 [#40908769301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40908769301)：Linux SUCCESS，Windows 47 PASS/3 FAIL；根因是 Windows temp 8.3/真实路径别名与检测器使用的 canonical 字符串不一致，新合成 fixture 被误判为外置引用。第二轮 [#40909082916](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909082916) 仍发生同项误判。已在 `06ae2c58` 采用仅对已认证临时根允许**原始和 canonical 两种路径写法**，不 stat/open 任何自定义/外置目标；精确业务代码 `06ae2c58` 的 [Linux/Windows #40909355786](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909355786) **2/2 SUCCESS**；随后 `079c2fc0` 新增 Windows canonical/原始别名及同名外置 sibling 拒绝回归，[精确新测试专项 #40909909799](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909909799) **2/2 SUCCESS**；原业务代码的 [Android/Web/Desktop 完整 CI #40909365635](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40909365635) **Android 与 Web/Desktop 两项 SUCCESS**。旧 FAIL 保留，测试/文档-only 后续 HEAD 不能冒充新增业务代码已走生产迁移。
+- 不能提前关闭 `CORE-LIB-04c-02b-03`：真实发行版源码运行生成的历史 fixture、外置资料授权、应用冻结及跨文件一致性、DPAPI/加密备份、失败注入/原地回滚、签名升级器以及 Android G1/G2/G3/G4 全部 OPEN。未合并 main、未发布、未改 OTA 或真实资料。细见 [历史结构 QA 审计](docs/S3_V050_HISTORICAL_FIXTURE_QA_20261029.md)。
+
+
+
+### CORE-LIB-04c-02b-02 最终质量回填｜2026-10-29
+
+- [#243](https://github.com/Saber-Alter-Lily/pica-library/pull/243) 加固代码 `87a20359396f67ba30b54f39c1e8958ee4760569` 已通过 [Linux+Windows 实体 WAL/回滚专项 #40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) 和 [Android/Web/Desktop 完整 CI #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471)，均 SUCCESS。最新仅文档 HEAD 不改变已测试的业务代码。正式 `v0.5.0` 标签中 migrations.ts、desktop/paths.ts 与研发分支 SHA 完全相同；types.ts 仍有后续差异，后续需独立历史结构验收。**QA 快照不是生产迁移/真实用户回滚授权，G1–G4 全 OPEN。**
+
+## S3 PR #243｜旧 v0.5.0 用户资料一致性备份与回滚演练（CORE-LIB-04c-02b-02，2026-10-29）
+
+- 新 [Draft #243](https://github.com/Saber-Alter-Lily/pica-library/pull/243)：建立严格**仅合成 OS Temp sentinel**的 `src/desktop/legacy-profile-snapshot-qa.ts`，不触碰本机旧用户配置。复用 Node 24.15 原生 `node:sqlite.backup()`，读取旧同一 SQLite/书架/阅读数据并合并尚未 checkpoint 的 WAL；无 WAL 时使用 immutable 只读 URI 避免生成空 sidecar；只对目标快照规范化 journal_mode 和做 `integrity_check`。所有原始主 DB/WAL 通过备份前后哈希比对。来源凭据等仅作为测试中不透明字节复制，不解析或打印。
+- 同步快照旧 `config`、`data`、`cache`、`packs`、`runtime-state/personalization` 的合成文件，包括书架/Reader/图片、虚拟 DPAPI 凭据和 WebDAV 配置；排除日志、实例锁与旧升级助手可执行文件。每项拥有独占读/写、身份检测、SHA256、路径/数量/容量限制；manifest 通过外部已知哈希校验后，恢复只写全新的 `restored/`，严禁覆盖原 profile。现增补零字节文件、短写重试、父目录软链接拒绝，以及 `crossFileAtomicityProven:false`——没有误称 SQLite 快照等于整个文件系统的原子性。
+- 新 `test/unit/legacy-profile-snapshot-qa.test.ts` 合成真实 `LibraryDatabase/LocalLibraryIngestion` 作品页、书架和阅读进度；实测 WAL 未检查点记录进入独立备份，恢复后校验，篡改、锁、外置目录和未授权资料均拒绝。Linux/Windows 使用固定 Node 24.15 的 [S3 专项工作流](.github/workflows/s3-v050-snapshot-rollback-qa.yml)，附原 Desktop instance ownership、旧只读 preflight 与本地导入回归。
+- 初轮 [#40894619522](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40894619522) Vite 5 无法直接解析 `node:sqlite`，按旧库 `createRequire` 修正；次轮 [#40894856666](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40894856666) 找到空 WAL sidecar 实际风险并以 immutable/在线备份分流修复。基础代码 [Linux/Windows #40895318054](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895318054) **2/2 SUCCESS**；加固最终提交的 [#40895722435](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895722435) 与 [完整 Android/Web/Desktop CI #40895730471](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40895730471) 需按实际 SHA 最终核查，不能复用基础结果冒称新代码全通过。
+- **下阶段 CORE-LIB-04c-02b-03**：真实 v0.5.0 历史文件布局/Schema 的只读 fixture 资格、外置书库/媒体大小和缺失路径决策、正式受控快照保存与原地失败回滚、DPAPI/加密备份、升级器确认和断电/进程终止模拟；独立 source-free Windows 目前仍**只能运行临时 QA profile**。Android Service/Binder、正式来源签名/更新和 Android G1 UX、原 42+新增12 用例与 G1–G4 均 OPEN。详细见 [本轮审计](docs/S3_V050_WAL_SNAPSHOT_ROLLBACK_QA_20261029.md)。不合并 main、不发布/OTA、不触碰真实用户文件。
+
+
+## S3 PR #241｜独立无来源 Desktop 执行入口和原 Windows Launcher 选择（CORE-LIB-04c-02a，2026-10-29）
+
+- 新 [Draft PR #241](https://github.com/Saber-Alter-Lily/pica-library/pull/241)：真正新增 src/desktop/core-preview-main.ts 作为无来源、非旧 Desktop 的独立可执行入口；原本地 SQLite/Reader/Shelf/本地导入/完整 Web 复用 createCoreLocalRuntime、旧 InstanceLock 和原受保护 loopback HTTP。明确只允许拥有原 QA sentinel、且 canonical realpath 在 OS Temp 的独立书库，绝不打开 v0.5.0 用户数据。
+- 复用原 esbuild 物理无源审核器，给 desktop-core-preview 增加严格入口模式，src/desktop 仅允许 core-preview-main.ts 与 instance.ts，其余具体来源 SDK/Provider/Host 全禁。原 packaging/windows/Launcher.cs 默认仍启动 app/desktop.js；只有首参数 --source-free-preview 才选择不同的 app/desktop-core-preview.mjs，缺文件直接失败，不回退旧来源程序。
+- 在原 Windows 官方 Node 固定 SHA Portable 的 Full-Web 临时 QA 变体中，现会编译原 C# Launcher 并打包单独无源 ESM（源账户/SDK 不进入该 QA ZIP），以实际 Windows 原生 exe 启动受控临时 Profile，检查 Cookie/原完整 UI/SQLite、禁用来源路由。Reader-only ZIP 原路径保持。
+- 首轮 Linux 发现未初始化根的 ENOENT 文案问题、Windows 发现粗暴 SIGTERM 可留下单实例锁；均已修复为显式拒绝和原有死 PID 验证回收，未删除未知锁。独立可执行 [Linux/Windows 专项 #40881540640](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40881540640) SUCCESS。
+- 原生 Launcher 初轮 [Windows 双 ZIP #40881936384](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40881936384) Reader-only SUCCESS，Full-Web 因本次测试持有的进程句柄未释放导致提取目录 EPERM，尚不可验收。修复仅检查本次已发布的精确 PID 并等待死亡/文件句柄释放，新运行 [#40882450092](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40882450092) 与全 Android/Web/Desktop [#40882462037](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40882462037) 写入时仍待最终判断，不能凭旧测试冒充通过。
+- **接下来 CORE-LIB-04c-02b**：真实 production profile 契约与 v0.5.0 用户资料、漫画、下载、推荐数据的只读盘点、备份/可验证回滚；然后允许正式 Windows 源无关客户端在可信新 profile 上启动，组合现有受限文件导入/设置/WebDAV。不允许在实机上无预检直接迁移。之后来源可信签名包/生命周期、Android 核心 APK/Service/Binder、视觉/引导和所有用户验收。见 [审计](docs/S3_CORE_DESKTOP_ENTRY_20261029.md)。G1–G4 全 OPEN；不合并 main/发布/OTA。
+
+## S3 PR #240｜原正式 Desktop 和无源 Core 复用同一业务运行组合（CORE-LIB-04c-01，2026-10-29）
+
+- 在正式原 `src/library/server.ts` 与已验证 Windows Full-Web Core 共用代码上新增 [Draft PR #240](https://github.com/Saber-Alter-Lily/pica-library/pull/240)，加入 `src/library/core-runtime-composition.ts` 并**真实替换**原 Desktop 的 `LibraryQueryService`、`ShelfService`、`ReaderService`、`LocalLibraryIngestion` 分散初始化。原服务/SQLite/Reader/HTTP/用户事件语义不变，可信 Desktop 的 `ExternalReaderAdapter` 仍显式注入，来源插件不能获得 OS 文件打开能力；源中立 Core 不导入 `LibraryService/ProviderService` 或 Pica/E-H/JM SDK。
+- 物理 `src/offline-core/qa-cli.ts` 与 `qa-http.ts` 也使用**同一** `createCoreLocalRuntime/createCoreLibraryPorts`，旧本地 Reader 片段及原完整网页、书架/导入、同一 SQLite 均未复制实现；实体 `esbuild` 必须包含此工厂且继续拒绝具体 Provider/Host。
+- 新 `test/unit/core-runtime-composition.test.ts` 通过真实临时 SQLite 和原 LocalLibraryIngestion 跑图片导入、书架 CRUD、Reader 原章节与分面，验证无 OS opener 默认拒绝及可信注入后仍必须是当前 Library 所拥有的文件。第一轮 Windows 新用例对原 Reader 规范化路径误判（Windows RUNNER~1 vs runneradmin），在 `d77a422cca1a7c116f80b5821eea2a37f3db0cec` 改为对照 `fs.realpathSync.native`，不放宽原安全路径保护或跳过任何用例。
+- 修后精确源码 [Linux/Windows 源无关实体 ESM+Chromium #40872173707](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173707) **SUCCESS**；[原完整 Web Linux/Windows+真实 Chromium #40872173639](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173639) **3/3 SUCCESS**；[Windows x64 官方 Node Reader/Full-Web 双 ZIP #40872173806](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872173806) **2/2 SUCCESS**。Android/Web/Desktop 全量 [CI #40872182323](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40872182323) 本轮初记时尚在运行，不能提前给全量 PASS。[本轮工程审计](docs/S3_CORE_RUNTIME_COMPOSITION_20261029.md)。
+- **下一阶段 CORE-LIB-04c-02**：让真正正式 `src/desktop/main.ts` / `src/library/server.ts` 可选择性完全不创建 `LibraryService/ProviderService`，保留旧完整 UI/SQLite/书架/Reader/本地设置/WebDAV、可靠任务生命周期；必须验证最终正式可执行闭包确实零具体 SDK。之后是插件可信签名安装/停用/升级/撤销、Android Service/Binder 和 source-free APK、原 v0.5.0 用户数据/下载/偏好无损一键更新回滚、Android 真机 G1。原 42+12 案例与 G1–G4 全部 OPEN；未合并 main/签名/Release/OTA。#232/#233 分叉书架方案仍需选版。
+
+
+## S3 PR #239｜正式完整网页可在无来源物理 Core 和 Windows x64 ZIP 内运行（CORE-LIB-04b-02/03，2026-10-29）
+
+- 基于已完成原 Web 初始化门禁的 Draft #238，建立 [Draft PR #239](https://github.com/Saber-Alter-Lily/pica-library/pull/239)，直接复用**原** `web/index.html`、`web/app.js`、CSS/语言模块、SQLite/Reader/书架与真实 HTTP。新增 `scripts/stage-offline-full-web-qa.ts` 以 TypeScript AST 审核 ES module 闭包、拷贝到全新 OS Temp、哈希清单/原五视图回读，明确排除 Pica/E-H/JM 站点登录的独立顶层入口、重复 Host Library 初始化及非必要 Worker。原画风推理改为仅在用户主动开始分析时按需导入，正常书库启动不强制加载模型。
+- `src/offline-core/full-web-qa-assets.ts` 与现有 `qa-http.ts` 复用旧 session Cookie/Host/同源/CSRF，原首页本地目录/分面/书架/阅读/状态接口由**同一真实业务实现**支撑；只有显式 QA 完整网页权限允许最多5000条本地目录查询，原旧 Reader QA 限制保持。原正常 Desktop API 未更改。新增真实 SQLite、无权限/跨源拒绝、脚本 SHA 篡改测试。
+- [Linux/Windows 原完整 HTML/HTTP 资源闭包 #40869094570](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869094570) 与 [实际 Chromium 原首页/书库筛选/书架创建/阅读/设置 #40869551499](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869551499) 均 **SUCCESS**；原 E2E 没有对外网络请求或浏览器运行异常。全 Android/Web/Desktop [原完整 UI 代码 CI #40869749947](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40869749947) SUCCESS。
+- 延用现有 `scripts/build-windows-offline-portable-qa.ts`、`verify-windows-offline-portable-qa.ts` 官方 Node 24.15.0 固定 SHA 发行校验、许可证、原 CMD/Node 真实进程树关闭与 SQLite 恢复，新增**可选** `--full-web` 和矩阵 Reader-only/Full-Web。源码 `28bd5d07ef7f9d59b19ff936be93652bacfd8164` 的 [实际 Windows x64 两 ZIP 提取/运行 #40870550859](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40870550859)：**2/2 JOBS SUCCESS**，无可执行 ZIP 上传给用户。其对应 Android/Web/Desktop [全 CI #40870561582](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40870561582) 初次登记时仍需单独核对，不挪用历史测试。
+- 开发期间严格审核发现并修复双重 Host JS 初始加载、原 AI Worker 动态外部模型、原完整网页 CSRF 和资源闭包风险，先前未通过/取消的 Actions 仍保留真实历史。详细 [技术审计](docs/S3_FULL_WEB_WINDOWS_PORTABLE_QA_20261029.md)。
+- **下一步 CORE-LIB-04c** 应以现有已经可以完整渲染原 HTML 的源无关 Core 业务端口为主，将正式 Windows `desktop/main.ts` 和 `library/server.ts` 对 `LibraryService/ProviderService` 的强制依赖做生产 composition 级拆除，不再重复 QA 小产品。其后才可信插件独立安装更新、Android Service/Binder 与纯核心 APK、旧 v0.5.0 用户数据无损升级和回滚及真机 G1 UX。G1–G4 全部 OPEN，**未合并 main、未发行、未操作真实用户书库/凭据/OTA**；#232/#233 两版书架分叉需选版。
+
+
+### 2026-10-29 CORE-LIB-04b-01 完整 CI 回归与纠正（PR #238，保持 Draft）
+
+- [原可执行代码完整 CI #40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) **FAIL**：其原 `reading-library-shell.test.ts`（全量共 2,793 PASS、1 FAIL）证明当原 Desktop status 读取成功、但 capabilities 读取失败时，新的 `loadDesktop()` fallback 错误地重复请求了 capabilities。这会违反旧版明确的 fail-closed 读取资格，不能因为单独 Linux/Windows 新专项先前成功就声称完整验收通过。
+- 在 `a40d8e821f53a64460cd246311705aba4a4a54e9` 修改真实 `web/app.js`：增加 `desktopHostReached` 边界。只有 **Desktop host status 本身不可用** 时，才尝试由无来源 Core 独立读取 capabilities；正常 Desktop host 已经响应且其能力读取失败时，立即保留 `desktop=null/state.capabilities=null`，不重试、不伪造可用功能。
+- 专项工作流增加原 `test/unit/reading-library-shell.test.ts`，使以后兼顾“无 Desktop host、但可读 Core”和“已联系 Desktop、但能力获取失败必须拒绝”的双重行为。修复后代码和门禁 HEAD `94a4221aecf01ce7ac1656db2a7e6a055b219dac` 的 [Linux/Windows 专项 #40861065013](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861065013) 与 [Android/Web/Desktop 完整 #40861072267](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40861072267) 此时仍 **QUEUED / NOT_VERIFIED**。不得复用旧 #40860567748 的成功替代新 HEAD。
+- 保持 PR #238 为 Draft；下一优先级依然是原完整 Web/index 静态图、真实 Chromium 和生产无源启动组合，而不是继续创建独立迷你 UI。G1–G4 继续 OPEN。
+
+
+## S3 PR #238｜原正式 Web 首页无源启动：能力驱动关闭在线推荐请求（CORE-LIB-04b-01，2026-10-29）
+
+- 在 [Draft #238](https://github.com/Saber-Alter-Lily/pica-library/pull/238) 继续依赖 [#237](https://github.com/Saber-Alter-Lily/pica-library/pull/237) 真正已复用的 `status/authors/capabilities`，直接修改**原正式** `web/app.js` 的 `loadDesktop/detect`；来源无关 Core 没有 Desktop 主机状态时单独恢复 `/api/v1/capabilities`。明确 `features.recommendationSessions === false` 时保留原本地作品、作者、分面查询和渲染，但**不得请求在线推荐反馈/session/自动启动**，UI 解释为何功能不可用。兼容旧正式 Desktop 在缺字段或为 true 时的既有推荐行为，无第二套 UI/算法。
+- 中/英/日统一新增 `message.coreOnlyRecommendations`。原 TypeScript AST 测试实际提取执行正式 `detect()` 和 `loadDesktop()`，覆盖三类能力模式、精确 API 请求/不联网、缺失 Desktop 状态回退、原翻译完整性；新增 Linux/Windows 双平台专项。
+- 首轮 [S3 专项 #40860442807](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860442807) **FAIL** 为新测试同名类型参数 TS2502，修复 `c7f6e47d` 未跳过测试；修后 [S3 双平台 #40860567748](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860567748) **SUCCESS**；Android/Web/Desktop [CI #40860576867](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40860576867) 仍须独立核查最终完整结果。详见 [本轮审计](docs/S3_FULL_WEB_SOURCE_FREE_BOOTSTRAP_20261029.md)。
+- **下一目标 CORE-LIB-04b-02**：按原正式 `web/index.html` 和模块 import/静态资源清单构造**完整旧网页**的 source-free 资产/服务组合，真实 Chromium 验收首页/书库/书架/阅读/设置/WebDAV；禁止继续用 Reader 片段冒充完整 App，禁止伪造成功 API。04c 再移除原 Windows 主程序强制 `LibraryService/ProviderService` 初始化；真实 Windows/Android 纯核心产品、来源 SDK 独立签名/更新、老 v0.5.0 无痛升级回滚、Android 实机和 G1–G4 均 OPEN。
+
+
+## S3 PR #237｜原 Windows 真正启动接口：状态、作者、能力声明抽离（CORE-LIB-04a，2026-10-29）
+
+- 基于 [CORE-LIB-03c Draft #236](https://github.com/Saber-Alter-Lily/pica-library/pull/236)（已核实 [Linux/Windows 专项 #40857679928](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857679928)、[完整 Android/Web/Desktop CI #40857731995](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857731995) 与 [其文档 HEAD CI #40858006521](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40858006521) 全 SUCCESS），继续新增 [CORE-LIB-04a Draft #237](https://github.com/Saber-Alter-Lily/pica-library/pull/237)，未合并 main，不改正式版本。
+- **修改原生产 `src/library/server.ts`**：旧 `GET /api/v1/status`、`/api/v1/authors` 与 `/api/v1/capabilities` 委托到来源中立 `src/library/core-bootstrap-read.ts`，仍用旧 SQLite、`appCapabilities` 与产品版本；旧 Desktop `provider-enabled` 分支透传原具体 Provider、来源模块与来源配置数据，**不改变其结构与行为**。
+- **同一旧正式 URL** 在物理 `src/offline-core/qa-http.ts` sentinel-only loopback Core 中执行；随机 Cookie 授权之前不可见。`source-free` 分支真实关闭未实现的来源、收藏修改和推荐/画像/在线预览能力声明，不能用虚假“可用”伪造完整 Windows 应用。原 Core/Reader/SQLite/书架依然复用。
+- 版本原 `src/version.ts` 引用项目根 `package.json` 触发 [Linux/Windows #40858854790](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40858854790) 与 [Windows Portable #40858861108](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40858861108) **实测失败**（原构建严格只允许 AdmZip）。修复 `81275598` 后仅允许**固定项目根 `package.json`** 作为版本 metadata，要求 `src/version.ts` 存在，不放行其它外部 JSON/JS/SDK。新增输入图与归档测试；[修后 Windows 官方 Node x64 Portable #40859105359](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859105359) **SUCCESS**，实体 QA ZIP 不上传发布。
+- [最新 Linux/Windows+真实 Chromium 专项 #40859128504](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859128504)、[完整 Android/Web/Desktop CI #40859135753](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40859135753) 最初登记时仍需核查最终状态，不能以旧测试或单平台 PASS 代替全量。审计 [docs/S3_CORE_BOOTSTRAP_20261029.md](docs/S3_CORE_BOOTSTRAP_20261029.md)。
+- **下一步 CORE-LIB-04b**：原完整 `web/index.html`、`web/app.js`、原 UI 全资源、三语言和不联网无源模式，真正显示首页/书库/书架/Reader/设置/WebDAV，避免继续堆 QA 小型页面；CORE-LIB-04c 再移除原完整 Windows 主组合的 `LibraryService/ProviderService` 强制初始化，做实际零 SDK 稳定包、旧 v0.5.0 数据安全无痛升级/回滚和 Android Source Service/Binder。G1–G4 仍 OPEN；#232/#233 竞争书架分支须单独选版。
+
+
+## S3 PR #236｜真实 Windows 本地配置及原生文件夹接口来源无关化（CORE-LIB-03c，2026-10-29）
+
+- 新建 [Draft #236](https://github.com/Saber-Alter-Lily/pica-library/pull/236)，在 #235 的已验收 WebDAV 端口基础上，直接重构**正式生产** `src/desktop/config.ts`、`src/desktop/main.ts` 和 `src/library/server.ts`，新增 `src/library/core-local-config.ts` 与 `core-local-platform.ts`。不是新的 QA 阅读器；复用旧 `config.json`、Reader 设置、SQLite VFS 校验、原生文件选择器、受控目录打开与完整旧 HTTP API。
+- 纯本地设置模块只有 Node/pure Reader settings/SQLite-path 的运行时 import，原旧 Desktop wrapper 继续处理 `sourcePolicyForConfig` 兼容性、账号/代理凭据和 `externalSources` 校验，**没有更改正式用户配置路径及账户记录**。受限原生平台接口只接受 data/logs/personalization/packs/browser-lite-export 五类固定用途，Web 不可给 Shell 提供绝对路径/命令或来源参数；原 Host/Origin/CSRF 保持。
+- 新增旧 Desktop 配置 golden 对照、真实临时文件机密拒绝/原子写、异常 Reader 设置、无自动数据库创建、目录用途/原型键/路径注入及原生产 HTTP 请求回归。Linux/Windows 两平台 [CORE-LIB-03c 专项 #40857679928](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857679928) **SUCCESS**，含 TypeScript、原生选择器及真实 API 集成。全 Android/Web/Desktop [#40857731995](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40857731995) 在最初登记时仍待最终判定。
+- **继续任务 CORE-LIB-04a：** 盘点原 Windows 完整网页 UI 与旧 `src/library/server.ts` 的真实启动/HTTP/JS 依赖，优先让书库、书架、Reader、设置、WebDAV 可在没有旧 `LibraryService/ProviderService` 的核心组合中运行；保留原 UI，不继续堆 QA 小页面。#232/#233 为互斥书架分支需专门选版再集成。
+- Android 可拆卸来源 Service/Binder、可信签名/运行隔离、正式 Windows 纯核心安装包、v0.5.0 老用户无痛升级及回滚、真实手机 G1 UX 和 G1–G4 均 **OPEN**，没有合并 main/Release/OTA。技术证据见 [本轮审计](docs/S3_CORE_LOCAL_PLATFORM_20261029.md)。
+
+
+## S3 PR #235｜WebDAV 业务控制器从 Desktop 来源组合剥离（CORE-LIB-03b，2026-10-29）
+
+- 在 [Draft #235](https://github.com/Saber-Alter-Lily/pica-library/pull/235) 直接修改正式 `src/desktop/main.ts` 原 `desktop.save` 与 `desktop.status.remoteStorage`，将原 WebDAV `save/sync/pause-sync/resume-sync/cancel-sync/delete-remote` 调度统一复用来源无关 `src/remote-storage/core-action-port.ts`，**仅 type import** 原 `RemoteStorageDesktopManager`，不复制 WebDAV Provider、SQLite、凭据/远端 generation/scope 保护或后台同步控制。旧 HTTP/CSRF、真实管理器全部原样执行，未知动作保留原普通设置回退。
+- 新增 Linux+Windows `s3-core-storage-qa.yml` 和真实临时 SQLite/MemoryCredentialStore、目标配置机密隔离、6类动作与取消、确认删除、错误传播测试；4个文件共29项已在 [修复后 S3 专项 #40853863903](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853863903) **双平台 SUCCESS**。
+- 首轮 [专项 #40853704332](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853704332) 曾因返回类型写成 `unknown` 触发 TS2322；在 `ab4137b4` 恢复原 `Record<string,unknown>` 类型后重新通过，未绕过完整型检查。全 Android/Web/Desktop [CI #40853872527](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40853872527) 在写入本条时仍需核实最后结果，不提前写 PASS。
+- 下一切口固定 CORE-LIB-03c 旧 Desktop 本地设置/系统文件夹入口与受限 OS 能力，然后 CORE-LIB-04 将完整 Windows 页面/同一数据库脱离 `LibraryService/ProviderService` 的强制启动。Android 纯核心 APK + Service/Binder、可信来源签名/更新和 v0.5.0 老库无痛升级/回滚、G1–G4 全部 OPEN。见 [技术审计](docs/S3_CORE_REMOTE_STORAGE_20261029.md)。
+
+
+## S3 PR #234｜正式 Desktop 本地文件导入抽离（CORE-LIB-03a，2026-10-29）
+
+- 基于源无关书架 Draft #233 新建 [Draft PR #234](https://github.com/Saber-Alter-Lily/pica-library/pull/234)，**实际修改生产** `src/library/server.ts` 的 `POST /api/v1/desktop/local-import/preview|confirm|cancel`，提取 `CoreLocalImportController` 为不含来源/Host/旧业务服务运行时 import 的共用控制器。复用原 `LocalLibraryIngestion`，没有再做一套 CBZ/SQLite/Reader。
+- 保留受信任原生文件选择器、未配置/Headless/并发拒绝及 HTTP 路径、source 元数据输入拒绝；旧的二阶段 token、取消与临时库存未修改。真正的无源离线 CLI 亦改为调用**相同** `previewChosen/confirm`，esbuild 物理闭包必须包含新控制器。
+- 新增真实 SQLite 确认/取消/单次 token、路径注入、虚拟源字段、并发选取、headless 及路由回归。S3 Linux/Windows+Chromium、Windows 官方 Node x64 Portable、全项目 Android+Web/Desktop CI 需按**精确 SHA**核查，首次提交时仍在运行，不预设 SUCCESS。
+- 计划继续 CORE-LIB-03b（原正式 Windows 设置、本地文件夹/打开目录与已有 WebDAV 能力端口）→ CORE-LIB-04（完整 Windows UI/core-only 启动）；不能无限堆 QA mini UI。旧主程序仍依赖 `LibraryService/ProviderService`，Android core-only APK、可信外置来源、升级回滚、G1–G4 用户验收全部 OPEN。见 [本轮审计](docs/S3_CORE_LOCAL_IMPORT_20261029.md)。
+
+
+## S3 PR #233｜正式桌面书架路由与纯 Core 共用（2026-10-29）
+
+- 在 [Draft PR #233](https://github.com/Saber-Alter-Lily/pica-library/pull/233) 抽出原 `src/library/server.ts` 书架 GET/POST/PATCH/DELETE 及 add/remove/add-filtered 路由为 `coreShelfMatch/coreShelfExecute`，直接沿用旧 `ShelfService/LibraryDatabase/LibraryQueryService`；正式 Desktop 的 HTTP 端点和 shelf_add/shelf_remove **逐作品事件批量事务、会话/上下文、搜索记录导入**均保留。实体纯 Core esbuild 必含新的共享 ShelfService，不允许旧 Pica/E-H/JM 源 SDK 导入。
+- QA Core 仅在一次性本机授权会话/CSRF 后允许 `local:<64hex>` 书架加入/移除，远端 `records`/来源扩大/未授权筛选一律拒绝，混合历史书架只显示本地作品。真实 SQLite 单测、正式 `startLibraryServer` HTTP 读写/事件，以及 Linux/Windows 独立 HTTP 回归已增加。
+- 真实 [Linux/Windows 专项 #40848142891](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40848142891) **各70/70 SUCCESS**， [Windows Portable ZIP #40848432952](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40848432952) **SUCCESS**，实际 CMD/Node 关闭并重启可恢复书架与阅读进度。首轮专项目视为 TS 变量同名失败已修。旧完整 CI 因曾在 `server.ts` 静态寻找内联书架事件而失败（原事件其实已经迁入共用控制器），已修订静态检查和增加正式 HTTP 动态回归，没有删除事务性测试。
+- **最新精确源码 c5bd6469** 的 [S3 全专项 #40849035242](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40849035242) 与 [全项目 CI #40849044107](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40849044107) 文件登记时仍待最终判定。G1–G4 依旧 OPEN，未合并 main、发布、触碰 OTA/用户资料。详见 [CORE-SHELF 审计文档](docs/S3_CORE_SHELF_20261029.md)。
+
+## S3 PR #231｜正式 Desktop 书库查询接口与纯 Core 共用（2026-10-29）
+
+- 新建 [Draft PR #231](https://github.com/Saber-Alter-Lily/pica-library/pull/231)。不再做重复的 QA Reader：实际修改生产 `src/library/server.ts`，原 `GET /comics`/作品详情/下载列表/`POST /library/query` 统一调用 `src/library/core-catalog-read.ts`。后者只引用已有 LibraryDatabase、LibraryQueryService 的 type-only ports，不依赖 Pica/E-H/JM SDK、Host、账号、来源激活，也不自写第二套搜索或缓存。原 Desktop 历史多来源数据完整保留，API 合约不改。
+- 纯 Core 的 loopback HTTP 调用相同目录和分面查询服务，对 `localOnly` 请求强制 providerIds local 和 local:<64hex> 身份；Session/Origin/CSRF/类型及 4KiB 请求上限保持。新增本地作品搜索网页（沿用既有 Reader 页面）；源闭包强制包含原 LibraryQueryService，仍禁止 SDK。实际 ZIP 解压后的 Windows 自带 Node 测试增加旧 catalogue/分面 API 验证。
+- 精确源码 **e698f66a4648cda1954c7c1293a4812749301fa5** 的 [Linux/Windows/Chromium #40842187533](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842187533) **SUCCESS：51/51 + 51/51 + 1/1**；[Windows Portable ZIP #40842196837](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842196837) **SUCCESS**。完整 Android+Web/Desktop [CI #40842243847](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40842243847) 登记时在运行中，不能先行判定全绿。
+- 下一阶段抽真实 ShelfService HTTP、行为事件，再处理无源设置、本地导入与 WebDAV 的正式启动组合；**生产 Desktop 仍依赖 LibraryService/ProviderService，正式 Windows/Android 还未完成物理 SDK 剥离**。G1-G4 OPEN。详细见 [S3 CORE-LIB-01 审计](docs/S3_CORE_LIBRARY_READ_20261029.md)。
+
+## S3 PR #230｜Windows x64 纯 Core Portable QA 真实 ZIP 与启动器（2026-10-29）
+
+- 叠加 #229 创建 [Draft PR #230](https://github.com/Saber-Alter-Lily/pica-library/pull/230)。沿用现有 source-free `core.mjs`、Reader DOM+9资源，不造第二数据库/Reader；新建**只在 CI OS Temp 内**组装 ZIP（20 文件 + 清单）、官方 Node 24.15.0 x64 运行时和 LICENSE、AdmZip MIT 许可证、项目 MIT/NOTICES、只可启动 sentinel QA 目录的 `.cmd`。不上传可执行 ZIP，仅保留短期 SHA/源闭包/许可证/真实启动验收 JSON。
+- [官方 Node 归档 SHA256](https://nodejs.org/dist/v24.15.0/SHASUMS256.txt) 验证通过，附加固定归档 hash `cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62`，防止运行时静默替换；实际解压后用随包 `runtime/node.exe` 运行旧 Reader、Local PNG 章节/媒体、Cookie/CSRF/Host 边界及 SQLite 进度重启恢复。后来把启动脚本 `.cmd` 本身加入正向运行测试并负责清理整个临时进程树。
+- 失败记录保留：初版 [#40837813326](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40837813326) 因 pnpm 管理的 AdmZip LICENSE 硬链接被拒绝；仅许可证做严格例外后 [#40838038263](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838038263) **PASS**；新增正向 CMD 测试首次 [#40838531135](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838531135) 因测试类型函数未改全失败，修后精确源码 **0ca6f6e8** 的 [Windows #40838638638](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838638638) **SUCCESS**。本轮 [Android/Web 完整 CI #40838644597](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40838644597) 登记时尚未结束。
+- 重要：**该 ZIP 没有提供给用户、没有签名和 Release，正式 Windows UI/Android APK 的 Pica/EH/JM 仍未物理脱离**，不声明 G1–G4 或 NEW-SRC-01 通过；老用户 v0.5.0 原账号、记忆书库、下载和一键更新/回滚亦未真正验收。详情 [S3 Windows Portable QA](docs/S3_WINDOWS_OFFLINE_PORTABLE_QA_20261029.md)。
+
+## S3 PR #229｜Reader 静态资源从源码仓库真正拆出（2026-10-28）
+
+- 在 [Draft PR #229](https://github.com/Saber-Alter-Lily/pica-library/pull/229) 中，新增严格白名单资源装配器：只复制**当前原始 Reader section DOM** 和 9 项已有 Reader JS/CSS/图标，带 SHA-256/大小回读；不复制完整 `index.html`、`web/app.js`、Pica/E-H/JM 账号、来源 Host 或推荐脚本。只能装配到不存在的 OS Temp 子目录，不覆盖其他目录，不上传/发布任何可执行候选。
+- QA HTTP 优先从实体 `core.mjs` 旁 `web/reader-fragment.html` 读取已有 Reader 片段，真实子进程/Chromium 从非 Git cwd 启动，依旧复用同一 ReaderService/SQLite/CBZ 和 `/api/v1/reader` 及安全会话，避免复制第二 Reader。
+- 首轮 [S3 #40827089058](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40827089058) Linux 33/33 成功但 Windows 路径规范化失败；按 Windows native realpath 修正父目录包含关系且继续拒绝非临时路径/覆盖，旧失败如实保留。精确源码 **8ed7d80cf0cdb79a3571c13bc62d20fbc5269197** 的 [S3 #40827250488](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40827250488) **SUCCESS**：Linux33/33、Windows33/33、TS 双平台通过、真实 Chromium1/1；浏览器读回进度测试不依赖 Git 源码目录。
+- 对应 [完整 CI #40827256178](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40827256178) 记录时仍运行中，不预判。未完成生产签名 Windows 程序、正式 Node runtime/ZIP、全功能 Windows Web UI 纯 Core、Android、用户 v0.5.0 无痛升级/回滚，G1–G4 保持 OPEN。详细证据见 [`docs/S3_OFFLINE_READER_ASSET_STAGE_20261028.md`](docs/S3_OFFLINE_READER_ASSET_STAGE_20261028.md)。
+
+## S3 PR #228｜无来源核心真实 HTTP＋Chromium 阅读界面（2026-10-28）
+
+- 新建 [Draft PR #228](https://github.com/Saber-Alter-Lily/pica-library/pull/228)，叠加 #227。在已具备真实源码无源 ESM 文件、旧 Reader GET 端口的基础上，新增只允许 disposable QA sentinel 目录的 `serve`，启动固定 127.0.0.1 随机端口 HTTP；复用原 Reader GET 路由、数据库、图片/进度逻辑。额外保护 256-bit 一次性入口、HttpOnly/SameSite Cookie、实际 Host/loopback、Origin+CSRF、CSP、静态资源白名单、no-store，拒绝其它来源和在线路由。
+- **现有界面复用而非复制**：取原 `web/index.html` 的 `section#reader` DOM，沿用原样式、`reader-input/viewport/progress/settings` 模块；QA 浏览器适配层负责将保存在测试目录内的本地漫画与原 `/api/v1/reader/...` URL 接通。没有搬入旧 Desktop 的在线 SDK/ProviderService，也不涉及正式用户账号/资料。
+- 精确代码 `87f142b305fd051f8006d94ad23e46f44c49e794` 的 [S3 双平台及浏览器 #40826346306](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40826346306) **SUCCESS**：Linux 31/31、Windows 31/31、真实 Chromium 1/1、TS 双端通过。浏览器实际翻到第二页并保存，在刷新后恢复；HTTP 测试完成跨站与源路径拒绝。
+- 本轮 [全项目 CI #40826350952](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40826350952) 记录时仍待最终状态，不以专项通过代替全项目验收。详见 [`docs/S3_OFFLINE_CORE_HTTP_UI_20261028.md`](docs/S3_OFFLINE_CORE_HTTP_UI_20261028.md)。
+- 纯核心仅为隔离 QA 阅读入口；**生产 Windows 启动器、完整多功能 Web UI、Android 纯 Core、可验证来源签名安装和 v0.5.0 一键升级仍未完成**。保留 G1–G4 OPEN，不合并或发布。
+
+## S3 PR #227｜统一本地 Reader 的 HTTP GET 路由（2026-10-28）
+
+- 在 #226 已验证的来源中立本地 CLI 上创建 [Draft PR #227](https://github.com/Saber-Alter-Lily/pica-library/pull/227)，从**实际旧** src/library/server.ts 抽出本地 Reader 的章节/单章/页图片/进度 GET 分派到 src/reader/local-http-read.ts。旧 Desktop Server 保留原 HTTP 安全校验/headers/输出以及 POST 保存进度、用户事件、导出和外部文件打开；同时让零来源实体 QA 候选调用同一 GET 路由，不造第二个 Reader。
+- 新增 URL/百分号解码、缓存头、本地与旧下载图片、未知 Host/在线来源不误接管、依赖图双调用方门禁；源闭包验证要求这个共享文件进入 source-free CLI 打包。
+- **精确源码 34b5705030d69e3b13db483ba2c3654bd1ea1d95** 的 [S3 双系统 #40821561989](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821561989) **SUCCESS**：Linux 30/30、Windows 30/30，两端 TypeScript PASS，仍保留前轮的本地 folder+CBZ 跨进程物理验证。新代码 [完整 CI #40821583070](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821583070) 当时仍在运行，未先行判 PASS。
+- 详见 [S3 CORE-HTTP 验收边界](docs/S3_SHARED_LOCAL_READER_HTTP_20261028.md)。现有 Desktop Server、Windows 正式发行物仍携带 Pica/E-H/JM，Android/旧版升级/真机验收未解决，G1–G4 持续 OPEN。
+
+## S3 PR #226｜本地纯核心真实独立进程候选（2026-10-28）
+
+- 从已确认 #225 完整 CI SUCCESS 的开发线新建 [Draft PR #226](https://github.com/Saber-Alter-Lily/pica-library/pull/226)，仅加入 src/offline-core/qa-cli.ts、build-offline-core-candidate.ts、专项回归与 CI。直接复用旧 LibraryDatabase、LocalLibraryIngestion、ReaderService，真实 esbuild ESM 物理打包并检查站点 SDK 不在单文件依赖闭包；临时 QA root 与用户 v0.5.0 数据隔离。
+- 已测试真实不同 OS Node 进程的**文件夹与 CBZ 导入→章节与媒体摘要→显示/保存阅读进度→重启恢复**、无确认拒绝、旧数据库不写入，且 CI Artifact 只留 SHA/依赖 JSON，不传可执行文件或用户资料。AdmZip 的 Electron 可选 original-fs 引起旧 CI 失败，修复为在 Node-only QA 显式 alias 到 node:fs，正式 Rollup/包不改。旧失败不删除。
+- **精确源码 bc1539515aa0f5b41dfbedb0b3b0a47df3744609** 的 [双系统 S3 专项 #40821030082](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821030082) **SUCCESS**：Linux 26/26、Windows 26/26、两端 TS 检查通过。[全项目 CI #40821035105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40821035105) 登记时仍运行中，不能冒充完整 PASS。
+- **核心重要限制**：这不是用户可用 Windows 浏览器 UI/启动器，也不是正式源外置版本。旧 src/library/server.ts/LibraryService 仍捆绑具体 Pica/E-H/JM，Android 核心仍含来源代码；G1–G4、NEW-SRC-01、旧版无痛升级和物理回滚全部仍 OPEN。
+- 详见 [S3 离线核心证据及后续抽路由计划](docs/S3_OFFLINE_CORE_PHYSICAL_QA_20261028.md)。
+
+## S3 PR #225｜修复 E-H 旧 ID 点击签名来源无反应（2026-10-28）
+
+- 实际发现 Web 入口 openReaderComic 的单冒号限制与已有 EhPublicIdentityBridge 保持旧 eh:gid:token 的计划矛盾：统一书库会显示已连接的签名阅读按钮，但点击旧作品 ID 静默返回。新增来源中立 Web signed-route 语法校验（两段/三段标识，无 URL、路径和 local/hosted），并将无效会话改为显式错误反馈。沿用唯一 Reader、既有 SignedSourceDesktopReader、独立 CSRF、同一数据库作品身份与保存进度。
+- 新增实际 AST 提取的 Web Reader 函数调用测试、已有 ReadingLibrary 真 DOM 模拟按钮点击回归和 Linux/Windows S3 CI 门禁。旧源码 1043285 的 [专项 #40811134919](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40811134919) 因新测试 TS18048 失败（两系统）；在 066f105f 修复。新源码 [专项 #40811216292](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40811216292) **SUCCESS**：Linux 125/125、Windows 99/99 和两系统类型检查通过；[完整 CI #40811220694](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40811220694) 尚待最终判定。
+- 详见 [签名旧 ID Web Reader 修复审计](docs/S3_SIGNED_LEGACY_WEB_ROUTE_20261028.md)；不合并 main/发布，G1–G4 保持开放，Android 纯核心、OS 隔离、真实来源签名分发与 v0.5.0 无痛升级尚未完成。
+
+## S3 PR #224｜E-H worker 独立可重复构建与待签名清单（2026-10-28）
+
+- 基于 #223 新建 [Draft PR #224](https://github.com/Saber-Alter-Lily/pica-library/pull/224)，未发布、未合并 main。用项目已有 esbuild 构建真实 EhProvider 的可选 worker，内存生成固定入口、固定单文件、上限 1MiB 的未签名候选，CLI 只输出 SHA/大小/真实依赖清单，不发布 worker 或私钥。
+- 严格 9 文件源码 allowlist 与 Node 内置依赖约束，阻止未经审计的具体 SDK/第三方代码被悄悄带入。回归实际做两次字节确定性检查、临时 Ed25519 验签安装前拒绝、签名后默认禁用、字节变更拒绝；模块 DAG 明确证明可选 worker 没有进入默认 Desktop/Reader，同时旧 Desktop 仍然含 EhProvider（NEW-SRC-01/G2 未通过）。
+- 精确代码 70521297 的 [S3 双平台专项 #40810352619](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40810352619) **SUCCESS**：Linux 98/98、Windows 72/72，双系统 TypeScript PASS。完整 [CI #40810412798](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40810412798) 记录时尚未结束，不可提前认定全绿。
+- 不含可安装签名来源包、真实站点联网、账号/下载、Android Binder、Windows OS 沙箱/生产信任根、纯 Core 物理拆包、v0.5.0 原地升级/回滚和真机验收。G1–G4 均继续开放。详细审计见 [S3-EH-PKG 说明](docs/S3_EH_UNSIGNED_CANDIDATE_20261028.md)。
+
+## S3 PR #223｜E-H 真实来源协议独立进程首片（2026-10-28）
+
+- 新建 [Draft PR #223](https://github.com/Saber-Alter-Lily/pica-library/pull/223)，叠加 #222 而不合并正式 main。复用原有 EhProvider，抽出匿名公开的真实来源解析，在可选工作进程执行，旧 eh:gid:token 身份和旧书库记录不改，原 Reader 复用而非复制。新增可选 identity bridge、HMAC 页面 token、受限 IPC 和签名 CJS worker。
+- 真实源读取由带固定无账号 HTTP fixture 的旧 EhProvider 执行：单元/类型与真实 OS child-process IPC、签名安装、禁用撤销、进度/书库合并在 Linux 和 Windows 运行。旧源码 21831684 的 [专项 #40732088085](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40732088085) SUCCESS（Linux91/91，Windows65/65）。此后补充 token 资源边界/安全刷新和实际 worker import 图，必须由新 HEAD 重测，不继承旧通过。
+- 未测试真实站点和用户账号；不含 ExH、登录/收藏/搜索/下载，不是可安装正式来源，更不是两个 Core 包真实去 SDK。发行者公钥、OS 保护根、Android Binder/Service、完整 v0.5.0 兼容/回滚、G1–G4 均 OPEN。无 Release、OTA、用户数据、main 更改。
+- 详细方案、适用边界、S3-EH-01～06 与后续计划：[S3 E-H 来源交付与风险](docs/S3_EH_PUBLIC_WORKER_20261028.md)。
+
+## S3 安全及 CI 续接｜2026-10-28（HEAD 2e3bcf3）
+
+- **实际基线**：当前开发树的最后一项运行代码提交为 `2e3bcf32fba43c041009099afa3d7de6f2296c91`，位于未合并 Draft [PR #222](https://github.com/Saber-Alter-Lily/pica-library/pull/222)，继承 #221 → #220 → #219 → #218；正式 main 与 v0.5.0、用户数据/账号、签名 APK、OTA、安装包未修改。此日志更新是文档提交，不可把旧源码测试伪装成文档 HEAD 的独立通过。
+- **首轮真实失败（已诊断）**：[完整 CI #40715568582](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40715568582) 对 `4a13b65d` 实际 **FAIL**，其中 Android PASS，Web/Desktop 的 340 个测试文件中 2 文件失败，4 项失败/2684 项通过/14 跳过。根因为两份旧契约测试仍逐字检查 `api(`${root}/progress`)`，新共用 Reader 实际使用 `api(`${root}/progress`, signedReadOptions)`（带签名源会话/CSRF 参数）；不能仅凭此断言推出实际阅读流程损坏。
+- **修复且保留回归门禁**：`8f743563` 修复 `test/unit/dev2-web-contract.test.ts` 三个用例共用的过时字符串检查；`debeebe3` 修复 `test/unit/v020-product-contracts.test.ts` 的另一个相同断言。新断言必须维持旧本地/online URL、signed-session 读参数和 scoped CSRF，而非简单删测；现有 `web-reader-progress.test.ts` 继续覆盖本地、Host、signed 实际保存/ACK 调用。
+- **新增真实安全缺口与阻断**：签名图片的原生 `<img>` 无法附加 CSRF，之前在 loopback TCP + 无 CSRF 图片例外里依据客户端自报 HTTP Host 构造允许的 Origin/Referer，可能对 DNS rebinding 的攻击者同源网址形成许可混淆。`38a6a8c` 要求 Host 为 `127.0.0.1` / `localhost` / `[::1]` 并匹配 HTTP Server **实际 socket 监听端口**；所有 signed API 受此门禁；`2e3bcf3` 对伪造外域 Host + 同源 Referer 与错误本机端口增加真实 Node HTTP 负向测试，仍应允许有效同源原生图片、拒绝无 CSRF 的 JSON/进度请求。
+- **精确新代码验证**：[S3 双系统专项 #40728398018](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40728398018)、[全项目 CI #40728408056](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40728408056) 在本次日志写入时尚在队列/进行中，结果 **NOT_VERIFIED**；旧 #40715552549 Linux87/87、Windows61/61 是安全补丁之前的专项通过，不得继承为新 HEAD 通过。如新 CI 失败，应按真实日志修复并再次以新 SHA 判定。
+- **当前尚未实现**：真正 Pica/E-H/JM 源协议在隔离进程/Android Binder 内运行、发行者公钥与受保护安装根、多进程安全与官方签名/安装、两端纯 Core 安装包物理无源 SDK、账号/收藏/下载/历史进度兼容、旧 v0.5.0 原地升级/回滚。下一切口应选一个真实 Provider 逐项梳理旧 ID、凭据作用域、实际请求和书库/Reader 对应，避免重复制造仅会返回合成图片的 worker。G1–G4 仍 OPEN。
+- **待核查**：本提交之后分别检查专项 CI 和完整 CI 的精确源 SHA，真实 Android/Windows 设备与用户视觉验收不得以 CI 全绿代替；继续保留旧 42 + 新 12 案例的各项阻断记录。
+
+## S3 PR #222 接续验收｜2026-10-28：安全隔离与真正阅读 UI 路由
+
+- **历史基线已经精确核实**：旧源码 `dd03822e` 的 [签名来源双平台专项 #40712630322](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712630322) 和 [完整 CI #40712643773](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712643773) 均 SUCCESS；这两项不能直接覆盖后续 UI 修改。
+- **本轮最主要的产品错误已实际解决**：之前统一书库的签名来源被标记成 legacy `online` 通道，点击会误跳旧 Provider 而非签名源。新的 `ReadingLibrary` 使用 `signed` 独立 channel、严格 UUID 会话归属；`web/reading-library.js` 中英日按钮走 `openSigned`；`web/app.js` 的唯一 Reader UI 复用导航/分页/纵向滚动、调用 `/desktop/signed-reader/<session>` 的真实章/页/进度接口，进度写入用独立有 CSRF 的 signed session 而不是覆盖现有 `online-reader-progress-v1`。
+- **安全与默认禁用**：`signed-reader-errors.ts` 零依赖合同阻止普通 HTTP server 为错误处理而传递加载签名来源执行器；TypeScript 真正的 runtime import DAG/负向注入测试检测整个默认 `src/library/server.ts` 的依赖闭包，禁止隐式加载进程管理器与签名安装器。默认无受控组件的 HTTP 服务必须返回 403。子进程崩溃后回收 session 但永不悄悄重连；同版本 no-op 激活不会误断线。
+- **原生图片受限同源读取**：浏览器 `<img>` 不能加自定义 CSRF 头，签名来源图片仅在准确的会话作品图片 URL 且有匹配同源 Referrer、`Sec-Fetch-Site:same-origin`、`Sec-Fetch-Dest:image`、无外来 Origin 时接受无 CSRF 的 GET，普通 JSON/状态/进度/修改均继续强制原有 Local Desktop origin+CSRF；跨站 GET、错误 Fetch Dest 与裸来源 URL 拒绝，安全包头保留。
+- **新源码精确专项 CI**：[Linux + Windows #40715552549](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40715552549) **SUCCESS**，代码 `4a13b65d`，Linux **87/87** + Windows **61/61**。覆盖原有真实进程 IPC、Ed25519 签名 lifecycle、实际 HTTP、书库页面按钮与进度、跨站媒体权限、会话崩溃撤销和来源 DTO。对应 [完整 CI #40715568582](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40715568582) 登记时仍为 **QUEUED / NOT_VERIFIED**，不得把专项通过冒充正式全绿。
+- **余下 G2/G3 关键点**：生产 `src/desktop/main.ts` **没有注入**签名组件，因为未有已审核的真实发行者公钥与可信不可改写安装目录；Pica/E-H/JM 核心 SDK 仍在正式两个安装包中、Android Binder/AIDL 没有、真实来源迁移/旧账号及数据升级/一键安装回滚没有。S1 真机用户交互 G1 也尚未签收。全部 Draft、未合并/未发布。
+- 当前技术与验收记录：`docs/S3_SIGNED_DESKTOP_READER_20261028.md`；开发 PR [#222](https://github.com/Saber-Alter-Lily/pica-library/pull/222)。
+
+---
+
+
+## 2026-10-28｜S3 受控签名源 → 桌面实际 UI/Reader 接续（Draft PR #222）
+
+**这次不再继续做纯隔离 mock 原型，而是把已通过真实 IPC / Ed25519 的组件接入现有 Desktop 服务和统一书库，保障用户点击能打开**。来源执行/管理必须来自应用显式可信组合入口，尚不能让第三方普通资源包/来源清单自行执行代码。全部仍为 Draft，不修改 main、正式 v0.5.0、Release、OTA、个人收藏/凭证/下载。
+
+- **上轮真实通过**：[Linux + Windows 签名源 HTTP 专项 #40712630322](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712630322) SUCCESS；[完整 CI #40712643773](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40712643773) SUCCESS，均对应 `dd03822e` 的前一批业务代码。
+- **修复默认应用的特权导入倒灌**：`SignedReaderInputError` 从特权签名来源控制器独立为零依赖模块，默认 `src/library/server.ts` 只引用类型签名控制器 + 纯错误类，不允许默认 HTTP 服务器传递导入 `TrustedSourceProcess` / `SignedWorkerStore`。真实 TypeScript 依赖图/传递闭包测试检测其新增运行时导入并拒绝 CI。
+- **管理/会话安全**：崩溃/超时工作进程的 signed session 能被清理，旧链接失效；查状态不自动启动，连接须明确用户授权。对同一个已签名版本进行 no-op 激活不触发无意义断开。原有修订号 CAS、来源撤销和无安装/公钥/代码注入的 HTTP 接口不变。
+- **禁止来源身份误路由**：原来签名来源投影曾使用通用 `online`，会导致统一书库按钮错误调用旧 `ProviderService`。现改为带可验证易失 sessionId 的独立 `signed` channel，`reading-library.js` 使用 `openSigned` 专属 callback（中/英/日），`web/app.js` 把它接到现有 Reader UI 的章节/图片/进度和导航；不重新发明 Reader、不覆盖旧进度。停用来源后仍保留独立 `signed-source-progress-v1:<id>`，已失效链接不可访问。
+- **浏览器图片权限细化**：自有 `<img>` 不可发送 CSRF，仅对准确 `/desktop/signed-reader/<uuid>/.../pages/<n>` 路径开放严格的同源 Referrer + Fetch Metadata image 限定 GET；所有管理、进度与元数据仍使用 loopback + Origin/CSRF，跨域与错误 Fetch Dest 失败闭锁。
+- **真实测试补充**：默认无 SignedSourceDesktopReader 的 Desktop HTTP 拒绝访问；真实子进程 crash 后新连接必须显式执行、旧图片 URL 409；完整 HTTP → 阅读页 → 统一进度投影；阅读书库 route `signed` 不得假装普通 online；用户页面点击应携带源 sessionId；进度写入沿用旧 Reader 纪律。新的 `S3` 工作流纳入 Linux/Windows 平台测试及 UI/进度回归，结果必须以该批代码精确 SHA 的 Actions 状态判定。
+- **没有通过的产品关口**：正式应用未提供生产级固定公钥与不可被同用户进程篡改的安装根；工作进程仍不是 OS 沙箱；Pica/E-H/JM SDK 仍物理捆绑，Android Service/Binder 尚未实现；没有真实源的独立安装、升级与兼容、旧 v0.5.0 数据无损迁移或实体双端发布，G1–G4 继续 OPEN。
+
+详细技术/验收表：`docs/S3_SIGNED_DESKTOP_READER_20261028.md`；[PR #222](https://github.com/Saber-Alter-Lily/pica-library/pull/222) 保留 Draft，禁止因自动化测试变绿而直接合并/发布。
+
+---
+
+
+## 2026-10-28｜S3 受控签名组件生命周期：实际安装/启停/回滚工程薄片（Draft PR #221）
+
+**授权与分支边界**：用户要求按计划继续将来源从漫画阅读器本体解耦。项目依赖链保持 [S1 #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) → [S2 #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) → [S3 进程 #220](https://github.com/Saber-Alter-Lily/pica-library/pull/220) → [S3 签名生命周期 #221](https://github.com/Saber-Alter-Lily/pica-library/pull/221)。全部 Draft、未合并，生产 `main`/Release/OTA/用户账号与库数据未修改。S1 真机 G1、核心源外置 G2、迁移 G3、发布 G4 均未验收。
+
+- **前置真实工程基线**：[S3 真实 IPC 专项 #40691301737](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40691301737) 与 [完整 CI #40691317341](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40691317341) 在旧代码 `e52bf61a` SUCCESS。已具备 Linux/Windows 真实来源进程、随机握手、无网络 QA worker、撤销/超时等验证。
+- **本批实际代码**：新增 `src/source-extensions/signed-worker-store.ts`，在已有 `TrustedSourceProcess` 上方提供带固定 schema v1 的 Ed25519 发布者验签、应用代码外给定的**受信任公钥**、canonical message、SHA256/大小双校验、固定单文件 `worker.cjs`、同目录分代 staging + 重命名。安装**不启用/不执行**；旧版本目录不可覆盖；每次显式激活和打开前复验源 ID、版本、签名、文件清单与实体 hash；拒绝 symlink/hardlink 和悬空激活指针。
+- **生命周期和恢复**：`activate/disable/rollback` 显式带存储 `revision` CAS，切换前先停止旧会话及挂起 IPC，持久化 `active.json` 使用临时文件 + 原子替换；旧签名版本留存供手动回滚，进程 crash/重启不自动激活未选组件，其他已运行进程不获额外权限。单一 Node 写入者，不宣称跨进程并发和断电事务已证明。
+- **真实测试**：`test/unit/signed-worker-lifecycle.test.ts` 运行时生成临时 Ed25519 keypair（私钥不提交），受控 QA worker 实际 fork → S2 Reader → 章节/图片/进度，覆盖伪签名、篡改、跨源目录、非法版本、悬空链接、不可覆盖、过时 revision、激活后撤销、旧版本回滚、模拟原子写入失败、Windows 只读 worker 文件清理。原 `scripts/audit-modules.ts` + `test/unit/module-dag-policy.test.ts` 继续阻断签名安装器/进程执行器反向污染 Reader 核心；没有绕过现有代码安全门禁。
+- **已经完成的验证**：[S3 新源码 Linux/Windows 双平台专项 #40695633671](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40695633671)，精确代码 `8a476400` **SUCCESS：Linux 43/43，Windows 18/18**。Windows 曾因测试清理只读文件/已退出 worker 的文件句柄报 `EPERM`；只调整测试清理的只读属性恢复和重试，不降低签名或权限要求。最新同源 [完整 CI #40695640938](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40695640938) 登记时仍在运行，未将单项成功填写为正式 G2。
+- **重要产品差距**：目前 `SignedWorkerStore` **只在隔离测试组合入口使用**；不允许用户通过普通资源包下载安装可执行源，没有真实生产用发布者公钥/Windows 安装器私有根权限和可执行文件签名链，没有真实漫画源迁移、Android Binder Service，也没有 Windows/Android 纯 Core 包去 SDK、1,500 作品库/旧 v0.5.0 一键升级回滚和设备验收。因此 `S3-LIFECYCLE_DRAFT_TESTED`，`S3_PRODUCT_INTEGRATION_NOT_DONE`，`G2/G3/G4_OPEN`。
+- **接续**：先看精确完整 CI；再以稳定官方签名包内置且不可由用户覆盖的公钥、受限源码与可信安装根、可观测安装失败/回滚状态，组织一条实际来源的业务连接及账号凭据 broker；随后 Android 受控/独立进程、删除原核心源 SDK 和实体升级验收。不得用仅合成 source 的通过替代真实使用。
+
+完整基线和验收表：[签名组件设计](docs/S3_SIGNED_WORKER_LIFECYCLE_20261028.md)、[此前 IPC 执行](docs/S3_TRUSTED_PROCESS_PROTOTYPE_20261028.md)、[S2 依赖图](docs/S2_SOURCE_BOUNDARY_20261028.md)。
+
+---
+
+
+## S3 独立来源运行时｜2026-10-28 · Linux/Windows 受控 IPC 原型与安全门禁
+
+**用户授权推进 S2/S3，正式 `v0.5.0`、main、Release/OTA 和个人账号/书库保持不动。** 从 [S2 Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) 分出独立 [S3 Draft PR #220](https://github.com/Saber-Alter-Lily/pica-library/pull/220)，确保架构实验不夹带生产发布。
+
+- **基线 S2**：完整 [CI #40689775058](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40689775058) 在 `3c544bd8` SUCCESS，先前因新架构工件保留7天而违反原仓保留1天安全约束，已按原门禁修复，不放松安全测试。
+- **S3 新代码**：`src/source-extensions/trusted-process.ts` 采用 Node 原生 `child_process.fork` 复用 IPC，不开发任意插件加载器；只接受显式可信根目录下固定 SHA-256 的入口，握手校验来源和随机会话、4路并发上限、媒体大小/安全 MIME 与请求超时边界；父进程不传 `PICA_*` 和 `NODE_OPTIONS` 环境变量。中止、故障、超时都关闭并拒绝挂起请求，原 Reader 内缓存命中前再次校验权限。
+- **实际进程测试**：`test/fixtures/s3-trusted-worker.cjs` 无真实漫画源、账号、网络；`test/unit/trusted-source-process.test.ts` 启动独立 worker，经原 `OnlineReaderService` 实际完成章/页/媒体/进度与缓存；错误哈希/路径/握手、跨作品归属、超限/非法媒体、敏感环境隔离、迟到请求撤销/超时/崩溃均有自动化断言。
+- **实证**：[S3 Linux + Windows 双系统专项 #40690767200](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40690767200)，精确代码 `a785af6f` **SUCCESS，2/2 独立 jobs**。Windows 是 Actions Windows 系统实际运行测试，而非仅在 Linux 上做平台模拟。完整项目 CI 与正式安装包认证另行检查；不能把专项绿灯当 G2 PASS。
+- **未完成关键出口**：真实 Pica/E-H/JM 协议仍在旧正式安装包；本次受控工作进程不是沙箱、没有真实签名/应用私有不可修改目录、没有跨进程凭据 broker、没有 Android 独立 Service/Binder、没有单源安装/撤销/回滚/版本管理、没有 v0.5.0 无损升级及双端纯 Core 证明。G1 用户真机与 G2/G3/G4 全保持 OPEN。
+- **下一步**：验证最新完整 CI，按 `docs/S3_TRUSTED_PROCESS_PROTOTYPE_20261028.md` 推进 Windows QA 签名/真实打包与 Android 受控 Service 原型；实际一项来源接入前先评估信任模型和许可，不直接借用 Mihon 具有全应用权限的第三方插件机制；Suwayomi 保持用户自选可选 Host。
+
+---
+
+
+## S2-01/S2-02 续修回执｜2026-10-28 · 已验证依赖图与内置来源构造入口抽离
+
+- **首轮独立架构 CI 实证**：[S2 run #40677952242](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40677952242) 于 `383c89e5` SUCCESS，生成并下载 `module-graph.json`：实际分析 **239 个 TypeScript 源文件、1,079 条静态依赖边、0 个 TypeScript runtime SCC 循环、0 条受保护 Reader 反向依赖违规**；旧 `ProviderService` 直连 Pica/E-H/JM 类、ProviderRegistry 的边均如实留在该基线证据中，不代表 Android/Windows 纯核心包已经去掉 SDK。
+- **下一功能薄片已经提交**：将默认 Pica/E-H/JM 的 `new`、权限 lease 注入、registry 组装从 `src/services/provider-service.ts` 集中移至 `src/providers/compiled-composition.ts`，`ProviderService` 改经组合入口取对象。保持原构造参数顺序、EH/JM 测试注入、旧 Pica 无前缀 ID 与 EH/JM 路由；未更改推荐规则、来源账号/下载/数据结构。
+- **CI 约束**：`moduleBoundaryViolations` 新增禁止 `ProviderService` 对三个具体类建立运行时 import，`test/unit/compiled-source-composition.test.ts` 逐项核对旧三源路由、零主动联网、注入同一实例和真实导入方向。独立架构工作流也纳入此测试和源文件。
+- **精确阶段结论**：上述构造入口重构仍等待其自己的精确 SHA 架构与完整 CI，不能借用旧 `383c89e5` SUCCESS 宣称已验收。当前 `S2-01=IN_PROGRESS`、`S2-02=IN_PROGRESS`、`S3-01/02=NOT_IMPLEMENTED`、`G2=OPEN`。保留 v0.5.0/main、Release、账号/用户数据库及所有 S1/G1 和后续 S5/G3 阻断。
+
+完整工程记录：`docs/S2_SOURCE_BOUNDARY_20261028.md`，Draft [PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219)。
+
+---
+
+
+## 2026-10-28 | S2/S3 主线启动：核心依赖图 + 可撤销来源 Reader 端口（PR #219，未发布）
+
+**最新优先级授权**：用户明确同意暂不继续反复调整 S1 截图测试，将开发主力切至 S2 模块维护边界和 S3 漫画源真正外置。此授权仅支持隔离 Draft 研发，**不视为 G1 已通过，不允许合并 main / Release / OTA / 生产迁移**。旧42+新增12案例继续保留；Android 真机 UI 测试仍为 G1 阻断项。
+
+- **工作分支隔离**：`codex/s2-source-contract-20261028` 从 PR #218 的 `6e5c1a4a` 分出；[Draft PR #219](https://github.com/Saber-Alter-Lily/pica-library/pull/219) 以 PR #218 为 base，不直接改 `main` / 正式 `v0.5.0`。
+- **S2-01 架构依赖门禁**：`scripts/audit-modules.ts` 复用已有 TypeScript 编译器 AST/解析器和 `ts.resolveModuleName`，枚举真实 `src` import 边、type-only 关系和已有 runtime cycles；`test/unit/module-dag-policy.test.ts` 把 Reader、来源契约、受控 Desktop 适配桥的反向依赖变成单测失败，针对人为注入的 SDK 引用/动态加载进行负向测试。它不会宣称全仓已经无循环，更不会隐瞒 `ProviderService` → 具体 SDK 的旧依赖。
+- **S2-02 有实际调用的 Reader 无源对接**：`src/source-extensions/reader-contract.ts` 限定版本化 manifest、来源 ID/作品归属、章节/页 ID、媒体大小与安全 MIME，不提供任何 JS/JAR/APK 安装入口；`desktop-reader-adapter.ts` 将**应用显式提供的可信 transport**接入原 `OnlineReaderService` 的真实章节/页面/媒体/进度链，缓存 scope 随 source epoch 变化，禁用与迟到回复失效闭锁，禁止未知来源和裸 HTTP 路由回退。
+- **实际测试任务**：`test/unit/external-reader-boundary.test.ts` 在无账号、无 Host、无网络数据的受控 fixture 中执行章节→图片→进度、跨作品访问拒绝、缓存后的撤销拒绝、来源 epoch 变更、超限媒体/非法 MIME/章节重复键、打包依赖闭包。**源码已提交；测试必须以后续 PR #219 精确 SHA 的完整 CI 才能宣称 PASS**。
+- **参考和执行限制**：以 Mihon bring-your-own-content 和 Suwayomi 可选 Host 作为边界设计参考；不导入其可执行插件或代码资产，不提供任何来源绕过法律/权限审查的保证。该批不是 S3 独立安装/升级/签名来源，更不是双端纯 Core 已通过。
+- **下一步**：拿到完整 CI 与真实 AST 图后修复失败，继续把来源构造移动到明确的 composition root，并测现有内置来源与 Reader/数据身份兼容；另行验证 Android 受控服务 + Windows 独立进程的实际 IPC、签名与隔离，最后才进行包内 SDK 的物理抽离和老用户迁移/回滚。
+
+权威实施和验收边界：`docs/S2_SOURCE_BOUNDARY_20261028.md`。
+
+---
+
+
+## S1 视觉质量闭锁续修｜2026-10-28：ATD 纯黑截图的精确失败与非黑白门禁
+
+- **新失败的硬证据**：AOSP-ATD 视觉矩阵 [#40649923301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649923301) 在第二组 `zhCN-dark-w393-f130/guide` FAIL，日志证明 `active-owner=com.picalibrary.android.dev` 且 `app-focused=true`，但是 `painted=false`；第一组 `zhCN-light-w360-f100` 的七张自动通过 PNG 经下载后逐图像素检验全部是 **720×1280 的 100% #000000 纯黑图（1种颜色、921600个黑像素）**。此时来源不是 Pixel Launcher 弹窗，而是 `aosp_atd` 图形帧不可用与原 `looksPainted` 浅色分支把纯黑当文字的**错误通过**；两种失败源分别保留。黑色 PNG **不能证明 Pica 自身持续黑屏**，更不能认定第一组已通过视觉 QA。
+- **实现变更且已回读**：`12537807` 给真实 `S1AndroidLocaleMatrixTest` 增加纯黑/纯白双主题拒绝断言，并将 PNG 判定从单向“墨色数量”升级为**主题背景 + 明暗两端像素 + 非均匀边缘**门禁，仍保持前台窗口所有权判定，不放宽页面锚点、页面已加载和全部九组合验收。 `0724234d` 只将此独立视觉矩阵从图形不可用的 `aosp_atd` 换为 **API35 普通 graphical AOSP (`target: default`)**，独立于已有 Google APIs 八章聚光和完整 CI；官方 android-emulator-runner 支持此系统映像类型。 `41560ff3`、`c6a5af47` 对拒绝/成功 PNG 添加真实 8-byte PNG magic 校验，避免 `run-as cat` 的错误文字被当作 PNG；`57c542cc` 锁定新门禁的静态回归。
+- **已知成功的历史测试范围**：`c23a1e3` [完整 CI #40649865872](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649865872) SUCCESS，`81fbaed5` [完整 CI #40649938731](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649938731) SUCCESS，均不是新的图形映像/新像素门禁的终态结果。原 `e44de731` 八章 VSpot [#40634745706](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706) SUCCESS、中文浅色两字号的 40 张单独截图已抽查，不替代三语言九组矩阵。
+- **待严格收口**：新精确源码 `c6a5af47` 的 [普通 AOSP 九组实页 #40651031422](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40651031422) 与 [完整 CI #40651038857](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40651038857) 在本登记时 **QUEUED/NOT_VERIFIED**。必须真实运行9组、保存有效63张、逐图人工核对，不能对黑屏做主题特判或降低阈值混过去。继续 G1=NOT_ACCEPTED，S2/S3 来源 SDK 真外置与 S5 旧 v0.5.0 数据升级均未完成，正式 main/Release/OTA 未改变。
+
+---
+
+
+## S1-02 视觉矩阵假阳性闭锁｜2026-10-28 · Pixel Launcher ANR 与前台画面归属
+
+**来源/边界**：正式 `v0.5.0` 与 `main 095d6910` 无修改；继续在未合并 Draft PR #218、隔离 Debug/模拟器中实施。G1 用户验收仍 **NOT_ACCEPTED**，G2/G3/G4 继续 OPEN。保留历史 42 + 新增 12 验收案例。
+
+- **精确旧源码实证**：`e44de731` 的 [完整 CI #40634752986](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634752986) SUCCESS、[定向 Android #40634745752](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745752) SUCCESS、[八章 VSpot #40634745706](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706) SUCCESS；但 [九组实页矩阵 #40634745695](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695) FAIL。实际失败是第六组 `en-dark-w480-f130` 的 `guide` 截图未通过有效绘制判断，后续三组未运行。
+- **新增 P1 证据污染**：下载并目视检查该次矩阵工件 [#12793718801](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695/artifacts/12793718801)，前五组通过的 **35/35 张所谓有效页面截图都被系统弹窗 `Pixel Launcher isn't responding` 覆盖**，个别甚至只显示系统壁纸。原来的主题/亮度像素门禁对非本应用弹窗出现假阳性；此前 9/9 的 `d8b7f4c` 截图也存在空白转场，故不可将矩阵 Instrumentation 成功等同于页面视觉验收。ANR 弹窗归因于模拟器系统 Launcher 的图像证据，**尚未证明 Pica 正式/候选应用发生 ANR 或持续白屏**。
+- **独立参考**：同批八章引导 [#12792869042](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706/artifacts/12792869042) 实页聚光抽样未见 Launcher 遮挡；继续复用现有 VSpot 引导，不因此重写业务 UI/动画。
+- **隔离修复（GitHub 已提交并读回）**：`c23a1e3b` 在 `S1AndroidLocaleMatrixTest` 的真实截图验收上新增“当前 Activity 有窗口焦点 + Accessibility 活动窗口归属本 APK + 有实际绘制像素”三重门禁，失败保留 `rejected-*.png` 与诊断而非套用旧 PASS；`f48f9897` 在失败用例导出拒绝截图和窗口焦点状态；`3c89e981` 只将 S1 独立视觉矩阵的 Android 系统映像切换为 `aosp_atd`，避免该组 Pixel Launcher 特定干扰（其他工作流基线不动）；`81fbaed5` 加入预防回退的仓库契约测试。**不缩减矩阵、不跳过失效用例、不取消外部遮挡检测**。
+- **验收与下一步**：新 `aosp_atd` 九组矩阵 [#40649923301](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649923301) 和新 HEAD `81fbaed5` [CI #40649938731](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40649938731) 在本回执时尚未产生成功终态，不能宣称 PASS。必须逐图审查实际 63 PNG，保证页面可读、无系统对话框、深色下拉高对比、英日翻译和标签真实已加载，再在真实 Android/OEM 验证，最后推进 S2 模块依赖 DAG / S3 SDK 真外置及 S5 老数据升级事务，保持既有 G1–G4 门槛。
+
+---
+
+## S1 人工视觉验收接续｜2026-10-27 · 63张截图复核与新版门禁
+
+**当前事实基线：** Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)，业务最新候选 `e44de731`，正式 v0.5.0 / 生产 `main` `095d6910` / OTA / 用户资料均未改。S1 = IN_PROGRESS，G1 USER_ACCEPTANCE = NOT_ACCEPTED；S2/S3 来源 SDK 真正外置与 S5 老用户数据升级仍未完成。
+
+- **八章真实 VSpot**：`b5e134f` [Android 35 #40622970105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105) 18/18 Instrumentation PASS、40 张实际截图；`8e581ea` 的 [#40629907241](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907241) 同类专项 SUCCESS。仅中文/浅色/360dp/字体100和150%，不等于真机和其他组合验收。
+- **九组实页矩阵自动通过但人工视觉不通过**：`d8b7f4` 的 [#40632432541](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40632432541) 9/9 Android Instrumentation SUCCESS、63 PNG，涵盖 3 语言、2 主题、360/393/480dp、100/130/150% 字体的代表性九组，每组七页。已下载全部图并逐页人工审视，**至少七张为空白转场帧**（尚不能断言程序持续白屏）；标签页图多次停在“读取本地标签”，WebDAV 深色下拉文本与背景低对比、英日页面混有中文。故此阶段**视觉质量 FAIL/OPEN**，不因自动 PASS 偷换验收结论。
+- **修复候选**：`8eb0c11` 新增深浅主题显式前景色 Spinner 与 WebDAV 13 厂商 UI-only 翻译，保留原厂商 ID/地址和数据结构；`9d86fda`、`c4e435c`、`e44de731` 补 WebDAV 初始标签、表单提示、状态和删除确认三语，新增 `RemoteStorageVisualContractTest`；`3a39ef1` 同步修复高级指南章节/标签筛选 Spinner 对比度并加入深色回归。所有均为 Draft 源码，**新 SHA 尚未得到完整模拟器、Android CI 和真机验收**。
+- **真正的截图门禁**：`c4e435c` 在 S1 语言矩阵中加入真实内容已绘制的像素/主题检查与重试，标签页先等到真正标签操作按钮加载完成，超时 FAIL，绝不保存纯白帧当 PASS。此约束可能暴露真实耗时/加载失败，应保留最新运行日志而非放宽阈值。
+- **单元测试已核实的历史部分**：`7b5cbcc` Robolectric [#40629290421](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629290421) 5/5 组 SUCCESS；`8e581ea` 原子下载索引合成回归测试成功。旧全量 CI `b0db300` [#40630048456](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40630048456) 为516测试中1条标签英语窄屏布局断言 FAIL；`d8b7f4` 更正后 `e42919a` 的定向标签单测 SUCCESS，但 **最新候选全量 Android CI 仍需单独确认**。
+- **当前精确源码门禁**：[真实九组矩阵](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745695)、[八章模拟器](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745706)、[定向 Robolectric](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634745752)、[全量 CI](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40634752986) 均在最近查询时未有最终结论，不得判成 PASS。
+
+**下一步优先顺序**：检查上述精确 SHA 的实际成功/失败与新图，修复仍空白或读不清的页面；真实 Android OEM 设备复核、Windows/v0.5.0 功能对照；之后按 S2→S3 来源解耦、S4 Issue #199/#200/推荐、S5 原子索引/迁移/升级回滚、S6 双端发布推进。历史42+新增12案例原文和状态继续保留。
+
+---
+
+## S0/S1 当前新增回执｜2026-10-27：标签英语窄屏与九组脚本失败分类
+
+- 旧 [Android CI #40629479729](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629479729)、[#40629559940](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629559940) 的 Android job 是实际 **FAIL**，失败测试精确定位 `TagParticipationActivityTest.headerFitsEnglishNarrowPhoneWithoutCoveringBack` 第66行（标题起点不应贴住紧凑返回键）。`d8b7f4c` 在正式标签页加至少72dp返回控制宽度、标题最多两行，并强化原测试的实际 back/title 几何边界检查。仍以新 SHA Android 复测判定是否真的修好。
+- [首次三语矩阵 #40629907105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907105) **FAIL** 的实际根因是 here-doc 输入被子 `adb` 进程提前读取：首个中文浅色360dp100%案例已通过1次 Instrumentation 且写出6张 PNG，余下八个案例未执行；它不是第一个页面渲染FAIL。`d8b7f4c` 改为 `mapfile` 事先完整读取9条用例，仍保留 `count == 9` 的硬门禁，新增标签参与页为第7个视图，目标63张原生截图；任何未执行不可算PASS。
+- `e42919a` 将 `TagParticipationActivityTest` 原测试加入**独立 Robolectric 矩阵**，与原 Full Android CI 双轨诊断。运行结果仍待新 SHA Actions/原始 JUnit。
+- `8e581ea` 的 `PhoneDownloadStoreAtomicTest` 已在 [定向 job #40629907129](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907129) 单组 **SUCCESS**；测试全部使用合成文件，无生产升级证据。八章 VSpot 的复测 [#40629907241](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629907241) **SUCCESS**，但 G1 仍待实体设备和用户确认。
+- S2 仅执行 read-only import 关系核查（见 [来源耦合审计](docs/PRODUCT_RECOVERY_S2_S3_SOURCE_DEPENDENCY_AUDIT_20261027.md)），还未达到 `NEW-MOD-01`、`NEW-SRC-01` 的 CI/产物验收。保持 Draft、正式 main、发布和 OTA 不变。
+
+---
+
+## 最新执行回执｜2026-10-27 深度开发续轮（精确证据）
+
+当前 Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 继续保留 `main` `095d6910` / Stable v0.5.0 / OTA / 用户生产数据不变。**G1 用户验收、G2 真正来源外置、G3 正式升级回退、G4 发布仍 OPEN**。下列成果不代表完整 S1 或 S5 验收。
+
+- **8章实页引导通过**：`b5e134f` 的 [Android 35模拟器 #40622970105](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105) **SUCCESS**，18/18 Instrumentation 正常、40 张原始 PNG（中/浅/360dp，100%和150%字号）。画风最后一章确实显示5个目标，逐步可见与跳过无模型操作已验证，短期工件 [#12788940746](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105/artifacts/12788940746)。实际下载并检查两张字体汇总图，未自动给出全部语言/主题/OEM 的 PASS。
+- **Robolectric 停滞收口**：旧5组中3 SUCCESS、2因持续动画进入测试周期而 CANCELLED（不是FAIL断言）。`7b5cbcc` 使测试生命周期只观察已消费 one-shot 引导后状态，另保留真机模拟器对动画的验收。[隔离矩阵 #40629290421](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40629290421) **5/5组 SUCCESS 且独立 JUnit 文件存在**。整套 Android 全量 CI 仍须独立验证。
+- **新增多语言/主题/屏宽真实图任务**：`a0f2d9a`+`061b2c1` 加入9组交叉模拟器测试，六页×九组目标54张原始PNG；英文/日文、深色、393/480dp、130%字号首次进入真实截图流程。原始 #40629554559 被后续新 SHA 触发的同组并发策略 CANCELLED，**不能计为测试失败/通过**；需看最新 #40629907105 的结果。9组仅为代表性，不是3×3×3×2全排列。
+- **S0 数据持久性候选修复**：`c9e31e9`+`8e581ea` 将 `PhoneDownloadStore` JSON 索引改为 AtomicFile 原子提交；读取损坏/旧 `.tmp` 时 UI 警示并阻止任何保存/删除/目录重算，防止隐式将错误空索引写回；显式删除正文移至索引保存成功之后。保留旧 JSON v1 schema 和路径，增加5个纯合成 Robolectric 测试：损坏保护、兼容写、备份恢复、旧 `.tmp`、禁止误删本地正文。**尚未经这些新测试完整运行，不等于真实迁移/用户数据安全验收**，更不意味着已触及生产目录。
+- **完整 CI 可观测性**：本轮给 Android 测试设置明确 step/job 超时，`--info` 输出测试运行细节，并在失败/超时上传有效 JUnit，避免再把无限停滞当作全量通过。Web/Desktop 与发布过程未删改。
+
+近期应以新 SHA 的 Android focused/locale-matrix/CI 运行结果为依据继续修复，S1 完成物理手机验收前不进入正式 S6 发布。
+
+---
+
+## S1 最新执行回执｜2026-10-27，7章真实聚光及大字号缺陷整改
+
+本段为后续推进的**当前权威状态快照**；不改写下文历史失败/中间运行和旧42+新增12条验收映射。生产正式版 `v0.5.0` / main `095d6910` / OTA / 用户真实数据保持不动；Draft [PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 未合并。
+
+- **实际通过**：源码 `eea0db58` 的 [Android35 模拟器运行 #40621769915](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915) **SUCCESS**，16/16 独立 Instrumentation PASS、30张实际 PNG（中/浅色/360dp、100%与150%字体）。第0、1、3、4、5、6、7章真实高亮和跳过不记已读；人工偏好保存键维持禁用、远程来源无自动连接。截图及原始日志见短期工件 [#12787068908](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621769915/artifacts/12787068908)。
+- **真实图像复核及纠正**：下载解包目视检查，150%字体来源行标题末字孤行，推荐画像 Engine 长版本号被窄列拆成多段且整张卡片成为过大 VSpot 目标。已提交 `ff37b77`（大字号窄屏 SettingsRow 上下排）、`116244b`（技术状态行上下排、画像高亮真实标题），附 Robolectric 测量测试和截图路径守卫。此修复必须以新源码复拍才能判已验收。
+- **最后一个高级章节**：`b5e134f` 将第2章原有五步画风 VSpot 加入真实 Instrumentation，校验控件在视口内、五张每档字体截图、跳过不写入已读或推荐新周期，同时补齐滚动目标逻辑。**尚未返回完整运行结论，当前仍是7/8个章节已验证，绝不宣称8/8通过**；[视觉工作流](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40622970105)。
+- **Android 测试阻断仍开放**：[首次聚焦单测 #40621041603](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40621041603) 在 Gradle Javac 通过后卡在 `:app:testDebugUnitTest`，至任务时限被取消；没有 JUnit 成功证据，不将其记作测试失败或 PASS。新 `8efe395` 用5个独立 Robolectric 类、每个12分钟上限及逐类 JUnit 产物诊断卡点，实际运行仍待核实。普通 Android 全量 CI 亦未获得当前精确源码的完整通过结论。
+- **阶段门禁**：S0/S1 IN_PROGRESS，S2 限定来源身份路由 IN_PROGRESS，S3–S6 OPEN。G1 用户未验收、G2 真正来源外置、G3 老版升级回滚、G4 双端发布均未通过。存在潜在 `PhoneDownloadStore` 损坏索引静默空值/非原子替换风险，未实测生产事故，也未修改个人下载。
+
+**下一动作**：收口本次最后一章及字号修复的真实截图 → 独立判定被取消的 Android 单测故障原因并修复 → 全量中英日/浅深主题/360-480dp与物理手机 G1 → 然后 S2-S3、S4、S5、S6。禁止把模拟器 PASS 直接改成用户接受或正式发布。
+
+---
+
+## 当前执行权威快照｜2026-10-27 产品恢复 S0–S6
+
+**本段更新最近结果，以下历史段落均为各自时间点的原始记录，不自动改写。** 仍基于 Stable v0.5.0 + [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)；正式 main `095d6910`、Release、OTA、安装与生产资料未改。当前阶段 S0 IN_PROGRESS、S1 IN_PROGRESS、S2 有限安全端口 IN_PROGRESS，S3–S6 PLANNED；G1 用户验收 NOT_ACCEPTED，G2/G3/G4 OPEN。
+
+- **实际成功：** `cab5067c` 的 [Android35 模拟器 #40620663666](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666) 10/10 Instrumentation PASS，18 张真实 PNG（100%/150%字体各9张）。已验证第0/3/5/7章真实 VSpot 两步、跳过不记已读；更新导览只读。有效证据 [#12787147081](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620663666/artifacts/12787147081)。不是全八章、多语言、真机或用户 ACCEPTED。
+- **已修复旧静态测试漂移：** `34ffaa1` 将原先 3 个 Web/Desktop 失败契约对应到现有 QA 安装隔离、多语言资源、来源归属路由；**保留冻结 Host 哈希及原测试，无删减。** [此 SHA 的 Web/Desktop 作业](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40620102405) 已实际 SUCCESS；Android 全量 CI 终态及后续源码须另核对。
+- **新增聚焦单测基础设施：** `b44b9f97` 添加限时 Android Robolectric 工作流，执行本批账户/下载/高级引导相关真实测试，上传原始 JUnit 结果。新增工作流的首轮运行状态只以 Actions 原始结果为准。
+- **尚未达标：** 四个高级章节 1/2/4/6、三语/深浅/多设备完整视觉矩阵、用户提出的具体手机缺陷全链路复现、物理手机验收、Windows 功能对等、纯核心包去除所有来源 SDK、正式签名覆盖升级、全量42+12案例复测。
+- **新增潜在风险未修复：** `PhoneDownloadStore` 索引损坏与不原子替换路径需 S0/S5 独立故障注入和回滚方案；尚无现实事故证据，不改动用户数据。
+
+**近期下一动作**：先处理当前 Android 全量 CI 与定向测试真实失败，再补 S1 的其余四章及真实屏宽/字体/语言证据；在 G1 通过前不宣布架构与完整产品验收。工作计划见 [S0–S6](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md)，历史 42 项与新增 12 项分别沿用 [验收映射](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。
+
+---
+
+## S1 真实截图整改、QA2 产物校验与 QA3 数据隔离（2026-10-27）
+
+当前代码最新提交 `a28404e7fbdbad20906688a9fd0814bd1f658acd`，仍为 [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)，`main`、正式 v0.5.0、Release/OTA 与用户生产资料均未改变。**G1 用户验收、G2 来源外置、G3 旧版无损升级、G4 正式发布仍 OPEN**。
+
+- **首次实体 UI 图像证据已成功**：[Android 35 模拟器 #40539159767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40539159767) 在源码 `d7afa3db` 上获得了真实中文浅色 `AdvancedGuideActivity` 截图 2 张（Android 字体 100% 和 150%），已下载 PNG 与 Instrumentation/Logcat 并由本对话进行人工目视核查。该画面无明显横向裁切，但安全说明过长、选中章节重复展示、主 CTA 层级弱和底部导航按钮贴边。**不等于八章节聚光动画或其他语言/手机已通过。**
+- **针对截图修复**：`7689f26b` 将首屏安全及操作说明压缩为短提示，原完整文本移入原可折叠说明，移除与 Spinner 重复的章节标题，主 CTA 用主题强调色，底部两个按钮增间距，补 Robotlectic 测试和 3 语言资源。修复后 [模拟器复拍 #40541090821](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090821) **仍为 QUEUED**；新截图未回收之前不能视为修复验收。
+- **QA2 Dev v91 已完成**：[CI #40541090823](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090823) **SUCCESS**；工件 [#12750938267](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090823/artifacts/12750938267) 已下载，六文件逐项核验，APK 独立 SHA 计算 PASS。`com.picalibrary.android.dev` / code91 / APK 14,578,316 bytes / SHA-256 `568bbcb04f1af56ce0056599e103fb38d1244807acbd898032e3c35d4afd76ed` / Debug 证书 `a2f84443b72af8c85ad69d0d7d1c47a729b03169b4edc9c84165fe141e26576a`；与 v90 Debug 证书 `d3588d98...` 不一致，**不得称 v91 可覆盖升级既有 Dev90**。
+- **修复 QA 测试数据风险**：`a28404e7` 添加仅允许 `.s1qaN` 的独立 QA 后缀配置，普通 Debug 默认 `com.picalibrary.android.dev` 不变；下一工件 QA3 `v92` 使用 `com.picalibrary.android.s1qa3`、不同配对 scheme、单独应用显示名，避免不同临时 Debug 证书覆盖旧 Dev 资料。对应 [QA3 workflow #40542505173](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40542505173) **QUEUED**，尚无实际 APK 产物/验收；这不是生产签名迁移的解决方案。
+- **S2 端口切入**：前面 `ProviderRegistry.forPageForComic`、ProviderService/OnlineReaderService work-owned 图片权限校验及独立模块测试已提交，**不能**由 S1 Debug 包结果推断来源已从 APK/Windows 移除或 G2 成功。
+- 旧 42 案例和 12 新增标准保持原有状态，不把 Debug 打包成功或“2 张主目录图像”重判为完整 NEW-UI-01/02 PASS。阶段证据详见 [S1 验收台账](docs/PRODUCT_RECOVERY_S1_UI_CLOSEOUT_20261027.md)、[Dev90/QA3 交接](docs/PRODUCT_RECOVERY_S1_DEV90_HANDOFF_20261027.md)。
+
+---
+
+## S1 开发包实体校验与最小模拟器回归（2026-10-27）
+
+**唯一交付事实**：独立的 [S1 Dev QA workflow #40526064065](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065) 在精确源码 `d288bc225e15e49c40eea06b52c67193f95ba457` 上 **SUCCESS**。已实际下载其 [6 文件 ZIP #12745469077](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065/artifacts/12745469077)，逐文件回读并独立计算 APK SHA-256，等于包内 SHA256SUMS。编译/Lint/签名合法性/包身份均经 GitHub Actions PASS；测试包含 Debug APK 但**未执行这条工作流内的完整 Robolectric 或用户手机验收**。
+
+- APK `Pica-Library-S1-Android-Dev-v90.apk`：**14,576,408 字节**，SHA-256 `bee99853830d5244c68eff2cda5eb58063564ea952a892d69de7b67e5c69ab28`；身份 `com.picalibrary.android.dev`、versionCode `90`、versionName `0.5.0-S1-QA-dev-pr35`，应用名称 `Pica Library Dev`，Android minSDK `28` / targetSDK `35`。证书 SHA-256 `d3588d987b4d0a6afdf4aed66909722db63011d5b7dacb1d7a8f509a07e4f6b1`。完整 ZIP 5,681,155 字节，SHA-256 `f4ee25f3ee182a0af0802334f79e7b124751091cbdd5bf70ef07579b377cb0d4`。GitHub Actions artifact 仅保留 1 天。
+- 该 DEBUG 签名不承诺兼容之前别的 Dev 安装；发生签名冲突不得为了覆盖测试包而自动删除已有 Dev 数据。正式 v0.5.0 APK 是不同的 `com.picalibrary.android` 包，当前未经稳定覆盖升级验收。测试包不含任何 S2 新增桌面 TypeScript 路由代码的部署证明。
+- **真实 UI 截图仍 NOT_ACCEPTED**：[#40526314386](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526314386) 已冷启动/构建 APK 但 Instrumentation 长时无完成信号，随后 CANCELLED；不是 24 张截图 PASS。新 [第一张真实指南最小截图 #40539159767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40539159767) 基于 `d7afa3db`，保留详细进度日志/150 秒超时，每个字体档先争取一张 `AdvancedGuideActivity`，**进行中，未确认 PNG**。
+- 对测试人员的简明交接：[S1 Android Dev90 测试包与验证规范](docs/PRODUCT_RECOVERY_S1_DEV90_HANDOFF_20261027.md)，覆盖真实聚光指南、书库多选、三个语言长标题、更新只读模式和数据不破坏。此前错误/原 42 验收仍保留，S1/G1 用户接受为 NOT_ACCEPTED，S2/G2 来源真正外置未完成，正式发布无授权。
+
+---
+
+
+## S1/S2 最近一次执行回执（2026-10-27 · PR #218）
+
+当前代码提交基线 **`2bb3b44b6c0b5fbfe0455f7beaa57995acbae07c`**。此条是本轮新增回执，不删除此前所有实际失败/证据。正式 v0.5.0、`main`、OTA 和用户资料仍未更动。Draft PR #218 未合并，S1/G1、S2/G2、S5/G3、S6/G4 均未通过用户验收。
+
+- **S1 模拟器真实证据**：首次 Gradle CWD 错误 `#40517358640`；第二次 Android 35 `/sdcard/Android/data` 权限拒绝 `#40519878220`（Debug APK、AndroidTest APK 已构建）；第三次 `#40522901087` 因 runner 用户缺 `/dev/kvm` 硬件加速而启动超时。均是 **FAIL / 没有可验收截图**，不可认定 UI 已验收。
+- 最新 KVM 预检/授权修正 `82558994`：Android 35 真实模拟器工作流 [#40526314386](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526314386) 的 **KVM 检查已 PASS**，但首次读取时完整截图步骤仍 `IN_PROGRESS`；尚未确认24张 PNG、字型布局与操作。如果 CI 仍失败，应严格区分启动、Instrumentation 或真实页面缺陷。
+- **Dev QA 安装物**：`#40521071684` 因重复完整 Android unit suite 达到工作流时间上限 CANCELLED，无 APK 工件。新 `d288bc22` 只保留打包工作流内 Lint/Debug assembly，并要求原 Android CI 独立做 JUnit；[#40526064065](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065) 最近查询是 QUEUED，未经证实的 APK 不能发给用户或称“可无痛升级”。
+- **S2 开始有真实读图链路**：在原 `ProviderRegistry` 之上新增 `forPageForComic`；真实 `ProviderService` 接入 `assertPageOwnedByComic/fetchPageForComic`；在线 `OnlineReaderService.picture()` 在缓存命中之前校验作品归属。新增回归覆盖来源冲突、缓存绕过与不完整新端口的 fail-closed 拒绝，旧 `fetchPage` 仍为 legacy 兼容。**源码已提交，不等于新 SHA 的测试已 PASS；尚未外置 Pica/EH/JM SDK。**
+- 当前阶段以 [S1 视觉验收矩阵](docs/PRODUCT_RECOVERY_S1_UI_CLOSEOUT_20261027.md)、[S2/S3 来源解耦审计](docs/PRODUCT_RECOVERY_S2_S3_SOURCE_DEPENDENCY_AUDIT_20261027.md) 为证据入口，并严格保留原 [42 项+新增 12 项验收映射](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。后续精确 SHA 的 Android/Web CI 仍在队列；NOT_RUN / QUEUED / PASS 不得混写。
+
+---
+
+
+## S1 视觉验证第 2 次失败与存储边界修复（2026-10-27）
+
+当前 [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 保持独立候选；最后这次源码修复为 `505b4a90b8da1eb78808e1b4fc859b6eec30171f`。正式 `main`、Stable v0.5.0、OTA 与用户账号/数据均未触及。G1 真实用户 UI 验收仍为 **NOT_ACCEPTED**。
+
+- `45e6e641` 修复了 Gradle 工作目录错误，真实 [Android API35 模拟器运行 #40519878220](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40519878220) 成功冷启动并执行 Gradle `:app:assembleDebug :app:assembleDebugAndroidTest`（**59 tasks / BUILD SUCCESSFUL**），两个调试 APK 均已编译。**之后的流程仍失败**：Android 35 拒绝 `adb shell rm -rf /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual`（Permission denied）。因此 **0 份可信 UI 截图，不能把 APK 编译成功写成模拟器验收通过**。
+- `505b4a90` 改用 `getFilesDir()/s1-visual-f100|f150` 的应用私有临时证据目录，使用仅对 Debug 应用可用的 `adb exec-out run-as com.picalibrary.android.dev cat` 逐个提取 12 个已知文件名。禁用 shell 直接删除受保护的 Android/data 目录；不读取应用用户其他数据。新 [模拟器运行 #40522901087](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40522901087) 已触发，**当前不得宣称成功或提供 PNG**。
+- 并行 [S1 Dev QA 构建 #40521071684](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40521071684) 源码 `b1cc4777` 使用隔离包名 `com.picalibrary.android.dev`、versionCode 90，严格经 JUnit/Lint/打包/签名/校验；构建任务仍应以真实 run 成功和工件存在为准。它与 `505b4a90` 只差视觉测试脚本/AndroidTest 改动，没有普通 Android UI 业务代码差异；**仍未正式发布**。
+- 本次仅修复证据基础设施，不改推荐/Visual、数据库/来源 SDK、正式 updater。Android 真机/多字体/三语言的完整视觉证据与 G1 仍待验证；S2/S3 来源真实外置、老用户一键迁移和发布门禁保持未完成。
+
+---
+
+## S1 实际视觉证据与独立测试包（2026-10-27，继续推进）
+
+**开发主体：** [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)；正式版 `v0.5.0`、生产 `main`、正式 OTA、历史 PR 和真实用户数据均未改。S1/G1 用户验收仍为 **NOT_ACCEPTED**。
+
+- **独立模拟器真实 UI 验证**：新增 `.github/workflows/s1-android-visual-evidence.yml` 和 `S1AndroidVisualSmokeTest.java`，计划以 Android 35/360dp、100%/150% 字体、中文/英语/日语、深浅模式，对高级引导、标签/多选/更新页留下 **24 张截图**。数据仅写入 `com.picalibrary.android.dev` 临时目录；不需要正式来源、账号或用户数据。截图只允许公开仓库上传且保留 1 天。**未有截图包之前禁止宣称可视化通过。**
+- **真实失败与修复**：首次视觉运行没有 APK/PNG：模拟器成功启动，但 `android-emulator-runner` 的多行 `script` 各命令工作目录不能保证持久，Gradle 错误在仓库根目录找不到 `settings.gradle`（失败运行 [40517358640](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40517358640)）。`45e6e641` 将完整流程改为同一 Bash 进程内执行的 `scripts/run-s1-android-visual-emulator.sh`；新 [可视化运行 40519878220](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40519878220) 发起时未完成，**不得沿用旧版 CI PASS**。
+- **独立 Dev QA APK**：添加 `.github/workflows/s1-android-dev-package.yml`，在源码 `b1cc4777` 上独立执行 Android JUnit/Lint/Debug 编译并验证 APK 签名、包名、版本和 SHA256；目标输出 `Pica-Library-S1-Android-Dev-v90.apk`，固定 `com.picalibrary.android.dev`，与 Stable 正式包隔离。自动产物仅保留一天，无第三方签名私钥及 Release/OTA。首次 [QA 工作流 40521071684](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40521071684) 发起时仍在运行，**未证明候选 APK 已产生**。
+- **边界不改变**：Gradle/API35 模拟器证据并非真实手机/OEM 验收；Dev APK 不代表正式签名覆盖升级；Pica/EH/JM 具体来源协议仍捆绑于历史程序，S2/S3 仍需要真正外置、独立组件生命周期与老用户迁移。
+
+**下一动作**：按精确 GitHub Actions run 结果定位脚本、仪表测试或实际布局故障；只在生成的可审阅截图/Dev 安装包确实存在时，把对应记录由 NOT_RUN 更新为自动/模拟器已验证；维持 G1 人工验收 OPEN，不越级提交 Release。
+
+---
+
+
+## S0–S1 当前开发回执（2026-10-27，PR #218 独立 Draft）
+
+产品策略不变：正式 `v0.5.0` 是功能/视觉体验基线；Dev89 源码是未发布工程起点。当前本分支精确源码 `8f8124657d203c71a51ea5e7121fd6798bfee998`；不得合并/发布/OTA。新版用户验收状态 **NOT_ACCEPTED**，真实手机/UI/字体放大和源码包体/来源外置门禁仍 OPEN。
+
+- **S1 首批有效改动**：设置行有界标题/状态宽度、窄屏五项多选操作栏分行、标签参与页面标题宽度限制、更新版本说明可滚动、WebDAV 表单在主线程快照、只读引导不会重启更新任务。
+- **高级引导可用性推进**：真实 VSpot 页面控件定位，8 章（其中画风复用历史五步），步骤说明三语言；手册正文改为可展开的次级内容，**交互引导默认呈现在正文前**，不再让长文字挡住入口；进度返回刷新，断点/跳过按现有 store，业务操作需用户手动执行。
+- **自动证据范围**：Robolectric/Java 回归覆盖导航/控件/预览/窄屏/三语言部分情况；新的 Tag 标题有 360dp 测量测试。用户多处手机排版问题尚未提供完整截图，不伪造具体位置或宣布已消除；物理设备与 130%/150% 字体及 OEM 验收仍须补充。
+- **历史失败可追溯**：早期 Android 测试行数断言失败（caacd016）；Lint `WrongConstant` 失败（868e4ec）；Web 测试 20 次固定引导重试断言失败（f64143b）；测试中 Activity 视图查找编译失败（a7118094）；较早 57275365 / 64009d41 集中旧 P2 工作流曾因外部实机证据/运行取消导致 automated-summary FAIL，不可与独立 Android/Web CI 绿灯混为全项 PASS。未覆盖全量专项时保持未验收。
+- 先前 `be75219` Android/Web 两项 CI 已通过；之后各源码提交须以**对应 SHA** 的 Actions 为准。当前 `8f812465` 自动验证在提交时仍未结束，**不可预先填 PASS**。
+- **证据与下一动作**：[S1 UI 修复/待验收矩阵](docs/PRODUCT_RECOVERY_S1_UI_CLOSEOUT_20261027.md)；严格按 [S0–S6 权威任务计划](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md) 和 [原 42 项+新增门禁](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。继续完成来源与真实 UI 证据之后才可讨论 G1；S2/S3 只已完成静态审计，来源正式外置未实现。
+
+---
+
+## 当前执行权威：产品恢复 S0–S6（2026-10-27）
+
+**本段优先于下面全部历史“下一步/状态快照”；历史事实、任务 ID、失败记录均原样保留。** 此次工作基于正式 `v0.5.0` 作为功能/UX 基线、Dev89 `af42b4d3ecafd1d51b3c2ef8aee7339c56c75921` 作为未发布工程起点；当前新分支 `codex/product-recovery-s0-s1-20261027` / [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)。旧 PR #203/#205–#217 及 main 均不自动合并或发布。
+
+- **总计划**：[S0–S6 分阶段实施方案](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md)；两条主线为正式版用户体验保留基础上的**实际模块维护隔离**和**Pica/EH/JM 等来源可选外置**。一键升级、Issue #199/#200、推荐/Visual、LAN/WebDAV 和旧用户数据兼容持续保留。
+- **原验收**：[42 个原案例逐一映射 + 12 个明确新增案例](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)；新阶段不删除/重判旧 42 项，不以“关闭来源默认启用”或“Windows 不带 JM JVM”冒充来源外置。
+- **S0 已推进**：[首轮源码核查](docs/PRODUCT_RECOVERY_S0_BASELINE_20261027.md)、[v0.5.0 官方 Release 资产/功能基线](docs/PRODUCT_RECOVERY_V050_OFFICIAL_BASELINE_20261027.md)。正式资产哈希来自官方元数据，本轮未重新下载独立计算；真实 Windows/手机对照、完整来源文件清单仍需验收。
+- **S1 已提交源码，未经用户验收**：Android `SettingsRow` 长状态文本宽度约束；高级 8 章节中的 7 个使用现有 VSpot 复用真实双控件聚光、画风章节沿用原五步；三语言独立短说明；教程进入更新页不自动检查更新，账户页教程避免首次自动账户探测；窄屏书库多选栏自适应两行、宽屏一行。已增加 Robolectric 测试；**物理手机/真实截图仍 NOT_RUN，排版问题还不能标为修完**。
+- **新 CI 的原始失败不可删改**：PR218 首次 `caacd016` Android 481 测试中 2 个新增 Robolectric 行数断言失败；后续 `868e4ec` 定位并修复该断言，但 Android Lint 因两个错误的旧 Layout 常量引用 FAIL；后续源码已移除常量并重新提交。**最终精确 SHA 门禁结果以新的 Actions 检查为准，不预先声称通过**。
+- **安全边界**：仅独立 Draft；不改生产 app/数据、账号、OTA、Release/tag、冻结 PR，不下载私钥，不在用户设备上安装或擅自迁移。任何 CI PASS 不等于 USER_ACCEPTED。
+
+当前顺序：**S0 功能差异与资料矩阵 → S1 Android 排版/交互与真实控件引导 G1 → S2 核心模块隔离 → S3 漫画源真实外置 G2 → S4 书库/标签/推荐/跨端整合 → S5 升级/性能 G3 → S6 双端集中验收 G4**。后续小修只改变对应任务和证据，不得无限扩展 Dev 候选或宣布整个项目完成。
+
+---
+
+## Concentrated Dev89 — actual packages verified, teardown-only gate correction (2026-10-27 local)
+
+Exactfe84055f4202b2c2917d0d9ee4fd8992fedd2b32 ordinaryCI40474512657 both jobsPASS. Dedicated40474606748 terminal9/10PASS, overallFAIL: source/Windowsunit/actualWindows/Androidsigning and five runtime scenesPASS; launch-rollback failed only in finally/stopOwned. Original result has actualHelperRollback=true, exactApplicationTree=true, selectedStateCanaries=true and no browser/source boundary events, but teardownError='Refuse process outside exact owned root'. Preserve overallFAIL, not waive cleanup. Raw stack is ownedPid called after process.kill at the existing second wait. Original generic assertion omitted PID/path-presence details; it cannot distinguish a transient missing CIM executable path from PID reuse/foreign process, so no retrospective exact-cause claim.
+
+Download/independentNodeZIP/binaryXML/v2certificate/source-byte checks for fe84055 actual packagesPASS, not installableREADY while mandatoryjobFAIL. Core113files/0JM, optionalJM280files/167runtime files. ActualAPK com.picalibrary.android.dev/version89/fixedcertificate64fb87...; full cryptographic authority is successful same-source CIapksigner, localNode only extracts certificate. ActualJUnit60files/471tests/0failure/0error/0skip. Linux2629PASS/14skip andWindows2642PASS/1skip, all conditional cases have passing opposite-platform counterparts; rawJSON misleadingly reports2643passed, retained without alteration. No localJava/app/installation or productiondata.
+
+Finite correction is CIharness ONLY: explicit absent/owned/unidentified CIM states. Missing executable identity never means gone or permission to kill; foreign paths/mismatched records still throw. Only owned may be killed, original50+100polls/intervals unchanged, and only confirmedabsence permits fixture removal. Bounded state-only observations distinguish future evidence without exporting process paths. Six inert-port tests execute the actual stopOwned function: unknown→absent withoutkill, persistentunknown fails/retains, owned→terminatingunknown→absent, foreign refusal; no duplicate implementation or realprocess run. Reuse existing fixture and its declaration; no app/mobile/Reader/helper/ranker/schema/timeout/dependency/workflow/version changes.
+
+Localregression-7:236PASS/0FAIL/0skip/20files; fulltypes-6PASS, both0IOevents/source unchanged. Firsttypes-5 failure preserved: existing .d.mts omitted the newly exported pure classifier; declaration was then added, no any/ignore escape. New exact-source full gates/package/signature check still required, sameDev89 because no installer has been handed out or installed. Goal remainsOPEN; no feature expansion, release/OTA/deployment or modification of frozenPR213..216.
+
+## Concentrated Dev89 — authorization, actual first gate and bounded correction (2026-10-27 local)
+
+Direct human reply now authorizes pushing an independent Draft, Dev build numbering, and existing fixed-signing Secrets in Actions for unpublished Windows/upgrade-compatible Dev APKs. No main merge/tag/Release/OTA/deployment, private-key download, production data or localJava/application/listener. LocalMemory context/claim remainNOT_FOUND; standing isolated waiver continues, no identity guess/DPAPI repair. Exact0a8a0ddb152a6c0c303c54d090a59bf11ef2d861 pushed tocodex/concentrated-acceptance-20261027; DraftPR217 created/attached on frozenPR216/f5be335. Readback main095d6910c34e and frozenbase unchanged. Dispatched existinguser-host-acceptance.yml with explicitwindows-and-signed-dev89:run40473230012.
+
+Actual firstsourcejob122085109052:2623PASS/6FAIL/14skip/332files. Android/windows/runtime-choice jobs skipped after requiredsource failure, so no fixed signing reached; Windows full-unit independent job's terminal result remains separately tracked, not fabricated. OrdinaryCI40473198434 actualAndroid taskPASS, Web/DesktopFAIL. Raw completed-source log and originalSourceEvidence JSON retained. Original local179/type/Rollup successes are preparation only, not a reason to dismiss these full-suite failures.
+
+Root cause is exact contract drift from reusing existing build/identity helpers: recommendation allowlist omitted src/library/content-identity.ts, already admitted for reading projection; four old userHost recipe assertions still fixed old push-branch/Dev88/status/fixture label; global artifact guard required literal1day. Actual identity file has no imports or I/O. Correction admits ONLY that pure leaf, requires AST imports=[] and independent browser-target bundle containing only that file, leaving all transitive storage/model/network exclusions intact. Recipe asserts manual-only exact newbranch, explicitsigned mode,Dev89,read-only permissions,old predecessorHOLD and separate historicalT3/Host evidence. Retention7days is narrowly specific to this public/synthetic concentrated handoff; all other workflows retain1day and new parsedYAML tests check EACH concentrated upload exactly7. No test removal,skip,deadline/network/state/ranker change or dependency update.
+
+Finite correctionpreflightregression-5:201PASS/0FAIL/0skip/16files, fulltypes-4PASS, both0IOevents and unchanged inspectedsource. New full current-source cloud gates/installable verification remain required. Dev89 is retained because the first run produced no installable. No further feature expansion; full goal/sevenphases/42cases remainOPEN. Source docs are preparation-time snapshots; PR217/independent post-run receipt will carry actual final outcome without rebuilding binaries merely for bookkeeping.
+
+## Concentrated acceptance freeze — one candidate, no feature expansion (2026-10-27 local)
+
+Human now explicitly prioritizes a usable consolidated acceptance build. Freeze further module/private-Host-tag expansion; prepare one isolated candidate branch `codex/concentrated-acceptance-20261027` from PR216/f5be335, leaving frozen PR213..216 untouched. Current-source full gates, actual packages, hashes/signature/profile isolation and short daily/advanced instructions are delivery requirements, not replaced by source review. Full objective/seven phases/42 cases stay OPEN; known complete Host metadata/tags/favorites/sync/background recovery, second real source and physical/OEM gaps remain explicit. Contract: `docs/CONCENTRATED_ACCEPTANCE_DEV89.zh-CN.md`.
+
+PR216 final actual CI40459202415/f5be335: both Web/Desktop and Android PASS, read-only verified again. Web56, Vitest2620PASS/14skip/331files, realChromium61; native testDebugUnitTest/lintDebug/assembleRelease actually successful, no successful-run exact native count exported. Retained warnings and original471/470/1failed run are not erased. No installable artifacts or fixed signing were produced by ordinary CI.
+
+One reproduced blocker fixed in this candidate: manually bound unknown/hosted IDs could inherit the old Pica fallback and become RELATED request seeds. New real red regression had9PASS/2FAIL; the seed now uses existing catalogSourceId validation and preserves valid legacy/Pica seeds without changing ranking weights or state. Final typecheck PASS/0IO; local no-listener regression168PASS/0FAIL/11actual files/0IO. An earlier broad attempt168PASS/2FAIL hit the unchanged local TCP_LISTENER guard in tag-profile-server's two realHTTP cases; this is an execution-scope failure, not falsely a product failure or PASS. Those HTTP cases remain in unfiltered full cloud Vitest; local runner explicitly defers them, no global skip or IO exception.
+
+Reused existing user-host acceptance workflow, prepared manual-only/exact-branch mode with Windows-only safe default and explicitly selected fixed-signed Dev89 option. Keeps full source/JVM/Chromium/Windows/native gates and six component-choice scenarios; separately checks both actual core/JM ZIPs and retains native JUnit/lint/evidence for7days. Signing Secrets remain step-scoped after native gates, never on push/PR. Preparation is not new cloud/signing authorization: one consolidated permission question is pending. No push, dispatch, Secret retrieval, local Java/app/listener, production-data access, merge/tag/Release/OTA or deployment.
+
+Final localregression-4:179PASS/0FAIL/0skip/13files; types-2 fullTypeScript PASS, both0IOevents and unchanged inspected source hashes. New workflow's7 parsed-YAML contract cases passed. Retain preceding regression-3:172PASS but one suite could not load js-yaml from the root under pnpm strict dependency layout; resolve the already-locked ESLint parser from ESLint's own scope, no install/lockfile change and no test removed. An approval-review timeout prevented the first types-2 launch; one permitted retry actually completed successfully. These local tool/parser failures are not cloud/product failures or hidden reruns.
+
+## P2 native Host books — authorized Draft216, first actual Android result (2026-10-26 local)
+
+Human explicitly authorized a newDraft and existing temporary-debug CI, still forbidding fixedSigningSecrets,version changes,merge/release/OTA/deploy and localJava/app. Pushed frozen67ef35ae16658b23ef32da178e12550e189ee954 tocodex/host-personal-library-20261027 and openedDraftPR216 on frozenPR215/8045754; attached it to this task. Eleven unchanged signing recipes were audited: no matching signing push trigger, PR signing jobs denied, no global signing env; the only reusable signing caller is manual-only and was not dispatched. Actual RC workflow40458023906 has android-rc/windows-rc SKIPPED; ordinaryCI uses no fixed keys. LocalMemory context/claim remainNOT_FOUND; standing isolated waiver continues, no DPAPI/identity changes.
+
+ActualCI40458023912/source67ef35a: Web/Desktop PASS. Android job122035800397 compiled application and test code and executed471tests,470PASS/1FAIL: HostSourceActivityTest.removingReferenceRequiresConfirmationAndDoesNotSendAHostRequest at the combined assertion line52. Preserve raw completed-job log; do not relabel this source asPASS. No JUnit artifact was emitted by the existing CI, so first failure's individual expected/actual assertion is not available from the compact log.
+
+Source attribution: Android AlertController posts button callbacks through a Handler; the test has PAUSED looper but omitted idle after native dialog clicks, unlike the project's existing JmSourceActivityTest.pressDialog helper. Reuse that exact click+mainLooper.idle pattern, separate/assert each confirmation stage and keep all retention/no-network checks. No product timing, retry or safety gate changes. Independently, real product source left main status at host_working after confirmed removal; add a localized completion state and assert it, rather than claiming deletion itself was proven broken. Strengthen existing metadata-refresh test with a different incoming save timestamp to actually prove the original timestamp is retained. Current-source fullCI still required; original failure remains.
+
+Corrected localpreflightregression-5:235PASS/0FAIL/0skip/17files; fulltypes-4 PASS; bothIOaudit0events and unchanged source hashes. Nodegrammar-6 parsed254Java files without syntax errors; three locale XML files valid with62unique strings each. These do not substitute for the new current-source native CI. Frozen67ef35a failed raw result is retained; no blind retry, fixed signing, version/workflow change or source/timeout/guard weakening.
+
+## P2 native explicitly saved Host books — isolated local implementation (2026-10-27)
+
+Previous goal turn was concretePROGRESS: frozen8045754/PR215 realHost40453173182 H1..H6 engineering assertions and ordinaryCI40453179583 both jobs PASS; downloaded original result/archive digests, failed history, source diff and32-member review bundle independently verified (.NET31/31payloads). Two actual built-in synthetic books each reported-1 metadata then2pages; stop-ownedHost/fresh-process local four-page progress alsoPASS. This is not second-provider or physicalAndroid acceptance. The exact post-run addendum is now preserved in the realHost contract rather than relabeling old preparation snapshots.
+
+New local branchcodex/host-personal-library-20261027 at8045754 closes a concrete native continuity gap: an explicitly saved Host reference survives session end/restart and has actual Library/Host UI entry, bounded12-row local paging, explicit same-host/account/source regrant and existingReader revalidation. Pinning, saving body pages and removing a local reference remain separate actions; removal confirms and does not delete downloads/history or mutate Host favorites. AtomicFile/local class locking and existing permissions/Reader/HTTP are reused; no new SDK/Reader/queue, source executor, SQLite migration or legacy catalogue coercion. Contract:docs/NATIVE_HOST_PERSONAL_LIBRARY.md.
+
+LocalMemory context/claim bothNOT_FOUND; existing user-approved persistent isolated-development exception remains, no identity guess/DPAPI work. No localJava/app/browser/listener, production-data read/write, main merge, version change, fixed signing, Release/OTA/deployment. NewDraft/ordinary-debugCI authorization was requested once, pending actual human reply. Node22source/resource checks and fulltypes passed; Nodegrammar254Java files passed. First broad regression234PASS/1FAIL/17files,0IOevents retained: pre-existing guard rejected reading failure.getMessage in capacity handling. Product now uses typedHostSavedBooks.Full; the original no-error-text guard is unchanged. Second broad regression passed; final exact counts/new native test count must be sealed after final preflight. Android compilation, native tests and new installers remainNOT_RUN.
+
+This is persistent selected-reference metadata, not complete native Host catalogue/private tags/favorites/sync/background recovery, a second real platform, or final user acceptance. Seven phases/42product cases and fullObjective=OPEN remain intact. FrozenPR215/T3/Dev88 and original data stay untouched; no user testing requested.
+
+Final local preflightregression-4:235PASS/0FAIL/0skip in17files; finaltypes-3 PASS, bothIO-denying audits0events and unchanged source hashes. Nodegrammar-5 parsed254Java files without syntax errors; three locale XML documents valid,61unique strings each.24new native cases are written (HostSavedBooks12,manager+5,screen+7), NOT_COMPILED/NOT_RUN locally. Review also keeps captured session throughout resume and uses standard AtomicFile.failWrite for write exceptions/OOME. ExistingManifest allowBackup=true is explicitly disclosed, not changed or falsely described as preventing OS backup. No new cloud authorization is presumed from this local result.
+
+## P2 actual Host failure attribution — unknown chapter count (2026-10-26)
+
+PR215 remains Draft/unmerged. Actual run40451709011/source02a72e293b698f432f7435ebfbb73f17cd5b5c74 reached official Suwayomi in a loopback-only namespace: startup/inspection/source list/search succeeded, then CBZ prepare failed at hostChapter→hostInteger(pageCount), before body retrieval. Downloaded original result/job logs are retained; ownedHostStopped=true. This supersedes the earlier preparation-only NOT_RUN snapshot, not a PASS.
+
+Fixed upstream ChapterTable blobf6fd7be8a37a3dba07c13c99a442d98e69824085 defines page_count.default(-1). Local source-only unit-5 reproduced the missing -1 sentinel support:196PASS/3FAIL, zeroIO guard events. Minimal Desktop/Android metadata codecs now preserve only this exact unknown value; ready page lists still require positive exact counts and owned identity/paths. Android initial Reader filtering also allows only Host/-1 so legitimate unfetched chapters are not discarded; local empty chapter behavior stays unchanged. Four new native tests cover codec/ready-page/ReaderPolicy/HostReaderSource paths, cloud execution pending. unit-6 is199PASS/13files/0events; fulltypes-4 and worker-5 PASS/0events before final evidence instrumentation. New full exact-source gates still required.
+
+This is the first application/mobile delta in PR215, explicitly superseding the initial no-app-delta claim. No schema/version/lockfile/production-data changes, new Reader or downloader, local Java/app/listener or fixed signing. Only permitted existing temporary-debug CI; no merge/tag/Release/OTA/deploy. Seven phases/42cases and fullObjective=OPEN remain unchanged.
+
+Final preflightunit-7:199PASS/0FAIL across13actual files,0boundary events; finalworker-6 and fulltypes-4 PASS/0events. Source02a72e2 ordinaryCI40451713301 bothjobs PASS is historical proof only, not acceptance of these new native/product changes. New exact-source realHost and ordinaryCI remain required.
+
+## P2 real Host interoperability — authorized isolated gate preparation (2026-10-26)
+
+First real-host run40450507601/source112038f failed in about28seconds before worker/Java: frozen source checks/types and pinned official JARhash/size PASS, then ERR_PACKAGE_PATH_NOT_EXPORTED for tsx/esm/api. The installed/frozen tsx4.7.0 exports ./cli, not that newer API. No runtime result artifact was created; preserve completed job122011847637's raw log. First bounded correction uses the existing public CLI/tinyTSentry; no dependency/application/version/schema or security/deadline change, no local Host/app/Java execution. Real interoperability remainsNOT_RUN pending corrected-source cloud proof.
+
+Localunit-3 retained194PASS/1FAIL with3TCP_CLIENT guard labels from the proposed literalCLI probe; destinations were not recorded, so actualTCPvsIPC cannot be inferred. Original guard blocked those calls and is unchanged. Remove local CLI execution from the regression: resolve public export/bin and Node syntax-check only; real CLI/worker execution stays cloud-only. Java/Pica never started locally. This failed local probe is not relabeled as0IO or PASS.
+
+Correctedpreflightunit-4:195PASS/13files,0audit events; worker-4/types-3 PASS with0events. PublicCLI syntax and whole diff checks PASS. No application/dependency/version change or network-guard relaxation. New exact-source runtime remains pending, original run112038f failure preserved.
+
+Previous goal turn: **PROGRESS**, not a status-only wait. T3 source5f4b7ead0fcd actual run40444592760 seven/seven PASS; ordinaryCI40444597333 both jobs PASS. Downloaded23raw leaves independently verified, including0.5.2/200HTML readback,12precisely correlated transient probes, zeroHTTP errors/boundary/cleanup failures and58952msnegative-health span under the unchanged60000ms deadline.116-entry review ZIPSHA2564c8909ef67eccb79ca1106231f491acfd867e31afe0086481beb3be6070a3296 also passed independent.NET manifest115/115. PR214 remainsDraft/unmerged; old recovery is supported-headless CI only, not old interactiveLAN/publication/OEM acceptance. Original failures remain retained.
+
+User now separately approved a newDraft and temporary real Suwayomi runtime integration using synthetic content only, no third-party sources/platforms/signing/release/deployment. New local branchcodex/source-host-interop-20261026 starts at frozen5f4b7ea; no app/mobile/schema/version/dependency changes. Local context stillNOT_FOUND; continue the existing persistent isolated waiver, not a guessed identity/DPAPI repair. Public officialtag/commit/JARdigest and26text Gitblobs verified; no JAR downloaded or Java/app/listener started locally.
+
+The finite H1..H6 engineering gate reuses existing connection/Reader/cache/scheduler/ingestion/localReader ports, actual upstream built-in LocalSource, onefolder+oneCBZ/fourdistinct owned synthetic pages and a fresh offline Node process. A separateloopback-only network namespace isolates Java/client from external platforms. Source/op/body/page identity, explicit save/revoke, controlled child exit and persistence are checked. Only bounded diagnostics upload, neverJAR/images/DB/config. This does not count a second realProvider, finalWindowsGUI or physicalAndroid acceptance. Contract:docs/REAL_SOURCE_HOST_INTEROPERABILITY_GATE.md. Actual runtime/Actions remainsNOT_RUN at preparation; no test counts relabelled as interoperability.
+
+Local preparation unit-1:194actualPASS/13files, fulltypes-1 and separately includedworker-1 types PASS; three IO-denying audits0events, no Java/app/listener. User subsequently clarified that existing temporary-debug APK CI is permitted while fixed private signingSecrets/Dev version changes/installable publication remain prohibited. The dedicatedHost workflow has no Android/signing task. No source/mobile/web/package/lockfile delta from frozen5f4b7ea.
+
+Finalpreflightunit-2/worker-2/types-2:194PASS/13files, committed-worker tsconfig and fulltypes PASS, allthree new audits0events. Existingjs-yaml parsed the8step/onejob workflow and exacttwo-leaf upload allowlist; the local inspector's first unnamed-step accessor was corrected without changing the workflow. Readonlytriggeraudit of11fixed-signature workflows found no matching push/signing-job path for this new branch; none has global signingSecrets env. FrozenPR2145f4b7ea/main095d6910c34e readback unchanged; remote target branch absent before push. No signingSecret values were retrieved.
+
+## T3 request attribution and first product correction (2026-10-26)
+
+d292f70/40442777436 remains6PASS/1FAIL;23downloaded diagnostic leaves checked, no boundary/cleanup failure. The startup400 is POST recommendation-events: renderAll invokes the recommendation renderer before any cycle/batch exists, yet it publishes recommend_batch_presented; server context validation correctly refuses. Executing the actual small client function against inert ports reproduces2FAIL/115PASS with0IO audit events. Retain this red test evidence. Minimal web/app.js guard suppresses only nonexistent/invalid/empty batch presentations, retaining real batch fields and ordinary search/feedback; no server validation, DB/schema/ranker/Visual/user-state changes.
+
+All connection refusals are the shipped reconnect GET capabilities/timestamped HTML probes in the accepted-apply/pre-reload interval. CI now classifies only same-origin fetch GET ERR_CONNECTION_REFUSED within the existing90second reconnect bound; console errors require one-to-one actual failed-request URL/1second correlation and real0.5.2/200capabilities/200HTML readback. HTTP errors,400,uncaught code,other origins/routes/methods/resources/times/codes still fail. This is an explicit correction of the overly literal zero-resource-message assertion, not a blanket ignore or an unchanged-assertion claim. Product60second health deadline unchanged. Product correction/new gates require new exact-source cloud evidence; PR213/Dev88 and original failures remain frozen. Broader source/device/P6 completion is still open.
+
+Green source preflight unit-6/types-5:119actual PASS/13files and full types; JS parses and git diff check PASS, both new boundary audits0events. The red unit-5 retained2failures/115passes. Ledger phase summary and affected42case rows now distinguish verified Dev88 engineering evidence from real source/device and still-incomplete persistence/sync work; stale uncompiled/old-six-scene-FAIL labels are superseded, not used for a completion percentage.
+
+## T3 second-run evidence — six of seven, diagnostic gap not waived (2026-10-26)
+
+Sourcead7040aabb4e, CI40441171189 Web/Desktop+Android PASS; T3 run40441168209 completed in about6minutes with a real exit1, **6PASS/1FAIL**. Actual .cmd preview/cancel, integrity rejection, running refusal, concurrent ownership, launch rollback and60000ms health rollback PASS within the declared old-supported-headless CI scope. Health negative-response span58740ms; no boundary violations or cleanup failures. All23diagnostic leaves were downloaded and independently checked. Controller resource type names are now retained; earlier exact leftover-handle cause is not retroactively inferred.
+
+The remaining success-forward scene reached migrated0.5.1, actual one-click forward target0.5.2/healthy process, exact target tree and retained synthetic state, but its unchanged final browser assertion recorded one400 and12ERR_CONNECTION_REFUSED messages. Overall FAIL is retained. Original diagnostics omitted request identity; add only bounded API/static-resource path/status/failure/stage/timing, never host/query/auth/body. Keep all browser-error and source/process/network assertions. No product code, deadline, dependency or schema changes; no local runtime. This is evidence collection for a new unresolved browser-error cause, not a green rerun or blanket resource-error exclusion. Remaining source/device and full-product gates stay open.
+
+## T3 first-run evidence and bounded harness correction (2026-10-26)
+
+PR214 source1360c5ce2e55: ordinary CI40433450181 Web/Desktop and Android PASS; dedicated T3 run40433426476 **FAIL,2PASS/5FAIL**, followed by55minute job cancellation because the controller remained alive after all seven result rows were durable. This is not evidence of a55minute migration transaction. Original summary, per-case result/audit/terminal and job log are retained under _validation/legacy-transition-t3-20261026 and _validation/user-host-cloud-20261026; no failed result is rewritten.
+
+Evidence-backed harness fixes only: invoke actual .cmd by its filename from the tool cwd instead of double-escaped absolute quoting; await both log-stream open events before spawn; await and genuinely dismiss the fresh-profile welcome before browser navigation. Integrity rejection and concurrent entry already passed. Launch/health rollback restored the exact old tree, retained the failure terminal and actually restarted the old application, but both remained FAIL because old interactive mode attempted0.0.0.0:7788 and was blocked. Exact pinned public source confirms its supported --headless mode: external CI instrumentation selects it only for hash-attested old-desktop, without archive/config/helper patch or network exception. This proves only supported-headless CI recovery, not old interactive-default LAN acceptance/fix. New target remains interactive. Safety assertions and60000ms product health deadline stay unchanged.
+
+After owned-process cleanup checks and synchronous summary persistence, record only active resource type names and explicitly exit the CI controller with the computed PASS/FAIL code. The first run did not record handle types, so the exact leftover-resource cause is not asserted. CI outer limits tighten to25minute job/15minute runtime step; no timeout extension, retry loop, product bypass, source/dependency/schema/Android-version change or local runtime execution. This is the first evidence-backed correction of these fixture causes; the new exact-source cloud result is still pending. PR213/Dev88/main/Release/OTA/formal data remain frozen; seven phases/42product cases and the full objective remain open.
+
+Correction preflight unit-3/types-3:106actual passed assertions/11files, full TypeScript, three MJS parse checks and PowerShell AST PASS; both new IO-denying audits0events. Public old ZIP downloaded read-only and independently verifiedSHA25614b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf/sourcebec7f9f/95members, without local app execution. Remote PR213 remains40b3a555cb0d Draft/open and main095d6910c34e unchanged at the push precheck. No delta in src/mobile/web/package/lockfile versus frozen40b3.
+
+## T3 separate cloud authorization and finite gate — original pre-execution snapshot (2026-10-26)
+
+Human explicitly approved disposable Windows T3 with the pinned public0.5.0 and synthetic data. New independent branch `codex/legacy-transition-t3-20261026`; PR213/Dev88 fixed40b3a555cb0d, PR212/main/Release/OTA/formal profiles unchanged. No local Java/app/listener/migration, no signing secrets or Android-version change. Seven fixed scenario groups cover actual producer/preview/cancel, integrity/role rejection, running/concurrent protection, successful entry plus browser one-click forward update, asynchronous launch failure and retained60second health failure. Reuse the existing producer/coordinator/transaction helper/selected-state programs and inert publisher; MIT Microsoft node-pty1.1.0 and existing Playwright1.63.0 are CI-temp tools only. Old generated state-program hashes remain identical. Raw synthetic stable tools/targets never upload; only receipt/result/bounded text diagnostics. This is not a stable publication or authenticated real OTA claim. Full gate contract: docs/LEGACY_TRANSITION_T3_GATE.md. Cloud results still NOT_RUN, not PASS.
+
+T3 local source preflight:103PASS/11files, full types, three JS parse checks and PowerShell AST PASS; four offline audits0events. The driver itself was tested to reject outside hosted CI before reading arguments or loading native tools. No change in src/,mobile/,web/,package.json,pnpm-lock.yaml against frozen40b3. New exact-source cloud execution is still required; source checks are not runtime migration evidence.
+
+Frozen40b3 actual evidence is now complete: CI40426885328 PASS; candidate40426878627 all10jobs PASS, including six current-helper/browser scenarios. Linux2581PASS+14conditional skips and Windows2594PASS+1POSIX-permission skip cover2595case occurrences on applicable hosts; Web56/Chromium61/native443 (38Host) PASS; lint0errors/107warnings, fixed signed Dev88 verified. Downloaded actual core/JM ZIP/APK CRC/path/source bytes/binary version/fixed certificate readback PASS. Core0 vs optionalJM167runtime files. Local review ZIP SHA256 ac9bdc9f20651c79a633a7db8d60ce3190f27aeea8b5b988cd67f28d6db42db8. No automatic deployment or real Host/device acceptance. Exact Dev86 predecessor remains unavailable/HOLD; T3 does not rename another package as it. Real Host/second source, persistent native online catalogue/tags/sync/background resume and physical/gesture/tag/AI/sync QA remain open;7phases/42cases not expanded or marked complete.
+
+## Human-authorized Dev88 cloud candidate — pre-execution snapshot (2026-10-26)
+
+Source2ae2550 actual gates: CI40423708291 Web/Desktop+Android PASS; candidate40423702933 source/JVM/Chromium61 PASS. Case-level unit evidence is Linux2580PASS+14conditional skips and Windows2593PASS+1POSIX-permission skip; each host's skips passed on the other host, covering all2594 cases. Native full tests/lint/release shrinker/fixed-signed Dev88 PASS. Windows packaging reached the actual Host Reader subgate and failed its old `downloads=false` capability assertion after separately authorized chapter saving was implemented. Original job121929992271 log is retained; six runtime-choice scenarios were skipped, not PASS. Synchronize that one stale capability with an additional actual packaged chapter-save/consent/inventory/privacy check, then revoke the session, stop the synthetic Host and read both complete pages through the existing local Reader. This changes only CI harness/contracts/documentation, not product/native code, security defaults or deadlines. The new exact source still requires its own full CI/package gates. Vitest JSON top-level passed counters include conditional skips on both hosts; case-level statuses/stdout supersede earlier2594PASS aggregate descriptions, including the prior0ee6dec Linux snapshot (actual2580PASS+14skips).
+
+Downloaded2ae native JUnit XML:443PASS/0FAIL/0skip in59suites, including38Host cases; lint XML107warnings/0errors (not zero warnings), and the existing upstream JM R8 stack-map warnings remain recorded rather than suppressed. New harness preflight95PASS/10files, full types and both JS parse checks PASS, audit0localJava/app/listener events. An initial sandbox esbuild ancestor-read denial is preserved separately; the reviewed Node-only retry passed without changing code or test assertions.
+
+Actual first head ed6e8c7: new Draft PR213/open/draft/unmerged, cloud candidate run40420816195 and CI40420906568. Source full unit snapshot2588PASS/5FAIL: legacy export contract incorrectly froze the whole importer despite the reviewed shared-copier extraction; retain old full authority and freeze unchanged identity/archive/path/raster/inventory regions, plus copier bounds and actual native tests, rather than bless a new whole-file hash. AST Reader lifecycle fixture omitted the newly used hostedDownloadsPanel.refresh port, causing3ReferenceErrors/1dependent timeout; add the inert port and assert calls, no timeout increase or app change. Native actual javac failed on unsupported Android Authenticator.getDefault; remove the desktop-only API, retain cookie rejection/explicit-session header ownership and gate all owned native source against global Authenticator registration. No reflection/global mutation/new transport/dependency. Android public API authority: https://developer.android.com/reference/java/net/Authenticator. The source-ownership invariant is not a sandbox claim about arbitrary third-party in-process code. Original full JSON/native log preserved under _validation/user-host-cloud-20261026; no native tests/build/signing PASS yet, no artifacts deployed.
+
+Second source d61d55d: actual native main compilation progressed past the prior error; unit-test javac then found two unavailable Files.readString calls in the new test fixture. Replace only those reads with existing-compatible readAllBytes + explicit UTF8; preserve every assertion. Original CI40422212263/job121919136184 log retained. Android tests/lint/build are still NOT_ESTABLISHED, not PASS.
+
+Third source0ee6dec: actual lint reached245MissingTranslation errors after compilation, because new values-en/strings_host.xml introduced an explicit English locale while this app already keeps English in default values. Move Host English to default values and Chinese to the existing values-zh-rCN; retain Japanese and all copy/format assertions. No MissingTranslation suppression, baseline or duplicate fake translations. Raw native log preserved. Superseded d61 candidate workflow was deliberately cancelled after its completed source PASS/native compile failure; no cancelled/queued package is counted PASS. The new source must execute actual native tests/lint again.
+
+The human explicitly approved the current independent branch, new Draft, complete CI and unpublished Windows/Dev APK builds. This supersedes the prior cloud-authority blocker, not the unverified product gates. Preserve PR212 at6efc865, main095d691, Dev87/frozen ZIPs and all formal/G-drive data; no merge, tag/Release/OTA, deployment, local Java/app/listener or private-key download.
+
+Reuse existing source/Windows/native tests, packagers and six actual current-helper/browser scenarios in a dedicated exact-branch public/non-PR/read-only workflow. Fixed-signed side-by-side APK versionCode88, not an official version. The old Dev86 application artifact is absent from run40222828902's current artifact list (only source/unit/diagnostics remain); do not rebuild or substitute it as exact prior bytes. Old predecessor-cross-version and accepted one-time migration T3 remain NOT_RUN/HOLD, not waived or counted PASS. Old workflows/tests remain intact. Preflight unit-1 retains one failure: new recipe retention7 violated existing one-day artifact policy; set all new artifacts to1day, do not weaken the existing gate. Actual CI/package/device outcomes are not yet available at this snapshot.
+
+## Android Host failure-path review — no new feature (2026-10-26)
+
+**Source cc92217a614666c15ca6b4e1e91f39e87165fd7a; local codex/android-user-host-recovery-20261026. SOURCE_REVIEW_CLEANUP_FIX / NODE_GATES_PASS / ANDROID_NOT_COMPILED_OR_RUN / CLOUD_AUTHORITY_PENDING / FULL_OBJECTIVE_OPEN.**
+
+- Previous goal turn made actual source/validation progress. Re-read current clean tree and original ZIP, then read GitHub PR212 metadata: still open/Draft/unmerged at6efc865fd229660f77929ebe2018b494fc198995. No PR/workflow mutation or live new job was started.
+- Bounded review found a concrete worker Error gap: OutOfMemoryError bypassed start's provisional-session cleanup and task's UI busy reset. Only those two cleanup catches changed; two synthetic native regressions added, no real memory pressure, new feature, timeout/security weakening or general OOM/crash-recovery claim.
+- Current13Node contract cases,485PASS/0FAIL/0skip across33files, full types/Web56,4offline audits0events and252Java grammar-only parse PASS. New native count38 plus3 shared importer tests are authored but UNCOMPILED/NOT_RUN. Final receipts bind current code under _validation/android-user-host-recovery-20261026; prior484/ffa54e2 ZIP remains unchanged/historical.
+- Context routing NOT_FOUND/claim DPAPI rejection persists; standing goal-scoped isolation only. No local Java/app/browser/listener, real Host/formal data/schema/algorithm/protocol/version/workflow change, push/new Draft/cloud dispatch/Release/OTA/deployment. Fresh cloud authorization for this slice is unanswered; next required step remains actual same-source Android compile/tests/packages, not further feature addition. Ledger7phases/42cases and full goal remain OPEN, user testing NOT_READY.
+
+## P2 Android user-Host — direct source, same Reader and owned chapter (2026-10-26)
+
+**Status: LOCAL_SOURCE_AND_NODE_GATES_PASS / ANDROID_COMPILE_RUNTIME_AND_REAL_HOST_NOT_RUN / FULL_OBJECTIVE_OPEN. Source ffa54e2de0b2e573cc2355991c4f6b78e0ea3ede, isolated local branch codex/android-user-host-20261026. No push/cloud/version/Release/OTA/deployment.**
+
+- User descriptor saved disabled → explicit enable without IO → separate15-minute memory grant → installed-source list → explicit one-source bind → manual search/book selection → existing Android Reader/history. Direct phone-to-user-Host, not Desktop relay. No default host/content, extension install/execution or provider account inheritance. Normal TLS/fixed routes, signed64-string identity, strict JSON/raster ownership and revoke/late-commit guards. Old Permit implements generic Access; three existing IDs/epochs/storage formats unchanged.
+- Separate selected-chapter save consent reuses LocalComicImporter/LocalComicStore's copy/validation/generation/AtomicFile publication and original local Reader/library; not another queue or temporary-cache offline claim. Cancellation/failure retains old copies. Foreground single chapter only, no background resume; online references remain bounded session state, not complete persistent native Host catalogue/tags/sync. Host history never falls back to Pica/Desktop; unsupported Host-only IDs are excluded from portable recommendation evidence without modifying rankers/sync algorithms.
+- Added36 Android/JUnit/Robolectric and3 shared-importer tests, all UNCOMPILED/NOT_RUN. Node contracts12PASS; final regression-2 484PASS/0FAIL/0skip in33files, full types-2/Web56/56 PASS,8offline audits0events. Isolated Node java-parser3.0.1 parses252 Java files: grammar-only, not JVM/Android/device/package proof. Evidence _validation/android-user-host-20261026, contract docs/ANDROID_USER_HOST_READER.md.
+- Local context NOT_FOUND/claim DPAPI failure remains; standing isolated-goal exception, no identity repair. No local Java/app/browser/listener, formal/G-drive data, PR212/Dev87/main/Release/OTA, schema/SDK/version/workflow or ranking/Visual modifications. New cloud authorization remains unanswered; no push/dispatch. Next is exact-source cloud compile/tests, then actual packages/Host, not further feature addition. Ledger7phases/42cases unchanged, user testing NOT_READY, full goal OPEN.
+
+## P2 unified Downloads — same Host tasks, shared view and safe query lifecycle (2026-10-26)
+
+**Status: LOCAL_UNIFIED_DOWNLOAD_PROJECTION_AND_GATES_PASS / ANDROID_AND_REAL_INTEROP_PENDING / FULL_OBJECTIVE_OPEN. Application source6d5ce26f2fbee9dcf199463e433b5b7d3c21c88a, isolated branch codex/user-host-offline-20261026. No push/cloud/version/Release/OTA/deployment.**
+
+- Previous goal turn implemented and verified actual Desktop saves; this turn closes its explicit unified-entry gap. The same ephemeral session jobs appear in Downloads through fixed current-session ports, with shared DOM rendering and separate persistence/count semantics. No second task queue, scheduler, download table, provider startup, retry/enqueue or legacy job-action delegation. Volatile scope exposes only ID/expiry, never credentials/CSRF; saved copies route to the existing local Reader.
+- Local Memory context NOT_FOUND/claim DPAPI rejection remains; standing isolated-goal exception, no identity/secret repair. Status/cancel are already synchronous local controls, so validate their signal/authority without remote-reading withSignal's disconnect→session-end rule. Verified that aborting their reply preserves unrelated confirmed tasks; a deliberate cancel targets one job. Metadata/page requests retain prior lifecycle and access rules.
+- Controller stops/fences work on view/hidden-tab/modal/page/scope/dispose changes, refuses stale results/detached buttons, never restores a grant on page return, and does no query without current authority. Shared renderer validates full snapshots/complete-copy identity before publishing safe text/DOM, with separate Host data attributes so old SQL queue controls cannot claim these rows. New inert test loader executes actual local modules/dependencies, not a mocked renderer.
+- Final regression-2:472PASS/0FAIL/0skip in32files;17projection cases,19save-service cases, full types-3 and web-3's56/56syntax PASS,9offline audits0events. Earlier unit-1 and regression-1 are successful historical snapshots, not renamed final results. Actual app markup/port/visibility wiring is statically checked, not run in a browser. Evidence remains _validation/unified-host-downloads-20261026. No runtime listening, Java, app, browser, real provider/Host or formal data.
+- Existing Host scheduler/store, LocalInventory/SQLite schema, Reader/download engines, platform/native/signing/version/workflow and ranking/Visual unchanged. Android source is under mobile/android-alpha2; current ReaderSource/ReaderSourceFactory were inspected read-only and lack a user-Host route. Next is that real native integration through existing modules, followed by separately authorized exact-source cloud/device acceptance; no Desktop-relay or cache-only shortcut. Ledger stays7phases/42cases; user testing NOT_READY and full goal OPEN. Frozen PR212/Dev87/main/Release/OTA/G-drive/formal data unchanged.
+
+## P2 S2 Desktop host saves — explicit selection, shared scheduling and durable local Reader (2026-10-26)
+
+**Status: LOCAL_DESKTOP_SAVE_FLOW_AND_OFFLINE_GATES_PASS / UNIFIED_DOWNLOAD_PROJECTION_ANDROID_AND_REAL_INTEROP_PENDING / FULL_OBJECTIVE_OPEN. Application source7a81e12f53685a1edfc221c97f92766906bd1ae1, isolated branch codex/user-host-offline-20261026. No push/cloud/version/Release/OTA/deployment.**
+
+- Previous turn committed and verified the actual local storage foundation, not merely a plan. Continues it into Desktop chosen Host → selected chapter → separate save consent → progress/cancel → same local Reader. Local context NOT_FOUND/claim DPAPI failure remains; standing isolated-goal exception only, no coordination identity/secret repair, app/Java/browser/listener or production data.
+- Reuses DownloadScheduler/state-machine/MediaRequestGate/balanced media spacing, shared RuntimeResourceCoordinator and LocalLibraryIngestion; no second downloader/Reader, copied upstream implementation or new dependency/schema. Host jobs do not enter the old platform SQL queue (which would create platform placeholder comics/events); they are ephemeral per-session adapters. Active work blocks update/engine switching; shutdown awaits task cancellation/cleanup before SQLite close.
+- Original browse/read permission cannot save. Additional consent, actual listed chapter and current principal/source/book/chapter checks precede execution. Bounded20active/50temporary tasks, same15minute grant, serial importer publication, explicit manual retry, no persisted task/credentials/URL or restart auto-network. Existing2000page/512MiB book and20MiB page limits stay visible. Completed copies remain after revoke; source and local progress are separate. Duplicate active clicks coalesce, explicit subsequent confirmation can replace; failed replacement preserves the complete prior copy/favorite/progress. A late cancel cannot misreport a committed healthy copy as unwritten.
+- Final regression-3:453PASS/0FAIL/0skip in31files; new service17 + inert actual-module UI8 assertions, full types-4 and web-4's54/54syntax PASS, all12offline audits0events. Covers actual synthetic SQLite/files/Reader reopen, queue/resource cancellation, revoke/expire/close, duplicate/limit/ownership/error isolation, retry, failed replacement and late-commit cancellation. First regression-1 retains445PASS+4FAIL: new UI fixture used reversed zh/en indices; fix the fixture against actual copy(zh,en,ja), not product locale/security/deadlines. Source emitted graph proves existing scheduler/gate/state-machine reuse and no concrete SQL/fs/provider/process dependency.
+- One real-HTTP→save→local-Reader test added and typed in CI-only source-host-api.test.ts; NOT_RUN locally or in new CI. Evidence remains _validation/host-download-flow-20261026. Core inventory/database/Reader/scheduler/resource implementation, version/Android/dependencies/workflow and ranker/Visual unchanged. Main/PR212/Dev87/formal/G-drive data remain untouched.
+- Ledger stays7phases/42product cases. Host task UI is not yet projected onto the unified download page; do that without another scheduler/store, then Android source/Reader/offline integration. Real Host/second source, exact-source packages/browser/native/device evidence and R1/T3 remain OPEN. No user test handoff or complete-goal claim.
+
+## P2 S2 user-host offline — shared local storage foundation (2026-10-26)
+
+**Status: LOCAL_STORAGE_FOUNDATION_AND_OFFLINE_GATES_PASS / HOST_JOBS_UI_ANDROID_AND_REAL_INTEROP_PENDING / FULL_OBJECTIVE_OPEN. Application source76bee26a41e096a74acb89d5a6f7a1023b2cb778, isolated branch codex/user-host-offline-20261026. No push/cloud/version/Release/OTA/deployment.**
+
+- Continued the interrupted validation rather than restarting live work: regression-1/types-2 had already completed successfully. Final formatted source reran regression-2/types-3. Local Memory context/claim remains NOT_FOUND/DPAPI denied; standing goal-scoped isolated exception only, no identity/secret repair or memory promotion.
+- Adds a source-neutral generated-chapter port to existing LocalLibraryIngestion, not another Reader/download/publication engine. Same LocalInventoryV1 and actual SQLite atomic transaction group chapters in one stable local book; append/replace retain IDs, favorites and applicable progress. Optional order hints require no SQL schema or old folder/CBZ format migration. Page producer owns no URL, credentials, network or scheduler in this module.
+- Verifies existing owned pages before local copying; bounded raster/bytes/count/hash/path validation, exclusive generation creation, guard-before-publication and in-process stale-revision rejection. Fetch/cancel/save failure removes only this uncommitted generation and preserves prior DB/files. Postcommit revocation does not undo an accepted local copy; failed old-generation cleanup retains both safely. No cross-process CAS, complete Host download job or native offline claim.
+- Final422PASS/0FAIL/0skip across28files, including21new actual temp-SQLite/Reader/PNG cases; full types PASS;6offline boundary audits0events. Database reopen/source-unavailable reading, stable grouping/progress, shortened chapter, late cancellation, actual transaction rollback, corrupted paths/hashes, collision and stale-writer cases are covered. Evidence remains _validation/host-offline-storage-20261026; no local app/Java/browser/listener or real provider/formal data access.
+- Source/API capabilities intentionally still downloads=false/native=false. Next finite S2 step: explicit save consent, existing DownloadScheduler/MediaRequestGate, async progress/cancel/status and this storage port, then Android. Ledger remains7phases/42product cases, not expanded by unit-test count. R1/T3 cloud, real Host/second provider, issue/tag/AI/gesture/sync/device acceptance remain OPEN; user testing NOT_READY. PR212/Dev87/frozen packages and G-drive/formal data unchanged.
+
+## P2 user-host source search/read — actual separate grant, shared engine (2026-10-26)
+
+**Status: LOCAL_SOURCE_SEARCH_READER_AND_OFFLINE_GATES_PASS / HOST_DOWNLOADS_ANDROID_AND_REAL_INTEROP_PENDING / FULL_OBJECTIVE_OPEN. Application sourceb85deefd835d1aa661c6640115933de8bf737e93, isolated branch codex/user-host-source-browse-20261026. No push/cloud dispatch/version/Release/OTA/deployment.**
+
+- Previous goal turn made actual source/test progress; interrupted exec cell1324 was missing and no unit-2 receipt existed, so no live test was restarted. Resumed the same code and retained original unit-1 failures. Local context routing NOT_FOUND/claim DPAPI rejection remains; standing goal-scoped isolated exception only, no broker identity/secret repair or memory promotion.
+- Closes one real P2 implementation gap: Desktop saved user host → separate catalogue-side-effect consent → installed-source list → explicit immutable single-source binding → search/pagination → selected metadata/chapters → SAME main Reader/cache/progress. Existing inspect-only/library-only grants do not gain search. No mandatory host, default repository/catalogue, source auto-enable, extension interpreter or alternate Reader/downloader.
+- Reuses official pinned Suwayomi2.4.2366 FetchSourceMangaInput and FetchMangaAndChaptersInput. Four raw GitHub protocol blobs/hashes verified, no implementation copied/run. Search modifies the user's host metadata, so additional consent is explicit. Canonical64-bit source IDs remain strings, actual listed choices only, expiry/revocation/late-result and existing bounded transport/CSRF/TLS rules apply. Unknown fields/mixed source or reused row results refuse; library sessions validate inLibrary even for stored search refs/cache. No atomic remote-CAS guarantee is claimed.
+- New protocol/service14 + actual inert UI6cases; source suite181PASS/12files. Current-source combined host/Reader/update/translation regression380PASS/0FAIL/0skip across23files, full types/Web54 and CI-helper parse PASS,12audits0boundary events. The new real-listener API and compiled-Windows host-source journeys are authored/typed/parsed but NOT_RUN. No local application/Java/browser/listener, real-host/body/credential/account/production database access.
+- Retains unit-1's12fixture contract failures (missing required allowInsecureLan=false) and1premature disabled-read-button test click; fixed the fixture and actual readiness oracle, not production validation/busy locks/deadlines. types-2's explicit header-record inference corrected without an any-cast. Source-bound receipts/logs remain _validation/user-host-discovery-20261026; no synthetic installer promoted.
+- [Single ledger](docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md) stays7phases/42cases. SRC-05 still lacks Host downloads/offline and Android; SRC-06 real second-source integration remains unverified. Next local work reuses existing download/native Reader modules rather than declaring this slice complete. R1 cloud attribution, T3 real migration/forward-update, issue/tag/AI/gesture/sync/provider/device acceptance remain OPEN. Frozen PR212/Dev87 and formal/G-drive data unchanged; user testing NOT_READY.
+
+## Legacy transition T2 — bound independent entry delegates to current engine (2026-10-26)
+
+**Status: LOCAL_IMPLEMENTATION_AND_OFFLINE_GATES_PASS / TRUSTED_PRODUCER_AND_REAL_WINDOWS_T3_NOT_RUN / FULL_OBJECTIVE_OPEN. Application source514e44d41f7199db1ddc61a12bbf1576502aca76. No push/cloud dispatch/migration/deployment.**
+
+- Implements the accepted one-time transition, not another roadmap or replacement engine. Adds exact clean-checkout/pinned-old-ZIP/target-hash/source/provenance binding, actual cmd→CJS entry and preview/confirm flow. Packs target-matched independent Node/helper/payload/notices; rejects historical PS builder use for0.5.0, source/env authority injection and output overwrite. Review/noninteractive entry stays read-only. Real trusted producer execution and human terminal acceptance remain NOT_RUN.
+- Reuses full-archive/staging and startUpgradeHelper readiness/nonce/ACK; all replacement, user-state snapshots, launch/health/recovery remain the existing full-upgrader. Requires user to close old app; read-only bounded hidden CIM checks selected-app and profile-instance identity, never arbitrary PID termination. Unknown/denied ownership refuses. Confirmation-gated exclusive write probes and complete post-preparation revalidation precede handoff.
+- Same helper repeats old-tree/profile-config/process proof after coordinator exit, before snapshot or replacement. Installation-level exclusive nonce lock prevents two different work directories from taking the same installation. Unknown helper/replacement exit retains lock/recovery assets; only proven safe completion/recovery releases its own lock. Does not alter database/schema, ranking/Visual, source activation, sync, Android/signing, versions or workflow.
+- Final unit-5:199PASS/0FAIL/0skip across11files,36new coordinator/producer cases; types-5 complete TypeScript PASS;10offline audits0boundary events. Actual CJS artifact bytes/checksum/preview and detached Rollup helper self-containment/no-instruction startup checked. Temporary synthetic app/config/DB transaction tests use fake process/OS/health ports, not real Windows migration, full producer release, runtime processes or devices.
+- Retains unit-1's188PASS+1 helper third-party-dependency gate failure and types-2 control-flow errors. Fixes the dependency boundary by extracting pure Node identity, without loosening the standalone/license assertion; outer entry reuses verified target notices and checks compiled dependencies. Fixes never-return function declaration; raw logs and final receipts remain in _validation/legacy-transition-coordinator-20261026. No temporary fake installer is promoted/delivered.
+- [Single delivery ledger](docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md) remains7phases/42product cases. Next finite task is separately authorized T3 disposable Windows production/entry/cancel/rejection/launch/health/concurrency/forward-update evidence. PR212, old immutable failure results, main/Release/OTA/G-drive/formal data stay unchanged. User testing is still NOT_READY; source/reader/tag/device/full objective is not replaced by updater test counts.
+
+## Legacy transition T1 — actual read-only preview and shared package validation (2026-10-26)
+
+**Status: LOCAL_CODE_AND_TARGETED_GATES_PASS / BUILD_BINDING_AND_EXECUTION_PENDING / FULL_OBJECTIVE_OPEN. Source045587d746e1664a639f7e0ed427d86135e2a87f, no push/build/deployment/migration.**
+
+- Implements the accepted route's T1 module and actual CLI, not another planner-only interface. Extracts the existing full-archive validator unchanged for both UpdateManager and preflight; reuse Desktop/SQLite disk-path and package asset/composition contracts. No new dependency, database/schema, model, ranker, source provider, Android/signing, application version or workflow change.
+- Read-only exact source-tree/target ZIP/independent-engine identity, CRC, profile/path-role separation, canonical-path review, existing-backup and denied-access handling. Default CLI is unbound and rejects before file access; no user JSON/--manifest/--apply/env authority. Every returned preview has canApply=false and requires later revalidation; target provenance is expected build context, not claimed live publisher authentication.
+- Final local unit-6:127PASS/0FAIL/0skip across7files,29new preflight cases including real compiled bound/unbound CLI; types-3 PASS. All nine unit/type phase boundary audits0events. Existing update-manager/full-orchestration/component and prior translation regressions pass; simulated transactions use owned synthetic temp files/fake processes only, never installed applications or formal data.
+- Preserve unit-1..4 and types-1 failures. The full CLI's misleading missing-launcher diagnosis came from bundled AdmZip's instanceof Uint8Array against native fs Buffer in another VM realm; confirmed dependency line and an explicit counterexample, fixed the fixture's byte/Node intrinsic contract, not package validation. The temporary diagnostic-only altered bundle was not acceptance and is absent from final source. No timeout/skip/security weakening.
+- T1 does not deliver an authenticated migration bundle or execute any transition. Next finite work is T2 trusted distribution/target binding and actual coordinator using existing startup/transaction engine, then separately authorized T3 synthetic cloud proof. [Current single ledger](docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md). Known old first-hop failures, R1 cloud attribution and real source/device/gesture/sync/full-product gates remain open.
+
+## P0-R2 — legacy transition route accepted, bounded compatibility decision (2026-10-26)
+
+**Status: HUMAN_ROUTE_DECISION_CONFIRMED / IMPLEMENTATION_NOT_STARTED / NO_MIGRATION_EXECUTED / FULL_OBJECTIVE_OPEN. Read-only feasibility, documentation only.**
+
+- Human explicitly accepts one independent first migration entry for old v0.5.0, automatic identity/data protection instead of manual file copying, then normal in-app one-click updates. No deployment/migration execution is authorized by this workflow choice. Keep the full goal and42cases; do not require endlessly repairing an immutable old helper, relabel its failed checks or silently weaken recovery.
+- Re-read pinned public archive SHA14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf/sourcebec7f9f:93files, no standard Velopack install markers. Official integration requires real installation/startup handling. This is archive/document compatibility evidence, not actual Velopack install testing or inspection of user installations; no SDK/build/dependency added.
+- Parse-only AST of existing fallback template SHA537483d4295d0adf8fa57afa01a3f8f7b3baeb969bece35fd5bb23652517ed2a:0parse errors, fixed formal data root and no post-Stop-Process exit verification before restoring state in Rollback-Upgrade. No script body, forms, process control, backup or restoration executed. Do not rebrand the old PS engine for isolated RC migration.
+- Chosen route reuses current full-upgrader/process-lifecycle/user-state-snapshot/helper-startup, not a third engine or immediate Velopack migration. The existing manager chooses helper bytes from the installed applicationRoot, so a new external coordinator needs explicit verified self-package authority, not a renamed old registration call. Actual helper reuse/handoff is not proven by this source analysis.
+- [Single ledger](docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md) fixes three work items: T1 readonly identity/path/data-profile preview; T2 actual independent entry with old-process proof and existing engine handshake; T3 separately authorized disposable cloud scenarios and forward updates. Next safe work is T1 with synthetic files/inert ports. R1 cloud attribution and physical/source/sync/gesture acceptance stay open; no user test package, push, version/tag/Release/OTA/G-drive/formal data change.
+
+## P0-R1 — idle translation request defect, first bounded local correction (2026-10-26)
+
+**Status: LOCAL_DEFECT_REPRODUCED_AND_FIXED / OFFLINE_GATES_PASS / ACTUAL_WINDOWS_ATTRIBUTION_PENDING / LEGACY_RECOVERY_HOLD / FULL_OBJECTIVE_OPEN. No push/build/deployment.**
+
+- Continues documentation checkpoint c9a9926 on independent local branch codex/reader-source-idle-boundary-20261026; sealed application source229330e85657f6fdee54d5ec5620c91330b74ccb. Coordination claim still fails DPAPI; standing isolated-goal exception only, no secret/identity repair. PR212/frozen packages and formal/G-drive data are untouched.
+- Execute the whole original parity script with inert browser/locale ports, not isolated invented loader code. Original unit-2 has31PASS+2real regression failures: four automatic translation fetch attempts at boot, six after language rebuild. This proves an actual idle-network defect; old Windows events still lack target/protocol attribution and remain FAIL, not retroactively proven.
+- Narrow correction: explicit optional GitHub translation action, fresh passive source-policy check, disabled/unknown policy refusal, one bounded single-flight request, abort on local source/dropdown change, atomic/late-result-safe maps and retry only by new action. Canonical tags remain usable. No source activation, account/SDK/DB/schema/ranker/Visual/sync/native/version changes. Cross-window immediate revocation is not established by these local events.
+- Existing Windows gate retains exact blocking/empty-event assertions and unchanged deadlines. New enum-only request categories can identify known translation endpoints without logging arbitrary URL/host/path/query/credentials. Actual browser route execution remains pending; no local browser/app/Java/listener.
+- Final unit-3:54PASS/0FAIL/0skip across4files, including23new actual-module/classifier cases; full types PASS, Web54/54 PASS, every runtime guard audit0events. Preserve unit-1's pre-test sandbox/esbuild failure and unit-2's actual counterexamples. [Scope, retained evidence and remaining gates](docs/SOURCE_IDLE_TRANSLATION_FIX.md).
+- Update the single ledger and acceptance entry, not another Dev package. P0-R1 remains cloud-PENDING after its first local correction. Next safe local work is P0-R2 read-only/pure-simulation old-controller transition feasibility; no new updater or UI scope and no change to legacy rollback HOLD.
+
+## P0 — consolidated product plan and acceptance ledger (2026-10-26)
+
+**Status: BASELINE_AND_CASE_INVENTORY_RECONCILED / P0_RISK_DECISIONS_OPEN / FULL_OBJECTIVE_OPEN. Documentation-only local branch; no application change/build/push/release/deployment.**
+
+- Human requested a whole-product plan informed by maintained open source, not another isolated patch. [The single delivery ledger](docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md) now binds seven phases and 42 concrete cases to existing implementation, missing capability and separate engineering/provider/device/user evidence. Corrects the Dev83-era entrypoint while retaining immutable historical records. No new Dev version or second runtime/framework.
+- Application source remains PR212 / 6efc865fd229660f77929ebe2018b494fc198995. Re-read run40305007546: completed/failure; source, windows-unit and fixtures succeed, all six transactions fail. Downloaded/read all six small result artifacts, no new synthetic/application ZIP: each reaches the final unexpected-browser-request assertion, with4events per single-launch scenario and16 for roundtrip. This identifies a shared next diagnostic, not six proved updater defects or six PASS gates. Actual request destination/scheme remains unknown. Static translation rawFetch startup calls are a hypothesis requiring attribution; no allowlist relaxation.
+- PR203 head9a68d13 is a proven ancestor. GitHub compare confirms independent PR196 diverged (ahead335/behind29, common f382413f); do not claim its patches integrated or absent purely from ancestry, and do not merge recommendation-cap changes wholesale. Match its UX issues to individual cases. Rehashed Dev87 review ZIP unchanged at6d68de38ba68fb0b2e7a16825df5d8d5146c2b70e69a5b36383e171c507ef2cd.
+- Reuse decisions retain optional version-bound Suwayomi, existing JM SDK and current Reader; Mihon/Komga guide workflow, Velopack only a bounded migration evaluation. Host existing-library reading is explicitly not full search/download/native integration. AI exchange remains Desktop file workflow plus confirmed-rule phone sync, not a claimed native parser. Source/Reader/tag/recommendation/sync boundaries and raw-fact/Visual safety remain unchanged.
+- Local Memory fallback could not route the initial intent; the explicit pica_library claim then failed DPAPI. Human's standing target-scoped isolated exception is used without identity/secret repair, Formal/Global writes or repeated permission prompts. New local documentation branch stays outside frozen PR212; existing cloud jobs were only read/downloaded, not restarted.
+- P0 is not DONE: risk P0-R1 (common request attribution/source compatibility) and P0-R2 (supported old-controller migration/recovery) must close under bounded evidence-backed iterations. Next safe action is P0-R1, not full CI rerun, app deployment or more interface extraction. User testing remains NOT_READY; old v0.5.0 rollback HOLD, missing source capabilities, physical/OEM/manual/scientific gates remain OPEN.
+- Documentation-only verification passed:42unique/sequential cases across8groups,7actual phase rows,15local links, all6downloaded result SHA256/source/scenario/failure fields, trailing whitespace and Git diff checks. This is ledger/evidence consistency, not application tests or readiness. Local diagnostic index remains outside the Git source commit.
+
+## Runtime-choice cloud execution — human-authorized pre-build snapshot (2026-10-26)
+
+**At source creation: INDEPENDENT_DRAFT_AND_WINDOWS_TESTS_AUTHORIZED / CLOUD_TERMINAL_RESULTS_NOT_YET_AVAILABLE / LEGACY_RECOVERY_HOLD / FULL_OBJECTIVE_OPEN.** This is explicitly a pre-build snapshot, not a live CI result; exact-head execution receipts and the new Draft's post-build report must supersede it after actual execution.
+
+- The human explicitly approved pushing local source `01d08bd0a622f85d94680811eca0a39c913ff5a4` to a new independent Draft and disposable hosted Windows tests. Frozen PR211/Dev87, PR210/Dev86 and the134-file source-review ZIP (SHA256 `6bc4cc9211d991d53c96b4597d3e08db89d8eb529acdf24adfa112a3b9256b2e`) remain unchanged. Independent .NET all-member/hash readback passed. No local Java/application/browser/listener.
+- Add only a dedicated exact-branch read-only Actions workflow: full source/Windows tests, existing actual core/JM fixture builder and all six independent actual-browser/HTTP/current-helper scenarios. No Android version/signing change or signing Secrets, no main merge, tag/Release, OTA or deployment. Marked synthetic ZIPs remain diagnostic inputs, never user installables.
+- Workflow/source preflight:10files/124PASS, full TypeScript PASS, YAML/four PowerShell fragments parse-only PASS, zero offline boundary events. These are preparation, not real transaction results. Old0.5.0 recovery failures and all user/source/device/full-goal work remain open. [Scenario contract](docs/RUNTIME_CHOICE_TRANSACTION_GATE.md).
+- First actual dispatch: Draft PR212/head3c3b6c63ac2151c8b10771232b85a0aa01ce3234, run40300517335. Source job121496953216 FAIL:2383PASS+14conditional skips+1failed existing workflow-entrypoint security assertion; the new workflow omitted its explicit public-repository artifact guard. Fixtures/transactions dependency-SKIPPED, not tested or PASS. Windows-unit was still running when this corrective source snapshot was prepared; preserve its actual eventual result. Add `github.event.repository.private == false` to every new job and strengthen the new recipe check, not weaken the existing assertion. Corrective offline11files/132PASS, types and four-fragment parse pass with0guarded runtime attempts. No product/Android/deadline change or frozen-PR edit.
+- Run40301266088 / b655e5f is terminal **FAIL**: Linux2384PASS+14conditional skips, Windows2397PASS+1conditional skip, Chromium61 and actual marked core/JM pair build PASS; all six transactions fail at the shared pre-transaction readiness check. Its flat composition assertion necessarily rejects the actual Desktop API envelope `{status:'declared',composition:{...}}`. A real installed-status-parser regression proves the incorrect oracle and now requires the exact declared envelope, still rejecting legacy/invalid/wrong composition, wrong versions, missing ready/token state and unchanged replacement identity. Correct only the external gate; no product/helper/deadline/retry change. Add bounded public readiness flags and the owned synthetic Desktop log for future failures, never raw status/token/header/config/DB exports. Offline11files/134PASS, types and four-fragment parse pass with0guarded runtime attempts. Raw six failures and downloaded marked input ZIPs are retained; no replacement/rollback success is inferred. Fresh exact-head execution is required.
+
+## Runtime-choice transaction gate — isolated local continuation (2026-10-26)
+
+**Status: LOCAL_SOURCE_AND_OFFLINE_GATES_PASS / ACTUAL_WINDOWS_BROWSER_RUN_PENDING / LEGACY_RECOVERY_HOLD / FULL_OBJECTIVE_OPEN. No push, release or deployment.**
+
+- Continues frozen PR211 `e9b08b418c2fdbc55dbf499afb74f7b927b12434` on independent `codex/reader-runtime-transaction-gate-20261026`. The previous status-only turn made no implementation progress; this slice authors the actual six-scenario package/browser/HTTP driver, paired real-package fixture builder and external boundary, without adding a user-facing feature or another updater. Standing isolated-goal exception continues after NOT_FOUND/DPAPI claim rejection. No local Java/application/browser/listener or production/G-drive access.
+- The synthetic stable-version pair is explicitly NOT FOR INSTALLATION and built/restored through the existing packager, not patched compiled code. Reuse the selected-state SQLite/config/download canaries with a separately confined temp-root identity; keep legacy first-hop wrapper compatibility. Preserve original request/health/recovery policies and raw failures.
+- Actual callback over a real Node memory stream exposed one product defect: an oversized runtime command destroyed the request before its error reply. Preserve `unit-5` FAIL; a narrow route correction reuses the existing safe body-reader mode and connection-close reply without relaxing4096bytes/5seconds/Origin/CSRF. Parse failures use bounded fixed text; virtual tests share actual JSON/Error intrinsics rather than masking same-realm behavior. Post-fix offline results do not establish hosted browser/rollback acceptance.
+- Final offline `unit-10`:23files/296PASS/0fail/0skip; full TypeScript `types-7` PASS, new MJS syntax checks PASS, actual pwsh builder parse/early-refusal PASS, all local boundary audits0events. Explicit Windows C:/D: path-port tests align browser-tool containment with hosted RUNNER_TEMP rather than incorrectly assuming it equals os.tmpdir. Retain earlier type-check failures and the one genuine oversized-stream regression instead of deleting/relabelling them. Six previous frozen ZIP hashes independently rechecked unchanged, including Dev86 and Dev87. No new installables were built.
+- [Exact scenario acceptance, safety, invocation and evidence limits](docs/RUNTIME_CHOICE_TRANSACTION_GATE.md). Current offline results belong only to this local source; actual hosted execution/new installables remain pending and need their own evidence. No workflow, Dev version, frozen artifact or PR changes are included.
+
+Next bounded closeout order: (1) separately authorized six-scenario real package/browser/HTTP run with failures retained; (2) supported safe old-client transition/recovery, not manual extraction or current-helper substitution; (3) freeze one-source installables/evidence and reconcile the grouped user acceptance checklist. Broader source-neutral/trust/native/sync/backup requirements remain explicit full-goal work, not secretly added UI features or declared complete by this checkpoint.
+
+## Core / optional runtime and upgrade — authorized Dev87 cloud candidate (2026-10-25)
+
+**Final checkpoint: e9b08b4 CURRENT_SOURCE_CI_AND_PACKAGES_VERIFIED / CANDIDATE_SPECIALIST_RUN_FAIL / LEGACY_FIRST_HOP_HOLD / FULL_OBJECTIVE_OPEN. No merge, release, OTA or deployment.**
+
+- Post-build correction (2026-10-26): exact source `e9b08b418c2fdbc55dbf499afb74f7b927b12434`, Draft PR211, actual core/JM ZIPs and fixed-signed Dev87 APK are verified. Linux2349pass+13conditional skips / Windows2361pass+1conditional skip cover all2362 cases on an applicable host; Chromium61, native402 and current-helper nine replacement/recovery scenarios pass. This supersedes only the old top-level build-PENDING label, not historical failed runs below.
+- Actual run40274664757 remains **FAIL**: old public v0.5.0 normal first hop and hash rejection PASS; health rollback FAIL with EPERM and old application not ready; asynchronous launch rollback FAIL with old helper exiting1 without terminal/recovery state. No helper substitution, consumed exception, timeout relaxation or waived failure. Earlier2433e39 settings timeout cause stays UNDETERMINED despite a later successful observed DPAPI call.
+- Independently verified 254-file handoff `PICA_CORE_RUNTIME_DEV87_CLOUD_REVIEW_20261025_e9b08b418c2f.zip`, SHA256 `6d68de38ba68fb0b2e7a16825df5d8d5146c2b70e69a5b36383e171c507ef2cd`, remains a **PARTIAL unpublished review candidate**, not whole-goal acceptance. It excludes private data/keys and synthetic stable-version install fixtures. PR211 and frozen bytes remain unchanged.
+
+- Human approved independent Draft/Actions/existing signing Secrets after the blocked local goal. `codex/reader-core-upgrade-dev87-20261025` continues sealed `555953600144d4e645b52155789f2bd3e6202f65`, stacked on frozen PR210 head4a18ba; PR210/Dev86 and previous archives remain unchanged. Remote main was inspected, not merged. DPAPI write claim still fails; standing isolated-goal exception continues without secret/identity repair.
+- Adds only necessary exact branch allowance and Dev87 candidate authority to existing workflow. Builds both actual core and optional-JM ZIPs, uses composition-aware nine-scenario current-helper recovery recipe, and pins actual Dev86 push-run40222828902 Windows bytes/source. No predecessor substitution or formal data/native/schema/version/dependency change.
+- Exact old-controller first-hop now has four independent real CI scenarios with fail-fast:false, genuine failures retained and no continue-on-error/helper substitution. Marked synthetic stable-version fixture remains separate and must never be installed or promoted. Existing Android tests/lint/shrinker precede fixed signing; package/certificate/version are verified, not bypassed.
+- Pre-push selected offline gate382/382 cases across37files,0skips; strict types/Web54 and YAML/seven PowerShell fragment parses PASS, zero guarded boundary events. These do not establish remote CI/package success. No local Java/application/browser/listener was started.
+- First push11803b1 / Draft211 / exact candidate run40263811750 failed the full Linux suite at the Windows-only java.exe fixture's host-availability assertion; type/Web passed, build/source-JVM/browser and dependent Windows/Android jobs did not run. Raw linux-unit JSON is retained. Product correctly selects java.exe on Windows and java on other hosts; separate Windows composition from host executable presence, retain both assertions and add missing/present-host differential. Do not fix it by changing product OS selection, adding skip or weakening source/runtime guards. Standard PR CI40263858773 observes the same old-source failure independently.
+- Source2757c86 passed standard CI40264571737, source-JVM/real Chromium, Linux2342 passed+13 conditional skips and fixed-signed Dev87 native402/402; actual APK/compiled manifest/certificate independently read back without local Java. Its candidate run40264567639 then failed Windows full tests at four new harness/encoding cases (2350pass+1skip+4fail); package/legacy gates never ran, so neither is PASS. Preserve raw Windows JSON/logs and the older APK as historical-only evidence, not current-head promotion.
+- Windows corrections: two unit calls now stub/assert the OS cwd port instead of changing worker-global cwd; pure build-choice probe uses the actual CI pwsh engine with unchanged10s deadline and explicitly rejects process timeouts. Real CP1252 parse regression traced to new literal Chinese in a BOM-less ps1: reuse existing Base64 README pattern, preserving identical Chinese output and ASCII-safe source. Actual PS5 parse-only UTF8/old-CP1252/fixed-CP1252 differential is0/3/0 errors. Selected thread-pool384/384/37files plus strict types/recipe parse pass, zero guarded runtime events; no actual local application/Java/listener or timeout relaxation.
+- Exact df6d78d candidate run40266585484 passed source/browser/native but Windows full suite retained two unfinished legacy-PowerShell subprocess failures (2353pass+1skip+2fail); previous worker/encoding cases no longer fail. Preserve raw result; do not call it a package failure because packaging never ran. Align the remaining probes with actual CI pwsh and assert no process error/null exit, keeping10s. Full Windows tests move to an independent mandatory parallel job (same full inventory/deadlines, no continue-on-error), so actual ZIP/runtime evidence can accumulate without serially waiting; overall acceptance still requires both and old first-hop gates. No source/account/schema/algorithm or release-boundary relaxation.
+- Source6d539d7 / run40268737492 reached actual Windows core/JM builds and all nine existing replacement/recovery scenarios successfully, Chromium61 and fixed-signed native402/402 also passed. Independently read back both ZIPs, exact source/composition/tag assets/CRC and APK manifest/certificate; no local runtime or installation. Full Windows2355pass+1conditional skip and Linux2343pass+13conditional skips cover all2356 assertions across applicable hosts, with0uncovered and0failures. Overall run remains FAIL: all four old-client scenarios failed before app launch because createWriteStream fd was still null at spawn, so none establishes a first-hop product outcome. Preserve their raw FAIL reports. Await actual stream open in the external test harness, and exercise that exact setup block with a harmless Node child/log readback; selected offline385/385 plus strict types pass,0guarded runtime events. No application/helper bytes, deadlines, scenario inventory or publisher checks are changed; require fresh exact-head cloud gates and artifacts, not relabelled6d539d7 packages.
+- Source2433e39 / run40270855529 passed source/Chromium, full Windows unit and fixed-signed native gates, but actual Windows smoke timed out at its unchanged15s synthetic settings-save request (line198); downstream legacy cases were dependency-skipped, not PASS. Retain full raw log; no claim that DPAPI/provider/network is the cause without evidence. Add an external hosted-CI-only observer recording synchronous process start/end, elapsed/status/error-code and DPAPI operation flags, never arguments, stdin/out/err, env, config, credentials or DB. It preserves original results/errors and has no product timeout/retry/credential behavior change. Move the exact synthetic first-hop fixture to an independent required source-dependent job, so Windows/account smoke cannot conceal the four real old-controller outcomes; all existing gates remain mandatory and failures retained. Initial new simulated observer test correctly rejected a noncanonical mkdtemp root; fix its fake temp port/owned child, not the real guard. No application/native/schema/algorithm or published state changed.
+- Source84f54a4 / run40272693245 actually executed the independent old-controller chain: hash-mismatch PASS preserves the original tree/state and starts no helper; launch-rollback FAIL reaches the exact old helper and injected async error but it exits without terminal/recovery status; health-rollback FAIL reports rollback EPERM and never restores a ready0.5.0; normal success FAIL is an unexplained fetch failure before publisher observation. Keep each raw result, not a blanket PASS or inferred cause. Add observation-only uncaughtExceptionMonitor/exit and bounded failure-step/cause-code fields, not exception consumption, transport retry or helper replacement. Windows smoke separately failed before instance publication because the test observer's raw Windows backslashes are escaped by NODE_OPTIONS; actual local no-app differential finds module-not-found for the old spelling and the existing early CI-refusal guard for forward slashes, with entry never executed. Use portable separators and retain a failure receipt even if observer never initialized. Product credentials/process timeouts and15s request deadline remain unchanged; original2433e39 settings-timeout root is still UNDETERMINED. Selected offline390/390/38files, types and10PowerShell fragments pass with0guarded runtime events.
+- Run40272693245 full Windows units retained2358pass+1skip+1fail: the new simulated process observer passed containment inputs with a different temporary-path spelling than its native realpath root. Canonicalize that test's own created directory before deriving descriptor paths; preserve the actual observer's containment checks unchanged. This is not a product credential fix or a reason to waive the failed run. Preserve all raw Windows JSON/logs and require a new exact-head result.
+- [Authorized scope, actual wiring, pending integrated runtime-choice gates and evidence rules](docs/CORE_RUNTIME_CLOUD_CANDIDATE.md). Current-source integrated component-choice HTTP/browser/add-remove and physical/source/native/user issue acceptance remain open; do not equate a candidate build or old-code audit with completing the full goal.
+
+## Pinned legacy incremental/full paths — local compatibility audit (2026-10-25)
+
+**Status: EXACT_OLD_CODE_COUNTEREXAMPLES_VERIFIED / LEGACY_FIRST_HOP_RECOVERY_HOLD / CLOUD_AND_INSTALLABLE_NOT_RUN / FULL_OBJECTIVE_OPEN. No product/runtime change, push or release.**
+
+- Independent `codex/reader-legacy-update-path-audit-20261025` starts at sealed `749d50fc3de9716600f8cc896a57f9a25e07f515`. Standing isolated-goal exception only after NOT_FOUND; PR210/Dev86/prior review ZIPs, formal data/schema and local Java/application/browser/listener stay frozen. No new cloud authority inferred.
+- Fixed official v0.5.0 bytes confirm both incremental launch branches also have no startup Promise or child-error listener. Exact old controller/registration methods on an in-memory filesystem select installed/registered old helpers, never the staged candidate helper, and return accepted before startup. This rules out assuming a normal incremental bridge or staged new full helper automatically fixes that first-hop defect; actual installed recovery and Desktop global handler effects remain unexecuted.
+- Pinned incremental path-safety dependency inspected too. Old case-variant guard discrepancy is a diagnostic, never a supported self-replacement workaround; current case-insensitive protection remains covered. No payload, runtime/plugin installer, permission bypass or third-party guardian is introduced.
+- Selected368/368 cases across33files,0skips; types/Web54 PASS, zero guarded boundary events. Initial missing-MJS-declaration type failure retained and fixed with explicit `.d.mts`, not suppression. No `src`/Web/native/schema/version/dependency/workflow changes. Audit exit0 means counterexample reproduced, **not upgrade PASS**.
+- [Fixed identities, exact findings, limitations and required next gates](docs/LEGACY_UPDATE_PATH_AUDIT.md). Real first-hop/core/JM/browser/HTTP/replacement tests still need separate Draft/Actions approval. No manual extraction or weakened self-replacement rule is accepted as fulfilling one-click upgrade. Broader modular-reader/device/source acceptance remains open.
+
+## Explicit optional-runtime choice — isolated local continuation (2026-10-25)
+
+**Status: LOCAL_SOURCE_AND_OFFLINE_GATES_PASS / EXACT_HEAD_CI_BROWSER_INSTALLABLE_PENDING / LEGACY_FIRST_HOP_HOLD / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**
+
+- Independent `codex/reader-explicit-runtime-choice-20261025` starts from sealed `6a66711611c44df1b410bbe80d05ae725315af46`. Standing human isolation exception continues after NOT_FOUND; frozen PR210/Dev86/prior ZIPs, G-drive app, formal data/schema and local Java/application/browser/listener remain untouched. Cloud push/sign/build still requires separate permission.
+- Added explicit Software update → Optional source runtimes → add/remove JM, using the existing full-application updater. Normal updates retain composition; installation is not source enablement, login, content download or permission reset. Windows x64 stable versions only, exact official variant required; no prerelease-to-stable substitution, downgrade or same-version different-source replacement.
+- Preview/confirm binds single-use 15-minute consent, from/to/source/version/hash/name; stage/apply/detached preflight/post-exit/post-copy recheck. Shared download ownership prevents a cancelled old task's late failure clearing a newer task; owning-request disconnect now reaches actual transport. Same-version readiness requires matching declared composition plus a new Desktop session, not just an unchanged version number. UI passive/three-language/duplicate guards and existing timeouts retained.
+- Final selected offline **358/358 test cases,32files,0skips**; strict types and Web54/54 PASS. In-memory-only closure checks207Desktop/9incremental/11full-helper modules; no generated code execution. Zero guarded boundary events. Synthetic temp filesystem/helper-port tests are not actual installables or real HTTP/browser/source/device evidence.
+- Preserved failures: TS lib missing AbortSignal.any; three old-server same-version readiness regressions; wrong FS injection point in one new rollback test (corrected, assertion retained); request-disconnect355/356 counterexample before abort forwarding. AST/VM differential pins the exact old server branches and current source hashes. Old released Launcher source has no exit watcher; legacy helper launch error remains HOLD, not retroactively repaired by current-source successes.
+- [Behavior, controls, evidence and pending exact-head gates](docs/EXPLICIT_RUNTIME_CHOICE.md). Stop adding features at this verification boundary; obtain new Draft/cloud authority for actual core/JM/HTTP/browser/replacement tests. No DB/native/dependency/version/workflow/ranker/sync contract change. Original issue acceptance and full user-owned source ecosystem remain open.
+
+## Real old-client first-hop boundary — local continuation (2026-10-25)
+
+**Status: LOCAL_HARNESS_AND_HASH_FIX_GATES_PASS / ACTUAL_FIRST_HOP_NOT_RUN / LEGACY_ASYNC_LAUNCH_COUNTEREXAMPLE_HOLD / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**
+
+- New independent local branch `codex/reader-old-client-first-hop-gate-20261025` starts from sealed `a5e57e1b776ac54b6bf1b7bddf6718f3056a9b2a`. Standing isolated-goal permission continues after NOT_FOUND context/claim; no new cloud/push authority inferred. Frozen PR210/Dev86/source-review ZIPs, formal data/schema and local Java/app/browser/listener remain untouched.
+- Authored CI-only exact-old-client check/prepare-latest/apply gate, not candidate-helper invocation. External test publisher preserves actual official origin/hash/download/file checks; old controller selects its exact pinned helper. Marked CI-only version-metadata fixture, full app tree/state canaries, hash rejection, health/launch recovery, owned process checks and retained evidence. No production test hook, dependency, native/API/DB/ranking/sync change or arbitrary source market.
+- Actual pure builder hash/reopen regression failed98/99: FileStream leaked after SHA calculation. Fixed explicit finally disposal; do not rely on GC/retry or weaken exclusive-open assertion. Initial native-SQLite test-loader/mock-generic development failures also retained. Final selected source/offline gate323/323 across29 files,0skips; strict types/Web53 PASS, zero guarded runtime boundary events.
+- Separate fixed-public-ZIP AST/VM audit verified old helper launch `w` returns no Promise, has zero child error listeners and lets asynchronous EACCES escape. This is a real old-code counterexample, not installed rollback execution or an update PASS. Candidate-helper successes do not repair it. Keep first-hop launch recovery HOLD; actual four runtime scenarios remain unexecuted and must not substitute helpers or skip the known-risk case.
+- [Exact input hashes, fixture safety, coverage limits and required continuation](docs/OLD_CLIENT_FIRST_HOP_GATE.md). Next: supported legacy compatibility/safety decision and separately authorized cloud execution, with real failures retained. Broader source-neutral core/native/trust/sync and physical user acceptance remain open; no one-action upgrade completion claim.
+
+## Core / optional-runtime composition — isolated local continuation (2026-10-25)
+
+**Status: LOCAL_IMPLEMENTATION_AND_SELECTED_OFFLINE_GATES_PASS / NEW_INSTALLABLE_AND_OLD_FIRST_HOP_GATES_PENDING / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**
+
+- Human granted a continuing exception for this goal's isolated local work after Local Memory routing remained `NOT_FOUND`. New branch `codex/reader-core-runtime-composition-20261025` starts at frozen PR210 `4a18ba769fb3c8df1e6bd100293d38db3013b5dc`. Frozen Dev86 artifacts/G-drive app, formal data/schema, Java/app/browser/listener and remote/OTA authority are unchanged; cloud signing/build needs separate permission.
+- Windows/RC builders now choose core by default instead of copying any checkout JVM that happens to exist. Explicit JM uses the existing pinned SDK/JRE. A strict non-executable composition descriptor, pure format module and separate filesystem adapter bind the physical payload. A packaged core never borrows cwd's runtime. Core/optional docs and JM-unavailable UX distinguish installation from source enablement/account state.
+- Reuses the single existing updater. Discovery is composition-scoped; optional JM cannot fall back to generic/core. Delta manifest/file binding, allowlists, helper-self-replacement restrictions and full staging/apply/detached preflight checks prohibit silent component changes. Helper bytes change, so use full application transition, not a falsely eligible incremental package. No DB/API/schema, dependency, ranking/Visual algorithm, account/choice or private-state rewrite.
+- Expanded final local target:293/293 assertions across28 files,0skips; strict types and Web53/53 PASS, zero guarded boundary events. Initial119-case run failed a stale expectation and a real pure-layer filesystem violation; the adapter was moved without relaxing architecture rules. Two new fixture-table typing errors remain recorded as failures before correction. These are source/mock/synthetic tests, not new installable/device acceptance.
+- Exact pinned v0.5.0 compiled discovery methods pass7 inert-VM response checks, including API/checksum fallback. Standard core filename is retained because renaming it `-core` breaks old discovery. This does not establish actual old-controller first-hop OTA; synthetic0.5.1 is not published/proposed. Previous unreleased JM controllers cannot be assumed composition-aware. An actual ZIP inspector and CI-only same-composition runtime/recovery recipe are authored, not locally executed or automatically triggered.
+- [Scope, evidence, old-client limits and required cloud gates](docs/CORE_RUNTIME_COMPOSITION.md). Next: separately authorized exact-head core/JM package and compiled runtime/recovery checks, followed by actual first-hop/device/provider validation. The broader user-owned source/trust/catalogue/native/sync architecture remains open; do not close user issues or claim a finished content-free extension ecosystem from this slice.
+
+## Reader-runtime correction — authorized Dev86 cloud candidate (2026-10-25)
+
+**Status: LOCAL_FIX_SEALED / NEW_EXACT_HEAD_CLOUD_AND_INSTALLABLE_GATES_PENDING / HUMAN_QA_PENDING. Not released or deployed.**
+
+- Human corrected the accidental local-only choice and explicitly authorized this independent Draft branch, required candidate metadata and existing-Secret unpublished Actions builds. Frozen PR209 stays at `16449a00a0eb2d9d0d792e5efe5312c86dbf4220`; corrective source `9aa5e1d162bcf6d804e489d0cede43bff14567c7` and its complete source-only review ZIP SHA256 `b039bfff2e0ff7494a13d5b5d468b7ad0b666ddde2e99b3cc9239be2afe13f9b` remain immutable.
+- Candidate-only Dev86 uses one public build/manifest authority, the unchanged Dev package and fixed certificate. Signing remains owner/public/exact-branch/non-PR only, after tests/lint/release-compatibility checks. No private key is downloaded. The still-NOT_FOUND coordination exception covers only the approved work; no registration, DPAPI or Windows security-policy change.
+- Retains all nine normal/health/launch replacement scenarios: stable baseline, current deep path and the exact actual Dev85 predecessor. Dev85 run40204828683, source16449a00a0eb and Windows payload SHA256 `d35ca45c7909197236eb27206370504f202b32b62b1f79aca452d0742fb31bb2` are pinned; unavailable/expired/mismatched artifacts fail closed rather than substituting a rebuild/latest. This remains replacement-engine evidence, not old-client OTA discovery.
+- Adds authored cloud-only real Chromium cold/late-image centering plus stored-page checks, and compiled Windows default-LAN-off, explicit enable/disable, paired-token continuity and display-setting restart gates. Browser image requests are synthetic/no-store; the test does not scroll to repair the app. Source-side artifacts retain the screenshot/diagnostics. These gates are not run on the user's PC and remain PENDING until the exact new source actually executes them successfully.
+- Local overlay selection passes170 assertions/13 files plus strict types and Web53/53; the two cloud test scripts are parsed, not executed here. Those local mock/static/fixture tests are not new Chromium, Windows, signature or installation evidence. The frozen159-assertion source-only handoff is not rewritten or relabeled.
+- First authorized push `ddb5b2fe859974fbdfe864b1f931bb199e57a32f`, Draft PR210, failed full Desktop suites in runs40220572360/40220577526/40220577562/40220577380. All four retained logs identify the same two old viewport source-shape assertions and two shell VM cases missing the new Reader settings ports. Update those contracts to the loaded-image/intent-gated viewport and inject the real settings dependencies into the shell fixture, retaining capability-failure admission and adding assertions that settings are applied only after capability success. No failed test is skipped or timeout expanded.
+- Independent offline counterexample unit-2 records170/171 PASS: asynchronous LAN disable saved its pre-close configuration, overwriting display/storage edits made while closing. The corrected branch persists the latest configuration after close while keeping immediate in-memory opt-out and close-before-save safety. The deferred-close regression requires both concurrent display settings and port choice to survive. The first new fixture Promise type was rejected by the type gate and corrected; no product/type check was waived. Expanded guarded selection now covers200 assertions/15 files; new exact-head cloud execution remains required before any installable handoff.
+- Corrected source `3d98dc3b0ecc406fc40464f2413f56f7848e70c1` passed the full Linux unit/build gate and the real cold/late-image Reader case, but push run40221580051 failed six existing English/Japanese layout cases: the new enable button relied on a successful Desktop-status render instead of the static translation map. Browser result55/61 is not accepted. Added both LAN controls to the existing DOM translation map and a pure-DOM counterexample that fails before the fix (200/201 PASS), including the no-Desktop-render case. Corrected guarded selection201/201, strict types and Web53/53 PASS. A separate PR-event run40221584545 failed Maven dependency retrieval with HTTP429, not a test assertion; retain that infrastructure failure rather than relabel it. No retry, timeout, skip or localization leak allowlist is added.
+- Independent readback of the digest-verified failed-head Source Evidence confirmed that a successful Reader screenshot attached as an in-memory body was not retained by the line-reporter artifact layout. The cloud case now writes the screenshot to its explicit `testInfo.outputPath` and attaches that file; static recipe checks require the write. Centering/progress assertions and timeouts are unchanged. This is evidence-retention correction, not a new product feature or permission for local browser execution; any superseded/cancelled run keeps its actual status and is not promoted.
+- No new product feature, source protocol, native implementation, DB schema/migration, dependency, ranking/Visual/tag/sync or updater implementation change is added by this build overlay. Current full CI, actual ZIP/APK/source/certificate and upgrade/runtime receipts must be inspected before handoff. No main merge, tag/Release, stable OTA, G-drive replacement, local Java/application/browser/listener or production-state access.
+
+## Dev85 local runtime acceptance — bounded Reader/LAN corrective slice (2026-10-25)
+
+**Status: LOCAL_SOURCE_AND_OFFLINE_GATES / NEW_BROWSER_AND_INSTALLABLE_RUNTIME_GATES_PENDING / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**
+
+- Frozen Dev85 `16449a00a0eb2d9d0d792e5efe5312c86dbf4220` was independently deployed, then separately authorized for empty-profile synthetic folder/CBZ runtime acceptance. Actual result was **PARTIAL**, not a new whole-product PASS: packaged CLI ingestion, images, natural order and pre-Reader restart persistence worked; cold continuous resume showed the wrong page and subsequent synthetic progress regressed. The native PowerShell-owned picker was not automated under computer-use policy, so CLI success is not GUI import evidence. Original evidence ZIP SHA256 `e5d008acc09611894f392cb2d98f5448ab629dbe09906dece733d9c77ca1f296` stays unchanged.
+- The initial interactive runtime also opened LAN Mobile Bridge for about five minutes before the owned instance was stopped. Later loopback-only test-process guarding was not a product fix. No unauthorized-client absence claim is made. These observations did not involve official/old RC databases, source login or Java.
+- Human separately approved this new local branch `codex/dev85-local-reader-runtime-fixes-20261025`, outside frozen PR209, under the still-NOT_FOUND coordination exception. No push/cloud run, merge/tag/Release/OTA, G-drive program change, application/browser/listener/Java launch or production-profile access is authorized for this corrective slice.
+- Reader viewport now waits for loaded saved-page geometry, requests only that page eagerly, re-anchors on earlier-image/resize changes and refuses layout-only replacement of the saved page before actual user reading intent. Lazy images reserve a box; stale frames, image callbacks, observers and input listeners are disposed. Reuses native browser APIs and the existing Reader/progress modules, not a second reader or new dependency. Settings codec/serialized writer are shared across Desktop and Web; validated display choices are saved in the existing profile config and cached for Browser Lite, without a SQLite migration or credential/source operation.
+- Interactive LAN listening is now explicit opt-in with a visible enable/disable control, confirmation, strict independent settings action and default-off policy for absent/legacy choices. Existing paired records remain separate; disable closes the current listener even when persisting the off choice fails. Late activation after engine shutdown is closed, not adopted. Headless retains its additional explicit `--mobile-bridge` requirement. A saved explicit off choice wins over the startup fallback flag.
+- Local offline target **159 assertions / 10 files PASS**, strict TypeScript, Web53/53 and memory-only Desktop compilation PASS. The actual Desktop dependency graph contains both new boundaries. The selected update-compatibility/helper/fixture-package tests include new Reader assets without config/DB/runtime replacement; this is not physical one-click upgrade or whole-package acceptance. All final guarded checks had zero TCP/provider/Java/application boundary events; the test framework's own WS transport is disabled only in the dedicated offline runner, while the real-I/O guard stays active.
+- Preserved failures: initial sandbox/esbuild ancestor-read denial and Vite's attempted internal WS listener rejected before bind were test-harness issues; the first readiness-variable type error was a source-development error, not a runtime result. No listener/timeout/skip/dependency relaxation. New real-browser cold-layout/port-change persistence, native picker GUI, actual LAN enable/disable/restart, full exact-source CI/package/update/rollback and device/provider/gesture acceptance remain pending. [Corrective scope and next checks](docs/DEV85_LOCAL_READER_RUNTIME_FIXES.txt). Existing installables are not relabeled with this repair.
+
+## Source-neutral reading Library — authorized Dev85 cloud candidate (2026-10-25)
+
+**Status: LOCAL_SOURCE_SEALED / NEW_EXACT_HEAD_CLOUD_AND_INSTALLABLE_GATES_PENDING / HUMAN_QA_PENDING. Not released or deployed.**
+
+- Human separately approved pushing this independent branch, a new Draft outside frozen PR208 and existing-Secret unpublished Actions builds. Local source is sealed at `291bdec208c96ff2cf3f2484b2e14859448a597c`; its101 selected assertions, strict types and Web52 are source-only evidence, not new installable results.
+- Candidate-only Dev85 advances the single build/manifest authority beyond frozen Dev84, retaining the same development package and certificate. Existing public-owner/non-PR/explicit-branch restrictions remain. No private-key download or local Java/application/browser/listener/updater execution.
+- Windows cloud validation additionally downloads the exact retained Dev84 Actions package, pins payload/source and requires normal replacement plus health/launch rollback in disposable synthetic profiles. The prior artifact is ephemeral: missing/expired/wrong bytes fail closed, never silently substitute a source rebuild or latest release. This is a replacement-engine test, not proof of old-client OTA discovery or physical installation.
+- Existing stable-baseline and deep-path gates remain; no production updater implementation/schema/algorithm/dependency change. PR206/207/208, main, Release and stable OTA remain untouched. [New candidate plan, safety and evidence requirements](docs/SOURCE_NEUTRAL_CLOUD_CANDIDATE.md).
+- First pushed source `74ba5d07fa4cce682ce04a562493c509d93fc926` failed both candidate source jobs:2184pass/5fail/8platform skips,300files. The two old AST-extracted Reader fixtures omitted new `activeView`/`readingLibraryPanel` closure ports. This was independently reproduced as35pass/5fail across40 inert tests. Only those test fixtures now inject explicit mock ports, retain every original assertion and additionally assert view-scoped Library refresh. No application change, timeout increase, skip or rerun-as-fix. The corrected exact source must rerun full CI and package gates; failed-head evidence remains.
+- Second source `604ecfbec6ab24547dfcbdccebf8562278dec55a` passed2190 Linux assertions/8platform skips but real Chromium was57pass/3fail, all three common-Library journeys hidden. Digest-verified actual traces show capability503 twice per language (initial/reloaded mock shell): the fixture omitted `/api/v1/capabilities`, so existing `loadDesktop()` correctly cleared Desktop authority. The fixture now supplies the real capability/browser-session bootstrap and asserts version discovery; no product guard or visibility assertion is weakened. Two actual-function inert tests separately prove failure-denies/success-admits. Fresh local target151/15files and full cloud/runtime/installables remain required.
+
+## Source-neutral reading Library — local-only integration (2026-10-25)
+
+**Status: LOCAL_IMPLEMENTATION_AND_SELECTED_GATES / NEW_CLOUD_BROWSER_INSTALLABLE_DEVICE_GATES_PENDING. Not pushed, released or deployed.**
+
+- Human authorization permits this local branch `codex/source-neutral-reading-library-20261025` outside frozen PR208 `295942c297f9377b28df5a2d3d32a311fed8a18f`, under the still-unavailable coordination exception. No new remote/build permission, production state, SQLite migration/schema, local Java/app/browser/listener/updater or stable OTA operation is authorized.
+- Actual generic read-projection module, bounded legacy bulk adapter, principal-owned explicitly selected host snapshot, configured Desktop host/origin/CSRF query and common Library/Reader entry are wired. No detached-interface-only completion claim, source protocol clone, catalogue auto-import, fake Pica identity, new persistent state key or unsupported phone/tag/favorite/recommendation sync.
+- Local and online route positions remain separate. A new readonly per-work SQLite view fixes chapter-row starvation; original `readingProgress()` source/API and every stored position are preserved. Missing metadata/history stays unknown. Optional host failure cannot reset local state. Opaque source facets do not contain endpoint/credentials/raw principal.
+- Preserved actual48pass/2fail UI and51pass/1fail synthetic-memory SQL counterexamples, plus test-tool/type scaffold failures. Request freshness is distinct from ownership; revocation evicts stale labels, validated connection snapshots revoke client sessions without secrets, and expiry permits a new explicit session. No timeout/retry/skip/dependency relaxation.
+- Selected target101 assertions/10files, types and Web52; clean final source/hash/evidence are recorded in the source-only handoff, not inferred from earlier green output. New Chromium/actual-Windows projection checks are authored and syntax-checked but require separately authorized cloud execution. [Scope, failures, concrete integration and remaining holds](docs/SOURCE_NEUTRAL_READING_LIBRARY.md).
+
+Post-build historical PR208 evidence: exact `295942c297f9377b28df5a2d3d32a311fed8a18f`, run40192577286 candidate3/3,27/27 successful workflows;2147 assertions paired across Linux/Windows, Chromium60, Android402/53suites and six normal/deep upgrade/rollback diagnostics. Complete Dev84 handoff SHA256 `6aed83a17d7b33f3792abd2e1d6daafbdff964d4b2d3ca9d8207777cc69d8bf8`. It remains frozen and does not validate the new reading-library source. Main/Release/data are unchanged; human/provider/OEM acceptance and the full modular-reader objective remain open.
+
+## Source idle boundary — authorized independent cloud candidate (2026-10-25)
+
+**Status: LOCAL_SOURCE_GATES_PASS / CLOUD_AND_INSTALLABLE_GATES_PENDING / HUMAN_PROVIDER_QA_PENDING. Not released or deployed.**
+
+- Human approval permits a new independent Draft PR and unpublished Actions builds using existing signing Secrets; the isolated coordination exception still applies. Base is frozen PR207 `1b7a9184eca11f73b295a55827d2cddee34dc69c`; local source corrections are sealed as `a723fbe29bc4323dddeb7370c37721dd6a4789bd`. PR206/207 and their packages stay unchanged.
+- Candidate-only Dev84 advances the single build/manifest authority from Dev83. Same Dev application ID and fixed certificate are required; no private-key download, uninstall, installation or production profile is authorized. Existing owner/non-PR/explicit-branch signing restrictions remain.
+- Exact a723 source passed135 selected assertions/18suites, strict TypeScript and Web51 syntax. A separate23-case/4suite source-and-synthetic update-planning check passed, including22 unchanged dependency/schema/module/updater inputs. These selections overlap; do not sum them as unique tests or borrow PR207 CI for this source.
+- Compatible metadata is necessary, not sufficient for real incremental eligibility. Generated updater/helper bytes are unknown until build; differing helpers require the existing one-click full-application path. Actual Windows runtime, HTTP/browser, signed Android, package/upgrade/rollback and physical/provider checks need their own current-source evidence.
+- No new product feature or updater implementation is added for cloud preparation. No main merge, tag/Release, stable OTA, local Java/application/browser/listener/upgrader, production data access or deployment. [Candidate scope and review limits](docs/SOURCE_IDLE_CLOUD_CANDIDATE.md).
+
+## JM command route and Node-stream error boundary (2026-10-25, local-only continuation)
+
+**ACTUAL_CALLBACK_OVER_VIRTUAL_REQUESTS / PASSIVE_GET_AND_EXPLICIT_POST / BOUNDED_GENERIC_INPUT_ERRORS / NO_SOCKET_OR_SOURCE_PROCESS / FULL_GOAL_OPEN.**
+
+- Continues local `0d8dc49713e7400f9c53b57b592212759b1fc72f`, within the same authorized source-idle isolation. Actual callback/json/body and three service methods run through compiler-extracted VM functions, fake responses/transport and in-memory Node Readables; no application/server setup/listener/provider/profile is started.
+- Initial24 cases had21pass/3fail: invalid JSON500, text/plain reaching the connection, oversize input using generic parsing. This action alone now requires JSON, limits input4096bytes and returns constant non-reflective errors; ordinary login/favorite routes remain unchanged.
+- Actual Node-stream counterexample then had24pass/1fail: early rejection destroyed input before an error reply. Native iterator(false) is opt-in only for this command, with Connection:close on parse/media failure. A separate case retains ordinary body-reader default behavior. Reuses the existing parser and standard Node API, no new dependencies or runtime floor.
+- Development133/134 runtime/type history retained. A contextual-this strict-type failure in the fake iterator is fixed using an explicit closure, not casts/relaxed criteria. Final target135 assertions/18 inspected suites plus types/Web51 is independently sealed; real HTTP/browser/compiled/cloud/signature/upgrade/device/source acceptance remains pending.
+- PR207/installables, main, OTA, production data, schema/deps/Android/recommendation/Visual/sync/updater remain untouched. No push, release, deployment or Java/permission-sensitive execution. [Exact method and limits](docs/JM_VIRTUAL_ROUTING_VALIDATION.md).
+
+## Source admission and idle observation boundary (2026-10-25, local-only)
+
+**LOCAL_ONLY_CORE_DEFAULT / EXPLICIT_CLI_SOURCES / PASSIVE_JM_STATUS / FROZEN_PR207_UNCHANGED / FULL_GOAL_OPEN.**
+
+- Continues candidate `1b7a9184eca11f73b295a55827d2cddee34dc69c` on a new local branch, not the unfinished profile-recovery branch. PR207, its Dev83/Windows handoff, main, stable OTA and official data remain untouched. User authorized this isolated write exception after Local Memory routing returned NOT_FOUND and broker status still showed DPAPI failure; no registration/secret/security-policy changes.
+- New SourceRuntime/LibraryService/ProviderService contexts default to no external adapters, even with credentials or an injected SDK. Desktop explicitly retains its old-config compatibility and saved choices. CLI uses an explicit validated `--sources pica,eh,jm|none` invocation choice before opening storage; intentional online CLI automation must add that flag. No implicit credential-to-source consent.
+- JM settings GET now reads an allowlisted local account snapshot and never restores login/requests a worker. UI distinguishes remembered/cached/not-checked in three languages. Empty-body, Desktop-CSRF-protected explicit connect reuses the existing worker/account flow, can retry saved login, and cannot enable sources or accept secrets/choice fields. The earlier trigger was opening the JM section, not ordinary homepage startup.
+- Local selected gates108/108 across17 inspected suites, strict types and Web51 PASS. Original68pass/1 historical policy-hash guard failure is retained; updated current pin plus exact inverse old-text hash permits only the reviewed default change. Historical50 fixture/harness files/92 constructors now declare their prior enabled context via a test-only helper; default-off tests remain separate. No test is skipped to obtain this result.
+- Final review reproduced an actual empty-array acceptance bug in the initial connect predicate through its AST-extracted expression (4pass/1fail preserved); now rejects nonobjects/arrays and unexpected fields. The new pure guard case plus future HTTP array/null/primitive cases are added; exact final-source target109 assertions is recorded separately.
+- Actual HTTP route/CSRF cases are extended but not locally run. Current full CI/browser/package/signature/upgrade/device/provider gates remain pending; no prior green is borrowed. No local Java/app/browser/listener or production data, new dependencies/schema/Android/ranking/Visual/sync/updater changes, push/Release/OTA/install/deployment. [Boundary, CLI compatibility and limits](docs/SOURCE_IDLE_BOUNDARY.md).
+
+## Reader reliability integration — focused unpublished candidate (2026-10-25)
+
+**IMPLEMENTED_AND_LOCALLY_INTEGRATED / EXACT_HEAD_CLOUD_RECEIPTS_ARE_SEPARATE / MANUAL_QA_PENDING / FULL_GOAL_OPEN.**
+
+- Human authorized a new independent Draft branch and existing Actions/signing-Secrets builds only. Do not edit frozen PR206, merge main, create tag/Release, change stable OTA, download keys, install/deploy or read production data.
+- Frozen base is `9e879d3aa7030d1fc49a92354f54bba0bd610074`; Reader/local-guide/input/viewport/progress fixes come from the bounded local series through `90a1595769ed382fe0bb43988a27d3c47651ad1f`. Preserve local-only reading with no source/account/content service, existing native/tags/recommendation/source/sync protocols and one application updater.
+- The source integration includes the independently useful instance/owned-profile initialization fix and its data-only theme-validator dependency/tests. It excludes unfinished `src/profile-backup`, ZIP64 packages/lockfile additions and unrelated local work; those remain in the original local branch/backlog, not reverted or accepted.
+- Initial integration commit `679a5f15d4f95a9ad4f7ecfc3d83acb7963b63dd` exactly binds all1371 tested source files/modes to manifest SHA256 `3193b497a414eacc5493ce31df3448e9ae0aad2efaac3081f14964734e989425`. Local284 tests/23files, strict types/Web51 PASS. These mocks/owned synthetic fixtures are not HTTP/browser/physical/provider/upgrade or full-CI acceptance.
+- Read-only Windows checkout-root guard prevents a nested source snapshot borrowing an ancestor's Git SHA before any provenance override/build/download/delete. Genuine roots remain supported; no Git ownership/security exception is added by the production helper.
+- This subsequent CI/ledger-only overlay enables the exact new candidate branch in the existing unpublished workflow and advances fixed-signature Dev82→83 from one tested public version authority; certificate/package checks and test-before-secret order remain strict. Native implementation remains unchanged. Local pre-overlay gates are not mislabeled as cloud or installer results: consult the exact source SHA/run/artifact receipts recorded in the new Draft PR and immutable handoff.
+- Existing r2/Dev82 handoff and PR206 head remain frozen. New binaries, if produced and verified, use their own exact SHA and isolated profile. Full neutral-source/trust/native/sync/asset/backup scope, real user/gesture/provider/AI/offline/retention/physical-upgrade acceptance remain OPEN. [Integration ownership and provenance](docs/READER_RELIABILITY_INTEGRATION.md).
+
+## Local execution restriction — security prompt disruption (2026-10-23)
+
+User reported repeated security-center permission prompts for Java/validation programs. Stop launching local Java, random-path Windows artifacts, LAN bridges and upgrade runtime matrices by default; move those checks to the already-authorized Draft CI. Local source/type/syntax and inspected no-Java/no-LAN targeted tests may continue. Do not allow dialogs, add exceptions or weaken protection. Read-only snapshot found zero active Java/current validation drivers; firewall logs confirmed prior task-temp application paths, including Node. Exact unseen dialog identity remains unverified. [Effective local validation policy](docs/LOCAL_VALIDATION_SAFETY.md).
+
+## NEXT-67 — existing user-host library to shared Reader (2026-10-24, unpublished)
+
+**ISOLATED_IMPLEMENTATION / LOCAL_SYNTHETIC_SOURCE_CHECKS / CURRENT_SOURCE_HTTP_BROWSER_COMPILED_PACKAGE_CI_REQUIRED / COMPLETE_EXTERNAL_SOURCE_AND_FULL_OBJECTIVE_OPEN.**
+
+- Frozen NEXT-66 `91b62d0fcccd552e4a6af1609283598f75022080` completed candidate3/3, broader39success+6conditional skip/45,1936+8 Linux/1943+1 Windows /1944,57 Chromium,402 native and separate recovery1 test/probe/workflow.159-entry handoff SHA256 `f82d331443e0ea78c8d31661c737181c8bc458a62aee03cba9fbaa7edb524406` independently verified. Prior timeout/J7 internal exit cause remains undetermined. Previous package/source stay immutable.
+- Advances beyond diagnostics to real optional Desktop reading of the user's existing Suwayomi2.4 library; no app-owned catalogue/service/market/default endpoint/repository/required backend, provider-wide search or import. Separate15-minute explicit library-read scope discloses host fetch/cache/KOReader side effects. Inspector permission remains unchanged. [Implementation and limits](docs/USER_HOST_LIBRARY_READER.md).
+- Reuses the actual main Reader through structural state/source/cache/identity/access ports, not a second Reader. Canonical LongString source + connection/principal/source-URL digest book identity, fresh manga/chapter ownership and row-reuse rejection before cached image/progress access. Only minimal selected references/recent private progress enter two owned app_state key families; no schema/provider fallback/catalogue/recommendation/Visual/user-event/favorite/sync/native change. Separate session/account credentials remain memory-only and revocable.
+- Shared bounded HTTP mechanics, reviewed fixed operations/routes, per-session/queue/deadline/body bounds, no cookie/redirect/ambient credentials and raster checks. Explicit ready-local Origin/CSRF commands and same-origin/referrer or explicit-CSRF GET guards prevent cross-site authenticated image proxying. Connection change/exit/disconnect/expiry cancel and fence late writes. Existing updater/config/SQLite protection retained.
+- Initial125 synthetic assertions passed but typecheck found concrete DB return-type coupling and a captured unknown index; structural Reader ports/validated value corrected them. Later126 passed with one new HTTP fixture headers inference type error; explicit headers type fixed it. Current126/126, types and Web48/48 PASS; failed logs remain, no criterion relaxation. Final clean-source run and fresh real API/three-language Chromium/compiled-Windows/cache/resume/stale/cross-site/revocation plus existing full/incremental/deep/native/signature gates required before package PASS. Dev81→82 is version authority only, not native host support or physical overwrite.
+- Next human acceptance is a bounded consolidated candidate, not permission to keep expanding every unfinished module before the user tests. [Frozen next-acceptance scope and true long-term gaps](docs/NEXT_USER_ACCEPTANCE_SCOPE.md). No end-state requirement is dropped or declared complete; source-host native/search/plugin ecosystem and whole-profile relocation/recovery remain explicit later development. Engineering ETA is conditional on actual current CI and artifact checks, not a promised completion time.
+- First source15c56be candidate40095595901 failed the unchanged ordinary-app i18n gate; Windows/Android dependent artifacts were skipped, not accepted. Adds actual en/zh/ja dictionary key rather than disabling the test. Independent J7 run40095599693 timed out with zero page errors/unchanged cards/enabled next/no observed next request; raw official diagnostics and actual same-tree c49c213… authority retained. A frozen old-handler oracle reproduces a real pending-current/enabled-next/lost-click mechanism; the actual UI now gives all three controls one busy owner. Matching mechanism is proven, unique attribution of that historical timeout is not. No benchmark, timeout, retry, skip or algorithm relaxation; repaired source needs fresh full CI.
+- Repair source passes148/148 across10 inspected pure/source/fake-port files, including20 existing i18n assertions and2 actual old/new handler reproductions, plus types and Web48/48 syntax. This is not current real-browser/J7/Windows/native/artifact acceptance; fresh exact-source CI remains required. No local app/browser/Java/listener or production data used.
+- Second source d7cb690 passed full source/type/unit/build/JVM, ordinary Android, unchanged strict J7 and Android recovery, but remained rejected: Chromium57/60 failed only the3 new hosted-Reader locales at selecting `#reader-mode` while its existing Reader-settings details were closed. Raw original logs/CI diagnostic screenshots retained. Corrects the test to open the actual settings summary, assert visibility, select/verify single-page, close settings and then test page/progress. No force, relaxed timeout/retry/skip, alternate Reader or production UI workaround. New exact-source browser/compiled Windows/fixed-signature candidate proof is still required; dependent skipped artifacts are not accepted.
+- Consolidated-guide review corrected stale 'inspection only / Reader unwired' wording: daily use still requires no external host, advanced use now explicitly separates diagnostic permission from Desktop-only15-minute library reading, hide versus revoke, independent local progress, host cache/sync effects and unsupported global search/import/native/sync. Added [one grouped acceptance checklist](docs/NEXT_CONCENTRATED_ACCEPTANCE_CHECKLIST.zh-CN.md) distinguishing untested/not applicable from PASS, production/Dev identities, body export versus backup and CI update fixtures versus installable updates. This is documentation alignment, not new host capability or physical/provider acceptance. Final package/source must include the same corrected guidance.
+- No local Java/Gradle/JM/app/browser/LAN/update runtime, security exceptions, production account/profile/body/vector/data, main merge, tag/Release, stable OTA,key download,installation/deployment. Unified history/catalogue/tags/Android/sync, host/provider real interoperability, source trust, secure persistence, whole-state recovery and prior deferred user/OEM/gesture/AI/performance QA remain OPEN. No immediate user test requested; full objective OPEN.
+
+## NEXT-66 — user-owned external-host configuration (2026-10-24, unpublished)
+
+**ISOLATED_IMPLEMENTATION / LOCAL113_SOURCE_ASSERTIONS_PASS / CURRENT_SOURCE_HTTP_BROWSER_COMPILED_PACKAGE_CI_REQUIRED / EXTERNAL_READER_AND_FULL_OBJECTIVE_OPEN.**
+
+- Frozen baseline NEXT-65 `e0265086584340ef19fbf7106170f0542bdffcb2`; immutable183-entry handoff SHA256 `29f6685722c6c44d715a4eb9342f175f3cfe69b7d60a669e079d34f259e7b592`. That source's candidate3/3, broader39success+6conditional skip/45 and actual recovery1 test/probe/workflow PASS remain historical evidence. Prior timeout/J7 action/process-exit cause is not solved by a later green run.
+- User re-emphasized **reader/library, not manga platform**. No app-owned catalogue/content service/source marketplace/default endpoint/repository/required backend. User owns source choice and access; app retains adapter security/accurate-scope responsibility. Product architecture is not a blanket legal-exemption assertion.
+- New actual host-settings module: pure permission/state machine + separate bounded file adapter + configured local Desktop routes and en/zh/ja panel. Save public metadata disabled; separate enable; settings operations/restart never connect; explicit inspect reuses NEXT-64 inspector/transport. UUID connection identity cannot be rebound to another endpoint. Strict schema/capacity, no inherited credentials, stale revision and cancel/late-result fences, optional-config degradation without reset or local-reader breakage. [Exact boundary and unfinished work](docs/USER_OWNED_SOURCE_HOST_SETTINGS.md).
+- Credentials remain per request, not in JSON/vault/browser/sync. No production account/profile/body/vector, DB/schema, recommendation/Visual, source-policy/provider IDs, native implementation or updater helper change. Existing local/remote content, favorites/history and source choices are not removed. Saved metadata is not an imported catalogue or comic identity; Reader/import/install still false. External comic/search/read/library/native/session/trust remain OPEN.
+- Local first attempt retained esbuild shared-parent sandbox denial and one mock tuple type issue; explicit narrow source-test filesystem authorization and mock signature corrected them. Final113/113 across7 inspected no-network/temp/fake-fetch files, TypeScript and Web47/47 PASS. Actual HTTP/three-language Chromium/compiled Windows save→enable→inspect→disable→remove gates authored for CI; fresh current-source native/signature/full/incremental/deep-upgrade proof required before candidate PASS. Dev80→81 only changes candidate build authority, not native functionality.
+- No local Java/Gradle/JM/app/browser/LAN/update runtime, protection exception/security dialog approval, main merge, tag/Release, stable OTA, key download, installation or deployment. Human/provider/device QA remains deferred; no immediate user test requested. Full objective OPEN.
+
+## NEXT-65 — minimal tag runtime, evidence separation and upgrade layout (2026-10-24, unpublished)
+
+**ISOLATED_IMPLEMENTATION / LOCAL_SOURCE_CHECKS / CURRENT_SOURCE_FULL_PACKAGE_CI_REQUIRED / FULL_READER_OBJECTIVE_OPEN.**
+
+- Previous goal turn: **PROGRESS**, not an unverified wait. Frozen NEXT-64 `a5e4a1d0cb078823f872e22a8561ea651f2a8db8` and complete handoff SHA256 `db3c4c4c632892e094977c3c0df32393e86ce2203fa0a40ddc70d277d2e87498` provide actual inspection, audit and exact-source evidence; broader acceptance remains PARTIAL as recorded below.
+- User's reader-not-platform boundary is enforced in distribution, not just a declaration. Existing review evidence stays in tracked source for provenance but is no longer directory-globbed into the application. Shared staging for Windows x64/ARM64/Linux/macOS includes only7 consumed semantic/entity/alias/watchlist files (82455bytes), not example titles/authors/counts/review columns or duplicate source roots. [Authority, reuse, formats and holds](docs/MINIMAL_TAG_RUNTIME.md).
+- Extracts asset I/O and compatibility tables into `src/tag-assets`, leaving the frozen V3 resolver body and pure personal-tag policy intact. Reuses existing CSV/adapters/precedence, Node JSON/FS/crypto, no dependency/schema/API/ranker/model/source/account/sync change. The actual module graph must exclude recommendation/storage/provider ownership.
+- New manifest/file integrity is separate from the pinned old semantic authority. Complete maps and3957 differential resolution cases plus full profile output/registryVersion are compared to a whole frozen old implementation. Removing evidence must not initialize a policy, rebuild embeddings or make unchanged rules appear new.
+- Default application paths choose only minimal runtime assets; missing/corrupt assets fail rather than silently using old installed evidence. Unsupported fields, alias metadata, payload changes with recomputed hashes, extra files, oversized/non-file assets and mixed stages are rejected. Generated source bytes have an explicit reproducibility check.
+- Old source-path removal requires the existing one-click full replacement; path-safety allowlists/helpers are not weakened. Modern app-only incremental transport remains supported, mixed evidence targets reject. CI-only full upgrade/health rollback/launch rollback/deep cases now compare exact asset layout/bytes while retaining external data canaries. No local runtime or production migration.
+- First local attempt retained24 passing tests but the new test file had a syntax typo; the next retained50/50 but typecheck found a moved private Row alias missing from the unchanged resolver. Both were fixed. A later52pass/1fail source-graph criterion counted repeated imports as distinct dependencies; it now compares exact unique dependency identities and retains a rejecting child_process counterexample. No runtime/security/cap/skip criterion was weakened. Final current-source local/native/Windows/browser/signature gates and new immutable package are required before claiming candidate PASS. Dev79→80 advances only the existing fixed-signature candidate version; no native feature change.
+- Current inspected source gates53/53 across7 files,3957 resolver comparisons, typecheck/Web46/46 and four PowerShell AST parses pass; actual emitted tag-asset dependency closure is3 files with only Node FS/path/crypto. Serialized runtime bytes are explicitly non-translated in .gitattributes. These checks are not local application/browser/upgrade/native execution; current full CI/package evidence remains required.
+- First pushed source `53737de97133df3cf5c8905de162c3cefa2ad473` exposed a real macOS stage-root error (PR run40086327118: missing outer app/desktop.js). Rules were staged into the outer archive rather than Contents/Resources, colliding with the existing app link. Corrects the Resources target, removes obsolete src link and makes shared staging require actual engine/module-contract file markers before writing. Adds a rejecting outer-directory fixture and exact platform argument checks. Raw failed run/log are retained; no timeout/skip/permission relaxation or local app execution. This follow-up needs fresh exact-source CI, not a rerun relabelled as the old source.
+- Follow-up inspected source checks54/54 across7 files,3957 resolver comparisons, typecheck and Web46/46 PASS. No user data, compiled updater helper, module API or native logic changed by the layout correction.
+- No production account/profile/body/vector access, main merge, tag/Release, stable OTA, key download, install or deployment. Vocabulary provenance/optional source ownership, all-binary content audit, source-host Reader/identity/native/trust lifecycle, full backup/restore and deferred physical/provider/gesture/tag/AI/offline acceptance remain OPEN. No immediate user testing requested.
+
+## NEXT-64 — explicit existing-source-host inspection (2026-10-24, unpublished)
+
+**IMPLEMENTATION_IN_PROGRESS / LOCAL_PURE_SOURCE_CHECKS_PASS / CURRENT_SOURCE_HTTP_BROWSER_PACKAGE_CI_REQUIRED / FULL_SOURCE_READER_AND_OBJECTIVE_OPEN.**
+
+Final frozen-source addendum: `a5e4a1d0cb078823f872e22a8561ea651f2a8db8` candidate3/3 +standard CI PASS; Linux1892+8 /Windows1899+1 /1900, Chromium54, native402/53 suites and signed Dev79. Broader38success+6conditional skips+1CANCELLED/45 = **PARTIAL/HOLD**, not all green. Recovery40080731580 actually reports OK(1 test), recovered probe/runCount2 and PASS, then hangs after emulator-kill ACK until35m cancellation; internal exit cause and prior J7 remain UNDETERMINED. No criterion/timeout/retry/skip/security change or rerun. Complete162-entry handoff SHA256 `db3c4c4c632892e094977c3c0df32393e86ce2203fa0a40ddc70d277d2e87498` preserves raw evidence/source/diff/installables/recipes; archive integrity was independently checked. The preparation notes below describe what was known before that build, not a claim that current NEXT-65 is validated.
+
+- Continues frozen NEXT-63 `cbbf3432efb2ead4517cebeafc44ac1901ac9fdb`, complete handoff SHA256 `b41913dbcc8ddbb9ca4824229a1b0bd9cb83123137ef0f76aa84fd30a0d2690d`. Its verified Windows/Web/updater gates and Android402 tests/fixed-signed Dev78 remain historical proof, not current uncommitted-host proof.
+- Official Suwayomi stable v2.4.2366 / commit `40bc5da57820324ed0ae724cbbc020cc4673b594` supplies seven pinned protocol references. Actual schema maps Long to LongString; source IDs stay canonical strings, never rounded numbers or guessed Pica/library comic identities. No upstream implementation is copied, installed or executed.
+- Adds separate contract/protocol/inspection/HTTP adapters and actual local Desktop/UI wiring. Explicit one-shot consent, fixed read-only queries, scoped anonymous/Basic auth, no redirect/cookie reuse, byte/deadline/pagination bounds, cancel/late-result fences and no persistence. Native/provider/catalogue IDs, schema, algorithms, existing source choices and module APIs remain unchanged. [Scope, reuse and open integration](docs/SOURCE_HOST_INSPECTION.md).
+- Local inspected source tests92/92 across4 files, types and Web46/46 syntax PASS. Actual HTTP/three-language Chromium/compiled-Windows tests are authored but not run locally; the compiled gate reuses the existing isolated source/media application rather than creating another application lifecycle. First type issues and a real early-response cancellation cleanup gap are retained separately from passing results.
+- Current work is not yet pushed/built. Reader/import/extension-install capabilities remain explicitly false. Real host interoperability/auth, stable host/comic identity, source-to-library/tag/Reader/Android integration, repository trust and all previously deferred device/provider/AI/gesture/sync/upgrade acceptance remain OPEN. No user test is requested, no production data or release/OTA/deployment touched, and local permission-sensitive runtime remains prohibited.
+- User clarified the hard product boundary: reader/library, not a manga platform; user-selected sources are not app-operated content/services. [Core/source ownership](docs/CORE_READER_SOURCE_BOUNDARY.md) now explicitly forbids an official catalogue/source market, pre-enabled repositories and a required external host/account. Historical fixed Pica/EH/JM coupling is retained as an unfinished compatibility-separation task, not declared solved or destructively removed. Existing profiles/data remain protected; source-specific packaged registries/default discovery still require semantic audit before full neutrality/content-free acceptance.
+- The single unpublished Android version authority advances Dev78→79 for safe fixed-certificate candidate continuity; native source/store/Reader/tag/gesture code is unchanged. This does not add native host support or prove actual phone installation/state retention.
+
+## NEXT-63 — native local-comic body export (2026-10-24, unpublished)
+
+**ISOLATED_IMPLEMENTATION / CURRENT_SOURCE_NATIVE_CI_AND_INSTALLABLE_PROOF_REQUIRED / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**
+
+- Continues frozen NEXT-62 `7203626e1cb324e6ca9601872e561950234f7231`, full handoff SHA256 `c899272db9eeddcb0bef8a1d082236323a6af3dcced78f8f27acb77d19b6100d`. Its Linux1780+8 / Windows1787+1 /1788, Chromium48, Android362 and signed Dev77 results are historical proof, not current-source validation.
+- New pure native body exporter reuses existing name/signature/natural-order validators and standard Java ZIP, with actual page/total/complete-archive byte limits. Separate stage/SAF/UI adapters expose only owned imports, pin the generation through final copy, refuse active-copy removal and never delete originals or external documents. [Actual ownership, limits and open acceptance](docs/NATIVE_LOCAL_CONTENT_EXPORT.md).
+- Explicit write-only system destination, retained rotation task, cancellation/finish and no raw error paths. En/zh/ja daily/advanced guidance distinguishes pages-only export from complete personal-state backup. Reimport of an exported selection creates a new local identity; history/private tags are not restored. No schema, recommendation, Visual, source/account, Reader API or sync format change.
+- Inspected local source checks:23/23 across4 files, TypeScript, Web45/45 syntax and six localized resource XML parses PASS. The first contract attempt misclassified the `com.picalibrary.android.local` package namespace as a runtime import (22 pass/1 fail); the criterion now removes only the package declaration and retains a rejecting Android-import counterexample. Raw failed/passing evidence remains. Real synthetic plain-Java / SDK28/35 store/SAF/Reader/UI tests are authored but not executed locally. Native execution, lint/R8/fixed signing and same-source Windows/source/browser/update regression remain REQUIRED before claiming current package PASS. Single Android candidate authority advances to Dev78, retaining Dev77 package/certificate.
+- No local Java/Gradle/application/browser/LAN/upgrade runtime, no production data, main merge, tag/Release, OTA, signing-key download, install or deployment. Whole-state backup/restore, identity-preserving relocation, crash-orphan/retired generation cleanup, source host/trust and concentrated physical/provider/gesture/tag/AI/offline QA remain OPEN; no immediate user testing is requested.
+
+## NEXT-62 — legacy recall and stored-only compatibility sessions (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / CURRENT_SOURCE_CI_AND_INSTALLABLE_PROOF_REQUIRED / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**
+
+- Continues frozen NEXT-61 `3ce697566f379fef2dc566af9e91f3ee183c2d21`, full handoff SHA256 `a6ee113fa3ab7957bdd03d3dd14d07baaa666807f419d9f8a7a9c97ab21b66b3`. Its CI passed Linux1737+8 / Windows1744+1 /1745, Chromium48, Android362; those results do not validate this new source.
+- Three actual baseline probes reproduced status initialization and seen-ID consumption before a failed adaptive batch. Actual recall/V2/adaptive bodies now use explicit domain ports;19 frozen method hashes include both complete old controllers. [Scope, reuse and holds](docs/LEGACY_ADAPTIVE_RECOMMENDATION_MODULE.md).
+- Status uses ephemeral drafts without writes or generation capability. Existing SQLite savepoint covers adaptive pool+pointer and final allocation+batch+pointer+view; source revision fences late legacy metadata. Same old rankers/p-limit/converter, schema/API/state keys/response shapes; no new dependency/framework/protocol/model.
+- Inspected source-only108/108 across11 files, including43 new assertions, types and Web45/45 PASS. Shared helper text hash proves its only change is the import of the same normalizer. Sandbox dependency denial occurred before tests and is retained separately. Full exact-source CI/compiled faults/fixed-certificate Dev76→77 remain REQUIRED before package PASS. No local Java/application/browser/LAN/upgrade runtime.
+- Static session-size criteria now inspect the actual inherited constants/owner. No security/cap/timeout/retry/skip relaxation. Full objective/source host-trust/overlapping commands/physical provider-phone-gesture-tag-AI-offline QA/crash-OTA-UNC remain OPEN. No production access, merge/release/OTA/key download/install/deployment.
+
+## NEXT-61 — stored work-identity views/commands/task and atomic human decisions (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / CURRENT_SOURCE_CI_AND_INSTALLABLE_PROOF_REQUIRED / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**
+
+- Continues frozen NEXT-60 `2c3f7d647100441398b28fbdc0cc41a5e8ffd0cc`; immutable complete handoff SHA256 `da40f5b62e7370ec4b304eb7b5c91abe5f94f097a04de0048c1f893251876c99`. That source's actual CI/package results remain preserved, not borrowed for this candidate.
+- Four synthetic baseline probes confirmed audit/detail policy initialization and decision-save/clear half-state after policy write rejection. Extracts actual six view, three command and five task-control methods with a frozen15-method oracle (includes catalog helper); public compatibility, matching bodies/thresholds/model, schema, formats and module APIs stay. Read/evidence paths now use ephemeral policy defaults.
+- Identity now owns its actual domain under `src/identity`, outside recommendation orchestration, and consumes only frozen explicit-distinct facts, not tag/taste/session profiles. Shared matcher input changes are type-only; canonical emitted matcher JavaScript retains the exact frozen hash. Explicit decision/clear reuses the existing SQLite synchronous savepoint for decision + distinct-pair policy + returned review. Pre-/post-policy-write, validation, view failure and nested rollback tests cover the concrete gap. Evidence keeps its existing batch transaction; preparation stays idempotent PREPARED_ONLY with no binding apply. [Ownership, reuse, coverage and limits](docs/WORK_IDENTITY_MODULE.md).
+- Inspected local source checks:149/149 across8 files, types and Web45/45 syntax PASS;84 new identity assertions cover complete output/row/read-order parity, >5000 decisions, synthetic cover matching, local pairs, all-table safety, actual background control, minimum factual authority and pure runtime import direction. First stale service-location assertions are retained and redirected to actual owners, not duplicated strings. Full exact-source CI, compiled Windows post-SQL fault gates and fixed-signed Dev76 remain **REQUIRED BEFORE CLAIMING PACKAGE PASS**.
+- No local Java, packaged application, browser/LAN or upgrade runtime checks: current full/native/signature/runtime gates run only in authorized Draft CI. No production data, main merge, tag/Release, OTA, key download, install or deployment. Large-profile latency, release/crash/multi-process durability, physical/provider/gesture/tag/AI/offline acceptance and the full objective remain open.
+- First pushed source `170b91dc6d10262c3627e9d53aced0f85ae57dc3`, run `40064133920`, retained1735 passed +2 stale source-location failures +8 platform skips /1745. The two criteria (variants/no-write ownership and unbounded authoritative identity reads) now inspect actual query methods and adapter/service binding; expanded inspected source checks156/156 across10 files PASS. No matcher, application guard, cap, timeout, retry or skip was weakened. Full failed log/source metadata are preserved in the handoff. No Windows/native candidate was produced by that failed push.
+
+## NEXT-60 — V5 shadow execution/task boundaries (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_CI_AND_PACKAGE_GATES_REQUIRED / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**
+
+- Continues frozen NEXT-59 `f4e2c2ba8cb147292e4c344c59ca1619766a4380`, immutable handoff SHA256 `cb56e1130ea34af23fd64ed1823f2a29d757728419ea85aeda5b19b4c55292b0`; prior packages/results untouched.
+- Three isolated synthetic baseline probes confirmed missing-policy initialization and audit commits after source revision changes. No real provider/profile/body/vector was used.
+- Extracted the actual shadow pipeline and existing task-control state through explicit evidence/provider/semantic/audit/runtime capabilities, retaining compatibility entry points. New audit adapter reads policy without initialization and fences source revisions; no serving activation or raw-catalog writer is exposed. Existing algorithm bodies/limits/model versions remain.
+- Frozen six-method hash oracle and actual browser-platform closure enforce real extraction. Local inspected synthetic tests compare complete outputs/telemetry/progress/read/provider order, budgets, private tags, failure, pause/resume/cancel/admission/duplicate/release, all-table safety and source fences; targeted94/94 across6 files, typecheck and Web45/45 syntax PASS. One first sandbox dependency-read failure and one stale source-location assertion failure are retained; no application or permission guard was weakened. [Ownership and limits](docs/RECOMMENDATION_SHADOW_MODULE.md).
+- Full Windows unit/runtime and Linux/browser/JVM suites now belong to the authorized CI, with raw test artifacts; compiled Desktop gate adds real confirmation/background completion and exactly one audit-only append in a source-disabled synthetic profile. Fixed-certificate Dev75, exact-head complete CI, artifact integrity and a new handoff are **REQUIRED BEFORE CLAIMING PACKAGE PASS**. Local Java/artifact/LAN/upgrade runtime checks are deliberately NOT RUN, not inferred from CI. Previous immutable evidence is not borrowed as current acceptance.
+- Apply the new no-local-Java/no-random-artifact/no-LAN validation policy. Continue only within the original isolated candidate/Draft/CI authority and prior coordination exception; no production data, main merge, tag/Release, OTA, signing-key download or deployment.
+
+## NEXT-59 — read-only V5 audit/query and export modules (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**
+
+- Continues frozen NEXT-58 `fe360d315d53c597042307a47e6e81fc14c9a1ef`, immutable handoff SHA256 `39faf0f43235c6cdce911962f3253aa14c677f72d2ec43a4362d8ced953ed632`. Keeps all prior packages and first failures unchanged.
+- Verified eight read paths initializing missing policy and export computing reports before a cancelled Save dialog; a separate rejecting regression also exposed initialization in mobile sync preview. Extracts13 actual V5 query/audit/planning methods through explicit read-only ports, plus schema2 export assembly and existing ZIP/file adapter. Selected reads and preview no longer initialize policy; explicit merge/save defaults and JSON/schema/weights/Visual thresholds stay unchanged. Save cancellation precedes any data acquisition.
+- Moves existing E-H string tag parsing unchanged away from the account client, keeping its compatibility export. Actual browser-platform dependency closure, frozen14-method/output/read-order oracle and frozen old export entry-byte comparison complement synthetic all-table no-write/cancel/error tests. [Ownership, evidence, privacy and limits](docs/RECOMMENDATION_AUDIT_READ_MODULE.md).
+- NEXT-58 J7 initial timeout remains UNDETERMINED despite one same-parameter passing retry. Adds bounded, allowlisted phase/button/card/network-status failure diagnostics with no identities/text/headers/bodies; no timeout/retry/criterion relaxation or claimed product fix.
+- Native/JVM app logic, recommendation algorithms and stored formats stay; current-source CI, downloaded artifact gates and signed Dev73→74 belong to the new handoff. Physical testing stays deferred. Legacy/adaptive, V5 shadow/identity mutation, optional runtime/trust, native export/orphan/backup retention and published OTA/first-hop remain open.
+- Same candidate/Draft/CI + prior DPAPI exception; no production access, merge/release/OTA, key download or deployment.
+
+## NEXT-58 — shared update lifecycle, acknowledged startup and incremental recovery (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_RELEASE_OTA_PHYSICAL_QA_OPEN.**
+
+- Continues frozen NEXT-57 `7f9fdb772feadf40fdf24906ea553df677f0fe3b`, handoff SHA256 `48086613a54936fd365c615d9b4831a4b8ed3ba9bf9b64d02f40950e456d77c0`. Its isolated incremental-launch probe was a confirmed follow-up, not completed transaction acceptance.
+- Shares existing full-helper process/health/shutdown/progress and user-state recovery via small modules. Current Desktop exits only after nonce/PID/parent/kind-bound ready plus acknowledgement. An unacknowledged orphan cannot later acquire replacement authority. Duplicate apply/staging are fenced; unsafe helper-stop failure retains the lock. No new framework/dependency.
+- Incremental preflight rechecks source/bytes, path/disjoint roots, regular files, collisions, data exclusions and unchanged updater before app exit. Completes owned application/config/SQLite-sidecar backups before mutation; awaits launch and stops unhealthy replacement before recovery. Failed backup/status cannot be treated as usable recovery. Config absence is restored; proven healthy success is not rolled back for reporting failure. Existing recovery copies are retained.
+- Adds actual Desktop/controller/helper same-source scoped asset cases and ready/ack to full-engine tests. No helper self-replacement/allowlist relaxation. These are **not** a published OTA or proof that new helper fixes already exist in old installed clients. [Scope, reuse, protocol, tests and limits](docs/INCREMENTAL_UPDATE_RUNTIME.md).
+- Actual first-package staging exposed the missing explicit `postrc` prerelease label; this is now recognized without admitting stable local-test updates. Successful spawn without instance publication fails closed: retain backups, do not overwrite or relaunch into an unknown process. Both source tests and an actual child-process fixture cover this boundary; failed first-attempt evidence stays retained.
+- First pushed CI `40046718879` / `1a4b44af...` retained a real full-engine rename EPERM after eight scoped cases passed. Adds bounded Windows EPERM/EACCES/EBUSY directory-rename retry, with repeated backup-ownership checks and permanent/nontransient failure protection. Does not infer who held the directory or retrospectively diagnose older runner failures; first failed run/log/diagnostic remain evidence.
+- Native/JVM and recommendation/tag/Visual/schema/module contracts stay; current-source CI, fixed-signed Dev72→73 and actual packages/stable/prior/deep gates belong to the new handoff. User/device QA remains deferred. V5/legacy, optional runtime/trust, export/orphan/backup retention and crash/power-loss/UNC remain open; original runner-only cause undetermined.
+- Same independent candidate/Draft/CI + prior DPAPI exception; no production account/data, main merge, tag/Release, OTA, key download, installation or deployment.
+
+## NEXT-57 — recommendation build ports, actual pipeline and commit-status truth (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_AND_PHYSICAL_QA_OPEN.**
+
+- Continues frozen NEXT-56 `2167576eea14e2c02f4d143e2097f4ca24da8856`, immutable handoff SHA256 `593c0b28eadebbe89acb4758e587c5fee22de4896bf46eb1b6d0db9af8e61874`. Keeps all previous packages and failed evidence unchanged.
+- Extracts the real Final V3 ordered build from LibraryService behind explicit evidence/semantics/provider/checkpoint/progress/version/revision capabilities. SQLite/account/Registry I/O remains in application adapters; existing algorithms, budgets, result format and observation timing are retained. Pure author normalizers are shared without crypto; the old API re-exports them.
+- Adds browser-platform actual dependency-closure enforcement and a hash-frozen old-method oracle. Synthetic old/new comparisons check full scores/ranks/evidence/versions/telemetry and I/O order across Visual modes, provider restrictions/failure, private tags, limited pools, both source fences and cancellation. No DINO inference/training, real account or body data.
+- Reproduces false-complete UI after candidate-pool save failure. Optional commit-state observation now distinguishes persistence from successful activation, fences obsolete status updates and cannot veto storage; failure/retry and old-batch preservation tests complement unchanged read-only delivery gates. [Contract and limitations](docs/RECOMMENDATION_BUILD_PIPELINE.md).
+- Native/JVM logic remains unchanged; Dev72 must preserve Dev71 identity/certificate. Exact-source full suites, CI, actual Windows/Android packages and state-retaining stable/prior/deep update gates belong to the new handoff, not borrowed green results.
+- V5 audit/export/legacy separation, source-extension trust/runtime, native export/orphan collection and concentrated physical/provider/gesture/tag/AI/offline QA remain open. Legacy incremental asynchronous-launch error parity is a separately tracked follow-up, not covered by full-update recovery. Same candidate/Draft/CI + prior DPAPI exception; no production access, main merge, tag/Release, OTA, private-key download, installation or deployment.
+
+## NEXT-56 — SQLite physical-path adapter and deep-path upgrade recovery (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_AND_PHYSICAL_QA_OPEN.**
+
+- Continues verified NEXT-55 `acab174c7b01f3ee32883b2bb89cfbf717ac0bf7`, complete handoff SHA256 `4d2a819a0325cebe118fc6c1fe3dd7dcfd359a30f14dceceb73212b15691b8e3`. Preserves that archive and its separately recorded deep-profile failure.
+- Uses the same actual packaged Node/SQLite to isolate two path limits: Win32 journal paths and the default SQLite VFS byte ceiling. Reuses Node's namespace conversion plus SQLite's built-in locking `win32-longpath`; no custom database engine/extension, registry changes, new dependency or data relocation.
+- Extracts a pure filename adapter; logical filenames/config/schema stay unchanged. Checks unsupported native limits before setup save, database mkdir/open, full-update apply and helper replacement. Closes a constructed SQLite connection when subsequent startup fails, retaining the original error.
+- Adds real deep LibraryDatabase/ordinary-VFS lock tests and actual source-free CLI/Desktop import→Reader→restart/backup gates at253/1200/4096. Extends current-candidate replacement/health/async recovery fixtures to1200 characters, while retaining public/prior baseline ordinary-path gates and minimal diagnostic retention. [Scope, reuse, evidence and limits](docs/SQLITE_PATH_ADAPTER.md).
+- The first local candidate's actual recovery test caught a Rollup shared-chunk dependency outside the detached helper. That failure is retained. CLI/Desktop keep their shared chunks, but each external helper is independently bundled into one file with a built-in-only closure guard and real isolated-start tests; no path-policy duplication or second updater framework.
+- The first pushed candidate's Windows/standard CI passed, but its Android signing-step gate exposed inconsistent Dev version metadata (build71 versus literal verify70). Build and manifest verification now share one public workflow authority with a rejecting regression fixture and explicit mismatch diagnostics; package/certificate checks are not relaxed. The failed run is retained, and new exact-head signed-artifact gates remain required.
+- Native/JVM app logic is unchanged; Dev71 retains Dev70 identity/certificate. Exact-source package/CI results are recorded in the new handoff. UNC/network/removable storage, maximum endpoints, physical device/provider/gesture/tag/offline-sync and released OTA acceptance remain unverified. The older runner-only failure is still UNDETERMINED, not conflated with the reproduced path defect.
+- Same independent candidate/Draft/CI and prior DPAPI exception authority. No production access, main merge, tag/Release, stable OTA change, key download, installation or deployment. Recommendation build-pipeline/V5/legacy, source-host trust decisions and native export/orphan collection remain open.
+
+## NEXT-55 — update transaction recovery and bounded failure diagnostics (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / RELEASE_AND_PHYSICAL_QA_HELD.** Full modular-reader objective remains open.
+
+- Continues verified NEXT-54 `bb9bdefe53768a421afa9bc7e7428c541e4af75a`, complete handoff SHA256 `08d6f8ff612ddd7863893edf5de8d5933acd5a9d4be3df6c3fc39b3bede9b432`. That turn completed direct Android local import, actual source-bound installables and synthetic upgrade gates; no production/deployment/release change.
+- Awaits asynchronous launcher failures inside the existing full-update transaction; recovery status-write failures cannot block restoring application/config/database; records backup ownership before partial copy; nonfatal browser fallback errors cannot roll back a healthy installation.
+- Adds source and actual-old-Windows counterexamples, including a work path with spaces. New actual package must restore/start the original application after a deterministic test-only first-spawn error, in addition to ordinary replacement and deliberate health failure. No production fault flag or new updater framework.
+- Extracts a bounded test-diagnostics adapter with progress-field/file allowlists, secret-line omission and byte limits. Windows CI retains only those reports with always-run artifact upload; no profile/database/instruction wildcard. Own-process cleanup verifies its exact synthetic root.
+- Dev70 preserves Dev69 package/certificate; native/JVM logic is unchanged. Exact-source/current CI and actual Windows/Android artifact identity plus stable/prior upgrade/rollback gates are recorded separately. Original runner-only code1 remains **UNDETERMINED**, not attributed to these independently verified defects. [Scope and holds](docs/UPGRADE_RECOVERY_MODULE.md).
+- Same isolated candidate/Draft/CI and prior DPAPI exception authority; no main merge, tag/Release, stable OTA change, private-key download, production access, installation or deployment. Recommendation build-pipeline, trusted extension/runtime decisions and concentrated physical/provider QA remain open.
+
+## NEXT-54 — Android direct local folder/CBZ import (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / PHYSICAL_SAF_QA_PENDING.** Full modular-reader objective remains open.
+
+- Continues frozen NEXT-53 `9ff83d2d09fdcb87e3f43e761ac5e09004b5b5f7`; immutable complete handoff SHA256 `19ebe7123f012394a5d27aad79a57b2d82cc531320b3339a74d34b0d77635293`.
+- Adds phone-local folder/CBZ picker → bounded private staging → preview/explicit confirm → existing Reader/catalog/cover/history. Reuses SAF/DocumentFile/Java ZIP, no new dependency or reference APK code. Pure import rules have a no-Android compilation gate.
+- Device/origin/kind-scoped opaque local IDs, no persisted original URI, no provider authentication/transport. Reimport keeps identity and page-ID progress; invalid/cancelled commits preserve previous inventory. Removing a confirmed app-owned copy leaves original/Desktop/cloud files and private metadata/history untouched. Retired generations remain for in-flight Readers; crash-orphan collection is not claimed.
+- Pinned internal body store is separate from disposable caches/data-root preferences. Existing state formats/database schema/public module APIs stay; additive `localImported` is an availability fact, not a provider download. Dev69 retains Dev68 package/signature. No uninstall/reset or automatic deployment.
+- [Scope, byte/path limits, reuse and unverified native/provider boundaries](docs/NATIVE_LOCAL_CONTENT_INGESTION.md). Exact-source Android/Desktop/browser/actual-Windows and upgrade gates are required in the new handoff; prior results are provenance only. Same isolated candidate/Draft/CI + DPAPI exception authority; no production access, main merge, tag/Release, OTA or private-key download.
+
+## NEXT-53 — recommendation cycle commands, read-only delivery and storage ports (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / DEVICE_QA_PENDING.** Full modular-reader work remains open.
+
+- Continues frozen NEXT-52 `21c94df844f87db7d58aaa9625612b132eaea32f`; immutable complete handoff SHA256 `a6a33363ad1f96e7f26b19f5118989c9db2b9812c61477f052f8df4fe309a1c8`.
+- Moves V3 cycle orchestration and result queries into a domain with explicit read/write/build/clock/identity capabilities. Reuses existing ranker, allocator, ownership/block and tag algorithms; SQLite methods/transactions and the old constructor remain application adapters. Browser-platform compilation checks actual runtime imports.
+- Mobile GET current/cache can only read persisted data; no state initialization, first-batch allocation, seen advancement or recall. Explicit recompute POST prepares the first batch. Local server startup stops legacy automatic recall. Existing Desktop command and portable formats remain.
+- Invalidates warm eligibility for newly seen/duplicate/blocked/temporarily suppressed items, and uses reviewed canonical ownership in both batch and portable views. Stored scores, batches and pool evidence are unchanged. New SQLite/paired-HTTP tests cover these flows; old static guards follow the moved implementation instead of a compatibility facade.
+- Dev code68 retains code67 identity/signature; native logic and shared JVM sources are unchanged. Exact-source CI, actual Windows package checks and stable/prior full replacement/forced rollback must be recorded in the new handoff. Prior green results are provenance only.
+- Initial actual-Windows gate at `eeebe93` correctly rejected the fixture: CLI CSV import creates library membership as well as favorites, so clearing only favorites left both supposed candidates owned and correctly filtered. Preserve the failed CI log, remove only those two synthetic membership rows and assert candidate eligibility before launch. Production ownership logic stays unchanged; rebuild from the corrected final source.
+- [Module contract and remaining build-pipeline work](docs/RECOMMENDATION_CYCLE_MODULE.md). Existing isolated candidate/Draft/CI and DPAPI exception authority continues. No production data, main merge, tag/Release, stable OTA change, private-key download, installation or deployment.
+
+## NEXT-52 — native tag domain and cross-client golden contract (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / PHYSICAL_QA_PENDING.** The full modular-reader objective remains open.
+
+- Continues frozen NEXT-51 `b4517ea70519d0266c985e1f67cb48beb393bc2d`; complete immutable handoff SHA256 `2412d0fcadbd5bde549e963cb1d86da230d0139511bd307b13d48ac438670dbd`. Old archives/results are unchanged.
+- Extracts pure Java personal-tag normalization, participation, private matching and unique-work counts. Existing org.json, Android catalog/portable/E-H raw-fact stores and editor remain adapters. No new dependency/protocol or taxonomy framework.
+- Both Desktop and Android read the same 44-case hand-authored synthetic fixture. Empty-classpath compilation plus SDK28/35 domain/adapter tests protect provider isolation, raw namespaces, private binding, explicit save/conflicts and immutable inputs.
+- Corrects Android's missing local namespace in unscoped controls, stale selected-list influence in ALL and missing current-comic facts at score gates. Explicit malformed false/numeric-name state rejects instead of coercing/resetting. Valid schema1/module API2 state, raw BLOCK, pending/cache baseline, ranking weights and Visual remain unchanged.
+- Candidate Dev code67 must preserve code66 identity/signature. Full local tests, exact-source CI, downloaded-artifact inspection and actual Windows update/forced rollback receipts are required in the separate handoff; no previous green result validates this source.
+- [Detailed boundary and device holds](docs/NATIVE_TAG_POLICY_MODULE.md). Recommendation service ports, Android local import, source-runtime/trust decisions and deferred concentrated user tests remain open. No main merge, tag/Release, stable OTA, production access, key download, automatic install or deployment; prior isolated-write/DPAPI exception authorization remains in effect.
+
+## NEXT-51 — native Reader gesture decision seam (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_RECORDED_IN_HANDOFF / PHYSICAL_TOUCH_QA_PENDING.** The complete modular-reader objective remains open.
+
+- Continues frozen NEXT-50 `76898ad29c1ac804b7451ac889107511c7532b21`; immutable complete handoff SHA256 `7c2003e35c5a5a48a735da2488821939c57f037a5046f3d31cc833ecf9d6a1e2`. No old archive/evidence is overwritten.
+- Extracts pure Java gesture decisions and per-touch ownership from the image widget. Reuses Android GestureDetector/ScaleGestureDetector and existing AndroidX containers, not a new recognition stack. A no-Android compilation gate and plain JUnit protect the seam.
+- Adds SDK28/35 event regression for cancelled/pending taps, recycled/detached views, vertical-dominant flings, parent interception, pinch/pan and pager-managed suppression. Disabling double-tap also disables Android quick-scale; pinch remains independent.
+- Local Desktop: 1359 passed + one existing POSIX-host skip. Android: 285 passed + 13 existing Windows/SDK35 AtomicFile skips (298 total, required to execute on Linux CI); lint and release shrinker passed. Running the old widget against the new 36-case SDK28/35 event suite produced eight expected failures across four defect scenarios; restoring the candidate must pass again before freezing evidence.
+- Preserves phone-local preference file/keys/defaults and existing zoom levels; portable reading settings, progress, sources, accounts, schema and production data are not migrated or reset. Candidate Dev code66 must retain code65's package/certificate.
+- [Detailed contract and remaining physical-device limits](docs/NATIVE_READER_GESTURE_MODULE.md). Automated counts, exact-source CI, actual installable hashes and Windows update/rollback evidence belong in the separate handoff. No issue/device acceptance is inferred from CI, and no user test is forced now.
+- Existing isolated-development/Draft-PR/CI and DPAPI coordination exception authorization continues. No main merge, tag/Release, stable OTA, production-profile access, key download, automatic install or deployment.
+
+## NEXT-50 — phone-local native source lifecycle (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / LOCAL_REGRESSION_PASS / EXACT_SOURCE_CI_AND_PACKAGE_EVIDENCE_IN_HANDOFF / REAL_DEVICE_QA_PENDING.** The full modular-reader objective remains open.
+
+- Continues immutable NEXT-49 `81f8b5665c6ba456a64b6660049727182d3ff4d1`; its complete handoff SHA256 is `9385440668d86fdb96e682eaeded5fba9fc54e56b61c8fbfe0be01f9f3f0246f`. Previous archives/evidence remain unchanged.
+- Adds phone-local Pica/E-H/JM choices with explicit draft/save, stale-revision protection, retained rotation draft and Chinese/English/Japanese UI. New installations start source-free; existing installs adopt legacy availability once, without decoding credentials. Desktop pairing does not overwrite phone choices.
+- Pure Java source authorization is separate from Android storage/UI. Existing direct and Desktop-relay provider transports, workers, metadata/favorite imports and image caches receive cancellation/late-result guards. JM uses the existing pinned SDK with non-blocking request-monitor revocation. Local/LAN/WebDAV reads and stored data remain independent.
+- Synthetic tests cover source policy, real AtomicFile persistence/restart, locales, task cancellation/data retention, stale results and already-cached/local Reader pages. Windows SDK35 AtomicFile persistence cases are explicitly skipped only on that host and must execute on Linux CI; SDK28 counterparts pass locally. Final counts and exact-source CI/installable evidence are in the separate handoff.
+- Existing task registries are preserved even when a historical identity is malformed; re-enabling does not automatically resume paused downloads/bootstrap. Dev code65 retains the existing package/certificate; current Windows artifacts and upgrade/rollback gates must cover the shared JVM change.
+- [Implementation, migration and remaining device limitations](docs/NATIVE_SOURCE_LIFECYCLE.md). Native WebView/SAF/OEM behavior, real provider accounts, gesture acceptance and the remaining architecture work are not certified by synthetic tests.
+- Existing authorization covers isolated edits, this Draft PR and unpublished CI builds. No main merge, tag/Release, stable OTA change, production data/credentials, private-key download or deployment; the previously authorized DPAPI coordination exception remains in effect.
+
+## NEXT-49 — persisted Desktop source lifecycle (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / LOCAL_AUTOMATION_PASS / EXACT_SOURCE_PACKAGE_GATES_IN_HANDOFF / NATIVE_LIFECYCLE_AND_DEVICE_QA_PENDING.** Not completion of the full modular-reader objective.
+
+- Continues immutable NEXT-48 `963af71c96e55578722f0806e37393b5bfa40c13`; its complete handoff SHA256 is `ec732724f7435eecc8a012008d290f8a9c34252671fffa8f70536a3c28eb0f86`. Prior artifacts/proofs are not overwritten or relabeled.
+- Adds a pure source-policy/request-lease module and atomic Desktop configuration adapter, explicit three-language Read → draft checkbox → Save UX. Fresh local setup has no online source enabled; existing pre-policy configuration preserves legacy choices. Credentials, library membership, local Reader/LAN and current recommendation batches are not deleted or reset.
+- Low-level Pica/EH/JM transport guards cover retained clients, not just UI/registry entrypoints. Disable aborts requests/closes JM; stale completions cannot import metadata after disable/re-enable. V3 no longer requires Pica when its source is off and EH is selected; capabilities/planning reflect enabled sources. No ranking/Visual re-tuning.
+- Mobile Desktop account status honors source availability; phone-owned source toggles/worker lifecycle remain a separate unfinished step. Existing direct phone sessions are not silently disabled by Desktop. Draft Dev code64 retains package/fixed signing certificate, with no install/OTA action.
+- Local tests: TypeScript, Web45 syntax, 1359 assertions + one platform skip; Edge46 including all three locale source-choice cases. Actual new archives, CI and restart/upgrade proofs are bound in a separate final handoff. [Detailed semantics, failure handling and holds](docs/SOURCE_LIFECYCLE.md).
+- No main merge, tag/Release, production data/credential reads, automatic deployment or new extension host. DPAPI coordination remains unavailable; the user's existing isolated-write exception is reused without changing identities/secrets.
+- Pre-build fixture review found that the earlier packaged media test assumed every fresh local installation could immediately fetch JM covers. The new explicit opt-in contract correctly forbids that. Update the fixture to assert all sources initially off, explicitly enable only JM, and test real in-flight HTTP cancellation, disabled-request rejection, stale-save protection and policy persistence through actual shutdown/relaunch. Do not weaken the production default to preserve an obsolete fixture assumption.
+
+## NEXT-48 — local folder/CBZ ingestion and cache freshness (2026-10-23, unpublished)
+
+**IMPLEMENTED_IN_ISOLATED_CANDIDATE / EXACT_SOURCE_PACKAGE_GATES_RECORDED_IN_FROZEN_HANDOFF / MANUAL_QA_PENDING.** This does not complete the full local-reader/source lifecycle objective.
+
+- Continues frozen NEXT-47 `241734856565b09f6bf18dae43b4f2fba6094268`; actual source/media Windows + fixed-signature Dev gates passed in run39944017468, with complete unchanged handoff SHA256 `bf344a511dc5ad5abb854f61a5f3629cef06c95e03078741bad88ceca7845798`. Prior evidence is provenance, not acceptance of new source.
+- Adds independent catalog `local:` identity (not an online adapter); existing native folder/CBZ open picker → bounded preview → explicit copied import → existing Reader and authenticated LAN. A narrow inventory storage port separates ingestion from SQLite/source auth/recommendation. Originals are untouched; no disk-wide scan or credential transfer.
+- Reimport preserves origin-based comic IDs, relative chapter/page IDs, logical reading position, favorites/private state; missing pages leave the readable inventory, missing chapters retain unavailable identities/history. Input changes/SQL failure preserve the old committed inventory. Limits, cleanup/crash-orphan holds and unsupported CBR/PDF/Android direct import are explicit in `docs/LOCAL_CONTENT_INGESTION.md`.
+- Fixes browser cover freshness (`private, no-store`) and revisioned imported-body URLs preserved by the paired bridge. Corrects source labels/CSV inference, local tag namespace on both clients, native foreign-source fallbacks and local detail's inappropriate Pica-login action. Local-only storage can now contain ordinary words such as “account/token”; config still rejects secret keys and credentialed proxy URLs.
+- Library/tag module APIs2 intentionally require the existing one-click full replacement, not a forced incompatible delta; schema14/Reader/source APIs unchanged. Dev code63 must retain the fixed package/certificate. Real Windows-archive CLI/import/Reader/reimport/restart is added to CI, alongside full successful/failed-health recovery and native tests.
+- First browser attempt stopped at the ordinary welcome guide, then used the existing completed-v2 fixture contract (disclaimer still handled normally). First full suite found two historical test assumptions: first-adoption module floor and the old three-provider catalog type. Tests now preserve the old compatibility-floor case, explicitly reject the new module break as incremental, and cover the local catalog identity rather than weakening production guards. Failures remain in task evidence.
+- Exact new source/hash and applicable-platform counts are frozen after build; no previous artifact is renamed. Native dialogs/OEM gestures, real devices/accounts, AI semantic usefulness, source opt-in/trust lifecycle and further recommendation/native decomposition remain pending. No issue closure, main merge, tag/Release, stable OTA, production data, key download or deployment.
+- Pre-handoff source review of `1042af3` also found the legacy recommendation fallback calling `pica.related(seedId)` directly, outside the registry. Restrict that specific native-ID route to legacy Pica catalog identities; a synthetic behavioral test proves local favorites never reach it while a real Pica-identity fixture still does. This is source routing, not a ranker-weight/model change. Rebuild the final follow-up source rather than accepting the superseded in-progress artifacts.
+- The actual Windows ZIP gate at `5ce9879` failed after successful import/ordinary/media checks: imported paths used native async canonicalization, while Reader's legacy synchronous realpath retained a Windows 8.3 root alias (`RUNNER~1` vs long user path) and falsely treated owned files as outside the library. Use native realpath for both Reader root/file, retaining the escape rejection. Add a deterministic alias-mismatch regression and better actual-archive chapter diagnostics. Source-only/old-launcher-overlay diagnostics pass but are explicitly not installable proof; retain the real CI failure and rebuild/reverify the final archive.
+- Follow-up `d38b9ae` passed actual Windows CI run39955461162 and independent downloaded-package import/Reader/reimport/restart; both v0.5.0 and prior candidate full replacement/forced rollback preserved synthetic state. Final evidence collection nevertheless rejected the browser count: the shell CI selector still ran 42 tests, omitting the new local-import scenario that passed among 43 locally. Add that scenario to the existing CI command; preserve the count discrepancy and rebuild from this final coverage fix. Do not report local-only execution as CI execution.
+
 > **Purpose:** authoritative engineering task log for the architecture/runtime/multi-platform expansion.
 >
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
-Last reconciled: **2026-09-26**  
-Authoritative repository baseline after unpublished RC packaging: `main@a6115aa2a9e60bf9e1c8a8f2e0ead9d02099a1de` (P2 RC / PR #195 merged)  
-Current critical-path work: **representative Windows/Android RC manual/physical evidence → K5 variance/budget review**
+Last reconciled: **2026-10-12**
+
+2026-10-21 isolated integration update: see **NEXT-38/39** and its exact-source package evidence. The dated reconciliation below remains historical; it is not a fresh acceptance claim for every backlog item.
+
+Audited repository baseline: `main@095d6910c34e00824e03b08a30af0ce4e708137e` (post-release reconnect fix, PR #198 merged)
+
+Published baseline: **v0.5.0 / Android v55**, source `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`, published 2026-10-01 UTC
+
+Current critical path: **NEXT-33 isolated post-release RC evidence → representative Windows/Android manual/physical evidence → K5 variance/budget review**
+
+## Current reconciliation — 2026-10-12
+
+Historical dated entries below retain their original context. The table below and the current NEXT status lines supersede obsolete "publication pending" or "J1/J2 only" wording; publication does not close the larger engineering backlog.
+
+| Lane | Verified progress | Still open |
+| --- | --- | --- |
+| NEXT-32 release | [v0.5.0 published](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0); [publish run 36815096800](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/36815096800) passed released Windows upgrade, Android signing/install and asset verification | No new release authorized by this reconciliation |
+| Post-release reconnect / NEXT-33 | PR #198 merged; [RC run 37492489884](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/37492489884) passed contract, Windows, Android and summary jobs at `454e9fef1a04` | Representative restart/reconnect and device QA remain pending. Artifacts are no longer listed by the run API on 2026-10-12; historical package PASS is not current download availability |
+| P2-J / P2-K | J1–J11 measurement harnesses and K1–K5 collection/reconciliation tooling implemented | Nine representative evidence categories listed in NEXT-33; no performance budget or P2 completion claim |
+| P2-C / P2-G | Desktop and Android G17 resource observation implemented | C3/G20 enforcement remains evidence-blocked; do not invent capacities |
+| H2B | Visual QC / Author Atlas / Style Family timing and synthetic scaling available | Real measurements and foreground/background threshold decision |
+| NEXT-28 | Release-scope corrective work shipped through PR #197 | A3 author-work completion prominence and A5 deeper refresh decomposition; PR #196 is a divergent Draft, not an accepted replacement for main |
+| P4 / P4B / P6 | Automated previews and Windows/Android release paths exist | Real-platform/provider/rollback/performance/trust evidence; Server/Docker deployment and soak acceptance |
+| W5 | W5A/B/C complete | W5D onboarding and W5E weak-network acceptance planned; W5F/G/H remain deferred |
+| Community feedback / NEXT-34–35 | Display-only atlas projection and full-local-catalog preference discovery implemented in local-only `e12d48839d0a`; local automated gates passed | Implementation is not uploaded in this documentation update. Fresh remote CI, Windows package/human acceptance and #200 explanation/taxonomy/Android gaps remain open; neither issue is closed |
+| Reader reference analysis / NEXT-36 | Isolated static analysis and 14-feature inventory completed; 27 analysis-model tests passed | Target APK was not executed; 28 reference-runtime scenarios remain pending. No third-party implementation or assets are imported |
+| Android Reader gestures / NEXT-37 | Phone-local double-tap switch and 1.5×/2×/3× zoom implemented locally; 28/28 targeted tests passed | Uncommitted local source only; full Android build/lint/APK, ReaderActivity integration and device QA are not complete |
+
+### 已推进但未验证 / Unreleased implementation inventory
+
+The local-only work above is **PARTIAL**, not released capability. [Conversation progress and evidence limits](docs/UNVERIFIED_PROGRESS_20261012.md) records NEXT-34–37 with the remaining acceptance gates. This documentation commit uploads no application source, APK, decompiled material or private data. Historical RC checks do not validate the newer local implementations.
+
+P1-E/G follow-ups and P1-F/P3 regression obligations remain open as documented. Old dependency-cleanup Drafts #23/#24 are not evidence of accepted implementation. Do not merge PR #196 wholesale: overlapping changes already shipped through #197, while its remaining author-progress work needs a current-main port and fresh tests.
 
 ---
 
@@ -1137,20 +2676,21 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 - **C1:** add a tested resource coordinator with shared resource-class vocabulary, atomic multi-resource leases, priority/FIFO admission semantics, cancellation and diagnostics. Production mode remains observe-only and does not impose invented capacities.
 - **C2 first batch implemented:** maintenance update, repair, organize, Recommendation V5 Shadow and Work Identity evidence refresh now declare observe-only resource leases; Desktop-only diagnostics expose current/peak overlap.
 - **C2B Desktop batch implemented:** Recommendation V3, favorites sync, local/GitHub download runners and WebDAV now join the same process-wide observe-only resource graph. Desktop injects one coordinator into LibraryService and RemoteStorageDesktopManager; existing task schedulers remain authoritative.
-- **C2 remaining:** collect overlap/latency evidence, keep Visual under its H2B timing path unless phase/resource observation is useful, and design Android-specific cross-task observation rather than copying the Desktop mechanism.
+- **C2 remaining:** collect overlap/latency evidence and keep Visual under its H2B timing path unless phase/resource observation is useful. Android-specific cross-task observation is already implemented under G17; its physical overlap evidence is still pending.
 - **C3 later:** propose enforceable capacities only after overlap and latency evidence exists; before enforcement, task-lifetime leases must become phase-aware where needed so paused tasks do not reserve enforced capacity.
 
 Use the runtime inventory plus H1/H2 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
 
 ## NEXT-5 — P2-J/P2-K performance baseline
-**Status: IN_PROGRESS — J1 telemetry + J2 repeatable Desktop scenario windows**
+**Status: PARTIAL — J1–J11 and K1–K5 tooling implemented; representative evidence and budget decisions pending**
 
 - **J1 implemented:** bounded in-memory local HTTP latency telemetry classifies requests into low-cardinality route classes and correlates them with active resource-task types without storing URLs, comic IDs, search terms, bodies, tokens or paths.
 - Desktop-only `/api/v1/desktop/runtime/http-profile` exposes count/p50/p95/max/error summaries for overall, idle, under-load, route class and active task type.
 - **J2 implemented:** `pnpm benchmark:http-latency-scenario` drives repeatable sequential Library/detail/Reader foreground traffic against an already-running loopback Desktop engine, with warm-up, clean telemetry reset and three rounds by default.
 - J2 idle windows are valid only when every foreground sample is idle; load windows are valid only when each requested observed task covers every foreground sample. This validates the measurement window, not the performance result.
 - The J2 harness never starts or controls the measured background workload, never emits discovered comic/chapter IDs, and selects no latency threshold or release budget.
-- **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
+- **Current reconciliation:** J3–J11, Android G18/G19 and K1–K5 now provide the additional measurement/collection paths; they are no longer future implementation work. The J1/J2 details above describe the original foundation only.
+- **Next:** collect representative Windows x64 idle/load and Android physical startup/jank/overlap evidence using the existing harnesses, reconcile through K5, and only then review variance and budgets. See NEXT-33 for the explicit missing evidence categories.
 
 ## NEXT-6 — P2-D SQLite/query discipline
 **Status: PARTIAL — D1–D8B + D7C merged; evidence collection blocks further production query rewrites**
@@ -2790,12 +4330,14 @@ Stable v0.4.11 Release assets and stable OTA metadata remain untouched.
 
 
 ## NEXT-32 — Next stable release scope / v0.4.11 bridge / support-provider reconciliation
-**Status: RELEASE FREEZE — permanent v0.5.0 / Android v55 stamp committed; final stamped candidate + publish transaction pending; broader project backlog remains open**
+**Status: DONE — v0.5.0 / Android v55 published and release transaction verified; broader project backlog remains open**
+
+Publication authority: [v0.5.0 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0), 2026-10-01 04:46:04 UTC; source `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`; [publish run 36815096800](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/36815096800). The post-release reconnect commits on main are not included in these immutable published assets.
 
 ### Why this entry exists
 The next stable release must not be treated as equivalent to “finish every open item in this log”.
 
-Repository history confirms three different scopes:
+The original 2026-09-30 pre-release reconciliation recorded three different scopes (historical counts, not current branch distances):
 
 1. public stable `v0.4.11`;
 2. current `main`, which is **1058 commits ahead of v0.4.11** and already contains a large body of unreleased architecture/runtime, evidence tooling and experimental-platform work;
@@ -2856,8 +4398,8 @@ The next stable release may contain already-implemented runtime/internal improve
 - internal runtime/performance hardening;
 - experimental or unsupported platform work that is **not** being promoted to formal support.
 
-### R4 — Current release blockers after this reconciliation
-Before publication:
+### R4 — Historical release gates, completed by the v0.5.0 publication
+The publication transaction completed the following gates; they are retained as the release contract, not listed as current blockers:
 1. AZZ migration passes Web/Android/localization tests and old support endpoints are absent from active surfaces.
 2. v0.4.11 -> target source-scoped incremental package is generated from the real public v0.4.11 Windows ZIP and proves schema 13 -> 14 plus unchanged legacy `app/updater.js`; after the upgraded target starts, the external persistent assistant under `runtime-state/upgrade-assistant` must also be present and hash-bound to that target.
 3. The final version number / Android versionCode are stamped once release scope is frozen.
@@ -2935,3 +4477,272 @@ State update:
 - Client-side hardening for subsequent upgrades: reconnect now probes both target-version capabilities and a no-cache Web shell, requires a 1.5-second continuous stabilization window, and only then reloads.
 - The final reconnect failure copy now tells users to wait briefly and refresh the current page before reopening the application.
 - No v0.5.0 Release asset, tag, OTA pointer, database schema, updater package format or version stamp is changed by this branch. The fix is isolated for the next patch release candidate.
+
+## NEXT-33 — Post-v0.5.0 isolated RC and evidence-ready handoff
+**Status: PARTIAL — automated installable-package gates passed at `454e9fef1a04`; representative physical/manual evidence remains pending; UNRELEASED**
+
+Scope:
+- Keep main's existing reconnect fix; add real-Chromium regression coverage for startup 503, a transient shell failure resetting the stability window, wrong version, non-HTML shell and network loss.
+- Preserve the historical 0.4.11 P2 RC workflow. Its hard-coded baseline cannot build current 0.5.0 metadata; add `post-stable-rc-packages.yml` and a guarded `-PostStable` builder mode instead.
+- Use source-bound `0.5.0-postrc.<12-char-sha>` application metadata, a checksum-pinned public v0.5.0 Windows launcher baseline and a new `%LOCALAPPDATA%\Pica Library Post Stable RC` root. Do not read/copy/migrate stable or historical P2 RC user data.
+- Android remains the fixed-certificate `com.picalibrary.android.dev` side-by-side identity. Stop on signature/version incompatibility; do not uninstall the user's Dev app or copy its data.
+- PR events run the non-secret contract only. Trusted branch/manual runs build and verify both installables. A machine-readable `RC_STATUS.json` distinguishes contract-only from package-ready and always keeps manual/physical QA pending.
+- No stable version bump, release/tag/OTA change, production database operation or local deployment is authorized by this lane.
+
+Acceptance:
+1. Type, Web, unit/integration and Chromium regression checks pass.
+2. Trusted CI uploads source/hash-bound Windows and Android artifacts; skipped jobs do not count as package PASS.
+3. Isolated Windows artifact smoke and released-v0.5.0 full-replacement acceptance preserve the temporary external test data. This does not bypass stable-to-RC OTA validation and is not user-machine evidence.
+4. Representative restart/reconnect behavior and Android device acceptance remain separate manual gates.
+
+Representative evidence still required before K5 variance/budget review:
+- Windows K1;
+- Android K2;
+- Android K3 real download;
+- Android K3 real Reader;
+- Windows K4 manual/recovery;
+- Android K4 manual/OEM;
+- J7B real Provider;
+- J10 real Visual;
+- low-end Windows CPU/jank trace.
+
+Verified historical package evidence: [run 37492489884](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/37492489884), exact source `454e9fef1a04a5fdbc17227af2fe755e52c6fbd7`, completed successfully; contract, Windows RC, Android RC and artifact summary jobs all succeeded. The run's artifact API lists no remaining downloads as of 2026-10-12. Do not relabel an old package as the local NEXT-34/35/37 implementation or claim the documentation-only head was built.
+
+K5 tooling completion permits at most `READY_FOR_HUMAN_VARIANCE_AND_BUDGET_REVIEW` after valid evidence reconciliation, not automatic P2 completion or concurrency enforcement. Detailed operator boundary: [POST_STABLE_RC_READINESS.md](docs/POST_STABLE_RC_READINESS.md).
+
+## NEXT-34 — Optional preference-aware collection-map view (#199)
+**Status: PARTIAL — Desktop/Web display projection implemented and locally tested; Windows package/human acceptance pending; LOCAL ONLY / UNRELEASED**
+
+Source: [issue #199](https://github.com/Saber-Alter-Lily/pica-library/issues/199), opened 2026-10-03 UTC.
+
+- Local implementation selects the reporter's opt-in BLOCK/LESS display alternative, with independent switches and default-off objective view. A separate manual exclusion list is not implemented.
+- Preserve the default objective collection view and clearly expose the selected view/filter.
+- Do not mutate favorites, embeddings, original analysis inputs, recommendation policy, feedback or sync state when toggling the view.
+- Automated synthetic-fixture tests cover original snapshot counts/denominators/IDs, empty/error/legacy states, browser-local refresh persistence, immutable projection and read-only service/GET behavior. Filtered views cannot use the old objective PDF export.
+- Local source: `codex/issue199-200-preference-discovery@e12d48839d0ad1ac86964c14cdc0164a5ebfe0a0`, based on the separate PR #203 readiness candidate; this source is NOT part of the current GitHub documentation commit.
+- Required next gate: fresh frozen dependency installation/remote CI, an isolated Windows package, and human objective → BLOCK → LESS → both → objective acceptance without production mutation. See [evidence and limitations](docs/UNVERIFIED_PROGRESS_20261012.md#next-3435--issues-199200-local-implementation).
+- Registration is not closure of the issue or authorization to change recommendation science.
+
+## NEXT-35 — Sparse-tag and interest-explanation discovery (#200)
+**Status: PARTIAL — full-local-catalog discovery and evidence wording implemented locally; explanation/taxonomy/cross-client work remains open; LOCAL ONLY / UNRELEASED**
+
+Source: [issue #200](https://github.com/Saber-Alter-Lily/pica-library/issues/200), opened 2026-10-03 UTC, including the reporter's taxonomy suggestion.
+
+- Separate sparse/coarse Provider tags, collection-frequency summaries and explicit/inferred personal interest in the UI and audit evidence; a collection count is not an interest label by itself.
+- Reproduce the reported manual-tuning burden with a bounded, user-authorized audit export; do not silently inspect or mutate production databases.
+- Assess explanation, unknown-evidence handling and opt-in taxonomy normalization before any recommendation-weight change.
+- An external taxonomy suggestion is a design input, not permission to scrape/import it. Evaluate licensing, provenance, term mapping, updates and user control before choosing a source.
+- Acceptance must preserve existing explicit preferences, avoid fabricated inferred interest and demonstrate whether the agreed change reduces unnecessary manual adjustments.
+- Local implementation searches the complete local catalog before capping results, uses simplified/traditional and existing-alias matching for discovery only, preserves raw preference keys and retains staged edits across searches. Default/mobile bounded snapshots and ranking/matching semantics remain unchanged.
+- Local automated evidence at `e12d48839d0a`: TypeScript PASS; Web syntax 38/38; unit/integration 226 files / 1231 PASS + 1 existing skip; headless Edge 28/28; Rollup and bundled OpenCC MIT/Apache notices PASS. Frozen lockfile-only check is not a fresh dependency installation.
+- Still unverified/unimplemented: actual tuning-burden reduction, artist/style-vs-tag explanations, missing-evidence/opt-in annotation design, versioned cross-client alias migration, Android full-discovery parity and external taxonomy licensing/mapping. No Moegirl import or neural-model change.
+- Windows packaging, Android native/device acceptance and remote CI for this local implementation were NOT RUN; PR #203's earlier CI must not be reused as their evidence.
+
+## 2026-10-06 — Post-release task reconciliation
+
+- Reconciled the current release state against GitHub Release, workflow jobs/artifacts, open PRs/issues and current-main source. Historical implementation notes remain intact.
+- NEXT-32 publication is DONE; NEXT-33 contains unreleased packaging/reconnect acceptance. NEXT-34/#199 and NEXT-35/#200 are tracked but not claimed fixed.
+- This change does not close PR #196 or import its divergent branch. A3/A5 residual work needs a separately reviewed current-main change.
+- Validation outcomes belong to the exact reviewed source/CI run; no CI success is a substitute for the nine external evidence categories above.
+
+## NEXT-36 — External reader behavior analysis and bounded adaptation design
+
+**Status: PARTIAL — isolated static analysis/inventory completed; reference-runtime validation pending; no feature integration claim**
+
+- Reference: user-provided MH-ARK 0.4.3.3. Complete APK/DEX/Smali/native capture was audited locally; high-level decompilation remains PARTIAL and is not original rebuildable source.
+- Reader analysis verified 5 JNI classes / 27 bindings and 48 configuration fields. Its 27 passing tests are analysis-design-model tests, not Android runtime tests.
+- The feature inventory contains 14 feature cards, 51 evidence groups and 142 source anchors. The 115 selected protected inputs remained unchanged at that phase; this is not a claim that all recovered code was behaviorally verified.
+- Target APK execution, runtime/performance/network/format compatibility and all 28 inventory QA scenarios are still pending.
+- Learning priorities: per-comic reading presets, adjustable gestures and split/spread display; later evaluate local directory/CBZ reading and comic/chapter cache control. These are design candidates, not accepted release scope or completed features.
+- Existing multi-WebDAV, categorized cache, preloading and library filtering should be reused, not rebuilt. Do not copy unsafe original-file deletion semantics or describe a privacy lock as proven encryption.
+- Third-party code, libraries, resources, APKs and decompilation outputs remain local isolated analysis material. Any Pica change must be independently implemented and separately verified; this documentation update uploads none of those materials.
+
+Acceptance still required:
+
+1. Confirm the chosen Pica source baseline against current main before implementation.
+2. Define only a small user-visible slice, original-page progress identity and non-destructive fallback.
+3. Verify target reference behavior where needed; treat unavailable runtime evidence as unknown.
+4. Complete the slice's own build/integration/device/data-preservation gates. NEXT-37 is the only local implementation slice so far.
+
+## NEXT-37 — Android phone-local double-tap and zoom options
+
+**Status: PARTIAL — local implementation + targeted tests PASS; full app/package/device gates PENDING; LOCAL ONLY / UNRELEASED**
+
+Local authority:
+
+- Branch `codex/android-reader-gesture-polish`; base `e12d48839d0ad1ac86964c14cdc0164a5ebfe0a0`, not asserted to be latest main.
+- Seven changed/new source/test files remain uncommitted locally. No implementation push, merge, APK installation or release is performed by this record.
+
+Implemented:
+
+- Reader → 阅读设置 → 手势与放大（仅此手机）.
+- Phone-local double-tap enable/disable, default enabled; selectable 1.5× / 2× / 3×, default 2×.
+- Disabling double-tap removes tap-confirmation waiting; pinch zoom stays available.
+- Existing/rebound page holders use current settings without chapter reload, reading-progress reset or zoom reset.
+- Scrollable Chinese/English/Japanese options; existing ReaderSource, cache, progress, portable settings and sync contracts are unchanged.
+
+Evidence:
+
+- 28/28 targeted tests PASS, zero failures/skips: settings 5, options 4, zoom 9, existing ReaderPolicy regression 10 (**18 new tests**, not 28 new tests).
+- Isolated SDK-free Java/Robolectric 4.17 harness compiles the repository settings/options/zoom classes directly against API 35; JDK 21 / harness Gradle 9.0.0.
+- This is NOT a full Android AGP/CI build, and does not establish ReaderActivity integration. Project build/signing/version settings are unchanged.
+- `git diff --check` PASS; all seven file hashes match the local validation record at this reconciliation. Production data/application, provider, recommendation and sync state are untouched.
+
+Acceptance still required:
+
+1. Review/rebase against current main without losing the local issue work.
+2. Full Android build, lint and Dev APK verification; the earlier local test run lacked an Android SDK.
+3. ReaderActivity integration and physical-device touch QA: immediate single tap when disabled, selected double-tap scale, pinch/pan, gesture cancellation and parent-scroll/page conflicts.
+4. Settings persistence after relaunch, recycling/rebind, active-page updates and orientation; unchanged chapter/progress/cache/source/sync behavior.
+5. Human acceptance before any merge or release. Do not infer package/device PASS from the 28 targeted tests.
+
+## 2026-10-12 — Conversation progress recorded, documentation only
+
+- Reconciled NEXT-33 against the exact successful historical run; kept its manual/physical gates and missing current artifact downloads explicit.
+- Advanced NEXT-34/35 from design registration to **local implementation / PARTIAL**, not issue closure or released behavior.
+- Registered NEXT-36 static reference analysis and NEXT-37 local Reader gesture slice separately, with independent evidence levels and remaining gates.
+- Documentation is updated on existing Draft PR #203 only. The PR remains unmerged; the current source implementations and private analysis remain local.
+- No application-source upload, version/signing/schema/model change, release/tag/OTA transaction, production-data operation or deployment is authorized.
+- The documentation-only commit skips automatic push/PR CI. Prior checks remain bound to their exact implementation SHA; no new application validation is claimed.
+
+## NEXT-38 — Consolidated issue/source/reader acceptance candidate
+
+**Status: IN_PROGRESS / UNRELEASED — isolated implementation and automated integration; physical/provider acceptance PENDING**
+
+- Authorized on 2026-10-21, including the explicit one-round exception for the DPAPI-blocked Local Memory coordination lock. No coordinator secret/identity is changed.
+- Independent checkout/branch `codex/next-acceptance-sources-jm`; original Reader dirty worktree remains preserved. The latest PR #203 documentation is reconciled without dropping its historical evidence limits.
+- NEXT-34: retain default-off BLOCK/LESS display projection and current automated regressions; no recommendation/data mutation or issue closure.
+- NEXT-35: retain Desktop full-catalog discovery; add Android search-only folding/aliases, explicit staged Save/Undo, rotation retention and collection-vs-interest wording. Taxonomy import, model changes, actual tuning-burden proof and versioned cross-client alias migration remain open.
+- NEXT-37: integrate the phone-local gesture slice into the full app; no borrowed reference-APK code/assets. Device touch/OEM acceptance remains pending even after compilation.
+- [Issue #204](https://github.com/Saber-Alter-Lily/pica-library/issues/204): opt-in JM account favorites using maintained MIT SDK v1.1.12; verified-account bounded preview/confirm, additive import, cancellation, metadata completeness and explicit enrichment; native Android and Desktop search/Reader routes.
+- Source registry preserves Pica/EH IDs, rejects unknown prefixes and exposes capabilities. It is a compiled extension seam, not a completed third-party plugin ecosystem. Automatic JM candidate recall and native JM phone-download/sync are not claimed.
+- Current evidence/limits, upstream licenses, package gates and consolidated device checklist: [NEXT_ACCEPTANCE_EXECUTION.md](docs/NEXT_ACCEPTANCE_EXECUTION.md), [JM_SOURCE_ADAPTER_ACCEPTANCE.md](docs/JM_SOURCE_ADAPTER_ACCEPTANCE.md).
+- Local final automated baseline: Desktop 228 files, 1245 PASS + 1 existing skip; TypeScript and Web 39/39; Edge browser 29/29; Android 34 files / 151 PASS, lint, Dev build and Release R8 build PASS. Android AtomicFile host semantics and upstream R8 warnings are documented; these checks do not establish real-device/provider acceptance.
+- The user separately authorized candidate-branch push, Draft PR and existing-secret CI signing. Remote/package results must still be recorded against their own source SHA; no local debug signature may be supplied as an existing-Dev upgrade substitute.
+- Candidate branch CI/package construction only. No production app/database/credential/Visual/sync operation, local deployment, main merge, formal version/tag/Release/OTA change, automatic issue response or closure.
+
+## NEXT-39 — After consolidated acceptance
+
+**Status: PLANNED, not implemented by NEXT-38**
+
+- Decide source-repository/manifest trust, source enable/disable/update lifecycle and legal/distribution policy before dynamic extensions.
+- Add bounded JM recommendation retrieval only after real metadata/profile evidence and a separate recommendation review; never synthesize Like/style labels from imported favorites.
+- Native JM progress/proxy and complete locale parity; NEXT-40 separately implements and validates the native download slice. Further source adapters use the registry and maintained upstreams, not one-off protocol copies.
+- Preserve all unrelated P2/W5/NEXT-28 performance, onboarding, author-progress and device evidence backlog above; this candidate does not declare them complete.
+
+## NEXT-40 — Native JM explicit downloads and offline Reader
+
+**Status: IN_PROGRESS / UNRELEASED — source implementation; fresh exact-source automated/package gates and real-device/provider acceptance PENDING**
+
+- Continued on 2026-10-22 after explicit permission to bypass the still-failing DPAPI coordination claim for this isolated development/build round. No memory identity or secret is repaired or replaced.
+- Base: previous frozen NEXT-38 candidate `0549bc5e271d936c656cd9c6bdf6baa7e13b5681`, Draft PR #205. Keep the prior handoff ZIP unchanged.
+- Scope: explicit JM single/all-chapter downloads via the maintained SDK, existing WorkManager resource tags and task center, Wi-Fi constraints, pause/resume/cancel, durable checksum-verified page checkpoints, and the existing phone-download Reader/index.
+- Complete-chapter publication only: interrupted/failed chapters are retained for resume outside the readable index. Invalid source/chapter/page identity, non-image content and changed login binding fail closed. Logout/account switching never deletes previously completed local downloads.
+- Same-comic jobs use unique WorkManager identity and a local write lock; duplicate KEEP requests cannot relabel the actual queued chapter. A job carries only a non-secret session binding, never a password or cookie.
+- JM search results open the common detail screen; JM chapter/all-download controls are added there. JM account/favorites controls must not incorrectly redirect users to Pica login.
+- No database-schema, recommendation-ranker/recall, Visual/embedding, sync-protocol, stable-version/tag/Release/OTA or production-state change. No automatic deployment or manual testing requested now.
+- Remaining acceptance and exact evidence: [JM_NATIVE_DOWNLOAD_ACCEPTANCE.md](docs/JM_NATIVE_DOWNLOAD_ACCEPTANCE.md). NEXT-40 does not complete the rest of NEXT-39 or close #199/#200/#204.
+
+Post-build evidence for NEXT-40: frozen source `43d9c2bc5a789994973703fe84408e8824962d5c`, candidate run `39759492930`, 3/3 PASS. Actual Android JUnit 35 files / 167 PASS; original fixed-signature Dev code 56 and downloaded Windows isolation/runtime checks verified. Full handoff `PICA_JM_OFFLINE_NEXT_ACCEPTANCE_20261022_43d9c2bc5a78.zip`, SHA-256 `36a20d49e464964562d29a931d22c762f4951f7949bbade7af5c596204b7c382`. These results advance NEXT-40 to AUTOMATED_CANDIDATE_READY / HUMAN_PROVIDER_QA_PENDING, not release or issue closure.
+
+## NEXT-41 — Native JM source-screen locale and operation feedback
+
+**Status: IN_PROGRESS / UNRELEASED — source implementation; fresh exact-source automated/package and human/provider gates PENDING**
+
+- Authorized 2026-10-22 by a new explicit one-round exception to the DPAPI-blocked coordination claim. Base `43d9c2bc5a789994973703fe84408e8824962d5c`; local branch `codex/jm-source-ux-20261022`, existing Draft PR #205 candidate ref only. Prior source/Reader worktrees and frozen packages remain intact.
+- Keep the source UI and SDK architecture. Add 68 semantic source-screen resources in zh-CN/en/ja; source titles/authors remain unmodified content. Distinct status, progress, success, empty, cancellation, failure and recreation messages replace generic failure text.
+- Gate all conflicting buttons/IME actions, including logout/enrichment/detail controls. Only scan/enrichment can be cancelled; cancelled or destroyed requests cannot expose late import previews/navigation. Failed account switch refreshes identity instead of keeping the old label.
+- Search failures retain the last successful page; pagination binds to its submitted query. Recreation stores bounded visible metadata/input only, never passwords or preview tokens, and never auto-replays an import. Incomplete/expired scans require fresh explicit confirmation. Import/enrichment retain the existing additive collection semantics and maximum-20 enrichment bound.
+- Add synthetic Robolectric UI and three-locale resource-format tests; rerun exact-source Android and Desktop/Web/source/browser/package gates. CI-only candidate versionCode becomes 57 under the same Dev identity and fixed certificate; no private key download.
+- No production account/data, database schema, ranker/recall, Visual/embedding, sync protocol, installed app, stable version/tag/Release/OTA or deployment change. No new manual testing requested. Full-app localization, JM native proxy/progress, automatic recall and dynamic extensions remain open.
+- Evidence levels and deferred consolidated checklist: [JM_SOURCE_UI_ACCEPTANCE.md](docs/JM_SOURCE_UI_ACCEPTANCE.md). No #199/#200/#204 closure and no claim that automated UI fixtures establish real-device/provider acceptance.
+
+## NEXT-42 — Daily UX simplification and separate daily/advanced guides
+
+**Status: FIRST_SLICE_IMPLEMENTED / UNRELEASED — local automated gates; fresh exact-source Android/CI/package and human gates must be recorded separately.**
+
+- New user authorization on 2026-10-22: isolated development/build despite DPAPI claim failure, then a separate authorization for a new Draft branch/PR and Actions using existing signing Secrets. No DPAPI identity or secret repair and no private-key download.
+- Base `e3c0ff365153555511f396321be6cdb63c981384`; branch `codex/ux-tags-dual-onboarding-20261022`. Preserve prior candidate branches, handoffs and installed data.
+- Web daily guide: seven practical steps plus completion; advanced guide: seven independently replayable chapters. Android daily no longer auto-chains into advanced settings; eight offline advanced chapters support explicit navigation/read markers and recreation.
+- zh-CN/en/ja guide text. Reading state is not configuration state. v2 completion/dismissal and automatic-prompt preference are respected. Guides never auto-run account, sync, download, deletion, update or model actions.
+- Browser regressions exposed a real Driver final-animation callback omission and a fast-Skip progress race. Explicit idempotent cleanup restores the original view/settings/disclosures; progress is captured before animation. Android target polling is bounded and stops on destroyed activities.
+- Existing adjustments stay primary; full search/sliders and evidence/recompute/diagnostic tools become opt-in. Policy IDs, weights, current serving behavior, data schema, frozen Visual and sync protocol are unchanged.
+- Two complete user handbooks: [daily](docs/DAILY_USE_GUIDE.zh-CN.md), [advanced](docs/ADVANCED_FEATURES_GUIDE.zh-CN.md). Native guides and actual owner-navigation tests accompany the documentation; this is not docs-only work.
+- **Not implemented here:** selected-tag gating, private per-work tags, provider-tag rule mappings, visual reference sets and automatic Save-and-apply. Do not present proposed controls as available; NEXT-35/#200 remains partial. The next slice must gate profile/recall/ranking/reasons and Android offline semantics together.
+- Candidate-only Actions versionCode 58 under the same Dev identity/fixed certificate. No stable version/tag/Release/OTA, main merge, official database or local installation change. Device/provider acceptance is deferred to the next consolidated test.
+- Final local source: 1,261 Desktop assertions PASS (zero skipped), 29/29 isolated Edge browser tests PASS, 41/41 Web syntax PASS, TypeScript and Rollup PASS. Native advanced Skip/target failure was also separated from daily dismissal during final review. Fresh remote Android/build/package evidence is recorded post-build; this entry does not claim physical acceptance.
+- First head `bdc7c4161601…`: unpublished build 3/3, 193 Android tests and independent Windows/APK checks PASS. The broader Windows gate failed before testing because the 100-item Release listing was empty; 30-item pages and direct v0.4.11 lookup verified the releases still existed. Corrected only the gate's bounded pagination and accepted-release filtering; retained its fail-closed assertions. Android force-stop passed its unchanged single retry. Rebuild all final installables on the corrected source SHA; do not relabel first-head packages or claim human acceptance.
+
+## NEXT-43 — Functional tag scope and private concepts across Desktop/Android
+
+**Status: IMPLEMENTED_IN_ISOLATED_CANDIDATE / AUTOMATION_AND_PACKAGE_EVIDENCE_SEPARATE / HUMAN_QA_PENDING. Not released or deployed.**
+
+- Continues NEXT-42 on the same stacked Draft #206. The user explicitly authorized continuing the isolated tag/private-label/paired recommendation development and existing Actions build. Local coordination returned NOT_FOUND on resume; no project identity/secret was guessed, repaired or reprovisioned. Work continues under the explicit bounded exception.
+- Prior NEXT-42 exact `ba8d043f0eb3…` CI has settled: 34 successful checks and 4 conditional skips, no failures. Its frozen ZIP is retained unchanged. Those results are not reused as evidence for this new source.
+- Added optional nested tag schema v1; no DB migration/outer-policy reset. Default ALL, selectable allowlist, provider-scoped raw identities, unique-favorite coverage groups, immutable raw metadata.
+- Added manual per-work private concepts and ANY raw-tag mappings with stable IDs, strict size limits, independent participation and safe text rendering. No private alias is sent as a provider keyword. Manual labels are not classifiers. Automatic JM online recall and Visual reference sets remain outside this slice.
+- Gated Final V3 profile/intent/provider requests/soft feedback/fandom allocation and V5 timescales, Shadow channels/ranker, plus mobile native/offline behavior. Safety/BLOCK still inspect original facts. Frozen ranker weights, Visual modes/models/vectors are unchanged.
+- Web/Android editors stage Save/Undo with bounded 100-row pages and 50-row binding pickers. Desktop explicit Save-and-regenerate preserves old usable cycles on failure and marks a stale tag baseline. Android scheme changes transparently rebase cached candidates rather than retaining opaque old tag ordering/reasons; no new retrieval on Save.
+- Scheme synchronizes with a three-way whole-scheme conflict choice. Legacy omission preserves new settings; unresolved conflicts apply no other mutations or recomputation. Stale acknowledgement cannot erase newer local edits.
+- Updated daily/advanced handbooks and zh-CN/en/ja in-app chapters. Main, stable versions, tags/Releases, OTA and installed official/RC data are not touched. Candidate-only fixed-signature Dev versionCode 59; keys remain in Actions.
+- Synthetic regression additions cover scope/defaults, source identities, raw-fact preservation, private matching, CAS/conflicts/legacy clients, actual provider-route compilation, Android cache/queue/evidence, and actual-browser lazy/paged/staged/private/CAS/narrow-layout flows. Exact final counts, source SHA, Actions, artifact/signature hashes and remaining physical/provider gates are recorded in the new handoff validation, not inferred from an older green build.
+- Initial `1f6c4fae6bad…` CI correctly stopped on an obsolete first-slice guide assertion requiring tags to remain unavailable, and a missing explicit Android `JSONException` import. Updated the guide assertion to verify real tag navigation plus explicit no-auto-visual/no-fact-rewrite/cache-only boundaries; retained the Visual caution and all gate tasks. Added the missing import without changing build requirements. Exact-source rerun and packages are required; the failed head is not an accepted artifact.
+- Android then compiled and ran all 205 tests. One new CAS test compared the whole read-time snapshot, including the default SessionIntent timestamp freshly synthesized by each getter; it was not a persistent write. Its assertion now compares the complete persisted preference map, including snapshot/base, dirty flag and mutation ID, which directly checks the no-write contract. No production code/gate was relaxed for this test correction; rebuild and retain the failed-run evidence separately.
+- Final route audit found two additional input leaks: legacy V3 cluster allocation and V5 semantic diversity still had raw tag inputs. Both now receive the personal view without changing frozen weights or returned facts. The audit also established that EH display values omit raw namespaces: scope/directory/mappings now use the existing lossless sidecar when present. Paired catalog/candidates add optional public `providerRawTags`; Android keeps them separate from display tags, consumes them via a read-only semantic adapter, and sends public facts back with catalog evidence. Missing legacy namespaces remain unknown. No credential/auth protocol, SQLite schema, raw display facts or Visual asset is changed. Added Desktop/Android namespace and portable round-trip regressions; earlier green artifacts are not relabeled as this final source.
+
+## NEXT-44 — AI-assisted tag-profile export / preview / apply / undo
+
+**Status: PREVIOUS_SLICE_AUTOMATED_AND_PACKAGE_GATES_PASS / HUMAN_AI_PROVIDER_QA_PENDING. Frozen source 9ff972e50446; unreleased, undeployed.**
+
+- User authorized the first AI-assisted file-exchange slice and explicitly allowed isolated development/build despite the continuing DPAPI coordination failure. No memory identity or secret was repaired. Continue the existing Draft #206, not main.
+- Desktop/Web exports a bounded ZIP with instructions, exact source-ID vocabulary, privacy-filtered current scheme, editable JSON result template and SHA manifest. Counts and local titles/work IDs/manual bindings default off. Preferences and private names remain sensitive; no automatic AI upload or account/history/image/embedding export.
+- JSON results accept only bounded participation/private-label operations; unknown fields/IDs, namespaces invented by AI, scripts/SQL/ZIP, invalid bindings and conflicting/expired baseline reject the whole import. Locally retained baseline is the authority, not hashes asserted by the file.
+- Paged text-only preview writes no tag settings. Explicit apply plus persistent undo metadata use one SQLite savepoint; no migration. Saving and starting regeneration are separate choices/outcomes. Subsequent local/mobile tag-scheme edits block stale apply/undo. Late audit narrowed conflict detection to the tag scheme: unrelated controls, feedback and sync no longer invalidate AI files/undo; commit still CAS-checks the latest policy revision and preserves those unrelated fields. Added a full export → intervening controls/feedback → preview → apply → more controls → undo preservation regression.
+- First version is a same-installation AI round trip (four retained exports / 30 days; process-local previews / 30 minutes), not archival backup, community-profile installation or cross-installation migration.
+- Android receives the confirmed scheme using unchanged existing tag sync. No Android file parser/picker is introduced; zh/en/ja guides explicitly explain the Desktop path. Candidate-only fixed-signature Dev versionCode 60; private keys remain in Actions.
+- Added synthetic domain and actual loopback/CSRF HTTP tests, browser export/preview/cancel/confirm/undo/XSS/size/draft regressions and privacy instructions. Exact final source/run/installable digests and remaining manual gates belong in the new handoff; prior `f3fe4b95fb02` artifacts remain frozen and are not relabeled.
+
+Post-build NEXT-44 evidence: `9ff972e50446b40445c9c54e24350f8ce9ef312b`, trusted run `39909777945` 3/3 SUCCESS, PR rollup 37 SUCCESS + 4 conditional SKIPPED. Local Windows 1291 PASS + 1 POSIX-only SKIP; Linux 1289 PASS + 3 Windows-only SKIP; the matrix covers all 1292 assertions. Real Edge 39/39, Android JUnit 207/207 and fixed-signature Dev code 60 PASS. Downloaded Windows ZIP verified privacy/preview/apply/replay and restart-persistent undo with synthetic hidden bindings. Handoff `PICA_AI_TAG_PROFILE_EXCHANGE_ACCEPTANCE_20261022_9ff972e50446.zip`, SHA-256 `a950d22b0a925500e867ad8ca9149b5c835be8e47cdcbf8b4d455c43021f1ae8`. Real AI/provider/device acceptance is still pending; no source/metadata write to formal data or deployment.
+
+## NEXT-45 — Modular local-first reader foundation and one-click module compatibility
+
+**Status: IMPLEMENTED_IN_ISOLATED_CANDIDATE / EXACT_HEAD_GATES_RECORDED_SEPARATELY / HUMAN_QA_PENDING. Unreleased, undeployed.**
+
+- User established the long-term product objective: a local reader/library without included comic bodies, optional external sources, maintainable modules (tags, gestures, recommendation and others), maintained open-source reuse and a single update action. Full requirements and remaining work are authoritative in [MODULAR_LOCAL_READER_ARCHITECTURE.md](docs/MODULAR_LOCAL_READER_ARCHITECTURE.md); this first foundation does not redefine the complete objective as done.
+- Explicit isolated development/build/Draft continuation permission despite the DPAPI-blocked claim. No identity/secret change, official data, main merge, tag/Release, stable OTA or installation/deployment.
+- Extracted `src/tags/policy.ts` as a pure domain independent of storage, sources and recommendation. Existing schema/IDs/matching behavior stay unchanged; the V5 path is a compatibility re-export. Consumers use the neutral path. Installed TypeScript compiler AST checks enforce this first boundary and pure source-routing metadata; no new architecture framework/parser was built.
+- `ProviderRegistry` owns compiled source aliases, namespaces and page schemes from versioned adapter descriptors; inspection is I/O-free, duplicate/incompatible registrations are atomic failures and unknown IDs/pages cannot fall through to an unrelated account. This is not a downloadable extension loader or completed arbitrary-provider/storage support.
+- Added bounded public module API metadata to capabilities and all Desktop package builders. Incremental builders/staging bind metadata to the actual target; malformed/false/undeclared/removal and noncanonical-case cases reject. API mismatches require the existing one-click full-application route. Existing global API/schema, official SHA verification, legacy incremental updater and protected-data boundaries remain intact; `src/update/updater.ts` is unchanged. The separate full-application recovery helper is hardened as described below.
+- Audit found that "configured" still depended on Pica credentials, although E-H access could bypass the setup page. Added explicit zh-CN/en/ja local-only setup, credential-backend-free config save, source-free relaunch and no automatic online recommendation cycle. Active-download library-folder guard is retained. Editing Pica now preserves JM/EH/all WebDAV-target credentials, not just a partial hand-maintained list.
+- Ordinary storage/profile/public-proxy settings after local setup no longer require Pica credentials either. Partial Pica logins still fail validation; authenticated proxies use the existing secure backend. Empty local settings do not create a synthetic credential file. The real artifact gate exercises both initial local setup and subsequent ordinary settings before restart.
+- Three-language real Edge local-only setup tests PASS with empty account/password and no source login/search/sync/recommendation-generation request. Added synthetic module contract/routing/payload tests and an actual Windows local-only save/relaunch/no-credential artifact gate. Candidate-only fixed-signature Dev versionCode 61; signing keys stay in Actions.
+- The first complete local suite correctly caught a real CLI startup regression: an extensionless `modules/contracts` import resolved same-basename JSON instead of TypeScript in the existing TSX CLI runtime. Renamed the JSON to `runtime-contracts.json`; retained the CLI tests unchanged and verified their actual child-process startup. A new full suite is required, not a waived failure. Added a frozen legacy contract floor so future target declarations cannot redefine old-package compatibility.
+- First pushed source `17f80c9006ad…` passed 1311 Windows assertions + 1 existing POSIX skip and 42 real Edge cases. Linux package run `39928226156` then correctly exposed a stale credential-lifecycle assertion: it conflated saved library configuration with a live provider session. Linux now separately requires local config to survive and session-only `picaAccount.configured` to clear; macOS/Windows secure-store gates also assert the provider-specific field. Existing plaintext/file checks remain. Rebuild final packages on the corrected source; do not relabel the first head as accepted.
+- Next `0fb175610144…` trusted run `39928718756` failed its first Chinese Chromium local-setup case: the test clicked navigation while same-URL reload was still committing. It now explicitly awaits the new document's DOM readiness and localized connected mode before the unchanged navigation/no-source-write assertions. No added retry, timeout increase or skipped case. Final exact-source CI/packages are required; first-head artifacts/results are not promoted.
+- Source `1d7c181e0738…` passed trusted run `39930043669`, 42 browser cases and packaged local/tag checks, but independent actual full-package **forced-health-failure rollback failed** with Windows `EPERM` removing the new application tree. The previous application backup was retained in an owned synthetic fixture; no official data was accessed. The exact lock holder was not proven. Recovery now first requests graceful authenticated loopback shutdown, awaits PID fallback exit and uses Node's bounded file-removal retries. Backup existence is checked before any installed-tree removal; post-health reporting/cleanup failure must not undo a healthy installation. Four focused safety tests and a real forced-failure CI scenario are added. New exact-source packages and both successful/full-failed recovery gates must pass before handoff; the green `1d7…` packages are not accepted.
+- Maintained primary references: Suwayomi source host/client boundary, Mihon content-free reader position, Komga separate config/content, already-pinned MIT JM SDK, installed TypeScript compiler API. No competitor/reference-APK code/assets or new arbitrary loader is imported.
+- Existing arbitrary archive import declaration remains false. Physical gestures, real providers, AI-returned files, native parity and published upgrade acceptance remain open. Exact source/run/hash evidence belongs in the post-build handoff, not an old green CI.
+
+## NEXT-46 — Continue toward the complete modular reader objective
+
+**Status: REQUIRED / NOT IMPLEMENTED BY NEXT-45.**
+
+- Source-independent local identity and safe folder/CBZ ingestion, page/chapter inventory, progress retention, missing-media handling; do not advertise CBR/PDF until implemented and verified.
+- Source enable/disable/remove and trust/update lifecycle, optional source-runtime packaging, stable arbitrary-source namespaces and native parity; review maintained extension hosts before adopting one.
+- Recommendation retrieval/policy/ranking/generation/delivery ports; native pure tag and gesture domains separated from persistence/UI; cross-client golden/event-level tests and physical gesture evidence.
+- Re-run the exact prior accepted Windows/Dev upgrade and rollback matrix as each module changes. Keep independent data roots and fixed Android signing continuity; no automatic uninstall/data migration or stable OTA operation.
+- Consolidated real-device/provider/AI UX acceptance after integration. Keep #199/#200/#204 and all earlier P2/W5/NEXT evidence holds open until their actual criteria are met.
+
+## NEXT-47 — Source-owned cover transport without Pica coupling
+
+**Status: IMPLEMENTED_IN_ISOLATED_CANDIDATE / EXACT_HEAD_GATES_PENDING / REAL_PROVIDER_QA_PENDING. Not released or deployed.**
+
+- Continues NEXT-46 from frozen `4230e66c3c86b470d17b9d463e55c649b60c380f`; previous complete handoff `PICA_MODULAR_LOCAL_READER_ACCEPTANCE_20261023_4230e66c3c86.zip`, SHA256 `b736ef3f76b2dcb76a4b2f645cccce147bdf82eaada69c2b33d4aa6717aa58fc`, remains unchanged. Prior engineering gates passed but full objective remains open.
+- The prior static finding is confirmed: ProviderService sent all non-EH covers through PicaProvider.fetchPage and its login. Extracted existing Axios media code and pure URL/MIME policy into `src/media`, retaining the old library policy entry as compatibility re-export. Pica still owns its API/auth; JM public covers have their own credential-free media path without Pica/JM login or a JVM request. Cover routing uses the compiled source registry; unsupported routes never silently fall back to Pica.
+- Retains URL/redirect/body/MIME boundaries, adds a total20s HTTP redirect-chain deadline, explicit proxy handling, no inherited API auth/header defaults and sanitized Axios errors. Pica/JM compiled adapter patch versions1.0.1; interface API1 remains compatible. This is not an untrusted-plugin/DNS egress sandbox claim.
+- Corrected cover cache source identity to include account/session scope, serialize per-comic writers and reject changed-source results after asynchronous network or cached-file reads. No raw identity/URL is persisted in metadata. Existing cache entries refresh once; user library/feedback/downloads are not migrated.
+- Added neutral-media/AST tests and actual local HTTP coverage with no Pica account; includes simultaneous cache readers and account changes during network/disk I/O. Added an actual Windows ZIP gate using only a synthetic PNG and a deny-all-except-fixture loopback proxy, retaining full success/forced-failure upgrade gates. Native code unchanged except candidate versionCode62 for fixed-signature continuity.
+- Local ingestion is not claimed complete. Inspected Mihon's official local-source structure and recorded the next source-independent identity, bounded preview/copy, safe archive and progress-preservation requirements in `docs/SOURCE_MEDIA_BOUNDARY.md`. Existing local Reader/ZIP implementation is reused; no competitor/reference-APK code or new decompressor imported. CSV source/cover lossiness must be addressed before it can be an ingestion authority.
+- No official profile, source credentials, production embeddings/mode, main merge, tag/Release, stable OTA, private-key download or deployment. Exact-source automated and actual-package results belong in the next handoff. Physical/native/provider/AI and source lifecycle/trust holds remain open.
+- Pre-handoff review of first NEXT-47 source `e1b147f` added standard AbortSignal cancellation alongside Axios timeout so the deadline also covers connection establishment. The actual Windows fixture now deliberately withholds image response headers/body and requires the backend to terminate it. This is a bounded-operation gate, not a CI timing/performance-budget claim; the final source must be rebuilt and reverified.
+- The actual archive gate at `33d2a2c` (run39942005009, Windows job120377444374) failed on the new JM-cover response while legacy/local gates passed. Static trace confirmed another real coupling: Desktop `applyCredentials` returned on null credentials before applying a saved public proxy. A source-free install saved proxy settings but did not use them. Extracted pure connection-environment construction; public proxy now applies without any credential file/Pica login, while secure proxy credentials remain separate. Added real Axios loopback-proxy and configuration regressions; retained actual response diagnostics and the failed source log. Rebuild exact head; do not accept or relabel33d2a2c.

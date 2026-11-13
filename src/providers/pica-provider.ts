@@ -125,4 +125,8 @@ export class PicaProvider implements ComicProvider {
     async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
         return (await this.connect()).fetchImage(locator, maxBytes)
     }
+
+    fetchCover(locator: string, maxBytes = 20 * 1024 * 1024) {
+        return this.fetchPage(locator, maxBytes)
+    }
 }

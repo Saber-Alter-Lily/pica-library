@@ -1,0 +1,6 @@
+// Redirect generated outputs only, for local Windows runners with Unicode checkout paths.
+// Source files, project settings and production data directories are not relocated.
+gradle.beforeProject { project ->
+    def outputRoot = gradle.startParameter.projectProperties['picaAcceptanceBuildRoot']
+    if (outputRoot) project.layout.buildDirectory.set(new File(outputRoot, project.name))
+}

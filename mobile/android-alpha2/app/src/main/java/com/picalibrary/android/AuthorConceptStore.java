@@ -40,7 +40,7 @@ final class AuthorConceptStore {
             ParsedPica parsed=parsePica(e.author);String canonical=!safe(e.canonicalAuthor).isEmpty()?e.canonicalAuthor:parsed.creator;String id=!safe(e.authorId).isEmpty()?e.authorId:conceptId("person",canonical);Concept c=ensure(out,id,canonical);c.confidence=!safe(e.authorId).isEmpty()?1.0:0.9;c.aliases.add(canonical);if(!safe(e.author).isEmpty())c.aliases.add(e.author);if(!parsed.creator.isEmpty())c.aliases.add(parsed.creator);if(!parsed.circle.isEmpty())c.circles.add(parsed.circle);indexPerson(out,c);
         }
         for(UnifiedCatalogStore.Entry e:catalog.entries()){
-            if(EhClient.isEhId(e.id)||"eh".equals(e.providerId))bindEh(out,e,semantics.byComicId.get(e.id));else bindPica(out,e);
+            if(ComicIdFormat.isEhId(e.id)||"eh".equals(e.providerId))bindEh(out,e,semantics.byComicId.get(e.id));else bindPica(out,e);
         }
         for(Concept c:out.byId.values()){c.aliases.remove("");c.circles.remove("");}
         return out;

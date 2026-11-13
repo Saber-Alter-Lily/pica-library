@@ -49,3 +49,21 @@
 - 参考 [B2 来源证据档](B2_REAL_LICENSED_SOURCE_E2E_20261109.md)。真实 [#42625363093](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42625363093) 按六独立 matrix job 核验。**Pepper&Carrot 与 ComicFury 两个真实站点各自完整 SUCCESS**：Pepper 1 章/6 张真实图片，ComicFury 2 章/2 张；均在原 Host Reader 读取、用户明确本地保存、撤销并关闭 Suwayomi 后在新本地 Reader 进程进行 Hash 对照。没有上传站点图片或账号 Cookie。原三款 Pica/JM/E-H 扩展仅安装/注册/撤销 SUCCESS，**未**验证目标站点内容。
 - xkcd 独立 case 因旧 2000 章数量上限 FAIL，故整个 matrix 工作流为 FAILURE；不能把两个通过 job 偷换成整体通过。后续 bounded 5000 章的双端代码已提交 `cad6d18`，与精确新 SHA 的真实 xkcd 结果、完整 CI 仍需复验。来源 ID 报告在 multi-ID 扩展中存在次要的记录错误，已于后续修正；Reader 实际绑定的精确来源身份没有改变。
 - Android35 实际原 Reader/Host [#42600954633](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/42600954633) **SUCCESS**（Suwayomi 官方 Local Source，非目标第三方真实站点）。G1 物理设备、G2 双端真实第三方及用户目标站点、G3 真实用户资料和 G4 发布仍 OPEN。
+
+## 2026-11-13 B3 最新源码工程与 QA 重新打包记录（保留上次原始证据，不覆盖）
+
+此节是**新增候选来源的独立记录**，不得把 2026-11-09 的 `ecd7435` 安装包 SHA 冒充最新代码；旧工件对应的证书/哈希仍为历史可验证事实。
+
+| 证据和结论 | 当前源/运行 | 能证明什么 | 不能证明什么 |
+| --- | --- | --- | --- |
+| 最新开发标准 CI **SUCCESS** | `f2892df` [#43407537556](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43407537556) | Android 及 Web/Desktop 代码通过；B3 离线推荐/封面绑定/任务中心修改通过工程检查 | 真实用户离线推荐全流程及物理设备 |
+| R3 Android 清洁来源边界 **SUCCESS** | `f2892df` [#43407528343](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43407528343) | 原完整四标签 QA 客户端不打包列举的站点 SDK | 生产签名、商业站点许可、用户实机 |
+| 综合 Web/source **适用部分 SUCCESS** | `f2892df` [#43407537337](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43407537337) | Web/source 适用 job 通过 | 被 SKIPPED 的历史其他 job |
+| P2 运行时 **六个任务 SUCCESS** | `f2892df` [#43407537618](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43407537618) | 既有 Windows/Android 运行时及资源检查通过 | 实机 1500 张真实图、实时帧率 |
+| S3 Android35 **整体 FAILURE，B3 子流程有真实 PASS** | `2c118d4` [#43406478168](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43406478168) | 1500 独立缓存键与 512×768 合成 PNG 写入、原 1500 本书架滑动和位置恢复、旧书检索/三宽布局、Pepper 真实章节离线重开等逐阶段 PASS | 同运行双真实站点 G2、真实封面库完整解码、用户实体 Android G1 |
+| 历史跨轮站点互补 | Pepper 当前 PASS／ComicFury `SOURCE_HOST_UNAVAILABLE`；较早 [#43358581271](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43358581271) ComicFury PASS／Pepper 失败 | 每站有独立真实使用成功历史，当前外部服务有可复现波动 | 任何同一候选两站点稳定通过的结论 |
+
+**本节写入之后触发的可信 push [Post-stable Isolated RC Packages](https://github.com/Saber-Alter-Lily/pica-library/actions/workflows/post-stable-rc-packages.yml) 是新的待核对安装包来源**；只有实际四 job 完成、上传文件同 SHA、源文件/签名/Manifest/哈希校验才可填写新候选的工件编号。不要预先填写未知 artifact ID 或 SHA256。
+
+**安全的试用方法**：仅在 Windows 独立 QA 目录解压候选，Android 仅把同一工件中的 `Clean-Android.apk`（`.cleanqa`）与可选 `User-Host.apk`（`.userhost.qa`）安装在旁路；原 `Android.apk` 是历史 Dev 对照，不是和 Clean 同时安装的必需组件。使用测试样本，不覆盖或清空正式资料；如果出现签名/包名冲突，停止而不卸载正式 App。证据 3 天过期；G1 实体用户验收、G2 真双来源、G3 真资料和 G4 正式发布全为 OPEN。
+

@@ -1,6 +1,6 @@
 # Pica Library｜集成候选至正式验收执行总计划（2026-11-09）
 
-> **唯一执行总账｜2026-11-12 最新核对**：B1 `PACKAGE_VERIFIED / MANUAL_QA_PENDING`；B2 **Pepper&Carrot 和 ComicFury 各有 Android/Windows 真实工程证据，现进入同一源码 SHA 双来源交叉校验（未取得新运行结果）**；B3 局部 Android35/布局工程通过但实机未验收；B4 真实旧用户资料未授权；B5 最终发布裁决未启动。原 42+12 项和 G1–G4 一律不缩减。只读本文件、[总 Issue #283](https://github.com/Saber-Alter-Lily/pica-library/issues/283) 和 PR #284 最新 SHA/CI，从首个未通过的产品关口继续，禁止零散 PR。
+> **唯一执行总账｜2026-11-13 实际运行复核**：B1 旧候选 PACKAGE_VERIFIED、最新同源码双端包本轮一次性打包中，实体 G1 MANUAL_QA_PENDING；B2 Pepper&Carrot/ComicFury 在不同轮各自真实端到端成功，但同一运行仍受上游波动阻断，G2 OPEN；B3 原四标签 Android、1500 张独立缓存的合成 PNG、九场景三语/多字号、离线 Reader、原 Windows CI 均已有工程实测，**未**取得实体设备/真实 1500 封面预算 G1；B4 真 v0.5.0 用户资料须另授权；B5 54 案与发布审批未开始。原 42+12 项、G1–G4 均不缩减。只以本计划、[总 Issue #283](https://github.com/Saber-Alter-Lily/pica-library/issues/283) 及 [唯一 Draft #284](https://github.com/Saber-Alter-Lily/pica-library/pull/284) 精确 SHA/Actions 为准，按产品批次推进、禁止拆碎重做或默认发布。
 
 ## 2026-11-12｜真正完成的双章离线工程路径与下一同源双站点关口（新增证据索引）
 
@@ -28,6 +28,15 @@
 - **1,500 本真实位图路径，不冒充真实作品**：延长原 Android35 S3 当前 1500 synthetic-entry 书库测试，向**原 App 私有 `cover-cache-v2`** 写入 1500 个与已有 key 一致的、由标准库生成的 512×768 PNG（24 色组，无第三方漫画图像或用户账号）。继续真实 RecyclerView 滚动/列表搜索/三宽字体检查和原 Reader；测实际解码与图片绑定路径，比之前无封面的 1500 条元数据测试更接近真实用户大书库。模拟器的合成 PNG 不能替代 OEM 手机上 1500 部真实封面的 p95/内存/ANR 性能与人工验收。
 - **后台任务恢复体验**：原 TaskCenter 可能优先拿已经 FINISHED 的旧 `MobileTaskRegistryStore` UUID，遮住 WorkManager KEEP 的现行任务；改为优先实际 active WorkInfo，继续按既有唯一任务名、暂停标记与进度恢复，不引入新的任务队列。
 - **证据门禁**：这个整体产品批次只有实际对应 SHA 的 Android CI、原 R3 source-neutral 原产品边界、原 S3 流程通过才能称为工程 PASS；原 v0.5.0 升级身份/签名、真实 G1、双可用站点 G2、真实用户 G3、54 条 G4 均继续 OPEN；绝不合并 main、发布或更改任何真实用户资料。
+
+## 2026-11-13｜B3 可安装双端 QA 冻结检查点：整批工程结果与未关闭的 G2
+
+- **已明确取证的实际 S3 终态**：原 clean Android35 [push #43406478168](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43406478168)（产品源码 `2c118d4`）总结果 **FAILURE**，失败在最终 B2 双源验收，**而非** B3。日志明确有 1500 个 512×768 *自生成 PNG* 写入现有 app-private `cover-cache-v2` 的 PASS，原 1500 本书架与小书架相互切换/滚动位置恢复、书库搜索旧作品/切列表、360/393/480dp 核心控件可见 PASS，Android SAF 导入、章节和进度重启、升级兼容仍 PASS。该测试验证实际缓存落盘+UI 连续操作；**没有**验证 1500 张都被解码、更不是 1500 张真实不同漫画封面的性能达标，更不能填实体 G1。
+- **独立真实外部来源**：同一 `2c118d4` 运行 Pepper&Carrot 固定哈希 JAR 安装、真实 Reader 图 1/2、选择保存一章、断开 Host、原四标签书库重新离线打开 PASS；ComicFury 两次显式搜索返回 `SOURCE_HOST_UNAVAILABLE`，导致该轮 G2 FAIL。之前 [#43358581271](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43358581271) 原站 ComicFury 两章真实离线成功，但 Pepper 当轮上游目录失败。**两个真实来源分轮成功不能合成为同 SHA 全绿，也不能据此认定原组件损坏。** 授权用户 Pica/JM/E-H 内容仍未实测。
+- **最新开发 HEAD `f2892df` 的确切 CI**：[标准 CI #43407537556](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43407537556) Android/Web+Desktop **SUCCESS**，[综合 #43407537337](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43407537337) 适用 Web/source **SUCCESS**、非适用分支任务 SKIPPED，[P2 runtime #43407537618](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43407537618) 六个实际任务 **SUCCESS**，[R3 原 Clean #43407528343](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43407528343) **SUCCESS**，R4 真包名/签名替换工程在前一 `2c118d4` [#43406478145](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/43406478145) **SUCCESS**。本行不宣称用户真实资料迁移，也不宣称 PR-only S3 SKIPPED 通过。
+- **一次性新 QA 包**：只修改当前验收/证据文档以触发原 `post-stable-rc-packages.yml` 可信 push；必须等待 `contract`、`windows-rc`、`android-rc`、`artifact-summary` 全部实际 SUCCESS、三个带 SHA/证书的安装产物真实上传后，方可将**当前新 SHA**记为 PACKAGE_VERIFIED/MANUAL_QA_PENDING。PR 上单纯合同绿灯不算实际包。Windows 隔离 `Pica Library Post Stable RC`，Android 同源 `.cleanqa` + `.userhost.qa`；绝不卸载正式 `com.picalibrary.android` 绕过签名冲突。
+- **减少无效工作流**：当前统一 Draft 的目标是 Windows x64 + Android 原产品，Linux/macOS/Windows ARM64/Docker 属实验平台。四类原有实验工作流保留原 main push、明确手动 dispatch、非 Draft PR 实际构建；本 Draft PR 只呈现 SKIPPED，不再每次运行多套不可用于 G1–G4 的重型构建。真实标准 CI、P2、S1/S3、源隔离、同签名和全量打包仍照常运行，**安全门禁不减**。
+- **顺序**：同源码安装包 → G1 实体 Windows/Android 日常用户路径与真实资源预算 → G2 来源信任/获授权真实内容 → G3 用户单独授权后真实 v0.5.0 只读盘点+回滚 → G4 54 条逐行证据、用户明确发布批准。打包不是正式发布、工程 PASS 不是用户签收。
 
 ## 0. 产品目标与冻结边界
 

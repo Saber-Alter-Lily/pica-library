@@ -39,6 +39,10 @@ permissions:
 
 jobs:
   docker-amd64-experimental:
+    # The unified Windows x64 + Android delivery PR stays Draft until G1-G4
+    # are accepted. Do not rebuild unrelated experimental platforms on every
+    # draft commit; keep main pushes, explicit dispatch and ready-PR checks.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -142,6 +142,7 @@ export const jaLibraryTranslations = {
     'recommend.exhausted': '今回のおすすめはすべて確認しました。新しいラウンドを生成すると別の作品を探せます。',
     'recommend.round': 'おすすめセッション {session} · {batch}{next}',
     'recommend.managedRound': '現在のおすすめ · {batch}{state}',
+    'recommend.freshShort': '今回の条件に合う未表示の作品は {count} 件です。最近表示した作品で件数を補いません。',
     'recommend.managedBatch': 'バッチ {current} / {max}',
     'recommend.roundFinished': ' · このラウンドは完了',
     'recommend.nextReady': ' · 次のセッションを準備済み',

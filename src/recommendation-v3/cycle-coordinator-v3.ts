@@ -11,11 +11,10 @@ import {
     FINAL_BATCH_SIZE
 } from './batch-allocator-v3'
 import { RecommendationPolicyStoreV5 } from '../recommendation-v5/policy-store'
-import { filterCandidatesAgainstOwnedV5 } from '../recommendation-v5/portable-policy'
+import { activeTemporarySuppressionsV5, filterCandidatesAgainstOwnedV5 } from '../recommendation-v5/portable-policy'
 
-export const CYCLE_COORDINATOR_VERSION = '3.2.0-schema8-visible-cap'
+export const CYCLE_COORDINATOR_VERSION = '3.3.0-confirmed-presentations'
 export const MAX_VISIBLE_BATCHES_PER_CYCLE = 6
-export const RECENT_CYCLE_COOLDOWN_COUNT = 2
 
 export interface V3CycleVersions {
     profileVersion: string
@@ -42,7 +41,6 @@ interface FrozenCycleServingSnapshotV3 {
     eligibleById: Map<string, RankedCandidateWithEvidenceV3>
     intents: RecommendationIntentV3[]
     favoriteIds: Set<string>
-    recentlyDisplayedComicIds: Set<string>
     servingFilterTelemetry: Record<string, unknown>
 }
 
@@ -100,25 +98,6 @@ export class CycleCoordinatorV3 {
         return typeof state === 'string' ? state : null
     }
 
-    private recentlyDisplayedComicIds(activeCycleId: string) {
-        const cycleIds: string[] = []
-        const seenCycles = new Set<string>()
-        for (const pool of this.database.listV3CandidatePools(30)) {
-            if (pool.cycleId === activeCycleId || seenCycles.has(pool.cycleId))
-                continue
-            const state = String(pool.telemetry.state ?? '')
-            if (state !== 'SUPERSEDED' && state !== 'EXHAUSTED') continue
-            seenCycles.add(pool.cycleId)
-            cycleIds.push(pool.cycleId)
-            if (cycleIds.length >= RECENT_CYCLE_COOLDOWN_COUNT) break
-        }
-        return new Set(
-            cycleIds.flatMap((cycleId) =>
-                this.database.recommendationSeen(cycleId)
-            )
-        )
-    }
-
     private servingSnapshot(
         cycleId: string,
         pool = this.pool(cycleId)
@@ -138,6 +117,8 @@ export class CycleCoordinatorV3 {
         ])
         const ownershipKey = JSON.stringify({
             ownedComicIds: [...ownedComicIds].sort(),
+            policyRevision: policy.revision,
+            activeSuppressions: activeTemporarySuppressionsV5(policy).map(item => item.comicId).sort(),
             identityBindingsVersion: ownership.identityBindingsVersion,
             explicitDistinctPairs: [...policy.explicitDistinctPairs].sort()
         })
@@ -198,8 +179,6 @@ export class CycleCoordinatorV3 {
             ),
             intents: telemetry.intentPlan ?? [],
             favoriteIds: new Set(this.database.favoriteIds()),
-            recentlyDisplayedComicIds:
-                this.recentlyDisplayedComicIds(cycleId),
             servingFilterTelemetry: {
                 ...serving.telemetry,
                 canonicalOwnedWorkCount: ownedWorkIds.size,
@@ -425,7 +404,7 @@ export class CycleCoordinatorV3 {
         if (
             next &&
             last &&
-            last.batchIndex >= MAX_VISIBLE_BATCHES_PER_CYCLE - 1
+            (last.batchIndex >= MAX_VISIBLE_BATCHES_PER_CYCLE - 1 || last.itemIds.length < FINAL_BATCH_SIZE)
         ) {
             this.database.updateV3CandidatePoolState(
                 state.activeCycleId,
@@ -434,15 +413,14 @@ export class CycleCoordinatorV3 {
             return this.responseForBatch(last)
         }
         const snapshot = this.servingSnapshot(state.activeCycleId, pool)
+        const freshness = this.database.recentV3BatchFreshness()
+        const alreadyAllocated = new Set(this.database.recommendationSeen(state.activeCycleId))
         const allocated = allocateRecommendationBatchV3({
             ranked: snapshot.eligibleRanked,
             intents: snapshot.intents,
-            alreadyAllocated: new Set(
-                this.database.recommendationSeen(state.activeCycleId)
-            ),
+            alreadyAllocated,
             currentFavoriteIds: snapshot.favoriteIds,
-            recentlyDisplayedComicIds:
-                snapshot.recentlyDisplayedComicIds
+            ...freshness
         })
         const batchIndex = last ? last.batchIndex + 1 : 0
         const batch = this.database.saveV3BatchAndAllocate({
@@ -455,11 +433,18 @@ export class CycleCoordinatorV3 {
                 schemaVersion: 1,
                 allocatorVersion: BATCH_ALLOCATOR_VERSION,
                 requestId,
+                freshness: {
+                    short: allocated.length < FINAL_BATCH_SIZE,
+                    recentWorksWithheld: snapshot.eligibleRanked.filter(item =>
+                        !alreadyAllocated.has(item.comicId) && !snapshot.favoriteIds.has(item.comicId) &&
+                        freshness.recentlyDisplayedComicIds.has(item.comicId)).length,
+                    authorCapRelaxedSlots: allocated.filter(item => item.authorLimitRelaxed).length
+                },
                 items: allocated
             }
         })
         if (
-            allocated.length === 0 ||
+            allocated.length < FINAL_BATCH_SIZE ||
             batchIndex >= MAX_VISIBLE_BATCHES_PER_CYCLE - 1
         )
             this.database.updateV3CandidatePoolState(

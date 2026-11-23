@@ -4175,6 +4175,7 @@ export class LibraryService {
         const profile = buildFinalLifetimeProfileV3(favorites, { registry })
         await this.recommendationCheckpoint()
         this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 7 }
+        const previousCycle = this.database.getAppState<{ activeCycleId?: string }>('recommendation.v3.activeCycle.v1')?.activeCycleId
         const history: IntentCycleHistory[] = this.database
             .listV3CandidatePools(50)
             .flatMap((pool) => {
@@ -4185,11 +4186,12 @@ export class LibraryService {
                           intentId?: unknown
                       }>)
                     : []
+                const justUsed = pool.cycleId === previousCycle && ['READY', 'READY_LIMITED', 'READY_DEGRADED', 'ACTIVE'].includes(state)
                 return completedAt &&
-                    (state === 'EXHAUSTED' || state === 'SUPERSEDED')
+                    (justUsed || state === 'EXHAUSTED' || state === 'SUPERSEDED')
                     ? [
                           {
-                              state,
+                              state: justUsed ? 'ACTIVE' : state,
                               completedAt,
                               intentIds: plan
                                   .map((intent) =>

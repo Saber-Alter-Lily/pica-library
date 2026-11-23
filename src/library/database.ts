@@ -40,6 +40,7 @@ import {
 import type { UpdateFinding } from '../maintenance/updates'
 import { trustedCoverUrl } from './cover-url'
 import type { UserEvent, UserEventInput } from '../recommendation-v3/types'
+import { AUTHOR_HISTORY_BATCHES, PRESENTATION_STATE_KEY, PRESENTED_BATCH_WINDOW, batchAuthorKey, batchFreshness, type PresentedBatchV3 } from '../recommendation-v3/batch-freshness-v3'
 import type {
     RecommendationFeedbackState,
     VisualEmbeddingRecord
@@ -1453,6 +1454,56 @@ export class LibraryDatabase {
             throw error
         }
         return { id, generatedAt, ...input, itemIds }
+    }
+
+    /** Non-mutating; intentionally do not infer visibility from old pool allocations. */
+    recentV3BatchFreshness() {
+        const history = this.getAppState<PresentedBatchV3[]>(PRESENTATION_STATE_KEY) ?? []
+        const ids = [...new Set(history.slice(0, AUTHOR_HISTORY_BATCHES).flatMap(batch => batch.itemIds))]
+        const authors = new Map<string, string>()
+        if (ids.length) {
+            // Fetch identity only, not full comic cards / page or download counts.
+            const rows = this.db.prepare(`SELECT c.id, c.canonical_author_id, a.canonical_name
+                FROM comics c LEFT JOIN authors a ON a.id = c.canonical_author_id
+                WHERE c.id IN (${ids.map(() => '?').join(',')})`).all(...ids) as SqlRow[]
+            for (const row of rows) {
+                const key = batchAuthorKey({ authorId: row.canonical_author_id ? String(row.canonical_author_id) : null,
+                    canonicalAuthor: row.canonical_name ? String(row.canonical_name) : null })
+                if (key) authors.set(String(row.id), key)
+            }
+        }
+        return batchFreshness(history, authors)
+    }
+
+    confirmV3BatchPresentation(input: { batchId: string; cycleId: string; contextId: string; batchIndex: number; itemIds: unknown }) {
+        const ids = input.itemIds
+        if (!Array.isArray(ids) || !ids.length || ids.length > 12 ||
+            !ids.every((id): id is string => typeof id === 'string' && id.length > 0) ||
+            new Set(ids).size !== ids.length) return false
+        this.db.exec('BEGIN IMMEDIATE')
+        try {
+            const row = this.db.prepare(`SELECT item_ids_json, evidence_json FROM recommendation_v3_batches
+                WHERE id = ? AND recommendation_cycle_id = ? AND context_id = ? AND batch_index = ?`)
+                .get(input.batchId, input.cycleId, input.contextId, input.batchIndex) as SqlRow | undefined
+            const evidence = jsonObject(row?.evidence_json)
+            const allocated = new Set(jsonArray(row?.item_ids_json))
+            const valid = Boolean(row && evidence.allocatorVersion && evidence.requestId && ids.every(id => allocated.has(id)))
+            if (valid && !evidence.presentationConfirmedV1) {
+                const previous = this.getAppState<PresentedBatchV3[]>(PRESENTATION_STATE_KEY) ?? []
+                this.setAppState(PRESENTATION_STATE_KEY, [
+                    { batchId: input.batchId, itemIds: ids }, ...previous
+                ].slice(0, PRESENTED_BATCH_WINDOW))
+                // The per-batch stamp also prevents an old tab from promoting
+                // a batch back into the rolling window after it has aged out.
+                this.db.prepare(`UPDATE recommendation_v3_batches SET evidence_json =
+                    json_set(evidence_json, '$.presentationConfirmedV1', 1) WHERE id = ?`).run(input.batchId)
+            }
+            this.db.exec('COMMIT')
+            return valid
+        } catch (error) {
+            this.db.exec('ROLLBACK')
+            throw error
+        }
     }
 
     listV3Batches(poolId: string) {

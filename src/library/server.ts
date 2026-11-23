@@ -1021,6 +1021,12 @@ export async function startLibraryServer(options: {
                     return json(response, 400, {
                         error: 'Batch presentation requires cycle and batch context'
                     })
+                const visibleBatch = eventType === 'recommend_batch_presented' && input.source === 'final-v3-visible'
+                if (visibleBatch && !options.database.confirmV3BatchPresentation({
+                    cycleId: cycleId!, batchId: batchId!, batchIndex: batchIndex!,
+                    contextId: String(input.contextId ?? ''),
+                    itemIds: (input.metadata as Record<string, unknown> | undefined)?.itemIds
+                })) return json(response, 400, { error: 'Presentation does not match the persisted Final V3 batch' })
                 if (
                     (eventType === 'recommend_like' ||
                         eventType === 'recommend_dislike' ||
@@ -1087,7 +1093,7 @@ export async function startLibraryServer(options: {
                                       ...(batchId ? { batchId } : {})
                                   }
                                 : {},
-                        dedupeKey: input.dedupeKey
+                        dedupeKey: visibleBatch ? `${cycleId}:${batchId}` : input.dedupeKey
                             ? String(input.dedupeKey)
                             : eventType === 'recommend_batch_presented' &&
                                 cycleId &&

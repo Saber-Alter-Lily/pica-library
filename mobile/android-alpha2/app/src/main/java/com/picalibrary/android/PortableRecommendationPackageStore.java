@@ -72,7 +72,7 @@ final class PortableRecommendationPackageStore {
         final Map<String,Candidate> candidateById=new LinkedHashMap<>();
         final Map<String,Identity> identityByComic=new LinkedHashMap<>();
         boolean available(){return !reservoirGeneration.isEmpty()&&!candidates.isEmpty();}
-        String workId(String comicId){Identity value=identityByComic.get(comicId);return value==null?"":value.workId;}
+        String workId(String comicId){Identity value=identityByComic.get(comicId);return value!=null&&"MANUAL_CONFIRMED".equals(value.bindingStatus)?value.workId:"";}
         int identityBindingCount(){return identityByComic.size();}
         double visualAdjustment(String comicId){return visualAdjustment(comicId,MobileVisualPolicyStore.LIGHT);}
         double visualAdjustment(String comicId,String strength){

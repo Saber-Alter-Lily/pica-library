@@ -23,7 +23,17 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
 
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);themeKey=ThemeStore.effectiveKey(this);prefs=getSharedPreferences("alpha81-ui",MODE_PRIVATE);collectionSelection=new CollectionSelectionController(this,this);collectionMode=UnifiedComicCollectionAdapter.normalizeMode(prefs.getInt("collectionMode",UnifiedComicCollectionAdapter.MODE_GRID_MEDIUM));activeShelfId=prefs.getString("activeShelfId","");librarySpec=UnifiedFilterStore.load(getSharedPreferences("library-display",MODE_PRIVATE));librarySpec.favoriteOnly=false;if(saved!=null){current=ShellPolicy.clampTab(saved.getInt("tab",0));showingShelves=saved.getBoolean("shelves",false);libraryQuery=saved.getString("libraryQuery","");int[] sy=saved.getIntArray("tabScrollY"),sp=saved.getIntArray("tabListPosition"),so=saved.getIntArray("tabListOffset");if(sy!=null&&sy.length==4)System.arraycopy(sy,0,tabScrollY,0,4);if(sp!=null&&sp.length==4)System.arraycopy(sp,0,tabListPosition,0,4);if(so!=null&&so.length==4)System.arraycopy(so,0,tabListOffset,0,4);}else current=ShellPolicy.clampTab(getIntent().getIntExtra("tab",0));renderShell();show();if(getIntent().getBooleanExtra("startOnboarding",false)){getIntent().removeExtra("startOnboarding");body.postDelayed(this::startOnboardingTour,250);}}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);showingShelves=false;current=ShellPolicy.clampTab(intent.getIntExtra("tab",0));renderShell();show();if(intent.getBooleanExtra("startOnboarding",false)){intent.removeExtra("startOnboarding");body.postDelayed(this::startOnboardingTour,250);}}
-    @Override protected void onResume(){super.onResume();RecommendationSyncActivity.maybeOfferOnConnection(this);String key=ThemeStore.effectiveKey(this);if(!key.equals(themeKey)){themeKey=key;Ui.applyWindow(this);renderShell();show();}else if(body!=null)show();if(!onboardingPromptScheduled&&body!=null&&OnboardingStore.shouldPrompt(this)){onboardingPromptScheduled=true;body.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&OnboardingStore.shouldPrompt(this))AndroidOnboarding.maybePrompt(this);},700);}else if(body!=null)body.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&!OnboardingStore.shouldPrompt(this))AutoUpdatePrompt.maybePrompt(this);},900);}
+    private long subscriptionNoticeAt;private int unreadSubscriptionCount,announcedSubscriptions;
+    @Override public void onWindowFocusChanged(boolean focus){super.onWindowFocusChanged(focus);if(focus)showUnreadSubscriptions();}
+    private void showUnreadSubscriptions(){
+        int n=unreadSubscriptionCount;if(n<=0){announcedSubscriptions=0;return;}
+        long now=android.os.SystemClock.elapsedRealtime();if((n<=announcedSubscriptions&&now-subscriptionNoticeAt<15*60000L)||isFinishing()||isDestroyed()||!hasWindowFocus())return;
+        subscriptionNoticeAt=now;announcedSubscriptions=n;Toast.makeText(this,LocalizedText.ui(this,"订阅作者有 "+n+" 条待看更新","Unread author updates: "+n,"作者の未読更新："+n),Toast.LENGTH_LONG).show();
+    }
+    @Override protected void onResume(){super.onResume();
+        ReaderSubscriptionSync.refresh(this,false,(n,partial)->{
+            unreadSubscriptionCount=n;showUnreadSubscriptions();
+        });RecommendationSyncActivity.maybeOfferOnConnection(this);String key=ThemeStore.effectiveKey(this);if(!key.equals(themeKey)){themeKey=key;Ui.applyWindow(this);renderShell();show();}else if(body!=null)show();if(!onboardingPromptScheduled&&body!=null&&OnboardingStore.shouldPrompt(this)){onboardingPromptScheduled=true;body.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&OnboardingStore.shouldPrompt(this))AndroidOnboarding.maybePrompt(this);},700);}else if(body!=null)body.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&!OnboardingStore.shouldPrompt(this))AutoUpdatePrompt.maybePrompt(this);},900);}
     @Override protected void onSaveInstanceState(Bundle out){captureCurrentViewport();out.putInt("tab",current);out.putBoolean("shelves",showingShelves);out.putString("libraryQuery",libraryQuery);out.putIntArray("tabScrollY",tabScrollY);out.putIntArray("tabListPosition",tabListPosition);out.putIntArray("tabListOffset",tabListOffset);super.onSaveInstanceState(out);}
     @Override protected void onPause(){captureCurrentViewport();super.onPause();}
     @Override protected void onDestroy(){++serial;if(collectionSelection!=null)collectionSelection.detach();if(pending!=null)pending.cancel(true);worker.shutdownNow();super.onDestroy();}
@@ -97,8 +107,10 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         LinearLayout p=page(true);
         RecommendationProgressPanel progress=new RecommendationProgressPanel(this,()->{if(current==1&&!isDestroyed()&&!isFinishing())show();});
         Button preferences=compact("画像 / 调整",v->startActivity(new Intent(this,RecommendationStyleActivity.class)));preferences.setTag(AndroidOnboarding.RECOMMEND_PREFERENCES);
-        ImageButton refresh=Ui.iconButton(this,R.drawable.ic_refresh_24,"重新生成手机推荐",v->refreshRecommendations(progress));refresh.setTag(AndroidOnboarding.RECOMMEND_BUILD);
+        Button refresh=compact(LocalizedText.ui(this,"生成新一轮","New round","新しいラウンド"),v->refreshRecommendations(progress));refresh.setTag(AndroidOnboarding.RECOMMEND_BUILD);
         titleRow(p,"为你推荐",preferences,refresh);
+        Button inbox=compact(LocalizedText.ui(this,"作者订阅","Author updates","作者の新着"),v->startActivity(new Intent(this,ReaderSubscriptionsActivity.class)));
+        p.addView(inbox);ReaderSubscriptionSync.refresh(this,false,(n,partial)->{if(!isDestroyed()&&!isFinishing())inbox.setText(LocalizedText.ui(this,"作者订阅 · 待看 "+n,"Author updates · "+n+" unread","作者の新着・未読 "+n));});
         p.addView(progress);
 
         NativeRecommendationStore.Snapshot stored=NativeRecommendationStore.load(this);
@@ -107,17 +119,17 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
 
         LinearLayout statusCard=SettingsRow.panel(this,null);
         statusCard.addView(SettingsRow.statusLine(this,"运行节点",Ui.text(this,"Android 本机",12,Ui.TEXT,true)));
-        statusCard.addView(SettingsRow.statusLine(this,"当前 Cycle",Ui.text(this,stored.cycleId.isEmpty()?"尚未生成":stored.cycleId.substring(0,Math.min(12,stored.cycleId.length())),12,Ui.MUTED,true)));
+        statusCard.addView(SettingsRow.statusLine(this,"当前轮次",Ui.text(this,stored.cycleId.isEmpty()?"尚未生成":stored.readerOrdinal>0?"第 "+stored.readerOrdinal+" 轮":"历史推荐",12,Ui.MUTED,true)));
         statusCard.addView(SettingsRow.statusLine(this,"候选基础",Ui.rawText(this,portable.available()?LocalizedText.ui(this,portable.candidates.size()+" 个 · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length())),portable.candidates.size()+" items · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length())),portable.candidates.size()+" 件 · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length()))):LocalizedText.ui(this,"尚未同步","Not synced yet","未同期"),12,Ui.MUTED,true)));
         statusCard.addView(SettingsRow.statusLine(this,"本次 Session",Ui.rawText(this,LocalizedText.ui(this,RecommendationEvidenceStore.sessionCount(this)+" 条行为 · 仅手机",RecommendationEvidenceStore.sessionCount(this)+" behaviors · phone only",RecommendationEvidenceStore.sessionCount(this)+" 件の行動 · スマートフォンのみ"),12,Ui.MUTED,true)));
         p.addView(statusCard);
 
         if(!snapshot.available()){
-            TextView t=Ui.text(this,stored.available()?"当前候选已被本机反馈或屏蔽规则耗尽。":"还没有手机本地推荐周期。",14,Ui.MUTED,false);
+            TextView t=Ui.text(this,stored.available()?"当前候选已被本机反馈或屏蔽规则耗尽。":("NO_UNSEEN_MATCH".equals(stored.readiness)?"没有符合条件的未展示作品。不会用旧书凑满。":"还没有手机本地推荐周期。"),14,Ui.MUTED,false);
             t.setPadding(0,Ui.dp(this,12),0,Ui.dp(this,10));p.addView(t);
             boolean canRun=PicaClient.available(this)||portable.available();
             if(canRun){
-                p.addView(compact("生成手机推荐",v->{NativeRecommendationJobs.refresh(this);progress.begin();}));
+                p.addView(Ui.text(this,LocalizedText.ui(this,"点右上角「生成新一轮」开始。","Tap New round to begin.","右上の「新しいラウンド」から開始します。"),13,Ui.MUTED,false));
             }else if(BridgeStore.paired(this)){
                 p.addView(compact("同步候选基础",v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
             }else{
@@ -129,15 +141,14 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         TextView sourceView=Ui.rawText(this,LocalizedText.ui(this,"手机独立排序 · Lifetime / Recent / Session / Explicit","Phone-local ranking · Lifetime / Recent / Session / Explicit","スマートフォン独立順位付け · Lifetime / Recent / Session / Explicit")+(portable.available()?LocalizedText.ui(this," · 已接入同步候选基础"," · synced candidate base connected"," · 同期済み候補基盤を利用"):""),12,Ui.MUTED,false);
         sourceView.setPadding(0,0,0,Ui.dp(this,6));p.addView(sourceView);
         LinearLayout pager=new LinearLayout(this);pager.setGravity(Gravity.CENTER_VERTICAL);
-        pager.addView(compact("上一批",v->switchHomeRecommendationBatch(-1)),new LinearLayout.LayoutParams(0,-2,1));
+        pager.addView(compact("上一页",v->switchHomeRecommendationBatch(-1)),new LinearLayout.LayoutParams(0,-2,1));
         recommendationBatchLabel=Ui.text(this,"",13,Ui.MUTED,false);recommendationBatchLabel.setGravity(Gravity.CENTER);pager.addView(recommendationBatchLabel,new LinearLayout.LayoutParams(0,-1,1));
-        pager.addView(compact("下一批",v->switchHomeRecommendationBatch(1)),new LinearLayout.LayoutParams(0,-2,1));
+        pager.addView(compact("下一页",v->switchHomeRecommendationBatch(1)),new LinearLayout.LayoutParams(0,-2,1));
         p.addView(pager);
 
         recommendationCatalog=UnifiedCatalogStore.load(this);
         recommendationBatchList=new LinearLayout(this);recommendationBatchList.setOrientation(LinearLayout.VERTICAL);p.addView(recommendationBatchList);
         renderHomeRecommendationBatch(snapshot);
-        NativeRecommendationStore.markSeen(this,snapshot.current());
     }
 
     private void switchHomeRecommendationBatch(int delta){
@@ -145,13 +156,15 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         RecommendationPolicyStore.moveVisibleBatch(this,delta);
         NativeRecommendationStore.Snapshot visible=RecommendationPolicyStore.applyLocalPolicy(this,NativeRecommendationStore.load(this));recommendationVisibleSnapshot=visible;
         renderHomeRecommendationBatch(visible);
-        NativeRecommendationStore.markSeen(this,visible.current());
     }
 
     private void renderHomeRecommendationBatch(NativeRecommendationStore.Snapshot snapshot){
         if(recommendationBatchList==null||recommendationBatchLabel==null)return;
-        recommendationBatchLabel.setText(LocalizedText.ui(this,"第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 批","Batch "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size(),"第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" バッチ"));
+        recommendationBatchLabel.setText(LocalizedText.ui(this,(snapshot.readerOrdinal>0?"第 "+snapshot.readerOrdinal+" 轮 · ":"")+"第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 页","Page "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size(),(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" ページ"));
         recommendationBatchList.removeAllViews();
+        if(snapshot.current().isEmpty())recommendationBatchList.addView(Ui.text(this,LocalizedText.ui(this,"本页已因订阅或屏蔽而清空。其他页不变，可以继续翻页。","Nothing left on this page after your exclusions. Other pages are unchanged.","購読やブロックのため、このページは空です。他のページは変わりません。"),13,Ui.MUTED,false));
+        final LinearLayout receiptView=recommendationBatchList;final int receiptSerial=serial;
+        RecommendationPageReceipt.afterDraw(this,receiptView,snapshot,()->serial==receiptSerial&&current==1&&recommendationBatchList==receiptView&&recommendationVisibleSnapshot==snapshot);
         UnifiedCatalogStore.Snapshot catalog=recommendationCatalog==null?UnifiedCatalogStore.load(this):recommendationCatalog;
         for(NativeRecommendationStore.Item item:snapshot.current()){
             UnifiedCatalogStore.Entry e=catalog.byId.get(item.comicId);
@@ -163,7 +176,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
             TextView why=Ui.text(this,item.reason,12,Ui.PRIMARY,false);why.setPadding(0,Ui.dp(this,6),0,0);copy.addView(why);
             String sentiment=RecommendationFeedbackStore.sentiment(this,item.comicId);boolean liked="like".equals(sentiment),disliked="dislike".equals(sentiment);
             if(liked||disliked){
-                TextView feedbackState=Ui.rawText(this,liked?LocalizedText.ui(this,"已记录喜欢 · 后续会增加类似推荐","Liked · similar recommendations will increase","好きとして記録 · 類似おすすめを増やします"):LocalizedText.ui(this,"已记录不喜欢 · 后续会减少此类推荐","Disliked · similar recommendations will decrease","苦手として記録 · この種類のおすすめを減らします"),11.5f,liked?Ui.PRIMARY:Ui.BAD,true);
+                TextView feedbackState=Ui.rawText(this,liked?LocalizedText.ui(this,"已记录喜欢，下次生成时参考","Liked; used when you generate the next round","次のラウンドから好みに反映します"):LocalizedText.ui(this,"不再推荐这本，不影响同类作品","This work won’t return; similar works are unaffected","この作品は再表示せず、似た作品には影響しません"),11.5f,liked?Ui.PRIMARY:Ui.BAD,true);
                 feedbackState.setPadding(0,Ui.dp(this,7),0,0);copy.addView(feedbackState);
                 if(disliked)cover.setAlpha(.55f);
             }
@@ -172,6 +185,8 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
             feedback.addView(compact(disliked?"👎 已不喜欢":"👎 不喜欢",v->recommendationFeedback(item,"dislike")));Ui.gap(feedback,this,6);
             UnifiedCatalogStore.Entry target=e;
             feedback.addView(compact("⚙ 调节",v->RecommendationItemControlDialog.show(this,target,this::show)));copy.addView(feedback);
+            String seenLabel=LocalizedText.ui(this,"看过，不再推荐","Already seen · don't recommend","既読・今後おすすめしない");
+            copy.addView(compact(seenLabel,v->{v.setEnabled(false);RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen",true,0);show();}));
             card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));card.setOnClickListener(v->openRecommendation(target));CoverRepository.load(this,cover,e,Ui.PLACEHOLDER);recommendationBatchList.addView(card);
         }
     }

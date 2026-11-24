@@ -300,7 +300,10 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(main).toContain('PortableRecommendationPackageStore.load(this)')
     expect(main).toContain('UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this)')
     expect(main).toContain('NativeRecommendationStore.Snapshot snapshot=')
-    expect(main).toContain('NativeRecommendationStore.markCurrentSeen(this)')
+    // A cache read (including a load canceled by navigation) is not exposure.
+    const pageLoad=main.slice(main.indexOf('private RecommendationPageState readRecommendationPageState()'),main.indexOf('private void recommendations(){'))
+    expect(pageLoad).not.toMatch(/markCurrentSeen|acknowledgePage|RecommendationPageReceipt/)
+    expect(main).toContain('RecommendationPageReceipt.afterDraw(this,recommendationBatchList,snapshot')
     expect(main).toContain('PicaClient.available(this)||portable.available()')
 
     const recommendationsStart = main.indexOf('private void recommendations(){')

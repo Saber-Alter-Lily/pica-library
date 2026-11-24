@@ -26,6 +26,7 @@ final class RecommendationFeedbackStore {
         prefs(context).edit().putString(SENTIMENT+id,value).putString(UPDATED+id,Instant.now().toString()).putBoolean(DIRTY+id,true).remove(REASONS+id).apply();
     }
     static String sentiment(Context context,String comicId){return prefs(context).getString(SENTIMENT+cleanId(comicId),"");}
+    static boolean recentlyLiked(Context c,String id){if(!isLiked(c,id))return false;try{return Instant.parse(prefs(c).getString(UPDATED+id,"")).isAfter(Instant.now().minusSeconds(30L*86400));}catch(Exception ignored){return false;}}
     static boolean isLiked(Context context,String comicId){return "like".equals(sentiment(context,comicId));}
     static boolean isDisliked(Context context,String comicId){return "dislike".equals(sentiment(context,comicId));}
     static boolean hasFeedback(Context context,String comicId){String value=sentiment(context,comicId);return "like".equals(value)||"dislike".equals(value);}

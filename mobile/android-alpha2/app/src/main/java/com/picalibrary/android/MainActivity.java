@@ -390,10 +390,7 @@ public class MainActivity extends LocaleAwareActivity {
 
         NativeRecommendationStore.Snapshot snapshot=
             NativeRecommendationStore.load(this);
-        if(snapshot.available()){
-            NativeRecommendationStore.markCurrentSeen(this);
-            snapshot=NativeRecommendationStore.load(this);
-        }
+        snapshot=RecommendationPolicyStore.applyLocalPolicy(this,snapshot);
         return new RecommendationPageState(portable,snapshot,canRun);
     }
 
@@ -495,11 +492,11 @@ public class MainActivity extends LocaleAwareActivity {
         LinearLayout batchControls=new LinearLayout(this);
         target.addView(batchControls);
         batchControls.addView(
-            button("上一批",v->switchNativeRecommendationBatch(-1)),
+            button("上一页",v->switchNativeRecommendationBatch(-1)),
             new LinearLayout.LayoutParams(0,-2,1)
         );
         batchControls.addView(
-            button("下一批",v->switchNativeRecommendationBatch(1)),
+            button("下一页",v->switchNativeRecommendationBatch(1)),
             new LinearLayout.LayoutParams(0,-2,1)
         );
         recommendationBatchList=new LinearLayout(this);
@@ -514,13 +511,16 @@ public class MainActivity extends LocaleAwareActivity {
             direction<0
                 ?NativeRecommendationStore.previousBatch(this)
                 :NativeRecommendationStore.nextBatch(this);
-        renderNativeRecommendationBatch(snapshot);
+        renderNativeRecommendationBatch(RecommendationPolicyStore.applyLocalPolicy(this,snapshot));
     }
 
+    private long recommendationRenderToken;
     private void renderNativeRecommendationBatch(NativeRecommendationStore.Snapshot snapshot){
         if(recommendationBatchList==null||recommendationBatchStatus==null)return;
         recommendationBatchStatus.setText(LocalizedText.ui("手机独立 Recommendation V3/V5 Portable · ")+snapshot.readiness+LocalizedText.ui(" · 候选 ")+snapshot.candidateCount+LocalizedText.ui(" 本 · 第 ")+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+LocalizedText.ui(" 批"));
         recommendationBatchList.removeAllViews();
+        final int receiptSerial=serial;final long draw=++recommendationRenderToken;
+        RecommendationPageReceipt.afterDraw(this,recommendationBatchList,snapshot,()->valid(receiptSerial)&&current==1&&draw==recommendationRenderToken);
         for(NativeRecommendationStore.Item item:snapshot.current()){
             LinearLayout card=Ui.card(this);
             card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));

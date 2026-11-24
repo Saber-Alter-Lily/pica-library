@@ -3,3 +3,24 @@
 Clean-room Android alpha. Alpha 2 adds real Desktop Mobile Bridge pairing, real favorite library loading, downloaded chapter/page reading, reading progress write-back, and live recommendation/atlas endpoints.
 
 No MH-ARK source code, resources, native libraries, package identity, or signing materials are included.
+
+## 手机推荐候选：从 v0.5.0 单独开发，未发布
+
+这是本地候选的验收说明，不是已上架版本的功能声明。Android 在手机本地生成一轮，最多六页；
+翻页只切换已经生成的内容。手机展示记录及作者订阅保存在单独的应用私有库；本阶段没有把这些记录同步到其他设备。
+
+| 在手机上怎么做 | 应看到什么 |
+| --- | --- |
+| 推荐 → 生成新一轮 → 下一页 → 上一页 | 页码改变，轮次不变；回到原页仍可查看。普通赞踩留到下轮，明确订阅或屏蔽除外。 |
+| 候选充足时查看一页；对某本选「看过，不再推荐」后生成新轮 | 首选 6 熟＋6 陌；已打开整页的作品不重新占位，不必逐本点开。仅在身份已确认时跨译本去重。未打开的其他页不算看过。 |
+| 对同一位陌生作者什么都不点，连续生成新轮 | 若首次展示在第 1 轮，则第 2、3 轮跳过该作者，第 4 轮起其**另一部**合口味作品才可回来。不是保证第 4 轮一定出现。 |
+| 作品详情 → 订阅这位作者；推荐 → 作者订阅 | 该作者退出普通推荐。首次不补发历史；新作或能判断的新增章节进入待看。只进详情不会清掉新章，读对应章节的正文或手动「标为已看」才清。 |
+
+数据不足时允许用另一边补位；两边都缺就少给，不用旧书凑满。未可靠记录的旧版曝光不追认为已看；
+没有可靠身份的同名作品不会仅凭标题合并。订阅不是后台系统推送：打开应用或手动检查时按预算轮查；
+Pica 根据可用章节数检测新增章节；E-H/ExH 目前只能识别有可靠时间的新画廊，不承诺检测已有画廊的增页。
+
+**已验证（合成数据、离线）：**直接执行 Java 排页器及订阅差异规则（含 10 轮、60 页、720 部不重复作品），
+运行 Android 相关仓库回归及实际 SQLite 语句的临时数据库关闭/重开检查。源码语法检查不等于 Android 编译。
+**待验证：**Android SDK 编译、Robolectric Activity/SQLite 集成、安装 Dev APK、前后台切换及真实来源的更新提醒。
+没有生成或发布 APK，没有接触正式账户、安装目录或数据库。

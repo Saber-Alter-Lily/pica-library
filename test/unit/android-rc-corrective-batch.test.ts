@@ -52,14 +52,16 @@ describe('Android RC corrective batch', () => {
         expect(home).toContain('"最近收藏","最早收藏","最近更新"')
     })
 
-    it('bounds author exposure across batches while allowing explicit author session intent', () => {
+    it('uses the reader mix planner even for an explicit target, without a relaxed fallback', () => {
         const engine = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java'
         )
-        expect(engine).toContain('cycleAuthorExposure')
-        expect(engine).toContain('targetAuthorKey')
-        expect(engine).toContain('{{4,2,4,4,2},{5,3,6,5,3}')
-        expect(engine).toContain('cycleAuthor.getOrDefault(authorKey,0)>=cycleAuthorCap')
+        expect(engine).toContain('ReaderRoundPlanner.plan(')
+        expect(engine).toContain('RecommendationPolicyStore.matches(c,target.optString')
+        expect(engine).toContain('ledger.clocks()')
+        expect(engine).not.toMatch(/allowRecent|cycleAuthorCap=target|cooldownForNextCycle/)
+        // Executable examples enforce 6+6, both shortage cases, and the two full-round cooldown.
+        expect(read('mobile/android-alpha2/app/src/test/java/com/picalibrary/android/ReaderRoundPolicyTest.java')).toContain('ReaderRoundExamples.main(')
     })
 
     it('balances positive and negative detail recommendation controls', () => {

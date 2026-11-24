@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.view.KeyEvent;
+import android.view.inputmethod.EditorInfo;
 import android.widget.ListView;
 import java.util.*;
 import org.junit.Test;
@@ -18,6 +20,23 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=32)
 public class LibrarySortMenuTest {
+    @Test public void searchAcceptsImeAndHardwareEnterOnlyOnce(){
+        int[] calls={0};Runnable submit=()->calls[0]++;
+        assertFalse(HomeActivity.handleLibrarySearchAction(EditorInfo.IME_NULL,null,submit));
+        assertTrue(HomeActivity.handleLibrarySearchAction(EditorInfo.IME_ACTION_SEARCH,null,submit));
+        for(int key:new int[]{KeyEvent.KEYCODE_ENTER,KeyEvent.KEYCODE_NUMPAD_ENTER}){
+            int before=calls[0];
+            assertTrue(HomeActivity.handleLibrarySearchAction(EditorInfo.IME_NULL,new KeyEvent(KeyEvent.ACTION_DOWN,key),submit));
+            assertTrue(HomeActivity.handleLibrarySearchAction(EditorInfo.IME_NULL,new KeyEvent(0,0,KeyEvent.ACTION_DOWN,key,1),submit));
+            assertEquals(before,calls[0]);
+            assertTrue(HomeActivity.handleLibrarySearchAction(EditorInfo.IME_NULL,new KeyEvent(KeyEvent.ACTION_UP,key),submit));
+            assertEquals(before+1,calls[0]);
+        }
+        KeyEvent cancelled=KeyEvent.changeFlags(new KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER),KeyEvent.FLAG_CANCELED);
+        assertTrue(HomeActivity.handleLibrarySearchAction(EditorInfo.IME_NULL,cancelled,submit));
+        assertFalse(HomeActivity.handleLibrarySearchAction(EditorInfo.IME_NULL,new KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_A),submit));
+        assertEquals(3,calls[0]);
+    }
     @Test public void selectingTheAlreadyCheckedRandomRowDispatchesAgainAndPrefsRestoreTheOrder(){
         ActivityController<Activity> host=Robolectric.buildActivity(Activity.class).setup().visible();
         Activity a=host.get();SharedPreferences prefs=a.getSharedPreferences("library-sort-fixture",Context.MODE_PRIVATE);

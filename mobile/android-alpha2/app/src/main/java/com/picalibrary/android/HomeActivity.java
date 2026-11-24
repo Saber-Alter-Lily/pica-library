@@ -69,7 +69,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         titleRow(p,"我的书库",history,shelfButton,display,refresh);
         libraryRefreshStatus=Ui.text(this,"",12,Ui.MUTED,false);libraryRefreshStatus.setVisibility(View.GONE);p.addView(libraryRefreshStatus);
         EditText search=new EditText(this);search.setSingleLine(true);search.setHint(LocalizedText.ui("搜索标题 / 作者 / 标签 / 分类"));search.setText(libraryQuery);search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);Ui.styleField(search,this);
-        search.setOnEditorActionListener((v,id,event)->{if(id==EditorInfo.IME_ACTION_SEARCH){libraryQuery=v.getText().toString().trim();show();return true;}return false;});
+        search.setOnEditorActionListener((v,id,event)->handleLibrarySearchAction(id,event,()->{libraryQuery=v.getText().toString().trim();show();}));
         LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.setMargins(0,Ui.dp(this,8),0,Ui.dp(this,6));p.addView(search,sp);
 
         LinearLayout tools=new LinearLayout(this);tools.setGravity(Gravity.CENTER_VERTICAL);
@@ -83,6 +83,19 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
 
         TextView count=Ui.text(this,"",12.5f,Ui.MUTED,false);count.setGravity(Gravity.RIGHT);p.addView(count);libraryResultCount=count;
         RecyclerView list=collection(p,collectionMode);renderLibrary(list);refreshLibrary(false);
+    }
+    static boolean handleLibrarySearchAction(int actionId,KeyEvent key,Runnable submit){
+        if(key==null){
+            if(actionId!=EditorInfo.IME_ACTION_SEARCH)return false;
+            submit.run();return true;
+        }
+        if((key.getKeyCode()!=KeyEvent.KEYCODE_ENTER&&key.getKeyCode()!=KeyEvent.KEYCODE_NUMPAD_ENTER)||!key.hasNoModifiers())return false;
+        // TextView sends hardware Enter as IME_NULL on older Android versions.
+        // Consume down/repeats; submit on release before the editor is rebuilt.
+        if(key.getAction()==KeyEvent.ACTION_DOWN)return true;
+        if(key.getAction()!=KeyEvent.ACTION_UP)return false;
+        if(!key.isCanceled())submit.run();
+        return true;
     }
     private void updateLibraryUpdatesButton(){
         if(libraryUpdatesButton==null)return;

@@ -17,6 +17,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     private FrameLayout body;private LinearLayout bottomNavigationHost;private SharedPreferences prefs;private final ExecutorService worker=Executors.newFixedThreadPool(4);private Future<?> pending;private int serial,current,collectionMode;private String libraryQuery="",activeShelfId="",themeKey="";private boolean showingShelves;
     private LinearLayout recommendationBatchList;private TextView recommendationBatchLabel;private UnifiedCatalogStore.Snapshot recommendationCatalog;private NativeRecommendationStore.Snapshot recommendationVisibleSnapshot;
     private ImageButton libraryRefreshButton;private TextView libraryRefreshStatus;
+    private Button libraryUpdatesButton,librarySortButton;private TextView libraryResultCount;private String libraryCountText="";
     private CollectionSelectionController collectionSelection;
     private UnifiedLibraryFilter.Spec librarySpec;private UnifiedLibraryFilter.Facets libraryFacets=new UnifiedLibraryFilter.Facets(new ArrayList<>(),new ArrayList<>(),new ArrayList<>());
     private final int[] tabScrollY=new int[4],tabListPosition=new int[4],tabListOffset=new int[4];private ScrollView activeScroll;private RecyclerView activeList;private int activeViewportTab=-1;private boolean onboardingPromptScheduled,fullyDrawnReported;
@@ -32,7 +33,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     }
     @Override protected void onResume(){super.onResume();
         ReaderSubscriptionSync.refresh(this,false,(n,partial)->{
-            unreadSubscriptionCount=n;showUnreadSubscriptions();
+            if(isDestroyed()||isFinishing())return;unreadSubscriptionCount=n;updateLibraryUpdatesButton();showUnreadSubscriptions();
         });RecommendationSyncActivity.maybeOfferOnConnection(this);String key=ThemeStore.effectiveKey(this);if(!key.equals(themeKey)){themeKey=key;Ui.applyWindow(this);renderShell();show();}else if(body!=null)show();if(!onboardingPromptScheduled&&body!=null&&OnboardingStore.shouldPrompt(this)){onboardingPromptScheduled=true;body.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&OnboardingStore.shouldPrompt(this))AndroidOnboarding.maybePrompt(this);},700);}else if(body!=null)body.postDelayed(()->{if(!isFinishing()&&!isDestroyed()&&!OnboardingStore.shouldPrompt(this))AutoUpdatePrompt.maybePrompt(this);},900);}
     @Override protected void onSaveInstanceState(Bundle out){captureCurrentViewport();out.putInt("tab",current);out.putBoolean("shelves",showingShelves);out.putString("libraryQuery",libraryQuery);out.putIntArray("tabScrollY",tabScrollY);out.putIntArray("tabListPosition",tabListPosition);out.putIntArray("tabListOffset",tabListOffset);super.onSaveInstanceState(out);}
     @Override protected void onPause(){captureCurrentViewport();super.onPause();}
@@ -48,7 +49,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     void startOnboardingTour(){onboardingPromptScheduled=true;AndroidOnboarding.start(this);}
     void onboardingShowTab(int tab,Runnable after){showingShelves=false;current=ShellPolicy.clampTab(tab);renderShell();show();if(body!=null)body.postDelayed(after,160);}
 
-    private void show(){captureCurrentViewport();if(collectionSelection!=null)collectionSelection.detach();++serial;if(pending!=null)pending.cancel(true);pending=null;body.removeAllViews();activeScroll=null;activeList=null;activeViewportTab=-1;recommendationBatchList=null;recommendationBatchLabel=null;recommendationCatalog=null;recommendationVisibleSnapshot=null;libraryRefreshButton=null;libraryRefreshStatus=null;if(showingShelves){shelves();return;}if(current==0)library();else if(current==1)recommendations();else if(current==2)onlineEntry();else settingsEntry();}
+    private void show(){captureCurrentViewport();if(collectionSelection!=null)collectionSelection.detach();++serial;if(pending!=null)pending.cancel(true);pending=null;body.removeAllViews();activeScroll=null;activeList=null;activeViewportTab=-1;recommendationBatchList=null;recommendationBatchLabel=null;recommendationCatalog=null;recommendationVisibleSnapshot=null;libraryRefreshButton=null;libraryRefreshStatus=null;libraryUpdatesButton=null;librarySortButton=null;libraryResultCount=null;if(showingShelves){shelves();return;}if(current==0)library();else if(current==1)recommendations();else if(current==2)onlineEntry();else settingsEntry();}
     private LinearLayout page(boolean scroll){LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setBackgroundColor(Ui.BG);p.setPadding(Ui.dp(this,12),Ui.dp(this,8),Ui.dp(this,12),Ui.dp(this,8));if(scroll){final int tab=current;ScrollView s=new ScrollView(this);activeScroll=s;activeList=null;activeViewportTab=tab;s.setBackgroundColor(Ui.BG);s.addView(p);body.addView(s,new FrameLayout.LayoutParams(-1,-1));s.post(()->s.scrollTo(0,Math.max(0,tabScrollY[tab])));}else{activeScroll=null;activeList=null;activeViewportTab=-1;body.addView(p,new FrameLayout.LayoutParams(-1,-1));}return p;}
     private void titleRow(LinearLayout p,String title,View... actions){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);TextView label=Ui.text(this,title,26,Ui.TEXT,true);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));for(View action:actions){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.setMargins(Ui.dp(this,4),0,0,0);row.addView(action,lp);}p.addView(row);}
     private RecyclerView collection(LinearLayout p,int mode){final int tab=current;RecyclerView v=new RecyclerView(this);activeScroll=null;activeList=v;activeViewportTab=tab;v.setClipToPadding(false);v.setPadding(0,Ui.dp(this,4),0,Ui.dp(this,16));setCollectionLayout(v,mode);p.addView(v,new LinearLayout.LayoutParams(-1,0,1));return v;}
@@ -59,9 +60,70 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     private void open(UnifiedCatalogStore.Entry e){Intent i=new Intent(this,UnifiedComicDetailActivity.class);i.putExtra("comicId",e.id);i.putExtra("title",e.title);i.putExtra("author",e.displayAuthor());startActivity(i);}
     private void openRecommendation(UnifiedCatalogStore.Entry e){RecommendationEvidenceStore.recordDetailOpen(this,e.id,e.displayAuthor(),e.tags,e.categories);open(e);}
 
-    private void library(){LinearLayout p=page(false);Button history=compact("历史",v->startActivity(new Intent(this,HistoryActivity.class)));history.setSingleLine(true);Button shelfButton=compact("书架",v->{showingShelves=true;show();});shelfButton.setTag(AndroidOnboarding.LIBRARY_SHELVES);shelfButton.setSingleLine(true);Button display=compact("显示",v->chooseCollectionMode());display.setSingleLine(true);ImageButton refresh=Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新书库",v->refreshLibrary(true));refresh.setTag(AndroidOnboarding.LIBRARY_REFRESH);libraryRefreshButton=refresh;titleRow(p,"我的书库",history,shelfButton,display,refresh);libraryRefreshStatus=Ui.text(this,"",12,Ui.MUTED,false);libraryRefreshStatus.setVisibility(View.GONE);p.addView(libraryRefreshStatus);EditText search=new EditText(this);search.setSingleLine(true);search.setHint(LocalizedText.ui("搜索标题 / 作者 / 标签 / 分类"));search.setText(libraryQuery);search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);Ui.styleField(search,this);search.setOnEditorActionListener((v,id,event)->{if(id==EditorInfo.IME_ACTION_SEARCH){libraryQuery=v.getText().toString().trim();show();return true;}return false;});LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.setMargins(0,Ui.dp(this,8),0,Ui.dp(this,6));p.addView(search,sp);LinearLayout tools=new LinearLayout(this);tools.setGravity(Gravity.CENTER_VERTICAL);Button filter=compact(librarySpec.activeCount()>0?LocalizedText.ui(this,"筛选 · "+librarySpec.activeCount(),"Filters · "+librarySpec.activeCount(),"絞り込み · "+librarySpec.activeCount()):LocalizedText.ui(this,"筛选","Filters","絞り込み"),v->UnifiedLibraryFilterDialog.show(this,librarySpec,libraryFacets,next->{librarySpec=next;librarySpec.favoriteOnly=false;UnifiedFilterStore.save(getSharedPreferences("library-display",MODE_PRIVATE),next);show();}));filter.setSingleLine(true);tools.addView(filter);Ui.gap(tools,this,6);Button sort=compact(UnifiedLibraryFilter.sortLabel(librarySpec.sort)+" ▾",v->chooseLibrarySort());sort.setSingleLine(true);tools.addView(sort);TextView count=Ui.text(this,"",12.5f,Ui.MUTED,false);count.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-1,1);cp.setMargins(Ui.dp(this,8),0,0,0);tools.addView(count,cp);p.addView(tools);RecyclerView list=collection(p,collectionMode);renderLibrary(list,count);refreshLibrary(false);}
-    private void chooseLibrarySort(){UnifiedLibraryFilter.Sort[] values={UnifiedLibraryFilter.Sort.FAVORITE_NEWEST,UnifiedLibraryFilter.Sort.FAVORITE_OLDEST,UnifiedLibraryFilter.Sort.LATEST,UnifiedLibraryFilter.Sort.TITLE,UnifiedLibraryFilter.Sort.AUTHOR};String[] labels={"最近收藏","最早收藏","最近更新","标题","作者"};int checked=0;for(int i=0;i<values.length;i++)if(librarySpec.sort==values[i])checked=i;new AlertDialog.Builder(this).setTitle(LocalizedText.ui("排序")).setSingleChoiceItems(LocalizedText.ui(labels),checked,(d,w)->{librarySpec.sort=values[w];UnifiedFilterStore.save(getSharedPreferences("library-display",MODE_PRIVATE),librarySpec);d.dismiss();show();}).setNegativeButton(LocalizedText.ui("取消"),null).show();}
-    private void renderLibrary(RecyclerView list,TextView count){UnifiedCatalogStore.Snapshot snapshot=UnifiedCatalogStore.reconcileLocalReferences(this);List<UnifiedCatalogStore.Entry> favorites=new ArrayList<>();for(UnifiedCatalogStore.Entry e:snapshot.entries())if(e.favorite)favorites.add(e);libraryFacets=UnifiedLibraryFilter.facets(favorites);UnifiedLibraryFilter.Spec spec=librarySpec.copy();spec.text=libraryQuery;spec.favoriteOnly=false;List<UnifiedCatalogStore.Entry> visible=UnifiedLibraryFilter.apply(favorites,spec);count.setText(visible.size()+(visible.size()==favorites.size()?LocalizedText.ui(" 本"):" / "+favorites.size()+LocalizedText.ui(" 本")));UnifiedComicCollectionAdapter adapter=new UnifiedComicCollectionAdapter(this,collectionMode,visible,this::open);list.setAdapter(adapter);collectionSelection.attach(adapter,visible,false,"");restoreListPosition(list,0);reportUsableLibraryOnce();}
+    private void library(){
+        LinearLayout p=page(false);
+        Button history=compact("历史",v->startActivity(new Intent(this,HistoryActivity.class)));history.setSingleLine(true);
+        Button shelfButton=compact("书架",v->{showingShelves=true;show();});shelfButton.setTag(AndroidOnboarding.LIBRARY_SHELVES);shelfButton.setSingleLine(true);
+        Button display=compact("显示",v->chooseCollectionMode());display.setSingleLine(true);
+        ImageButton refresh=Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新书库",v->refreshLibrary(true));refresh.setTag(AndroidOnboarding.LIBRARY_REFRESH);libraryRefreshButton=refresh;
+        titleRow(p,"我的书库",history,shelfButton,display,refresh);
+        libraryRefreshStatus=Ui.text(this,"",12,Ui.MUTED,false);libraryRefreshStatus.setVisibility(View.GONE);p.addView(libraryRefreshStatus);
+        EditText search=new EditText(this);search.setSingleLine(true);search.setHint(LocalizedText.ui("搜索标题 / 作者 / 标签 / 分类"));search.setText(libraryQuery);search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);Ui.styleField(search,this);
+        search.setOnEditorActionListener((v,id,event)->{if(id==EditorInfo.IME_ACTION_SEARCH){libraryQuery=v.getText().toString().trim();show();return true;}return false;});
+        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.setMargins(0,Ui.dp(this,8),0,Ui.dp(this,6));p.addView(search,sp);
+
+        LinearLayout tools=new LinearLayout(this);tools.setGravity(Gravity.CENTER_VERTICAL);
+        Button filter=compact(librarySpec.activeCount()>0?LocalizedText.ui(this,"筛选 · "+librarySpec.activeCount(),"Filters · "+librarySpec.activeCount(),"絞り込み · "+librarySpec.activeCount()):LocalizedText.ui(this,"筛选","Filters","絞り込み"),v->UnifiedLibraryFilterDialog.show(this,librarySpec,libraryFacets,next->{librarySpec=next;librarySpec.favoriteOnly=false;UnifiedFilterStore.save(getSharedPreferences("library-display",MODE_PRIVATE),next);show();}));
+        librarySortButton=compact(getString(R.string.library_sort_action)+" ▾",v->chooseLibrarySort());
+        libraryUpdatesButton=compact(getString(R.string.library_subscription_updates),v->startActivity(new Intent(this,ReaderSubscriptionsActivity.class)));
+        tools.addView(filter,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(tools,this,6);
+        tools.addView(librarySortButton,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(tools,this,6);
+        tools.addView(libraryUpdatesButton,new LinearLayout.LayoutParams(0,-2,1.5f));p.addView(tools);
+        updateLibraryUpdatesButton();
+
+        TextView count=Ui.text(this,"",12.5f,Ui.MUTED,false);count.setGravity(Gravity.RIGHT);p.addView(count);libraryResultCount=count;
+        RecyclerView list=collection(p,collectionMode);renderLibrary(list);refreshLibrary(false);
+    }
+    private void updateLibraryUpdatesButton(){
+        if(libraryUpdatesButton==null)return;
+        int n=unreadSubscriptionCount;
+        libraryUpdatesButton.setText(n==0?getString(R.string.library_subscription_updates):getString(R.string.library_subscription_updates_count,n>99?"99+":String.valueOf(n)));
+        libraryUpdatesButton.setContentDescription(getString(R.string.library_subscription_updates_unread,n));
+    }
+    private static String librarySortLabel(Context context,UnifiedLibraryFilter.Sort sort){
+        return sort==UnifiedLibraryFilter.Sort.RANDOM?context.getString(R.string.library_sort_random):LocalizedText.ui(context,UnifiedLibraryFilter.sortLabel(sort));
+    }
+    private void updateLibrarySortSummary(){
+        String label=librarySortLabel(this,librarySpec.sort);
+        if(librarySortButton!=null)librarySortButton.setContentDescription(getString(R.string.library_sort_current,label));
+        if(libraryResultCount!=null)libraryResultCount.setText(label+" · "+libraryCountText);
+    }
+    private void chooseLibrarySort(){
+        showLibrarySortMenu(this,librarySpec.sort,this::applyLibrarySort);
+    }
+    static AlertDialog showLibrarySortMenu(Activity context,UnifiedLibraryFilter.Sort current,java.util.function.Consumer<UnifiedLibraryFilter.Sort> choose){
+        UnifiedLibraryFilter.Sort[] values=UnifiedLibraryFilter.Sort.values();String[] labels=new String[values.length];int checked=0;
+        for(int i=0;i<values.length;i++){labels[i]=librarySortLabel(context,values[i]);if(current==values[i])checked=i;}
+        return new AlertDialog.Builder(context).setTitle(context.getString(R.string.library_sort_action))
+            .setSingleChoiceItems(labels,checked,(dialog,which)->{dialog.dismiss();choose.accept(values[which]);})
+            .setNegativeButton(LocalizedText.ui("取消"),null).show();
+    }
+    private void applyLibrarySort(UnifiedLibraryFilter.Sort next){
+        if(current!=0||showingShelves||activeList==null||!(activeList.getAdapter() instanceof UnifiedComicCollectionAdapter))return;
+        UnifiedComicCollectionAdapter adapter=(UnifiedComicCollectionAdapter)activeList.getAdapter();
+        List<UnifiedCatalogStore.Entry> visible=adapter.copyItems();
+        if(next==UnifiedLibraryFilter.Sort.RANDOM){
+            List<String> ids=new ArrayList<>(visible.size());for(UnifiedCatalogStore.Entry entry:visible)ids.add(entry.id);
+            librarySpec.shuffle=librarySpec.shuffle.reroll(ids,ThreadLocalRandom.current());
+        }
+        librarySpec.sort=next;UnifiedFilterStore.save(getSharedPreferences("library-display",MODE_PRIVATE),librarySpec);
+        UnifiedLibraryFilter.sortVisible(visible,librarySpec);adapter.replace(visible);updateLibrarySortSummary();
+        // Keep search text, selection and filters; only an explicitly chosen order jumps to its beginning.
+        tabListPosition[0]=0;tabListOffset[0]=0;activeList.stopScroll();
+        if(!visible.isEmpty()&&activeList.getLayoutManager() instanceof LinearLayoutManager)
+            ((LinearLayoutManager)activeList.getLayoutManager()).scrollToPositionWithOffset(0,0);
+    }
+    private void renderLibrary(RecyclerView list){UnifiedCatalogStore.Snapshot snapshot=UnifiedCatalogStore.reconcileLocalReferences(this);List<UnifiedCatalogStore.Entry> favorites=new ArrayList<>();for(UnifiedCatalogStore.Entry e:snapshot.entries())if(e.favorite)favorites.add(e);libraryFacets=UnifiedLibraryFilter.facets(favorites);UnifiedLibraryFilter.Spec spec=librarySpec.copy();spec.text=libraryQuery;spec.favoriteOnly=false;List<UnifiedCatalogStore.Entry> visible=UnifiedLibraryFilter.apply(favorites,spec);libraryCountText=visible.size()+(visible.size()==favorites.size()?LocalizedText.ui(" 本"):" / "+favorites.size()+LocalizedText.ui(" 本"));updateLibrarySortSummary();UnifiedComicCollectionAdapter adapter=new UnifiedComicCollectionAdapter(this,collectionMode,visible,this::open);list.setAdapter(adapter);collectionSelection.attach(adapter,visible,false,"");restoreListPosition(list,0);reportUsableLibraryOnce();}
     private void reportUsableLibraryOnce(){if(fullyDrawnReported)return;fullyDrawnReported=true;if(body!=null)body.post(this::reportFullyDrawn);else reportFullyDrawn();}
     private void setLibraryRefreshPhase(String phase,boolean running){runOnUiThread(()->{if(current!=0||showingShelves||isDestroyed())return;if(libraryRefreshStatus!=null){libraryRefreshStatus.setText(phase);libraryRefreshStatus.setVisibility(phase==null||phase.isEmpty()?View.GONE:View.VISIBLE);}if(libraryRefreshButton!=null)libraryRefreshButton.setEnabled(!running);});}
     private void refreshLibrary(boolean force){final int id=serial;if(!force&&prefs.getBoolean("libraryRefreshed",false))return;prefs.edit().putBoolean("libraryRefreshed",true).apply();setLibraryRefreshPhase("正在检查书库变化…",true);pending=worker.submit(()->{try{if(BridgeStore.paired(this)){setLibraryRefreshPhase("正在检查电脑端书库…",true);BridgeClient.device(this);UnifiedCatalogStore.refreshDesktop(this);setLibraryRefreshPhase("正在同步收藏与书架…",true);try{FavoriteCacheStore.syncFromDesktop(this,false,(done,total,phase)->setLibraryRefreshPhase(phase,true));}catch(Exception ignored){}try{ShelfStore.syncWithDesktop(this);}catch(Exception ignored){}}if(RemoteConfigStore.load(this).configured()){setLibraryRefreshPhase("正在检查远程书库…",true);try{RemoteLibraryClient client=new RemoteLibraryClient(this);UnifiedCatalogStore.refreshRemote(this);FavoriteCacheStore.Snapshot f=FavoriteCacheStore.fromRemote(client.favorites());FavoriteCacheStore.save(this,f.items,false);if(ShelfStore.load(this).activeShelves().isEmpty())try{ShelfStore.save(this,ShelfStore.fromRemote(client.shelves()));}catch(Exception ignored){}}catch(Exception ignored){}}setLibraryRefreshPhase("正在整理本地引用…",true);UnifiedCatalogStore.reconcileLocalReferences(this);runOnUiThread(()->{if(id==serial&&!isDestroyed())show();});}catch(Exception e){setLibraryRefreshPhase("刷新失败 · "+(e.getMessage()==null?"请稍后重试":e.getMessage()),false);}});}
@@ -109,8 +171,6 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         Button preferences=compact("画像 / 调整",v->startActivity(new Intent(this,RecommendationStyleActivity.class)));preferences.setTag(AndroidOnboarding.RECOMMEND_PREFERENCES);
         Button refresh=compact(LocalizedText.ui(this,"生成新一轮","New round","新しいラウンド"),v->refreshRecommendations(progress));refresh.setTag(AndroidOnboarding.RECOMMEND_BUILD);
         titleRow(p,"为你推荐",preferences,refresh);
-        Button inbox=compact(LocalizedText.ui(this,"作者订阅","Author updates","作者の新着"),v->startActivity(new Intent(this,ReaderSubscriptionsActivity.class)));
-        p.addView(inbox);ReaderSubscriptionSync.refresh(this,false,(n,partial)->{if(!isDestroyed()&&!isFinishing())inbox.setText(LocalizedText.ui(this,"作者订阅 · 待看 "+n,"Author updates · "+n+" unread","作者の新着・未読 "+n));});
         p.addView(progress);
 
         NativeRecommendationStore.Snapshot stored=NativeRecommendationStore.load(this);

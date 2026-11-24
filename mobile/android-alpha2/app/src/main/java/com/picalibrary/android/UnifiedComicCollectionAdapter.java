@@ -31,6 +31,7 @@ final class UnifiedComicCollectionAdapter extends RecyclerView.Adapter<UnifiedCo
     UnifiedComicCollectionAdapter(Activity activity,int mode,List<UnifiedCatalogStore.Entry> initial,Open open){this.activity=activity;this.mode=normalizeMode(mode);this.open=open;replace(initial);}
     static int normalizeMode(int value){return value==MODE_LIST||value==MODE_GRID_LARGE||value==MODE_GRID_MEDIUM||value==MODE_GRID_SMALL?value:MODE_GRID_MEDIUM;}
     int mode(){return mode;}
+    List<UnifiedCatalogStore.Entry> copyItems(){return new ArrayList<>(items);}
     void setMode(int value){int next=normalizeMode(value);if(next==mode)return;mode=next;notifyDataSetChanged();}
     void replace(List<UnifiedCatalogStore.Entry> next){items.clear();if(next!=null)items.addAll(next);notifyDataSetChanged();}
     void setSelection(Selection value){selection=value;notifyDataSetChanged();}

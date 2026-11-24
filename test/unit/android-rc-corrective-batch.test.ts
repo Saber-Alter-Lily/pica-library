@@ -49,7 +49,11 @@ describe('Android RC corrective batch', () => {
         expect(catalog).toContain('favoriteRank=-1')
         expect(filter).toContain('FAVORITE_NEWEST')
         expect(filter).toContain('FAVORITE_OLDEST')
-        expect(home).toContain('"最近收藏","最早收藏","最近更新"')
+        expect(filter).toMatch(/Sort\.FAVORITE_NEWEST\)return "最近收藏"/)
+        expect(filter).toMatch(/Sort\.FAVORITE_OLDEST\)return "最早收藏"/)
+        expect(filter).toContain('return "最近更新"')
+        expect(home).toContain('UnifiedLibraryFilter.Sort.values()')
+        expect(home).toContain('labels[i]=librarySortLabel(')
     })
 
     it('uses the reader mix planner even for an explicit target, without a relaxed fallback', () => {

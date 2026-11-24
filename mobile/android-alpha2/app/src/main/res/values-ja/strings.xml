@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pica Library</string>
+    <string name="library_sort_action">並べ替え</string>
+    <string name="library_sort_current">並び順：%1$s</string>
+    <string name="library_sort_random">ランダム順</string>
+    <string name="library_subscription_updates">購読の新着</string>
+    <string name="library_subscription_updates_count">購読の新着 · %1$s</string>
+    <string name="library_subscription_updates_unread">購読の新着、未読 %1$d 件</string>
     <string name="common_back">‹ 戻る</string>
     <string name="language_title">言語と地域</string>
     <string name="language_help">表示言語を切り替えます。変更はすぐに反映され、次回起動時も保持されます。</string>

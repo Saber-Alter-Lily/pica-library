@@ -25,11 +25,30 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(home).toContain('compact("显示",v->chooseCollectionMode())')
     expect(home).toContain('Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新书库"')
     expect(home).not.toContain('compact("⋮",v->showLibraryMenu())')
-    expect(home).toContain('UnifiedLibraryFilter.sortLabel(librarySpec.sort)+" ▾"')
+    expect(home).toContain('getString(R.string.library_sort_action)+" ▾"')
+    expect(home).toContain('librarySortLabel(this,librarySpec.sort)')
     expect(home).toContain('private void chooseLibrarySort()')
     expect(shell).toContain('{"书库","推荐","在线","设置"}')
     expect(shell).not.toContain('历史')
     expect(manifest).toContain('.HistoryActivity')
+  })
+
+  it('places author updates next to sorting under Library search and never reshuffles on navigation or refresh', () => {
+    const dir='mobile/android-alpha2/app/src/main/java/com/picalibrary/android/'
+    const home=fs.readFileSync(dir+'HomeActivity.java','utf8')
+    const library=home.slice(home.indexOf('private void library()'),home.indexOf('private void updateLibraryUpdatesButton()'))
+    const anchors=['p.addView(search,sp)','tools.addView(filter,','tools.addView(librarySortButton,','tools.addView(libraryUpdatesButton,','p.addView(tools)']
+    const offsets=anchors.map(a=>library.indexOf(a))
+    expect(offsets.every((n,i)=>n>=0&&(i===0||n>offsets[i-1]))).toBe(true)
+    expect(library).toContain('ReaderSubscriptionsActivity.class')
+    const recommendations=home.slice(home.indexOf('private void recommendations()'),home.indexOf('private void switchHomeRecommendationBatch('))
+    expect(recommendations).not.toContain('ReaderSubscriptionsActivity')
+    const manual=home.slice(home.indexOf('private void applyLibrarySort('),home.indexOf('private void renderLibrary('))
+    expect(manual).toContain('next==UnifiedLibraryFilter.Sort.RANDOM')
+    expect(manual).toContain('librarySpec.shuffle.reroll(')
+    expect(home.match(/\.reroll\(/g)).toHaveLength(1)
+    expect(manual).toContain('adapter.replace(visible)')
+    expect(manual).not.toMatch(/refreshLibrary\(|ReaderSubscriptionSync|NativeRecommendation|\.reconcileLocalReferences\(/)
   })
 
   it('uses an auditable creator concept and two-stage creator navigation', () => {

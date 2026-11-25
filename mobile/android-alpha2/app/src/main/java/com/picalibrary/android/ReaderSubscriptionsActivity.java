@@ -33,7 +33,7 @@ public final class ReaderSubscriptionsActivity extends LocaleAwareActivity {
         button.setEnabled(false);io.execute(()->{
             ReaderRoundLedger db=ReaderRoundLedger.get(a);boolean active=db.following().containsKey(key);
             a.runOnUiThread(()->{if(a.isDestroyed()||a.isFinishing())return;
-                button.setText(active?LocalizedText.ui(a,"已订阅 · 管理","Subscribed · manage","購読中・管理"):LocalizedText.ui(a,"订阅这位作者","Subscribe to this author","この作者を購読"));
+                button.setText(active?LocalizedText.ui(a,"已订阅","Subscribed","購読中"):LocalizedText.ui(a,"＋ 订阅","+ Subscribe","＋ 購読"));
                 button.setEnabled(true);button.setOnClickListener(v->{
                     if(active){a.startActivity(new Intent(a,ReaderSubscriptionsActivity.class));return;}
                     button.setEnabled(false);io.execute(()->{db.follow(label);ReaderSubscriptionSync.refresh(a,true,null);

@@ -41,8 +41,12 @@ public class ReaderActivity extends LocaleAwareActivity {
     private final Runnable syncProgress = () -> progress.sync();
     private final Runnable hideChrome = () -> { if(!destroyed && chapterReady && chrome) setChrome(false); };
 
+    private boolean detailExactChapter;
+    private int detailStartPage=-1;
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        detailExactChapter=getIntent().getBooleanExtra("detailExactChapter",false);
+        detailStartPage=saved==null?getIntent().getIntExtra("detailStartPage",-1):saved.getInt("pendingDetailStart",-1);
         String sourceKind = getIntent().getStringExtra("source");
         if("phone".equals(sourceKind))source=new PhoneDownloadReaderSource(this);else if("remote".equals(sourceKind))source=new RemoteReaderSource(this);else if("pica".equals(sourceKind))source=new PicaReaderSource(this);else if("eh".equals(sourceKind))source=new EhReaderSource(this);else source=new DesktopReaderSource(this);
         images = new ReaderImages(this, source);
@@ -71,8 +75,13 @@ public class ReaderActivity extends LocaleAwareActivity {
         chapterRequest = metadata.submit(() -> {try {List<BridgeClient.ChapterItem> available = source.chapters(comic);available.removeIf(c -> c.downloadedPictures <= 0); available.sort(Comparator.comparingInt(c -> c.order));if (available.isEmpty()) throw new IllegalStateException("没有可读章节");String selected = desiredChapter;
                 if (selected == null || selected.isEmpty()) {try { selected = source.recentChapter(comic); }catch (Exception ignored) { selected = ""; }}
                 if ((selected == null || selected.isEmpty()) && source instanceof DesktopReaderSource) {try { for (BridgeClient.RecentItem r : BridgeClient.recent(ReaderActivity.this, 100)) if (r.comic.id.equals(comic)) { selected = r.episodeId; break; } }catch (Exception ignored) {}}
-                boolean found = false; for (BridgeClient.ChapterItem c : available) if (c.id.equals(selected)) found = true;if (!found) selected = available.get(0).id;BridgeClient.ChapterData data = source.chapter(comic, selected);main.post(() -> { if (valid(serial)) { chapters = available; apply(data, -1); } });
+                selected=initialChapterId(available,selected,detailExactChapter);
+                if(selected==null)throw new IllegalStateException(LocalizedText.ui(this,"上次选择的章节暂不可用，请返回目录","Chapter unavailable; return to the directory","選択した章を開けません。目次に戻ってください"));BridgeClient.ChapterData data = source.chapter(comic, selected);main.post(() -> { if (valid(serial)) { chapters = available; int start=detailStartPage;detailStartPage=-1;apply(data,start); } });
             } catch (Exception e) { String reason=readerError(e);main.post(() -> { if (valid(serial)) failChapter(reason); }); }});
+    }
+    static String initialChapterId(List<BridgeClient.ChapterItem> available,String selected,boolean exact){
+        for(BridgeClient.ChapterItem c:available)if(c.id.equals(selected))return c.id;
+        return exact||available.isEmpty()?null:available.get(0).id;
     }
     private boolean valid(int serial) { return !destroyed && serial == generation; }
     private String readerError(Exception e){String value=e.getMessage()==null?"":e.getMessage().trim();if(value.contains("HTTP 509"))return "请求过于频繁，请稍后重试";if(value.contains("HTTP 403"))return "站点暂时拒绝访问";if(value.contains("页列表不完整"))return "漫画页列表读取不完整";if(value.contains("没有可读取图片")||value.contains("图片页没有可读取图片"))return "图片地址解析失败";if(value.contains("timed out")||value.contains("timeout"))return "网络请求超时";if(value.isEmpty())return "暂时无法读取";return value.length()>72?value.substring(0,72):value;}
@@ -125,7 +134,7 @@ public class ReaderActivity extends LocaleAwareActivity {
     @Override protected void onResume(){super.onResume();if(chapterReady){updateCounter();prefetchAround();scheduleHide();}}
     @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus&&chapterReady&&!destroyed)save(false);}
     @Override protected void onPause() { save(true); main.removeCallbacks(hideChrome); super.onPause(); }
-    @Override protected void onSaveInstanceState(Bundle out) { save(true); out.putString("chapter", chapter == null ? desiredChapter : chapter); super.onSaveInstanceState(out); }
+    @Override protected void onSaveInstanceState(Bundle out) { save(true); out.putInt("pendingDetailStart",detailStartPage);out.putString("chapter", chapter == null ? desiredChapter : chapter); super.onSaveInstanceState(out); }
     @Override protected void onDestroy() { destroyed = true; ++generation; main.removeCallbacksAndMessages(null); if (chapterRequest != null) chapterRequest.cancel(true); metadata.shutdownNow(); clearPages(); images.close(); super.onDestroy(); }
     @Override public boolean onKeyDown(int key, KeyEvent event) { if (key == KeyEvent.KEYCODE_VOLUME_UP || key == KeyEvent.KEYCODE_VOLUME_DOWN) { flip(key == KeyEvent.KEYCODE_VOLUME_UP ? -1 : 1); return true; } return super.onKeyDown(key, event); }
 

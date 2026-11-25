@@ -21,16 +21,23 @@ public class ReaderRoundLedgerTest {
         boolean focused;
         @Override public boolean hasWindowFocus(){return focused;}
     }
+    // Robolectric does not own a real compositor window. Drive its visibility separately
+    // from focus so an attached view in a hidden window cannot record an impression.
+    private static final class ReceiptWindow extends FrameLayout {
+        int reportedVisibility = android.view.View.GONE;
+        ReceiptWindow(Context c){super(c);}
+        @Override public int getWindowVisibility(){return reportedVisibility;}
+    }
     // Trigger the real listener list synchronously in Robolectric; the framework dispatch helper can be hidden in SDK stubs.
     private static void draw(FrameLayout v)throws Exception{
         android.view.ViewTreeObserver.class.getDeclaredMethod("dispatchOnDraw").invoke(v.getViewTreeObserver());
     }
     @Test @Config(sdk=35) public void backgroundAndReplacedPagesDoNotCountButTheForegroundPageDoes() throws Exception{
         ActivityController<ReceiptActivity> ctl=Robolectric.buildActivity(ReceiptActivity.class).setup().visible();
-        ReceiptActivity a=ctl.get();FrameLayout container=new FrameLayout(a);a.setContentView(container);
+        ReceiptActivity a=ctl.get();ReceiptWindow container=new ReceiptWindow(a);a.setContentView(container);
         org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
         assertTrue("content is attached",container.isAttachedToWindow());assertTrue("content is shown",container.isShown());
-        assertEquals("window is visible",android.view.View.VISIBLE,container.getWindowVisibility());
+        container.reportedVisibility=android.view.View.VISIBLE;
         NativeRecommendationStore.Snapshot snapshot=new NativeRecommendationStore.Snapshot();
         snapshot.cycleId="test-draw";snapshot.readerOrdinal=1;
         snapshot.batches.add(Collections.singletonList(new NativeRecommendationStore.Item("draw-book","synthetic","test","","","",0)));
@@ -40,7 +47,10 @@ public class ReaderRoundLedgerTest {
             draw(container);RecommendationPageReceipt.flush();assertFalse(db.shown().contains("draw-book"));
             a.focused=false;RecommendationPageReceipt.afterDraw(a,container,snapshot,()->true);
             draw(container);RecommendationPageReceipt.flush();assertFalse(db.shown().contains("draw-book"));
-            a.focused=true;draw(container);RecommendationPageReceipt.flush();assertTrue(db.shown().contains("draw-book"));
+            a.focused=true;container.reportedVisibility=android.view.View.GONE;
+            draw(container);RecommendationPageReceipt.flush();assertFalse(db.shown().contains("draw-book"));
+            container.reportedVisibility=android.view.View.VISIBLE;
+            draw(container);RecommendationPageReceipt.flush();assertTrue(db.shown().contains("draw-book"));
         }finally{ctl.pause().stop().destroy();}
     }
     @Test public void preparingLoadingAndPagingAreNotImpressionsButActualReceiptsPersist(){

@@ -8,7 +8,8 @@ describe('P2 J7 Desktop recommendation generation/batch benchmarks', () => {
             'utf8'
         )
         expect(seed).toContain('new LibraryDatabase(databaseFile)')
-        expect(seed).toContain("database.importCatalog(records, 'benchmark:j7')")
+        expect(seed).toContain("database.importCatalog([...records,positive], 'benchmark:j7')")
+        expect(seed).toContain('database.setLocalFavoriteState(positive.comicId,true)')
         expect(seed).toContain('new CycleCoordinatorV3(')
         expect(seed).toContain("coordinator.forceNew('p2-j7-fixture')")
         expect(seed).toContain('await coordinator.waitForBuild()')

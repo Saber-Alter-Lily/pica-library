@@ -17,6 +17,32 @@ env:
   EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
 
 jobs:
+  windows-tests:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Re-run Desktop release gates from permanent stamp
+        shell: pwsh
+        run: |
+          pnpm type:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm web:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   windows-candidate:
     if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
     runs-on: windows-latest
@@ -38,15 +64,7 @@ jobs:
           version: '11.16.0'
           run_install: false
       - run: pnpm install --frozen-lockfile
-      - name: Re-run Desktop release gates from permanent stamp
-        shell: pwsh
-        run: |
-          pnpm type:check
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pnpm web:check
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pnpm test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Download checksum-pinned public v0.5.0 baseline
         shell: pwsh
         run: |

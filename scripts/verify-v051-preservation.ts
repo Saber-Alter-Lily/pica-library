@@ -5,7 +5,7 @@ import os from 'node:os'
 import { LibraryDatabase } from '../src/library/database'
 const [mode,file]=process.argv.slice(2)
 const rel=path.relative(fs.realpathSync(os.tmpdir()),fs.realpathSync(file)).replaceAll('\\','/')
-assert.ok(process.env.GITHUB_ACTIONS==='true'&&/^pica-v050-incremental-[0-9a-f-]{36}\/localappdata\/Pica Library Incremental Acceptance\/data\/library\.db$/i.test(rel),'isolated CI database only')
+assert.ok(process.env.GITHUB_ACTIONS==='true'&&/^pica-v050-incremental-[0-9a-f]{32}\/localappdata\/Pica Library Incremental Acceptance\/data\/library\.db$/i.test(rel),'isolated CI database only')
 assert.ok(mode==='seed'||mode==='verify')
 const id='qa-release-051', ep=id+'-episode', db=new LibraryDatabase(file)
 try {

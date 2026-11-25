@@ -53,6 +53,8 @@ try {
     catch(error){console.error('Button request results:',network);console.error('Updater message:',await p.locator('#update-message').textContent({timeout:2000}).catch(()=>'<page closed>'));throw error}
     for(const [route,method] of [['check','GET'],['prepare-latest','POST'],['apply','POST']])
         assert.ok(network.some(([p,m,s])=>p==='/api/v1/update/'+route&&m===method&&s===200), 'Missing successful UI '+route+'; '+JSON.stringify(network))
+    // No test-driven reload/navigation here: v0.5.0 must reconnect and load the new Web bundle itself.
+    await p.waitForFunction(()=>performance.getEntriesByType('resource').some(e=>new URL(e.name).pathname.endsWith('/reader-ux-051.js')),null,{timeout:95000})
     assert.equal(fs.readFileSync(path.join(install,'SOURCE_SHA.txt'),'utf8').trim(),expectedSha)
     assert.equal(fs.readFileSync(marker,'utf8'),'button-qa')
     assert.ok(fs.readFileSync(path.join(root,'feed-log.txt'),'utf8').includes('/releases/download/v0.5.1/'+name))

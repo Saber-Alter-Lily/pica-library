@@ -314,7 +314,7 @@ try {
     }
     if ($success -and (Test-Path -LiteralPath $work)) {
         $resolved = (Resolve-Path -LiteralPath $work).ProviderPath
-        if ((Split-Path $resolved -Parent).TrimEnd('\') -ne ([IO.Path]::GetTempPath()).TrimEnd('\') -or (Split-Path $resolved -Leaf) -notmatch '^pica-v050-incremental-[a-f0-9-]{36}$') { throw 'Unexpected cleanup path' }
+        if ((Split-Path $resolved -Parent).TrimEnd('\') -ne ([IO.Path]::GetTempPath()).TrimEnd('\') -or (Split-Path $resolved -Leaf) -notmatch '^pica-v050-incremental-[a-f0-9]{32}$') { throw 'Unexpected cleanup path' }
         Remove-Item -Recurse -Force -LiteralPath $resolved -ErrorAction SilentlyContinue
     } elseif (-not $success) {
         Write-Warning "v0.5.0 incremental acceptance retained for diagnosis: $work"

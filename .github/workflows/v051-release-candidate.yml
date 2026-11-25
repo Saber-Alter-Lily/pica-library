@@ -81,6 +81,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/test-windows-v050-incremental-upgrade.ps1 -BaselineZip $base -CandidateZip $target -IncrementalZip $incremental -CandidateVersion $env:TARGET_VERSION -CandidateSourceSha $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify the official v0.5.0 Settings one-click button in Edge
+        shell: pwsh
+        run: |
+          node scripts/acceptance/v051-button-upgrade.mjs "artifacts/release-base/Pica-Library-v0.5.0-windows-x64.zip" "artifacts/Pica-Library-v0.5.1-update-from-v0.5.0.zip" $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Exercise official v0.5.0 full-update runtime
         shell: pwsh
         run: |

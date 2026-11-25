@@ -6,10 +6,11 @@ import {createHash} from 'node:crypto'
 import {spawn} from 'node:child_process'
 import {fileURLToPath} from 'node:url'
 import AdmZip from 'adm-zip'
-import {chromium} from '@playwright/test'
+import {createRequire} from 'node:module'
 
 assert.equal(process.platform,'win32')
-assert.equal(process.env.GITHUB_ACTIONS,'true','Run only on a disposable GitHub Windows runner')
+assert.equal(process.env.GITHUB_ACTIONS?.toLowerCase(),'true','Run only on a disposable GitHub Windows runner')
+const {chromium}=createRequire(path.join(process.env.RUNNER_TEMP,'pica-051-browser','package.json'))('playwright-core')
 const [baseFile,delta,expectedSha]=process.argv.slice(2),name=path.basename(delta)
 assert.equal(name,'Pica-Library-v0.5.1-update-from-v0.5.0.zip')
 assert.match(expectedSha,/^[a-f0-9]{40}$/)

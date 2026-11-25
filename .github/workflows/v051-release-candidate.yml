@@ -102,6 +102,9 @@ jobs:
       - name: Verify the official v0.5.0 Settings one-click button in Edge
         shell: pwsh
         run: |
+          # Same pinned driver as run-web-browser-smoke.sh, installed outside the release tree.
+          npm install --prefix "$env:RUNNER_TEMP/pica-051-browser" --no-save --ignore-scripts --package-lock=false playwright-core@1.63.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/acceptance/v051-button-upgrade.mjs "artifacts/release-base/Pica-Library-v0.5.0-windows-x64.zip" "artifacts/Pica-Library-v0.5.1-update-from-v0.5.0.zip" $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Exercise official v0.5.0 full-update runtime

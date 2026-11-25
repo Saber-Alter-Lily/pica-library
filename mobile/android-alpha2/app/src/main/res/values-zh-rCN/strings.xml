@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pica Library</string>
+    <string name="library_sort_action">排序</string>
+    <string name="library_sort_current">排序方式：%1$s</string>
+    <string name="library_sort_random">随机排序</string>
+    <string name="library_subscription_updates">订阅更新</string>
+    <string name="library_subscription_updates_count">订阅更新 · %1$s</string>
+    <string name="library_subscription_updates_unread">订阅更新，%1$d 条待看</string>
     <string name="common_back">‹ 返回</string>
     <string name="language_title">语言与地区</string>
     <string name="language_help">切换界面语言。修改会立即生效，并在下次启动时继续保持。</string>

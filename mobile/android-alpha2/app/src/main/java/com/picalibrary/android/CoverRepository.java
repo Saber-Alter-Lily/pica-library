@@ -69,7 +69,19 @@ final class CoverRepository {
 
     private static CompletableFuture<Bitmap> loadFuture(Context context,UnifiedCatalogStore.Entry entry){
         String cacheKey=key(entry);Context app=context.getApplicationContext();
-        return IN_FLIGHT.computeIfAbsent(cacheKey,k->CompletableFuture.supplyAsync(()->cacheNow(app,entry),POOL).whenComplete((bitmap,error)->IN_FLIGHT.remove(k)));
+        // Publish the promise before starting I/O. A fast disk hit can finish inline
+        // during callback registration; never remove a key inside its own map computation.
+        CompletableFuture<Bitmap> mine=new CompletableFuture<>();
+        CompletableFuture<Bitmap> pending=IN_FLIGHT.putIfAbsent(cacheKey,mine);
+        if(pending!=null)return pending;
+        try{
+            POOL.execute(()->{
+                try{mine.complete(cacheNow(app,entry));}
+                catch(Throwable failure){mine.completeExceptionally(failure);}
+                finally{IN_FLIGHT.remove(cacheKey,mine);}
+            });
+        }catch(RuntimeException failure){IN_FLIGHT.remove(cacheKey,mine);mine.completeExceptionally(failure);}
+        return mine;
     }
 
     static void load(Activity activity,ImageView target,UnifiedCatalogStore.Entry entry,int placeholderColor){

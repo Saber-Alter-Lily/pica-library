@@ -170,7 +170,7 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(dialog).toContain('重复上传')
         expect(dialog).toContain('暂时不想看（30 天）')
         expect(detail).toContain('RecommendationItemControlDialog.show')
-        expect(home).toContain('⚙ 调节')
+        expect(home).toContain('icon(feedback,"⚙"')
         expect(home).toContain(
             'RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen"'
         )

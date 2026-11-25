@@ -58,7 +58,7 @@ describe('v0.1.4 local user flow', () => {
     })
 
     it('reports no usable proxy when every candidate fails validation', async () => {
-        const candidates = proxyCandidates({ listeningPorts: [7890, 7891] })
+        const candidates = proxyCandidates({ environment: {}, listeningPorts: [7890, 7891] })
         const result = await validateProxyCandidates(candidates, async () => {
             throw new Error('provider rejected request')
         })

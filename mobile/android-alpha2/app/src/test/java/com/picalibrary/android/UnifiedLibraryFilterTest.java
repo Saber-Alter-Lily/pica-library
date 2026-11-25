@@ -5,6 +5,19 @@ import java.util.*;
 import org.junit.Test;
 
 public class UnifiedLibraryFilterTest {
+    @Test public void repeatedlySelectingRandomUsesAStableLocalOrder(){LibraryShuffleExamples.main(new String[0]);}
+
+    @Test public void randomAfterFilteringDoesNotChangeMembershipAndClearingFiltersKeepsTheSeed(){
+        UnifiedCatalogStore.Entry a=entry("a","A","author","selected"), b=entry("b","B","author","selected"), c=entry("c","C","author","other");
+        List<UnifiedCatalogStore.Entry> source=Arrays.asList(a,b,c);
+        UnifiedLibraryFilter.Spec spec=new UnifiedLibraryFilter.Spec();spec.tags.add("selected");spec.sort=UnifiedLibraryFilter.Sort.RANDOM;
+        spec.shuffle=spec.shuffle.reroll(Arrays.asList("a","b"),new Random(2));
+        assertEquals(Arrays.asList(b,a),UnifiedLibraryFilter.apply(source,spec));
+        UnifiedLibraryFilter.Spec copy=spec.copy();copy.clear();assertEquals(spec.shuffle.seed,copy.shuffle.seed);
+        List<UnifiedCatalogStore.Entry> all=UnifiedLibraryFilter.apply(source,copy);assertEquals(3,all.size());
+        assertTrue(all.indexOf(b)<all.indexOf(a));assertEquals(Arrays.asList(a,b,c),source);
+        copy.sort=UnifiedLibraryFilter.Sort.TITLE;assertEquals(source,UnifiedLibraryFilter.apply(source,copy));
+    }
     private UnifiedCatalogStore.Entry entry(String id,String title,String author,String... tags){UnifiedCatalogStore.Entry e=new UnifiedCatalogStore.Entry(id,title,author);e.canonicalAuthor=author;e.tags.addAll(Arrays.asList(tags));return e;}
 
     @Test public void combinesLocationGroupWithFavoriteConstraint(){UnifiedCatalogStore.Entry a=entry("a","Alpha","Author A","romance","school");a.desktopDownloaded=true;a.favorite=true;UnifiedCatalogStore.Entry b=entry("b","Beta","Author A","romance");b.remoteAvailable=true;UnifiedCatalogStore.Entry c=entry("c","Gamma","Author B","action");c.picaAvailable=true;c.favorite=true;UnifiedLibraryFilter.Spec spec=new UnifiedLibraryFilter.Spec();spec.locations.add(UnifiedLibraryFilter.Location.DESKTOP);spec.locations.add(UnifiedLibraryFilter.Location.WEBDAV);spec.favoriteOnly=true;List<UnifiedCatalogStore.Entry> out=UnifiedLibraryFilter.apply(Arrays.asList(a,b,c),spec);assertEquals(1,out.size());assertEquals("a",out.get(0).id);}

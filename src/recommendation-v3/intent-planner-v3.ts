@@ -5,7 +5,7 @@ import type {
     FinalLifetimeProfileV3
 } from './final-profile'
 
-export const INTENT_PLANNER_VERSION = '3.1.0-deterministic'
+export const INTENT_PLANNER_VERSION = '3.2.0-creator-rotation'
 export const INTENT_CONFIG = {
     conjunctionMinCoSupport: 5,
     conjunctionMinLift: 1.5,
@@ -146,6 +146,62 @@ const scheduleCompare = (
         Number(b.planning.lastUsedAt !== null) ||
     (a.planning.lastUsedAt ?? '').localeCompare(b.planning.lastUsedAt ?? '') ||
     a.intentId.localeCompare(b.intentId)
+
+// These are search slots, not promised seats in the 12 displayed works.
+// Evidence establishes two bounded tiers first; recent usage then genuinely
+// rotates within each tier rather than merely breaking exact support ties.
+export function rotateCreatorIntentsV3(
+    eligible: RecommendationIntentV3[],
+    history: IntentCycleHistory[]
+) {
+    const byEvidence = (a: RecommendationIntentV3, b: RecommendationIntentV3) =>
+        confidenceRank[a.evidence.confidence] -
+            confidenceRank[b.evidence.confidence] ||
+        b.evidence.supportCount - a.evidence.supportCount ||
+        b.evidence.supportShare - a.evidence.supportShare ||
+        a.intentId.localeCompare(b.intentId)
+    const byCreator = new Map<string, RecommendationIntentV3>()
+    for (const intent of eligible
+        .filter((x) => x.retrieval.providerEligible)
+        .sort(byEvidence)) {
+        if (!byCreator.has(intent.intentId))
+            byCreator.set(intent.intentId, intent)
+    }
+    const supported = [...byCreator.values()]
+    const credible = supported.filter(
+        (x) => x.evidence.confidence !== 'LOW' && x.evidence.supportCount >= 2
+    )
+    const recent = new Map<string, number>(),
+        total = new Map<string, number>()
+    const searches = history
+        .filter((x) => ['ACTIVE', 'EXHAUSTED', 'SUPERSEDED'].includes(x.state))
+        .sort(
+            (a, b) =>
+                b.completedAt.localeCompare(a.completedAt) ||
+                a.intentIds.join('|').localeCompare(b.intentIds.join('|'))
+        )
+        .slice(0, 50)
+    searches.forEach((entry, index) => {
+        for (const id of new Set(entry.intentIds)) {
+            total.set(id, (total.get(id) ?? 0) + 1)
+            if (index < 3) recent.set(id, (recent.get(id) ?? 0) + 1)
+        }
+    })
+    const rotate = (a: RecommendationIntentV3, b: RecommendationIntentV3) =>
+        (recent.get(a.intentId) ?? 0) - (recent.get(b.intentId) ?? 0) ||
+        (total.get(a.intentId) ?? 0) - (total.get(b.intentId) ?? 0) ||
+        byEvidence(a, b)
+    const core = credible.slice(0, 8).sort(rotate)
+    const wider = credible.slice(8, 24).sort(rotate)
+    return [
+        ...new Set([
+            ...core.slice(0, 2),
+            ...wider.slice(0, 1),
+            ...core,
+            ...supported
+        ])
+    ].slice(0, 3)
+}
 
 export function buildRecommendationIntentsV3(input: {
     profile: FinalLifetimeProfileV3
@@ -415,7 +471,7 @@ export function buildRecommendationIntentsV3(input: {
     }
 
     const compareByType: Record<
-        IntentTypeV3,
+        Exclude<IntentTypeV3, 'CREATOR'>,
         (a: RecommendationIntentV3, b: RecommendationIntentV3) => number
     > = {
         FANDOM: (a, b) =>
@@ -425,12 +481,6 @@ export function buildRecommendationIntentsV3(input: {
             b.evidence.supportShare - a.evidence.supportShare ||
             confidenceRank[a.evidence.confidence] -
                 confidenceRank[b.evidence.confidence] ||
-            scheduleCompare(a, b),
-        CREATOR: (a, b) =>
-            confidenceRank[a.evidence.confidence] -
-                confidenceRank[b.evidence.confidence] ||
-            b.evidence.supportCount - a.evidence.supportCount ||
-            b.evidence.supportShare - a.evidence.supportShare ||
             scheduleCompare(a, b),
         SEMANTIC_CONJUNCTION: (a, b) =>
             (b.evidence.coSupportCount ?? 0) -
@@ -450,9 +500,11 @@ export function buildRecommendationIntentsV3(input: {
     for (const [type, values] of families)
         families.set(
             type,
-            values
-                .filter((intent) => intent.retrieval.providerEligible)
-                .sort(compareByType[type])
+            type === 'CREATOR'
+                ? rotateCreatorIntentsV3(values, history)
+                : values
+                      .filter((intent) => intent.retrieval.providerEligible)
+                      .sort(compareByType[type])
         )
 
     const targets: Record<IntentTypeV3, number> = {

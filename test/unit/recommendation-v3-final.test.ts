@@ -460,9 +460,10 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
         try {
             expect(latestMigrationVersion).toBeGreaterThanOrEqual(9)
             const comics = Array.from({ length: 30 }, (_, index) =>
-                comic(`c${index}`)
+                comic(`c${index}`, ['mystery'], false, `creator ${index}`)
             )
-            database.importCatalog(comics, 'test')
+            database.importCatalog([...comics, comic('seed', ['mystery'], true, 'original creator')], 'test')
+            database.setLocalFavoriteState('seed',true)
             const profile = plannerProfile()
             const intents = buildRecommendationIntentsV3({
                 profile,
@@ -570,7 +571,7 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
         try {
             const owned = {
-                ...comic('owned'),
+                ...comic('owned', ['mystery'], false, 'Artist'),
                 title: 'Example Work',
                 author: 'Artist',
                 canonicalAuthor: 'Artist',
@@ -588,7 +589,7 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
                 providerId: 'eh' as const
             }
             const novel = Array.from({ length: 13 }, (_, index) => ({
-                ...comic(`novel-${index}`),
+                ...comic(`novel-${index}`, ['mystery'], false, `Artist ${index}`),
                 title: `Novel ${index}`,
                 author: `Artist ${index}`,
                 canonicalAuthor: `Artist ${index}`,

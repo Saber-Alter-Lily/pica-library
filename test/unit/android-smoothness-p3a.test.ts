@@ -13,7 +13,8 @@ describe('Android smoothness P3A', () => {
         expect(cover).toContain(
             'ConcurrentHashMap<String,CompletableFuture<Bitmap>> IN_FLIGHT'
         )
-        expect(cover).toContain('IN_FLIGHT.computeIfAbsent')
+        expect(cover).toContain('IN_FLIGHT.putIfAbsent(cacheKey,mine)')
+        expect(cover).toContain('IN_FLIGHT.remove(cacheKey,mine)')
         expect(cover).toContain('loadFuture(activity,entry).thenAccept')
         const start = cover.indexOf('static void load(Activity activity')
         const end = cover.indexOf('static void prefetch(', start)

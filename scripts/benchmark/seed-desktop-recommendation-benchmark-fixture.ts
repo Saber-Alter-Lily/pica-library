@@ -34,7 +34,7 @@ const records = Array.from({ length: candidateCount }, (_, index) => {
     return {
         comicId: `j7-recommend-${String(ordinal).padStart(3, '0')}`,
         title: `J7 推荐候选 ${String(ordinal).padStart(3, '0')}`,
-        author: `J7 作者 ${ordinal % 9}`,
+        author: `J7 独立作者 ${ordinal}`,
         description: 'J7 deterministic recommendation batch-switch fixture',
         categories: ['基准'],
         tags: ['推荐', `分组-${ordinal % 6}`],
@@ -42,14 +42,16 @@ const records = Array.from({ length: candidateCount }, (_, index) => {
         updatedAt: '2026-09-26T00:00:00.000Z'
     }
 })
-database.importCatalog(records, 'benchmark:j7')
+const positive={...records[0],comicId:'j7-taste-seed',title:'J7 收藏种子',author:'J7 独立种子作者'}
+database.importCatalog([...records,positive], 'benchmark:j7')
+database.setLocalFavoriteState(positive.comicId,true)
 
 const profile: FinalLifetimeProfileV3 = {
     schemaVersion: 1,
     profileVersion: FINAL_PROFILE_VERSION,
     registryVersion: 'benchmark:j7',
-    favoriteFingerprint: 'benchmark-j7-no-favorites',
-    sourceFavoriteCount: 0,
+    favoriteFingerprint: 'benchmark-j7-taste-seed',
+    sourceFavoriteCount: 1,
     primaryInterests: [],
     profileOnlyInterests: [],
     modifierEvidence: [],

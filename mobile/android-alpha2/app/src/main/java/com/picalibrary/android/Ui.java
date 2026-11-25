@@ -54,7 +54,18 @@ final class Ui {
     static LinearLayout card(Context c){int radius=ThemePackStore.cardRadiusDp(c);LinearLayout l=new LinearLayout(c);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(c,18),dp(c,16),dp(c,18),dp(c,16));l.setBackground(rounded(SURFACE,radius,c));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(dp(c,12),dp(c,7),dp(c,12),dp(c,7));l.setLayoutParams(p);return l;}
     static TextView pill(Context c,String label,int bg,int fg){TextView v=text(c,label,12,fg,true);v.setGravity(Gravity.CENTER);v.setPadding(dp(c,10),dp(c,5),dp(c,10),dp(c,5));v.setBackground(rounded(bg,14,c));return v;}
     static void stylePill(TextView v,Context c,String label,int bg,int fg){v.setText(LocalizedText.ui(c,label));v.setTextColor(fg);v.setTypeface(Typeface.DEFAULT,Typeface.BOLD);v.setBackground(rounded(bg,14,c));v.setPadding(dp(c,10),dp(c,5),dp(c,10),dp(c,5));}
-    static Button button(Context c,String label,View.OnClickListener action,boolean compact){Button b=new Button(c);b.setText(LocalizedText.ui(c,label));b.setAllCaps(false);b.setTextColor(PRIMARY);b.setTextSize(compact?13f:14f);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(dp(c,compact?44:48));b.setMinimumHeight(dp(c,compact?44:48));b.setPadding(dp(c,compact?10:14),dp(c,7),dp(c,compact?10:14),dp(c,7));b.setBackground(rounded(ACTION,Math.min(14,ThemePackStore.cardRadiusDp(c)),c));b.setOnClickListener(action);return b;}
+    static Drawable pressable(Context c,int fill,int radius){
+        android.graphics.drawable.StateListDrawable states=new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[]{-android.R.attr.state_enabled},rounded(SURFACE,radius,c));
+        states.addState(new int[]{android.R.attr.state_focused},outlined(fill,PRIMARY,radius,c));
+        states.addState(new int[]{},rounded(fill,radius,c));
+        int ink=(PRIMARY & 0x00ffffff)|0x37000000;
+        return new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(ink),states,rounded(Color.WHITE,radius,c));
+    }
+    private static android.content.res.ColorStateList actionText(){
+        return new android.content.res.ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},new int[]{MUTED,PRIMARY});
+    }
+    static Button button(Context c,String label,View.OnClickListener action,boolean compact){Button b=new Button(c);b.setText(LocalizedText.ui(c,label));b.setAllCaps(false);b.setTextColor(actionText());b.setTextSize(compact?13f:14f);b.setMinWidth(dp(c,48));b.setMinimumWidth(dp(c,48));b.setMinHeight(dp(c,compact?44:48));b.setMinimumHeight(dp(c,compact?44:48));b.setStateListAnimator(null);b.setBackground(new android.graphics.drawable.InsetDrawable(pressable(c,ACTION,Math.min(12,ThemePackStore.cardRadiusDp(c))),dp(c,1)));b.setPadding(dp(c,compact?10:14),dp(c,7),dp(c,compact?10:14),dp(c,7));b.setOnClickListener(action);return b;}
     static Button foldHeader(Context c,String label,boolean primary,View.OnClickListener action){
         Button b=new Button(c);b.setText(LocalizedText.ui(c,label));b.setAllCaps(false);b.setMinWidth(0);b.setMinimumWidth(0);
         b.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);b.setOnClickListener(action);
@@ -77,7 +88,7 @@ final class Ui {
         LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.addView(text(c,title,sp,TEXT,true),new LinearLayout.LayoutParams(0,-2,1));if(help!=null&&!help.trim().isEmpty()){LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(dp(c,24),dp(c,24));hp.setMargins(dp(c,6),0,0,0);Button info=infoButton(c,title,help);info.setLayoutParams(hp);row.addView(info);row.post(()->{Rect hit=new Rect();info.getHitRect(hit);int extra=dp(c,12);hit.inset(-extra,-extra);row.setTouchDelegate(new TouchDelegate(hit,info));});}return row;
     }
 
-    static ImageButton iconButton(Context c,int icon,String description,View.OnClickListener action){ImageButton b=new ImageButton(c);int size=dp(c,48);b.setLayoutParams(new LinearLayout.LayoutParams(size,size));b.setMinimumWidth(0);b.setMinimumHeight(0);b.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));b.setImageResource(icon);b.setColorFilter(PRIMARY);b.setBackground(rounded(ACTION,14,c));b.setContentDescription(LocalizedText.ui(c,description));b.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);b.setOnClickListener(action);return b;}
-    static void styleField(EditText e,Context c){e.setTextColor(TEXT);e.setHintTextColor(MUTED);e.setBackground(outlined(SURFACE,OUTLINE,Math.min(14,ThemePackStore.cardRadiusDp(c)),c));e.setPadding(dp(c,12),dp(c,8),dp(c,12),dp(c,8));e.setMinHeight(dp(c,48));}
+    static ImageButton iconButton(Context c,int icon,String description,View.OnClickListener action){ImageButton b=new ImageButton(c);int size=dp(c,48);b.setLayoutParams(new LinearLayout.LayoutParams(size,size));b.setMinimumWidth(0);b.setMinimumHeight(0);b.setImageResource(icon);b.setColorFilter(PRIMARY);b.setBackground(pressable(c,ACTION,12));b.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));b.setContentDescription(LocalizedText.ui(c,description));b.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);b.setOnClickListener(action);return b;}
+    static void styleField(EditText e,Context c){e.setTextColor(TEXT);e.setHintTextColor(MUTED);int r=Math.min(12,ThemePackStore.cardRadiusDp(c));android.graphics.drawable.StateListDrawable bg=new android.graphics.drawable.StateListDrawable();bg.addState(new int[]{android.R.attr.state_focused},outlined(SURFACE,PRIMARY,r,c));bg.addState(new int[]{},outlined(SURFACE,OUTLINE,r,c));e.setBackground(bg);e.setPadding(dp(c,12),dp(c,8),dp(c,12),dp(c,8));e.setMinHeight(dp(c,48));}
     static void gap(LinearLayout parent,Context c,int dp){View v=new View(c);v.setLayoutParams(parent.getOrientation()==LinearLayout.HORIZONTAL?new LinearLayout.LayoutParams(Ui.dp(c,dp),1):new LinearLayout.LayoutParams(1,Ui.dp(c,dp)));parent.addView(v);}
 }

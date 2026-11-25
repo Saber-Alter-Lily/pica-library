@@ -30,6 +30,9 @@ public final class NativeRecommendationWorker extends Worker {
             }
             NativeRecommendationJobs.complete(getApplicationContext());
             return Result.success(new Data.Builder().putString(KEY_PHASE,"手机原生 Recommendation V3 已更新").putInt(KEY_DONE,snapshot.batches.size()).putInt(KEY_TOTAL,NativeRecommendationPolicy.MAX_BATCHES).build());
+        }catch(NativeRecommendationEngine.NoUnseenWorks empty){
+            // This is a legitimate shortage, not a transient network exception or a new round.
+            return Result.failure(new Data.Builder().putString(KEY_PHASE,empty.getMessage()).build());
         }catch(Exception e){
             String message=e.getMessage()==null?"手机推荐生成失败":e.getMessage();
             if(isStopped())return Result.failure(new Data.Builder().putString(KEY_PHASE,NativeRecommendationJobs.paused(getApplicationContext())?"推荐生成已暂停":"推荐生成已取消").build());
@@ -56,7 +59,7 @@ public final class NativeRecommendationWorker extends Worker {
     private ForegroundInfo foreground(String text,int done,int total){
         NotificationManager manager=(NotificationManager)getApplicationContext().getSystemService(Context.NOTIFICATION_SERVICE);
         if(Build.VERSION.SDK_INT>=26)manager.createNotificationChannel(new NotificationChannel(CHANNEL,"Pica Library 手机推荐",NotificationManager.IMPORTANCE_LOW));
-        Intent intent=new Intent(getApplicationContext(),MainActivity.class);intent.putExtra("openTab",1);
+        Intent intent=new Intent(getApplicationContext(),HomeActivity.class);intent.putExtra("tab",1);
         PendingIntent pending=PendingIntent.getActivity(getApplicationContext(),0x5531,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder b=new NotificationCompat.Builder(getApplicationContext(),CHANNEL).setSmallIcon(android.R.drawable.stat_notify_sync).setContentTitle("手机原生 Recommendation V3").setContentText(text).setContentIntent(pending).setOnlyAlertOnce(true).setOngoing(true);
         if(total>0)b.setProgress(total,Math.max(0,Math.min(done,total)),false);else b.setProgress(0,0,true);

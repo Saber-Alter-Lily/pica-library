@@ -1,7 +1,12 @@
 import type { RankedCandidateWithEvidenceV3 } from './ranker-adapter-v3'
 import type { RecommendationIntentV3 } from './intent-planner-v3'
+import {
+    AUTHOR_BATCH_CAP,
+    AUTHOR_ROLLING_CAP,
+    batchAuthorKey
+} from './batch-freshness-v3'
 
-export const BATCH_ALLOCATOR_VERSION = '3.2.0-soft-cap-cooldown'
+export const BATCH_ALLOCATOR_VERSION = '3.3.0-presented-batches'
 export const FINAL_BATCH_SIZE = 12
 
 export interface AllocatedCandidateV3 {
@@ -13,6 +18,7 @@ export interface AllocatedCandidateV3 {
     primaryFamily: RecommendationIntentV3['type']
     relatedOnly: boolean
     recentlyDisplayed: boolean
+    authorLimitRelaxed: boolean
     reasonCodes: string[]
 }
 
@@ -76,6 +82,7 @@ export function allocateRecommendationBatchV3(input: {
     alreadyAllocated: Set<string>
     currentFavoriteIds?: Set<string>
     recentlyDisplayedComicIds?: Set<string>
+    recentAuthorCounts?: ReadonlyMap<string, number>
     limit?: number
 }) {
     const limit = input.limit ?? FINAL_BATCH_SIZE
@@ -101,28 +108,47 @@ export function allocateRecommendationBatchV3(input: {
         }
     ]
 
-    // First fill only with comics the user has not been shown in the recent
-    // completed cycles. If that cannot fill a 12-item batch, repeat the same
-    // deterministic soft-cap passes while allowing recently shown items back in.
-    for (const allowRecent of recent.size ? [false, true] : [true]) {
+    // Never re-admit an owned, already allocated or recently presented work
+    // just to fill the screen. Only author diversity is relaxed on starvation.
+    const eligible = input.ranked
+        .filter(
+            ({ comicId }) =>
+                !input.alreadyAllocated.has(comicId) &&
+                !input.currentFavoriteIds?.has(comicId) &&
+                !recent.has(comicId)
+        )
+        .map((candidate) => ({
+            candidate,
+            author: batchAuthorKey(candidate.comic),
+            primary: primaryIntent(candidate, intents),
+            fandoms: [...new Set(candidate.evidence.candidateFandomKeys ?? [])],
+            relatedOnly: candidate.evidence.routeFamilies.every(
+                (family) => family === 'RELATED'
+            )
+        }))
+    for (const authorPolicy of ['rolling', 'batch', 'relaxed'] as const) {
         for (const pass of passes) {
-            for (const candidate of input.ranked) {
-                if (selected.length >= limit) break
+            for (const {
+                candidate,
+                author,
+                primary,
+                fandoms,
+                relatedOnly
+            } of eligible) {
+                if (selected.length >= limit) return selected
                 const id = candidate.comicId
+                if (selectedIds.has(id)) continue
+                const inBatch = author ? authorCounts.get(author) ?? 0 : 0
+                const acrossThree =
+                    inBatch +
+                    (author ? input.recentAuthorCounts?.get(author) ?? 0 : 0)
                 if (
-                    input.alreadyAllocated.has(id) ||
-                    input.currentFavoriteIds?.has(id) ||
-                    selectedIds.has(id) ||
-                    (!allowRecent && recent.has(id))
+                    (authorPolicy !== 'relaxed' &&
+                        inBatch >= AUTHOR_BATCH_CAP) ||
+                    (authorPolicy === 'rolling' &&
+                        acrossThree >= AUTHOR_ROLLING_CAP)
                 )
                     continue
-                const primary = primaryIntent(candidate, intents)
-                const fandoms = candidate.evidence.candidateFandomKeys ?? []
-                const author =
-                    candidate.comic.authorId ?? candidate.comic.canonicalAuthor
-                const relatedOnly = candidate.evidence.routeFamilies.every(
-                    (family) => family === 'RELATED'
-                )
                 if (
                     fandoms.some(
                         (key) => (fandomCounts.get(key) ?? 0) >= pass.fandom
@@ -134,7 +160,7 @@ export function allocateRecommendationBatchV3(input: {
                 )
                     continue
                 selectedIds.add(id)
-                for (const key of new Set(fandoms))
+                for (const key of fandoms)
                     fandomCounts.set(key, (fandomCounts.get(key) ?? 0) + 1)
                 if (author)
                     authorCounts.set(
@@ -154,7 +180,10 @@ export function allocateRecommendationBatchV3(input: {
                     primaryIntentId: primary.intentId,
                     primaryFamily: primary.type,
                     relatedOnly,
-                    recentlyDisplayed: recent.has(id),
+                    recentlyDisplayed: false,
+                    authorLimitRelaxed:
+                        inBatch >= AUTHOR_BATCH_CAP ||
+                        acrossThree >= AUTHOR_ROLLING_CAP,
                     reasonCodes: candidate.reasons.slice(0, 2)
                 })
             }

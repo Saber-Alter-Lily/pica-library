@@ -110,6 +110,7 @@ public class MainActivity extends LocaleAwareActivity {
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
+        Ui.applyWindow(this);
         preferences=getSharedPreferences("library-display",MODE_PRIVATE);
         columns=preferences.getInt("columns",2)==3?3:2;
         activeShelfId=preferences.getString("activeShelfId","");
@@ -130,7 +131,7 @@ public class MainActivity extends LocaleAwareActivity {
         root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
         body=new FrameLayout(this);root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
-        nav=new LinearLayout(this);nav.setBackgroundColor(0xfff3f1f5);root.addView(nav);
+        nav=new LinearLayout(this);nav.setBackgroundColor(Ui.NAV);root.addView(nav);
         String[] labels=ShellPolicy.bottomTabs();
         for(int i=0;i<labels.length;i++){final int tab=i;Button b=button(labels[i],v->{current=tab;showTab();});nav.addView(b,new LinearLayout.LayoutParams(0,Ui.dp(this,54),1));}
         setContentView(root);root.requestApplyInsets();
@@ -142,7 +143,7 @@ public class MainActivity extends LocaleAwareActivity {
     @Override protected void onSaveInstanceState(Bundle out){out.putInt("tab",current);out.putString("query",query);out.putString("activeShelfId",activeShelfId);out.putBoolean("libraryRefreshed",libraryRefreshedThisSession);out.putBoolean("shelvesRefreshed",shelvesRefreshedThisSession);super.onSaveInstanceState(out);}
 
     private boolean valid(int id){return id==serial&&!isFinishing()&&!isDestroyed();}
-    private Button button(String label,View.OnClickListener action){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(Ui.PRIMARY);b.setOnClickListener(action);return b;}
+    private Button button(String label,View.OnClickListener action){return Ui.button(this,label,action,true);}
     private void cancelPageWork(){++serial;if(pending!=null)pending.cancel(true);pending=null;if(settingsSummaryTask!=null)settingsSummaryTask.cancel(true);settingsSummaryTask=null;if(unifiedGridAdapter!=null){unifiedGridAdapter.close();unifiedGridAdapter=null;}recommendationBatchList=null;recommendationBatchStatus=null;body.removeAllViews();}
     private void updateNav(){for(int i=0;i<nav.getChildCount();i++)nav.getChildAt(i).setBackgroundColor(i==current?Ui.PRIMARY_SOFT:Color.TRANSPARENT);}
     private void showTab(){cancelPageWork();updateNav();if(current==0)library();else if(current==1)recommendations();else if(current==2)history();else sources();}
@@ -390,10 +391,7 @@ public class MainActivity extends LocaleAwareActivity {
 
         NativeRecommendationStore.Snapshot snapshot=
             NativeRecommendationStore.load(this);
-        if(snapshot.available()){
-            NativeRecommendationStore.markCurrentSeen(this);
-            snapshot=NativeRecommendationStore.load(this);
-        }
+        snapshot=RecommendationPolicyStore.applyLocalPolicy(this,snapshot);
         return new RecommendationPageState(portable,snapshot,canRun);
     }
 
@@ -495,11 +493,11 @@ public class MainActivity extends LocaleAwareActivity {
         LinearLayout batchControls=new LinearLayout(this);
         target.addView(batchControls);
         batchControls.addView(
-            button("上一批",v->switchNativeRecommendationBatch(-1)),
+            button("上一页",v->switchNativeRecommendationBatch(-1)),
             new LinearLayout.LayoutParams(0,-2,1)
         );
         batchControls.addView(
-            button("下一批",v->switchNativeRecommendationBatch(1)),
+            button("下一页",v->switchNativeRecommendationBatch(1)),
             new LinearLayout.LayoutParams(0,-2,1)
         );
         recommendationBatchList=new LinearLayout(this);
@@ -514,13 +512,16 @@ public class MainActivity extends LocaleAwareActivity {
             direction<0
                 ?NativeRecommendationStore.previousBatch(this)
                 :NativeRecommendationStore.nextBatch(this);
-        renderNativeRecommendationBatch(snapshot);
+        renderNativeRecommendationBatch(RecommendationPolicyStore.applyLocalPolicy(this,snapshot));
     }
 
+    private long recommendationRenderToken;
     private void renderNativeRecommendationBatch(NativeRecommendationStore.Snapshot snapshot){
         if(recommendationBatchList==null||recommendationBatchStatus==null)return;
         recommendationBatchStatus.setText(LocalizedText.ui("手机独立 Recommendation V3/V5 Portable · ")+snapshot.readiness+LocalizedText.ui(" · 候选 ")+snapshot.candidateCount+LocalizedText.ui(" 本 · 第 ")+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+LocalizedText.ui(" 批"));
         recommendationBatchList.removeAllViews();
+        final int receiptSerial=serial;final long draw=++recommendationRenderToken;
+        RecommendationPageReceipt.afterDraw(this,recommendationBatchList,snapshot,()->valid(receiptSerial)&&current==1&&draw==recommendationRenderToken);
         for(NativeRecommendationStore.Item item:snapshot.current()){
             LinearLayout card=Ui.card(this);
             card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));

@@ -97,6 +97,7 @@ import {
     RANKER_ADAPTER_VERSION
 } from '../recommendation-v3/ranker-adapter-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
+import { policyForReaderRound } from '../recommendation-v3/reader-round-builder'
 import {
     buildVisualPreferenceProfile,
     cosineSimilarity,
@@ -4133,7 +4134,8 @@ export class LibraryService {
         const providerService = this.providerService()
         const catalog = this.database.listComics({ limit: 10000 })
         const recommendationV5Store = new RecommendationPolicyStoreV5(this.database)
-        const recommendationV5State = recommendationV5Store.state()
+        const recommendationV5State = policyForReaderRound(recommendationV5Store.state(),
+            this.database.getAppState<{readerConsumedIntent?:string}>('recommendation.v3.activeCycle.v1')?.readerConsumedIntent)
         const tasteExcludedIds = new Set(
             recommendationV5State.tasteExcludedComicIds
         )
@@ -4175,6 +4177,7 @@ export class LibraryService {
         const profile = buildFinalLifetimeProfileV3(favorites, { registry })
         await this.recommendationCheckpoint()
         this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 7 }
+        const previousCycle = this.database.getAppState<{ activeCycleId?: string }>('recommendation.v3.activeCycle.v1')?.activeCycleId
         const history: IntentCycleHistory[] = this.database
             .listV3CandidatePools(50)
             .flatMap((pool) => {
@@ -4185,11 +4188,12 @@ export class LibraryService {
                           intentId?: unknown
                       }>)
                     : []
+                const justUsed = pool.cycleId === previousCycle && ['READY', 'READY_LIMITED', 'READY_DEGRADED', 'ACTIVE'].includes(state)
                 return completedAt &&
-                    (state === 'EXHAUSTED' || state === 'SUPERSEDED')
+                    (justUsed || state === 'EXHAUSTED' || state === 'SUPERSEDED')
                     ? [
                           {
-                              state,
+                              state: justUsed ? 'ACTIVE' : state,
                               completedAt,
                               intentIds: plan
                                   .map((intent) =>
@@ -4414,7 +4418,7 @@ export class LibraryService {
                     a.rawRank - b.rawRank ||
                     a.comicId.localeCompare(b.comicId)
             )
-            .map(({ __v5RankScore: _score, ...candidate }) => candidate)
+            .map(({ __v5RankScore, ...candidate }) => ({...candidate,readerNonVisualScore:__v5RankScore}))
         await this.recommendationCheckpoint()
         this.recommendationProgress = {
             state: 'running',
@@ -4427,7 +4431,7 @@ export class LibraryService {
         const visualProfile = buildVisualPreferenceProfile({
             embeddings: visualEmbeddings,
             favoriteComicIds: explicitFavoriteIds,
-            feedback: recommendationFeedback,
+            feedback: recommendationFeedback.filter(f=>f.sentiment==='like'||f.reasons.includes('style')),
             catalogSize: Math.max(1, explicitFavoriteIds.size + likedIds.size)
         })
         const reranked = rerankWithVisualStyle({
@@ -4435,7 +4439,8 @@ export class LibraryService {
             embeddings: visualEmbeddings,
             profile: visualProfile,
             mode: visualSettings.enabled ? visualSettings.rerankMode : 'OFF',
-            strength: visualSettings.strength
+            strength: visualSettings.strength,
+            readerTieBreakOnly:true
         })
         this.recommendationProgress = {
             state: 'complete',

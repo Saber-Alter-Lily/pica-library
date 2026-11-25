@@ -13,9 +13,8 @@ const gradle = fs.readFileSync(
 
 describe('v0.5.0 formal release candidate workflow', () => {
     it('builds the real v0.4.11 one-click bridge from the permanent v0.5.0 stamp without publishing', () => {
-        expect(pkg.version).toBe('0.5.0')
-        expect(gradle).toContain("PICA_ANDROID_VERSION_CODE') ?: '55'")
-        expect(gradle).toContain("PICA_ANDROID_VERSION_NAME') ?: '0.5.0'")
+        expect(workflow).toContain("TARGET_VERSION: '0.5.0'")
+        expect(workflow).toContain("ANDROID_VERSION_CODE: '55'")
         expect(workflow).toContain('Verify permanent Desktop release stamp')
         expect(workflow).not.toContain('Temporarily stamp Desktop candidate version')
         expect(workflow).toContain(

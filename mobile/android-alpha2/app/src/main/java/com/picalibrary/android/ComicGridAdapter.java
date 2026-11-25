@@ -28,8 +28,8 @@ final class ComicGridAdapter extends BaseAdapter {
         Holder h;
         if(convertView==null){
             LinearLayout root=new LinearLayout(activity);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(Ui.dp(activity,5),Ui.dp(activity,5),Ui.dp(activity,5),Ui.dp(activity,9));
-            root.setBackground(Ui.rounded(Color.WHITE,14,activity));
-            ImageView cover=new ImageView(activity);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackgroundColor(0xffebe8ef);
+            root.setBackground(Ui.rounded(Ui.SURFACE,14,activity));
+            ImageView cover=new ImageView(activity);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackgroundColor(Ui.PLACEHOLDER);
             root.addView(cover,new LinearLayout.LayoutParams(-1,Ui.dp(activity,218)));
             TextView title=Ui.text(activity,"",14.5f,Ui.TEXT,true);title.setMaxLines(2);title.setPadding(0,Ui.dp(activity,7),0,0);root.addView(title);
             TextView meta=Ui.text(activity,"",11.5f,Ui.MUTED,false);meta.setMaxLines(1);meta.setPadding(0,Ui.dp(activity,2),0,0);root.addView(meta);
@@ -38,7 +38,7 @@ final class ComicGridAdapter extends BaseAdapter {
         BridgeClient.ComicItem item=getItem(position);
         h.title.setText(item.title);
         h.meta.setText(item.author+" · "+item.downloadedPictures+LocalizedText.ui(" 页"));
-        ImageRepository.load(activity,h.cover,item.coverPath,0xffebe8ef);
+        ImageRepository.load(activity,h.cover,item.coverPath,Ui.PLACEHOLDER);
         convertView.setOnClickListener(v->listener.onComic(item));
         return convertView;
     }

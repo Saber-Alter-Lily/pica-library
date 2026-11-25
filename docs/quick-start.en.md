@@ -1,5 +1,7 @@
 # Pica Library Quick Start
 
+> **v0.5.1**: use the [current installation instructions and official downloads](../README.en.md). The v0.4.11 → v0.5.0 bridge below is historical.
+
 Current stable release: **v0.5.0**. A typical first-time Windows setup consists of downloading the application, completing initial settings, synchronizing the library, and optionally configuring recommendations.
 
 ## 01 Download and extract

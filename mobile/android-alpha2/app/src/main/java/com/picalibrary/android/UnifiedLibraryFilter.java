@@ -7,7 +7,7 @@ final class UnifiedLibraryFilter {
     enum Location { PHONE, DESKTOP, WEBDAV, ONLINE }
     enum Provider { PICA, EH, EXH }
     enum TagMode { ANY, ALL }
-    enum Sort { FAVORITE_NEWEST, FAVORITE_OLDEST, LATEST, TITLE, AUTHOR }
+    enum Sort { FAVORITE_NEWEST, FAVORITE_OLDEST, LATEST, TITLE, AUTHOR, RANDOM }
 
     static final class Spec {
         String text="";
@@ -22,8 +22,9 @@ final class UnifiedLibraryFilter {
         Boolean finished;
         TagMode tagMode=TagMode.ANY;
         Sort sort=Sort.LATEST;
+        LibraryShuffleOrder shuffle=LibraryShuffleOrder.EMPTY;
 
-        Spec copy(){Spec next=new Spec();next.text=text;next.locations.addAll(locations);next.providers.addAll(providers);next.authors.addAll(authors);next.tags.addAll(tags);next.categories.addAll(categories);next.favoriteOnly=false;next.shelfOnly=shelfOnly;next.finished=finished;next.tagMode=tagMode;next.sort=sort;return next;}
+        Spec copy(){Spec next=new Spec();next.text=text;next.locations.addAll(locations);next.providers.addAll(providers);next.authors.addAll(authors);next.tags.addAll(tags);next.categories.addAll(categories);next.favoriteOnly=false;next.shelfOnly=shelfOnly;next.finished=finished;next.tagMode=tagMode;next.sort=sort;next.shuffle=shuffle;return next;}
         int activeCount(){int count=locations.isEmpty()?0:1;if(!providers.isEmpty())count++;if(shelfOnly)count++;if(finished!=null)count++;if(!authors.isEmpty())count++;if(!tags.isEmpty())count++;if(!categories.isEmpty())count++;return count;}
         void clear(){locations.clear();providers.clear();authors.clear();tags.clear();categories.clear();favoriteOnly=false;shelfOnly=false;finished=null;tagMode=TagMode.ANY;}
     }
@@ -47,12 +48,16 @@ final class UnifiedLibraryFilter {
             if(!matches(item.categories,spec.categories,TagMode.ANY))continue;
             out.add(item);
         }
-        Comparator<UnifiedCatalogStore.Entry> comparator;if(spec.sort==Sort.FAVORITE_NEWEST)comparator=Comparator.comparingInt(a->a.favoriteRank<0?Integer.MAX_VALUE:a.favoriteRank);else if(spec.sort==Sort.FAVORITE_OLDEST)comparator=(a,b)->Integer.compare(b.favoriteRank<0?Integer.MIN_VALUE:b.favoriteRank,a.favoriteRank<0?Integer.MIN_VALUE:a.favoriteRank);else if(spec.sort==Sort.TITLE)comparator=Comparator.comparing(a->norm(a.title));else if(spec.sort==Sort.AUTHOR)comparator=Comparator.comparing(a->norm(author(a)));else comparator=(a,b)->safe(b.updatedAt).compareTo(safe(a.updatedAt));out.sort(comparator.thenComparing(a->norm(a.title)));return out;
+        sortVisible(out,spec);return out;
+    }
+    static void sortVisible(List<UnifiedCatalogStore.Entry> out,Spec spec){
+        if(spec.sort==Sort.RANDOM){spec.shuffle.sort(out,e->e.id);return;}
+        Comparator<UnifiedCatalogStore.Entry> comparator;if(spec.sort==Sort.FAVORITE_NEWEST)comparator=Comparator.comparingInt(a->a.favoriteRank<0?Integer.MAX_VALUE:a.favoriteRank);else if(spec.sort==Sort.FAVORITE_OLDEST)comparator=(a,b)->Integer.compare(b.favoriteRank<0?Integer.MIN_VALUE:b.favoriteRank,a.favoriteRank<0?Integer.MIN_VALUE:a.favoriteRank);else if(spec.sort==Sort.TITLE)comparator=Comparator.comparing(a->norm(a.title));else if(spec.sort==Sort.AUTHOR)comparator=Comparator.comparing(a->norm(author(a)));else comparator=(a,b)->safe(b.updatedAt).compareTo(safe(a.updatedAt));out.sort(comparator.thenComparing(a->norm(a.title)).thenComparing(a->a.id));
     }
 
     static Facets facets(List<UnifiedCatalogStore.Entry> items){Map<String,Integer> authors=new HashMap<>(),tags=new HashMap<>(),categories=new HashMap<>();for(UnifiedCatalogStore.Entry item:items){add(authors,author(item));for(String value:item.tags)add(tags,value);for(String value:item.categories)add(categories,value);}return new Facets(facetList(authors),facetList(tags),facetList(categories));}
 
-    static String sortLabel(Sort sort){if(sort==Sort.FAVORITE_NEWEST)return "最近收藏";if(sort==Sort.FAVORITE_OLDEST)return "最早收藏";if(sort==Sort.TITLE)return "标题";if(sort==Sort.AUTHOR)return "作者";return "最近更新";}
+    static String sortLabel(Sort sort){if(sort==Sort.FAVORITE_NEWEST)return "最近收藏";if(sort==Sort.FAVORITE_OLDEST)return "最早收藏";if(sort==Sort.TITLE)return "标题";if(sort==Sort.AUTHOR)return "作者";if(sort==Sort.RANDOM)return "随机排序";return "最近更新";}
     private static boolean locationMatch(UnifiedCatalogStore.Entry item,Set<Location> selected){for(Location source:selected){if(source==Location.PHONE&&item.phoneDownloaded)return true;if(source==Location.DESKTOP&&item.desktopDownloaded)return true;if(source==Location.WEBDAV&&item.remoteAvailable)return true;if(source==Location.ONLINE&&online(item))return true;}return false;}
     private static boolean online(UnifiedCatalogStore.Entry item){return item.picaAvailable||item.ehAvailable||item.sourceBindings.contains("pica")||item.sourceBindings.contains("eh")||item.sourceBindings.contains("exh");}
     private static boolean providerMatch(UnifiedCatalogStore.Entry item,Set<Provider> selected){for(Provider provider:selected){if(provider==Provider.PICA&&(item.picaAvailable||item.sourceBindings.contains("pica")))return true;if(provider==Provider.EH&&(item.sourceBindings.contains("eh")||(item.ehAvailable&&!item.sourceBindings.contains("exh"))))return true;if(provider==Provider.EXH&&item.sourceBindings.contains("exh"))return true;}return false;}

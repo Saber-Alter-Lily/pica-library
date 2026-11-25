@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pica Library</string>
+    <string name="library_sort_action">Sort</string>
+    <string name="library_sort_current">Sort order: %1$s</string>
+    <string name="library_sort_random">Random order</string>
+    <string name="library_subscription_updates">Updates</string>
+    <string name="library_subscription_updates_count">Updates · %1$s</string>
+    <string name="library_subscription_updates_unread">Author updates: %1$d unread</string>
     <string name="common_back">‹ Back</string>
     <string name="language_title">Language &amp; Region</string>
     <string name="language_help">Choose the interface language. Changes apply immediately and are kept for the next launch.</string>

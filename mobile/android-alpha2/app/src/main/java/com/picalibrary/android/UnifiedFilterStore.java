@@ -34,6 +34,7 @@ final class UnifiedFilterStore {
         int finished=preferences.getInt(prefix+"finished",-1);spec.finished=finished<0?null:finished==1;
         try{spec.tagMode=UnifiedLibraryFilter.TagMode.valueOf(preferences.getString(prefix+"tag-mode",UnifiedLibraryFilter.TagMode.ANY.name()));}catch(Exception ignored){}
         try{spec.sort=UnifiedLibraryFilter.Sort.valueOf(preferences.getString(prefix+"sort",UnifiedLibraryFilter.Sort.LATEST.name()));}catch(Exception ignored){}
+        spec.shuffle=new LibraryShuffleOrder(preferences.getLong(prefix+"shuffle-seed",0L),preferences.getString(prefix+"shuffle-first",""));
     }
 
     static void save(SharedPreferences preferences,UnifiedLibraryFilter.Spec spec){
@@ -50,6 +51,8 @@ final class UnifiedFilterStore {
             .putInt(V2+"finished",spec.finished==null?-1:spec.finished?1:0)
             .putString(V2+"tag-mode",spec.tagMode.name())
             .putString(V2+"sort",spec.sort.name())
+            .putLong(V2+"shuffle-seed",spec.shuffle.seed)
+            .putString(V2+"shuffle-first",spec.shuffle.firstId)
             .apply();
     }
 

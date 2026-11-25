@@ -2,7 +2,9 @@
 
 # Windows One-Click Distribution
 
-> Current stable release: **v0.5.0**.
+> **v0.5.1**: use the [current installation instructions and official downloads](../README.en.md). The v0.4.11 → v0.5.0 bridge below is historical.
+
+> Historical baseline: **v0.5.0**.
 
 ## Download and start
 

@@ -7,6 +7,7 @@ import {
     saveLiteState
 } from './lite-state.js'
 import { deriveLiteAuthors } from './author-state.js'
+import { subscriptionUi, stableShuffle } from './reader-ux-051.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
@@ -35,6 +36,7 @@ const state = {
     recommendationContextId: null,
     recommendationCycleId: null,
     recommendationBatchId: null,
+    recommendationShort: false,
     recommendationManagedV3: false,
     recommendationPending: false,
     syncPending: false,
@@ -454,8 +456,8 @@ const post = (path, value) =>
 // action: 'restart'
 // recommendation.nextSessionReady
 
-function recordRecommendationEvent(eventType, payload = {}) {
-    if (state.mode !== 'connected') return
+function recordRecommendationEvent(eventType, payload = {}, awaitReceipt = false) {
+    if (state.mode !== 'connected') return Promise.resolve()
     const value = {
         eventType,
         appSessionId: state.appSessionId,
@@ -463,10 +465,11 @@ function recordRecommendationEvent(eventType, payload = {}) {
         recommendationCycleId: state.recommendationCycleId,
         ...payload
     }
-    void post('/api/v1/recommendation-events', {
+    const request = post('/api/v1/recommendation-events', {
         ...value,
         contextId: payload.contextId || value.recommendationContextId || null
-    }).catch(() => undefined)
+    })
+    return awaitReceipt ? request : request.catch(() => undefined)
 }
 
 const recommendationImpressionQueue = []
@@ -520,6 +523,7 @@ function queueRecommendationImpression(payload = {}) {
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden')
         flushRecommendationImpressions()
+    else void confirmVisibleRecommendationBatch().catch(() => {})
 })
 
 const mutate = (path, method, value = {}) =>
@@ -577,6 +581,7 @@ function activateView(id) {
     requestAnimationFrame(() => {
         if (id === 'reader') window.scrollTo(0, 0)
         else window.scrollTo(0, viewScrollPositions.get(id) ?? 0)
+        if (id === 'discover') void confirmVisibleRecommendationBatch().catch(() => {})
     })
 }
 
@@ -1653,7 +1658,8 @@ function renderComics(records = state.records) {
                           (comic.tags || []).map(normalize).includes(tag)
                       )
               )
-    state.visible.sort((left, right) => {
+    if(sort==='shuffle')state.visible=stableShuffle(state.visible)
+    else state.visible.sort((left, right) => {
         if (sort === 'likes')
             return (right.totalLikes || 0) - (left.totalLikes || 0)
         if (sort === 'views')
@@ -1885,6 +1891,46 @@ async function submitRecommendationFeedback(button, sentiment) {
     }
 }
 
+const presentationRequests = new Map()
+let lastConfirmedBatch = null
+function recommendationCardVisible(card) {
+    const r = card.getBoundingClientRect()
+    const left = Math.max(0, r.left), right = Math.min(window.innerWidth, r.right)
+    const top = Math.max(0, r.top), bottom = Math.min(window.innerHeight, r.bottom)
+    if (left >= right || top >= bottom) return false
+    // Modal overlays can cover a card even when its rectangle intersects.
+    return card.contains(document.elementFromPoint((left + right) / 2, (top + bottom) / 2))
+}
+function confirmVisibleRecommendationBatch() {
+    const id = state.recommendationBatchId
+    if (presentationRequests.has(id)) return presentationRequests.get(id)
+    if (!state.recommendationManagedV3 || !id || id === lastConfirmedBatch ||
+        state.mode !== 'connected' || document.visibilityState !== 'visible' || activeView !== 'discover')
+        return Promise.resolve()
+    const cards = $$('#recommend-results .result[data-comic-id]')
+    // Confirm the opened page, not individual eyes, clicks or scroll positions.
+    if (!cards.length || !cards.some(card => card.getClientRects().length > 0) ||
+        document.querySelector('dialog[open]')) return Promise.resolve()
+    const promise = recordRecommendationEvent('recommend_batch_presented', {
+        source: 'final-v3-visible',
+        appSessionId: state.appSessionId, contextId: state.recommendationContextId,
+        recommendationCycleId: state.recommendationCycleId, recommendationBatchId: id,
+        recommendationBatchIndex: state.recommendationBatch, recommendationSessionId: state.recommendationSessionNo,
+        metadata: { batchId: id, itemIds: cards.map(card => card.dataset.comicId) }
+    }, true).then(() => { lastConfirmedBatch = id }).finally(() => presentationRequests.delete(id))
+    presentationRequests.set(id, promise)
+    return promise
+}
+
+document.addEventListener('click', () => {
+    if (activeView === 'discover' && state.recommendationBatchId !== lastConfirmedBatch)
+        requestAnimationFrame(() => void confirmVisibleRecommendationBatch().catch(() => {}))
+})
+if (!('IntersectionObserver' in window))
+    window.addEventListener('scroll', () => {
+        if (activeView === 'discover') void confirmVisibleRecommendationBatch().catch(() => {})
+    }, { passive: true })
+
 function renderPreparedRecommendations() {
     $('#profile').innerHTML = ''
     const start = state.recommendationManagedV3
@@ -1895,21 +1941,10 @@ function renderPreparedRecommendations() {
         '#recommend-results',
         true
     )
-    recordRecommendationEvent('recommend_batch_presented', {
-        contextId: state.recommendationContextId,
-        recommendationCycleId: state.recommendationCycleId,
-        recommendationBatchId: state.recommendationBatchId,
-        recommendationBatchIndex: state.recommendationBatch,
-        dedupeKey: `${state.recommendationCycleId || 'none'}:${state.recommendationBatchId || state.recommendationBatch}`,
-        recommendationSessionId: state.recommendationSessionNo,
-        metadata: {
-            batchId: state.recommendationBatchId,
-            itemIds: state.recommendations
-                .slice(start, start + 12)
-                .map((item) => (item.comic || item).comicId)
-        }
-    })
-    $('#recommend-message').textContent = t('message.recommendationCount', {
+    void confirmVisibleRecommendationBatch().catch(() => {})
+    $('#recommend-message').textContent = state.recommendationManagedV3 && state.recommendationShort
+        ? t('recommend.freshShort', { count: state.recommendations.length })
+        : t('message.recommendationCount', {
         count: state.recommendations.length
     })
     $('#recommend-results').classList.toggle(
@@ -1976,8 +2011,11 @@ function observeRecommendationImpressions() {
         (entries) => {
             for (const entry of entries) {
                 const card = entry.target
+                if (entry.isIntersecting) void confirmVisibleRecommendationBatch().catch(() => {})
                 if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
                     const timer = window.setTimeout(() => {
+                        if (document.visibilityState !== 'visible' || activeView !== 'discover' ||
+                            !card.isConnected || !recommendationCardVisible(card)) return
                         const rank = Number(card.dataset.resultRank || 0)
                         queueRecommendationImpression({
                             comicId: card.dataset.comicId,
@@ -2008,6 +2046,7 @@ const recommendationRequestId = (action) =>
 
 function applyManagedRecommendationBatch(value) {
     state.recommendationManagedV3 = true
+    state.recommendationShort = Boolean(value.evidence?.freshness?.short)
     state.recommendations = value.recommendations || []
     state.recommendationCycleId = value.cycleId || value.activeCycleId || null
     state.recommendationBatchId = value.batchId || null
@@ -2167,7 +2206,7 @@ function libraryQueryFromControls() {
         authorIds: author ? [author.value] : [],
         tags: typedTags,
         tagMode: $('#filter-tag-mode').value,
-        sort: $('#sort-mode').value,
+        sort: $('#sort-mode').value==='shuffle'?'latest':$('#sort-mode').value,
         limit: 5000,
         offset: 0
     }
@@ -2700,6 +2739,7 @@ function openRecommendationDetail(comicId, context = 'recommendation', comicOver
         button.dataset.detailOnline = 'true'
         button.textContent = t('reader.online')
         $('#recommend-detail-content .detail-actions').prepend(button)
+        if(comic.canonicalAuthor||comic.author) subscriptionUi.followButton(comicId,comic.canonicalAuthor||comic.author,$('#recommend-detail-content .detail-actions'))
     }
     if (state.mode === 'connected') {
         const styleButton = document.createElement('button')
@@ -3081,6 +3121,8 @@ async function openReaderChapter(episodeId) {
     renderReaderChapterHeading()
     renderReaderPages()
     updateReaderChapterNavigation()
+    const order=state.reader.chapters.find(c=>c.id===episodeId)
+    if(chapter.pages.length&&order)void subscriptionUi.acknowledge(state.reader.comicId,Number(order.order??order.orderNo))
     if ($('#reader-mode').value !== 'vertical')
         requestAnimationFrame(() => scrollReaderViewportToTop())
     $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.online ? t('reader.onlineNotice') : ''
@@ -3103,7 +3145,7 @@ function renderReaderChapterHeading() {
             : '')
 }
 
-async function openReaderComic(comicId, online = false) {
+async function openReaderComic(comicId, online = false, requestedOrder = 0) {
     const requestId = ++readerComicRequest
     readerChapterRequest++
     try {
@@ -3155,12 +3197,15 @@ async function openReaderComic(comicId, online = false) {
             .join('')
         activateView('reader')
         document.body.classList.add('reader-active')
-        await openReaderChapter(resume?.episodeId || readable[0].id)
+        const requested=requestedOrder?readable.find(c=>Number(c.order??c.orderNo)===requestedOrder):null
+        if(requestedOrder&&!requested)throw new Error(t('reader.updateChapterUnavailable'))
+        await openReaderChapter(requested?.id || resume?.episodeId || readable[0].id)
     } catch (error) {
         if (requestId === readerComicRequest) $('#reader-message').textContent = localizeError(language, error)
     }
 }
 
+subscriptionUi.bind({language:()=>language,connected:()=>state.mode==='connected',open:openReaderComic,render:()=>{state.libraryPage=1;renderComics()}})
 document.addEventListener('pica-open-reader', (event) => {
     const detail = event instanceof CustomEvent ? event.detail : null
     const comicId = String(detail?.comicId || '').trim()
@@ -3461,6 +3506,7 @@ $('#recommend-next-batch').onclick = async () => {
         state.recommendationPending = true
         $('#recommend-next-batch').disabled = true
         try {
+            await confirmVisibleRecommendationBatch()
             const value = await post('/api/v1/recommendations', {
                 action: 'next',
                 requestId: recommendationRequestId('next'),
@@ -3468,7 +3514,7 @@ $('#recommend-next-batch').onclick = async () => {
             })
             applyManagedRecommendationBatch(value)
             renderPreparedRecommendations()
-            if (value.exhausted)
+            if (value.exhausted && !state.recommendationShort)
                 $('#recommend-message').textContent = t('recommend.exhausted')
         } catch (error) {
             $('#recommend-message').textContent = localizeError(language, error)
@@ -3993,7 +4039,7 @@ $('#recommend-button').onclick = async () => {
             state.recommendationSessionNo = 1
             state.recommendationBatch = 0
         }
-        if (!state.recommendations.length)
+        if (!state.recommendations.length && !(state.recommendationManagedV3 && state.recommendationShort))
             throw new Error(t('message.recommendNeedsData'))
         renderPreparedRecommendations()
     } catch (error) {
@@ -4010,6 +4056,7 @@ $('#recommend-restart').onclick = async () => {
         state.recommendationPending = true
         $('#recommend-restart').disabled = true
         const previousCycleId = state.recommendationCycleId
+        await confirmVisibleRecommendationBatch()
         await post('/api/v1/recommendation-sessions', {
             action: 'force_new',
             engine: 'v3',
@@ -5241,7 +5288,7 @@ async function detect() {
                 appSessionId: state.appSessionId
             })
             applyManagedRecommendationBatch(current)
-            if (state.recommendations.length) renderPreparedRecommendations()
+            if (state.recommendations.length || state.recommendationShort) renderPreparedRecommendations()
         } else if (recommendation.buildingCycleId) {
             $('#recommend-message').textContent = t('recommend.preparing')
         }

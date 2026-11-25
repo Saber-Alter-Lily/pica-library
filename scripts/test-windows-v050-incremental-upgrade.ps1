@@ -69,7 +69,9 @@ if ($CandidateSourceSha -notmatch '^[0-9a-f]{40}$') {
     throw 'CandidateSourceSha must be a full Git commit SHA'
 }
 
-$work = Join-Path ([IO.Path]::GetTempPath()) ("pica-v050-incremental-" + [guid]::NewGuid().ToString('N'))
+if ($env:GITHUB_ACTIONS -ne 'true' -or -not $env:RUNNER_TEMP) { throw 'Disposable CI runner required' }
+$qaTemp = (Get-Item -LiteralPath $env:RUNNER_TEMP -ErrorAction Stop).FullName
+$work = Join-Path $qaTemp ("pica-v050-incremental-" + [guid]::NewGuid().ToString('N'))
 $installExtract = Join-Path $work 'install'
 $candidateExtract = Join-Path $work 'candidate'
 $stagingRoot = Join-Path $work 'staging'
@@ -172,7 +174,7 @@ try {
 
     Stop-Desktop $currentInstance
     $currentInstance = $null
-    pnpm exec tsx scripts/verify-v051-preservation.ts seed $database
+    node --import tsx scripts/verify-v051-preservation.ts seed "$database"
     if ($LASTEXITCODE) { throw 'Failed to seed isolated QA rows' }
     Remove-Item -Force -ErrorAction SilentlyContinue $instanceFile
 
@@ -269,7 +271,7 @@ try {
     if (-not (Test-Path -LiteralPath $database)) {
         throw 'External Library database was not preserved'
     }
-    pnpm exec tsx scripts/verify-v051-preservation.ts verify $database
+    node --import tsx scripts/verify-v051-preservation.ts verify "$database"
     if ($LASTEXITCODE) { throw 'Upgrade did not preserve favorite, reading position or recommendation event' }
 
     foreach ($item in @($manifest.files)) {
@@ -314,7 +316,7 @@ try {
     }
     if ($success -and (Test-Path -LiteralPath $work)) {
         $resolved = (Resolve-Path -LiteralPath $work).ProviderPath
-        if ((Split-Path $resolved -Parent).TrimEnd('\') -ne ([IO.Path]::GetTempPath()).TrimEnd('\') -or (Split-Path $resolved -Leaf) -notmatch '^pica-v050-incremental-[a-f0-9]{32}$') { throw 'Unexpected cleanup path' }
+        if ((Split-Path $resolved -Parent).TrimEnd('\') -ne $qaTemp.TrimEnd('\') -or (Split-Path $resolved -Leaf) -notmatch '^pica-v050-incremental-[a-f0-9]{32}$') { throw 'Unexpected cleanup path' }
         Remove-Item -Recurse -Force -LiteralPath $resolved -ErrorAction SilentlyContinue
     } elseif (-not $success) {
         Write-Warning "v0.5.0 incremental acceptance retained for diagnosis: $work"

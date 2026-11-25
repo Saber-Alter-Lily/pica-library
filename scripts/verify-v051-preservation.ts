@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import fs from 'node:fs'
-import os from 'node:os'
+
 import { LibraryDatabase } from '../src/library/database'
 const [mode,file]=process.argv.slice(2)
-const rel=path.relative(fs.realpathSync(os.tmpdir()),fs.realpathSync(file)).replaceAll('\\','/')
-assert.ok(process.env.GITHUB_ACTIONS==='true'&&/^pica-v050-incremental-[0-9a-f]{32}\/localappdata\/Pica Library Incremental Acceptance\/data\/library\.db$/i.test(rel),'isolated CI database only')
+assert.equal(process.env.GITHUB_ACTIONS?.toLowerCase(),'true','Hosted Actions required')
+assert.ok(process.env.RUNNER_TEMP && file,'Expected explicit runner temp and database path')
+const rel=path.relative(fs.realpathSync.native(process.env.RUNNER_TEMP),fs.realpathSync.native(file)).split(path.sep).join('/')
+assert.ok(/^pica-v050-incremental-[0-9a-f]{32}\/localappdata\/Pica Library Incremental Acceptance\/data\/library\.db$/i.test(rel),'Refusing non-fixture path in Actions: '+JSON.stringify(rel))
 assert.ok(mode==='seed'||mode==='verify')
 const id='qa-release-051', ep=id+'-episode', db=new LibraryDatabase(file)
 try {

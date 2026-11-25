@@ -445,6 +445,7 @@ export function rerankWithVisualStyle(input: {
     profile: VisualPreferenceProfile | null
     mode: VisualRerankMode
     strength?: VisualInfluenceStrength
+    readerTieBreakOnly?: boolean
 }): VisualRerankedCandidate[] {
     const baseline = input.ranked.map((candidate, index) => ({
         candidate,
@@ -528,6 +529,20 @@ export function rerankWithVisualStyle(input: {
             live: input.mode === 'LIVE'
         }
     }))
+    if(input.mode==='LIVE'&&input.readerTieBreakOnly){
+        // Never displace a book lacking an embedding. Only reorder contiguous
+        // comparable runs within one percentile point of the pre-visual score.
+        const score=(row:VisualRerankedCandidate)=>
+            (row as {readerNonVisualScore?:number}).readerNonVisualScore??row.visual?.baselinePercentile??0
+        for(let i=0;i<output.length;){
+            if(!output[i].visual?.available){i++;continue}
+            let end=i+1
+            while(end<output.length&&output[end].visual?.available&&Math.abs(score(output[i])-score(output[end]))<=0.01)end++
+            if(end-i>1)output.splice(i,end-i,...output.slice(i,end).sort((a,b)=>(b.visual?.affinity??0)-(a.visual?.affinity??0)))
+            i=end
+        }
+        return output
+    }
     return input.mode === 'LIVE'
         ? output.sort(
               (a, b) =>
@@ -553,6 +568,7 @@ export function metadataFeedbackAdjustment(input: {
         const source = input.catalogById.get(feedback.comicId)
         if (!source || feedback.comicId === input.candidate.comicId) continue
         const reasons = new Set(feedback.reasons)
+        if (feedback.sentiment === 'dislike' && !['topic','author','character','style'].some(reason=>reasons.has(reason))) continue
         if (reasons.has('style') && reasons.size === 1) continue
         const hasTasteReason = ['style', 'topic', 'author', 'character'].some(
             (reason) => reasons.has(reason)

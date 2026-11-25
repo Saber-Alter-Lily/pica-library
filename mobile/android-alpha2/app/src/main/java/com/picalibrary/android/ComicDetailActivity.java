@@ -23,7 +23,7 @@ public class ComicDetailActivity extends LocaleAwareActivity {
     private ProgressBar loading;
 
     @Override public void onCreate(Bundle b){
-        super.onCreate(b);getWindow().setStatusBarColor(Ui.BG);getWindow().setNavigationBarColor(Ui.BG);
+        super.onCreate(b);Ui.applyWindow(this);
         comicId=getIntent().getStringExtra("comicId");title=getIntent().getStringExtra("title");author=getIntent().getStringExtra("author");coverPath=getIntent().getStringExtra("coverPath");sourceKind=getIntent().getStringExtra("source");downloadedPictures=getIntent().getIntExtra("downloadedPictures",0);
         render();load();
     }
@@ -32,7 +32,7 @@ public class ComicDetailActivity extends LocaleAwareActivity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());return insets;});
         LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,6),Ui.dp(this,4),Ui.dp(this,10),Ui.dp(this,4));
-        Button back=new Button(this);back.setText("‹");back.setTextSize(28);back.setAllCaps(false);back.setOnClickListener(v->finish());bar.addView(back,new LinearLayout.LayoutParams(Ui.dp(this,52),Ui.dp(this,52)));
+        Button back=Ui.button(this,"‹",v->finish(),true);back.setContentDescription(LocalizedText.ui(this,"返回","Back","戻る"));back.setPadding(0,0,0,0);back.setTextSize(22);bar.addView(back,new LinearLayout.LayoutParams(Ui.dp(this,48),Ui.dp(this,48)));
         TextView heading=Ui.text(this,"漫画详情",20,Ui.TEXT,true);bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);
         ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,16),Ui.dp(this,6),Ui.dp(this,16),Ui.dp(this,28));scroll.addView(content,new ScrollView.LayoutParams(-1,-2));root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);root.requestApplyInsets();
@@ -42,8 +42,8 @@ public class ComicDetailActivity extends LocaleAwareActivity {
 
     private void load(){
         LinearLayout hero=new LinearLayout(this);hero.setPadding(0,0,0,Ui.dp(this,18));
-        ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackgroundColor(0xffebe8ef);hero.addView(cover,new LinearLayout.LayoutParams(Ui.dp(this,132),Ui.dp(this,188)));
-        if("remote".equals(sourceKind))new Thread(()->{try{android.graphics.Bitmap bitmap=new RemoteLibraryClient(this).bitmap(coverPath);runOnUiThread(()->cover.setImageBitmap(bitmap));}catch(Exception ignored){}}).start();else ImageRepository.load(this,cover,coverPath,0xffebe8ef);
+        ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackgroundColor(Ui.PLACEHOLDER);hero.addView(cover,new LinearLayout.LayoutParams(Ui.dp(this,132),Ui.dp(this,188)));
+        if("remote".equals(sourceKind))new Thread(()->{try{android.graphics.Bitmap bitmap=new RemoteLibraryClient(this).bitmap(coverPath);runOnUiThread(()->cover.setImageBitmap(bitmap));}catch(Exception ignored){}}).start();else ImageRepository.load(this,cover,coverPath,Ui.PLACEHOLDER);
         LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(Ui.dp(this,15),Ui.dp(this,3),0,0);TextView titleView=Ui.text(this,title==null?"未命名漫画":title,21,Ui.TEXT,true);titleView.setMaxLines(4);copy.addView(titleView);Ui.gap(copy,this,8);copy.addView(Ui.text(this,author==null?"未知作者":author,14,Ui.MUTED,false));Ui.gap(copy,this,12);copy.addView(Ui.pill(this,("remote".equals(sourceKind)?"网盘可读 ":"电脑已下载 ")+downloadedPictures+" 页",Ui.PRIMARY_SOFT,Ui.PRIMARY));hero.addView(copy,new LinearLayout.LayoutParams(0,-2,1));content.addView(hero);
         TextView section=Ui.text(this,"可读章节",20,Ui.TEXT,true);content.addView(section);TextView hint=Ui.text(this,"remote".equals(sourceKind)?"章节图片从 WebDAV 按页流式读取":"只显示电脑端已经完整或部分下载、可直接读取的章节",12,Ui.MUTED,false);hint.setPadding(0,Ui.dp(this,3),0,Ui.dp(this,8));content.addView(hint);
         loading=new ProgressBar(this);content.addView(loading);

@@ -16,7 +16,7 @@ export const jaCommonChronicleTranslations = {
     'common.enterValue': '内容を入力',
     'common.name': '名前',
     'home.clearConfirm': 'このブラウザーに保存されたBrowser Liteデータを消去しますか？Windows側のライブラリは削除されません。',
-    'action.nextBatch': '次のバッチ',
+    'action.nextBatch': '次のページ',
     'action.grid': 'グリッド',
     'action.list': 'リスト',
     'action.loadCovers': 'カバーを読み込む',

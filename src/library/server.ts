@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FavoriteRecord, LibraryFacetQuery, SortMode } from './types'
 import { LibraryDatabase } from './database'
+import { ReaderSubscriptions } from './reader-subscriptions'
 import { LibraryService } from './service'
 import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
@@ -239,6 +240,7 @@ export async function startLibraryServer(options: {
     const host = options.host ?? '127.0.0.1'
     const port = options.port ?? 4789
     const providerService = options.service.providerService()
+    const subscriptions = new ReaderSubscriptions(options.database, name => options.service.discover({keyword:name,sort:'latest',limit:100}))
     const libraryQueries = new LibraryQueryService(options.database)
     const shelfService = new ShelfService(options.database, libraryQueries)
     const recommendationService = new RecommendationService(
@@ -354,6 +356,21 @@ export async function startLibraryServer(options: {
                 return json(response, 403, {
                     error: 'This local request could not be verified'
                 })
+            }
+            if (
+                options.desktop && url.pathname === '/api/v1/desktop/reader-subscriptions'
+            ) {
+                if(request.method==='GET')return json(response,200,subscriptions.view())
+                if(request.method!=='POST')return json(response,405,{error:'Method not allowed'})
+                const input=await body(request)
+                switch(input.action){
+                    case 'follow': subscriptions.follow(String(input.comicId));break
+                    case 'unfollow': subscriptions.unfollow(String(input.authorId));break
+                    case 'seen': subscriptions.acknowledge(String(input.comicId),Number(input.chapter));break
+                    case 'refresh': await subscriptions.refresh(input.force===true);break
+                    default:return json(response,400,{error:'Unknown subscription action'})
+                }
+                return json(response,200,subscriptions.view())
             }
             if (
                 url.pathname === '/api/v1/desktop/status' &&

@@ -156,8 +156,7 @@ function installLibraryToolbar() {
     moveNodes(filters.querySelector('.ux-more-body'), [
         ux$('#filter-author-input')?.closest('label'),
         ux$('#filter-tag')?.closest('label'),
-        ux$('#filter-tag-mode'),
-        ux$('#sort-mode')
+        ux$('#filter-tag-mode')
     ])
 
     const bulk = makeDetails('ux-library-bulk', 'bulkOrganize')
@@ -176,7 +175,16 @@ function installLibraryToolbar() {
         ux$('#library-selection-status')
     ])
 
-    toolbar.append(primary, display, filters, bulk, selection)
+    const readingActions=document.createElement('div');readingActions.className='ux-toolbar-primary reader-actions'
+    readingActions.append(filters)
+    const sort=ux$('#sort-mode'),shuffle=document.createElement('button'),inbox=document.createElement('button')
+    shuffle.type=inbox.type='button';shuffle.id='reader-shuffle';inbox.id='reader-inbox'
+    const labels=uxLanguage()==='en'?['Filter','Sort','Shuffle','Updates']:uxLanguage()==='ja'?['絞り込み','並べ替え','シャッフル','購読更新']:['筛选','排序','随机重排','订阅更新']
+    sort.setAttribute('aria-label',labels[1]);shuffle.textContent=labels[2];inbox.textContent=labels[3]
+    const randomOption=new Option(labels[2],'shuffle');sort.add(randomOption)
+    const sortGroup=document.createElement('div');sortGroup.className='control-group'
+    const sortLabel=document.createElement('label');sortLabel.append(labels[1]+' ',sort);sortGroup.append(sortLabel,shuffle)
+    readingActions.append(sortGroup,inbox);toolbar.append(primary,readingActions,display,bulk,selection)
     const search = ux$('#filter-text')
     if (search && !search.dataset.uxEnterFilter) {
         search.dataset.uxEnterFilter = '1'

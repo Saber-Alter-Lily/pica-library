@@ -46,7 +46,7 @@ describe('E-H cross-source Recommendation V3', () => {
     expect(mobile).toContain('EH_MAX_REQUESTS=4,EXH_MAX_REQUESTS=2')
     expect(mobile).toContain('ehClient.search(q,"eh")')
     expect(mobile).toContain('ehClient.search(q,"exh")')
-    expect(mobile).toContain('known.favorite||known.inShelf||known.phoneDownloaded||known.desktopDownloaded||known.remoteAvailable')
+    expect(mobile).toContain('known.favorite||known.phoneDownloaded||known.desktopDownloaded||known.inShelf||known.remoteAvailable')
   })
   it('routes ExH through the E-H provider while preserving canonical identity', async () => {
     const db = database()

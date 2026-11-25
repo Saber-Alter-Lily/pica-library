@@ -96,6 +96,7 @@ export const jaReaderUpdateTranslations = {
     'reader.pageAlt': '{page} ページ',
     'reader.chapter': '{title} · {pages} ページ',
     'reader.resume': ' · {page} ページから再開',
+    'reader.updateChapterUnavailable': '更新された話を現在開けません。',
     'reader.noChapters': 'この作品にはダウンロード済みチャプターがありません。',
     'reader.exported': '{name} を書き出しました · {pages} ページ · {bytes}',
     'reader.openExport': '{format} を書き出しました。既定のリーダーで開きますか？',

@@ -110,6 +110,7 @@ public class MainActivity extends LocaleAwareActivity {
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
+        Ui.applyWindow(this);
         preferences=getSharedPreferences("library-display",MODE_PRIVATE);
         columns=preferences.getInt("columns",2)==3?3:2;
         activeShelfId=preferences.getString("activeShelfId","");
@@ -130,7 +131,7 @@ public class MainActivity extends LocaleAwareActivity {
         root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
         body=new FrameLayout(this);root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
-        nav=new LinearLayout(this);nav.setBackgroundColor(0xfff3f1f5);root.addView(nav);
+        nav=new LinearLayout(this);nav.setBackgroundColor(Ui.NAV);root.addView(nav);
         String[] labels=ShellPolicy.bottomTabs();
         for(int i=0;i<labels.length;i++){final int tab=i;Button b=button(labels[i],v->{current=tab;showTab();});nav.addView(b,new LinearLayout.LayoutParams(0,Ui.dp(this,54),1));}
         setContentView(root);root.requestApplyInsets();
@@ -142,7 +143,7 @@ public class MainActivity extends LocaleAwareActivity {
     @Override protected void onSaveInstanceState(Bundle out){out.putInt("tab",current);out.putString("query",query);out.putString("activeShelfId",activeShelfId);out.putBoolean("libraryRefreshed",libraryRefreshedThisSession);out.putBoolean("shelvesRefreshed",shelvesRefreshedThisSession);super.onSaveInstanceState(out);}
 
     private boolean valid(int id){return id==serial&&!isFinishing()&&!isDestroyed();}
-    private Button button(String label,View.OnClickListener action){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(Ui.PRIMARY);b.setOnClickListener(action);return b;}
+    private Button button(String label,View.OnClickListener action){return Ui.button(this,label,action,true);}
     private void cancelPageWork(){++serial;if(pending!=null)pending.cancel(true);pending=null;if(settingsSummaryTask!=null)settingsSummaryTask.cancel(true);settingsSummaryTask=null;if(unifiedGridAdapter!=null){unifiedGridAdapter.close();unifiedGridAdapter=null;}recommendationBatchList=null;recommendationBatchStatus=null;body.removeAllViews();}
     private void updateNav(){for(int i=0;i<nav.getChildCount();i++)nav.getChildAt(i).setBackgroundColor(i==current?Ui.PRIMARY_SOFT:Color.TRANSPARENT);}
     private void showTab(){cancelPageWork();updateNav();if(current==0)library();else if(current==1)recommendations();else if(current==2)history();else sources();}

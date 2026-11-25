@@ -41,6 +41,7 @@ import type { UpdateFinding } from '../maintenance/updates'
 import { trustedCoverUrl } from './cover-url'
 import type { UserEvent, UserEventInput } from '../recommendation-v3/types'
 import { AUTHOR_HISTORY_BATCHES, PRESENTATION_STATE_KEY, PRESENTED_BATCH_WINDOW, batchAuthorKey, batchFreshness, type PresentedBatchV3 } from '../recommendation-v3/batch-freshness-v3'
+import { authorKeysForReceipt, importPriorReaderReceipts, logReaderReceipt, receiptHistory } from '../recommendation-v3/reader-round-history'
 import type {
     RecommendationFeedbackState,
     VisualEmbeddingRecord
@@ -1475,6 +1476,18 @@ export class LibraryDatabase {
         return batchFreshness(history, authors)
     }
 
+    prepareReaderReceiptHistory() { importPriorReaderReceipts(this.db) }
+
+    readerReceiptHistory(comicIds: Iterable<string>, authors: Iterable<string>) {
+        return receiptHistory(this.db, comicIds, authors)
+    }
+
+    readerRecentPositiveIds(since:string) {
+        return new Set(this.db.prepare(`SELECT DISTINCT comic_id FROM user_events
+            WHERE event_type IN ('favorite_add','recommend_like') AND occurred_at>=? AND comic_id IS NOT NULL`)
+            .all(since).map(row=>String(row.comic_id)))
+    }
+
     confirmV3BatchPresentation(input: { batchId: string; cycleId: string; contextId: string; batchIndex: number; itemIds: unknown }) {
         const ids = input.itemIds
         if (!Array.isArray(ids) || !ids.length || ids.length > 12 ||
@@ -1488,6 +1501,8 @@ export class LibraryDatabase {
             const evidence = jsonObject(row?.evidence_json)
             const allocated = new Set(jsonArray(row?.item_ids_json))
             const valid = Boolean(row && evidence.allocatorVersion && evidence.requestId && ids.every(id => allocated.has(id)))
+            if (valid) logReaderReceipt(this.db, ids, Number(evidence.readerRoundOrdinal ?? 0),
+                authorKeysForReceipt(this.db, ids))
             if (valid && !evidence.presentationConfirmedV1) {
                 const previous = this.getAppState<PresentedBatchV3[]>(PRESENTATION_STATE_KEY) ?? []
                 this.setAppState(PRESENTATION_STATE_KEY, [

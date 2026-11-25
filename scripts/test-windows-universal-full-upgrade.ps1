@@ -222,7 +222,9 @@ try {
         $env:PICA_LIBRARY_DESKTOP_HOME = $originalHome
     }
     if ($success -and (Test-Path -LiteralPath $work)) {
-        Remove-Item -Recurse -Force -LiteralPath $work -ErrorAction SilentlyContinue
+        $resolved=(Resolve-Path -LiteralPath $work).ProviderPath
+        if ((Split-Path $resolved -Parent).TrimEnd('\') -ne ([IO.Path]::GetTempPath()).TrimEnd('\') -or (Split-Path $resolved -Leaf) -notmatch '^pica-universal-upgrade-[a-f0-9-]{36}$'){throw 'Unexpected cleanup path'}
+        Remove-Item -Recurse -Force -LiteralPath $resolved -ErrorAction SilentlyContinue
     } elseif (-not $success) {
         Write-Warning "Universal full-upgrade acceptance retained for diagnosis: $work"
     }

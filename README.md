@@ -10,16 +10,12 @@
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.5.0 本次更新
+## v0.5.1 本次更新
 
-- **v0.4.11 → v0.5.0 Windows 无痛升级**：在软件更新页点击“一键检查并更新”即可直接进入新基线，不需要手工解压或重装。
-- **升级助手正式外置**：v0.5.0 首次启动后会在用户数据目录的 `runtime-state/upgrade-assistant` 建立可验证的升级运行时，后续跨 Schema、updater 自替换或大规模程序更新仍可继续一键完成。
-- **Android 批量操作更直接**：长按书库/书架进入多选后，加入书架、取消收藏、移出书架等操作直接出现在底部操作栏。
-- **书库与推荐交互收口**：新增收藏顺序排序、详情页页数、同一作品检查状态、作者曝光控制，并减少普通推荐/偏好编辑中的不必要全量读取。
-- **Desktop/Web 进一步简化**：设置中心、书库显示控制、连接状态与新手引导重新整理，减少重复按钮和隐藏状态。
-- **支持入口迁移到爱赞助**：Web、Android、README 与 GitHub Funding 统一使用爱赞助。
-
-完整版本演变见 [PROJECT_LOG.md](PROJECT_LOG.md)。
+- **书库**：在搜索下方打开筛选、排序或订阅更新；再次点「随机重排」才改变顺序。
+- **订阅**：从详情订阅作者，用封面浏览待看作品。阅读相应章节或手动标记才消除这条提醒。
+- **推荐与阅读**：同一轮分六页浏览，优先混合熟悉和陌生作者；Android 优化多章节目录、窄屏操作和深浅色布局。
+- [完整更新说明与限制](docs/V051_RELEASE_NOTES.md) · [Windows x64](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-v0.5.1-windows-x64.zip) · [Android v56 正式 APK](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-Android-v56.apk)
 
 ## 主要功能
 
@@ -66,31 +62,21 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 
 ## 安装与更新
 
+仍在 v0.4.11？先按 [v0.5.0 的升级说明](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0) 进入 v0.5.0，再使用本次升级包。不要将跨版本增量 ZIP 混用。
+
 正式版本统一发布在 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases)。
 
 ### Windows
 
 新用户下载并完整解压：
 
-`Pica-Library-v0.5.0-windows-x64.zip`
+[Pica-Library-v0.5.1-windows-x64.zip](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-v0.5.1-windows-x64.zip)
 
-然后运行 `Pica Library.exe`。
-
-已有 **v0.4.11** 的用户直接打开 **设置 → 维护工具 → 软件更新**，点击 **一键检查并更新**。正式更新通道会选择：
-
-`Pica-Library-v0.5.0-update-from-v0.4.11.zip`
-
-完成校验、替换、数据库迁移和自动重连，无需手工安装中间版本。
-
-如果软件内更新通道异常，可使用同一 Release 中的备用：
-
-`Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip`
-
-用户数据位于独立目录；正常升级和备用助手都不会把书库数据库、书架、历史、下载内容或账号配置当作程序文件覆盖。
+已装 v0.5.0 请在「软件更新」点「一键检查并更新」。对应增量包为 `Pica-Library-v0.5.1-update-from-v0.5.0.zip`；备用助手在同一 Release。不要删除数据目录。
 
 ### Android
 
-正式版为 **v55 / 0.5.0**。当前 public v54 / 0.4.11 已完成原地覆盖安装验收，可直接通过应用内更新进入 v55。
+正式包为 **v56 / 0.5.1**，使用与 v55 相同的签名。通过应用内更新覆盖原正式版，不要先卸载。独立 Dev 包不是正式版的升级起点。
 
 Android APK 不通过应用商店分发，请只从本仓库正式 Release 下载。
 

@@ -7,6 +7,7 @@ import {
     saveLiteState
 } from './lite-state.js'
 import { deriveLiteAuthors } from './author-state.js'
+import { subscriptionUi, stableShuffle } from './reader-ux-051.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
@@ -1657,7 +1658,8 @@ function renderComics(records = state.records) {
                           (comic.tags || []).map(normalize).includes(tag)
                       )
               )
-    state.visible.sort((left, right) => {
+    if(sort==='shuffle')state.visible=stableShuffle(state.visible)
+    else state.visible.sort((left, right) => {
         if (sort === 'likes')
             return (right.totalLikes || 0) - (left.totalLikes || 0)
         if (sort === 'views')
@@ -1906,7 +1908,9 @@ function confirmVisibleRecommendationBatch() {
         state.mode !== 'connected' || document.visibilityState !== 'visible' || activeView !== 'discover')
         return Promise.resolve()
     const cards = $$('#recommend-results .result[data-comic-id]')
-    if (!cards.some(recommendationCardVisible)) return Promise.resolve()
+    // Confirm the opened page, not individual eyes, clicks or scroll positions.
+    if (!cards.length || !cards.some(card => card.getClientRects().length > 0) ||
+        document.querySelector('dialog[open]')) return Promise.resolve()
     const promise = recordRecommendationEvent('recommend_batch_presented', {
         source: 'final-v3-visible',
         appSessionId: state.appSessionId, contextId: state.recommendationContextId,
@@ -2202,7 +2206,7 @@ function libraryQueryFromControls() {
         authorIds: author ? [author.value] : [],
         tags: typedTags,
         tagMode: $('#filter-tag-mode').value,
-        sort: $('#sort-mode').value,
+        sort: $('#sort-mode').value==='shuffle'?'latest':$('#sort-mode').value,
         limit: 5000,
         offset: 0
     }
@@ -2735,6 +2739,7 @@ function openRecommendationDetail(comicId, context = 'recommendation', comicOver
         button.dataset.detailOnline = 'true'
         button.textContent = t('reader.online')
         $('#recommend-detail-content .detail-actions').prepend(button)
+        if(comic.canonicalAuthor||comic.author) subscriptionUi.followButton(comicId,comic.canonicalAuthor||comic.author,$('#recommend-detail-content .detail-actions'))
     }
     if (state.mode === 'connected') {
         const styleButton = document.createElement('button')
@@ -3116,6 +3121,8 @@ async function openReaderChapter(episodeId) {
     renderReaderChapterHeading()
     renderReaderPages()
     updateReaderChapterNavigation()
+    const order=state.reader.chapters.find(c=>c.id===episodeId)
+    if(chapter.pages.length&&order)void subscriptionUi.acknowledge(state.reader.comicId,Number(order.order??order.orderNo))
     if ($('#reader-mode').value !== 'vertical')
         requestAnimationFrame(() => scrollReaderViewportToTop())
     $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.online ? t('reader.onlineNotice') : ''
@@ -3138,7 +3145,7 @@ function renderReaderChapterHeading() {
             : '')
 }
 
-async function openReaderComic(comicId, online = false) {
+async function openReaderComic(comicId, online = false, requestedOrder = 0) {
     const requestId = ++readerComicRequest
     readerChapterRequest++
     try {
@@ -3190,12 +3197,15 @@ async function openReaderComic(comicId, online = false) {
             .join('')
         activateView('reader')
         document.body.classList.add('reader-active')
-        await openReaderChapter(resume?.episodeId || readable[0].id)
+        const requested=requestedOrder?readable.find(c=>Number(c.order??c.orderNo)===requestedOrder):null
+        if(requestedOrder&&!requested)throw new Error(t('reader.updateChapterUnavailable'))
+        await openReaderChapter(requested?.id || resume?.episodeId || readable[0].id)
     } catch (error) {
         if (requestId === readerComicRequest) $('#reader-message').textContent = localizeError(language, error)
     }
 }
 
+subscriptionUi.bind({language:()=>language,connected:()=>state.mode==='connected',open:openReaderComic,render:()=>{state.libraryPage=1;renderComics()}})
 document.addEventListener('pica-open-reader', (event) => {
     const detail = event instanceof CustomEvent ? event.detail : null
     const comicId = String(detail?.comicId || '').trim()

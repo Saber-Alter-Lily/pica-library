@@ -2,6 +2,8 @@
 
 # Pica Library
 
+**v0.5.1** · [Windows x64](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-v0.5.1-windows-x64.zip) · [Android v56](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-Android-v56.apk) · [Release notes](docs/V051_RELEASE_NOTES.md)
+
 **Local-first manga library, reader, and download manager for Windows & Android.**
 
 Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV**, bringing discovery, favorites, library management, downloads, reading, recommendations, and cross-device access into one app.
@@ -10,16 +12,11 @@ Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV**, bringing discovery,
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.5.0 highlights
+For v0.4.11 installations, first follow the [v0.5.0 upgrade instructions](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0). Incremental packages are source-version specific.
 
-- **One-click Windows upgrade from v0.4.11 to v0.5.0** through the existing Software Update page, without manual extraction or reinstall.
-- **Persistent external upgrade assistant**: v0.5.0 registers a verified runtime/helper under `runtime-state/upgrade-assistant`, so later schema jumps or updater replacement can still use one-click full-application replacement.
-- **More direct Android batch actions**: long-press Library/Shelf selection exposes add/remove/unfavorite actions in a contextual bottom bar.
-- **Library and recommendation interaction cleanup**: favorite-order sorting, known page count, visible same-work checks, cycle-level author exposure control, and fewer unnecessary full reloads.
-- **Simpler Desktop/Web hierarchy** across Settings, Library display controls, connection state, and onboarding.
-- **Project support moved to AZZ** across Web, Android, documentation, and GitHub Funding.
+## What's new in v0.5.1
 
-See [PROJECT_LOG.md](PROJECT_LOG.md) for the core version history.
+Library filters, sort and subscription updates sit together. Reshuffle without changing the library. Browse unread chapters by cover or author. Recommendation pages stay in the same round; generating another round uses a new plan. Android keeps the single-column feed and improves long chapter lists, dark contrast and narrow layouts.
 
 ## Main features
 
@@ -72,27 +69,11 @@ Official builds are published through [GitHub Releases](https://github.com/Saber
 
 New users should download and fully extract:
 
-`Pica-Library-v0.5.0-windows-x64.zip`
-
-Then run `Pica Library.exe`.
-
-Existing **v0.4.11** users can open **Settings → Maintenance → Software Update** and use **One-click check & update**. The stable channel selects:
-
-`Pica-Library-v0.5.0-update-from-v0.4.11.zip`
-
-and performs verification, application replacement, database migration, and automatic reconnect without an intermediate install.
-
-If the in-app path is unavailable, the same Release provides the recovery fallback:
-
-`Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip`
-
-Personal data remains outside the application tree; neither normal updating nor the fallback assistant treats the library database, shelves, history, downloads, or account configuration as application files.
+Use the complete Windows x64 package for a new installation. From v0.5.0 use the built-in updater; the incremental ZIP and fallback Upgrade Assistant are available on the same release. Keep the data directory.
 
 ### Android
 
-The formal Android release is **v55 / 0.5.0**. The public v54 / 0.4.11 package has passed an in-place upgrade acceptance to v55.
-
-Android APKs are distributed only through this repository's official Release.
+Use the in-app update or install the official v56 APK over v55 without uninstalling. The separate Dev app is not a production update target.
 
 ## Local-first and security
 

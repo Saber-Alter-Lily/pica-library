@@ -12,8 +12,13 @@ import {
 } from './batch-allocator-v3'
 import { RecommendationPolicyStoreV5 } from '../recommendation-v5/policy-store'
 import { activeTemporarySuppressionsV5, filterCandidatesAgainstOwnedV5 } from '../recommendation-v5/portable-policy'
+import type { SessionIntentV5 } from '../recommendation-v5/portable-policy'
+import { freezeReaderRound, policyForReaderRound, readerTargetToken, type FocusHistory } from './reader-round-builder'
+import { readerWorkGroups, SUBSCRIBED_AUTHORS_KEY } from './reader-round-history'
+import { READER_ROUND_VERSION, readerWorkKey, type ReaderRoundPlan } from './reader-round'
+import { batchAuthorKey } from './batch-freshness-v3'
 
-export const CYCLE_COORDINATOR_VERSION = '3.3.0-confirmed-presentations'
+export const CYCLE_COORDINATOR_VERSION = '3.4.0-reader-rounds'
 export const MAX_VISIBLE_BATCHES_PER_CYCLE = 6
 
 export interface V3CycleVersions {
@@ -52,6 +57,9 @@ interface CoordinatorStateV3 {
     previousUsableCycleId: string | null
     buildingRequestId: string | null
     versions: V3CycleVersions
+    readerRoundOrdinal?:number
+    readerConsumedIntent?:string|null
+    readerFocusHistory?:FocusHistory[]
 }
 
 export class CycleCoordinatorV3 {
@@ -110,6 +118,7 @@ export class CycleCoordinatorV3 {
             >
         }
         const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const subscribed = new Set(this.database.getAppState<string[]>(SUBSCRIBED_AUTHORS_KEY) ?? [])
         const ownership = this.database.recommendationOwnershipState()
         const ownedComicIds = new Set([
             ...ownership.ownedComicIds,
@@ -118,6 +127,7 @@ export class CycleCoordinatorV3 {
         const ownershipKey = JSON.stringify({
             ownedComicIds: [...ownedComicIds].sort(),
             policyRevision: policy.revision,
+            subscribed:[...subscribed].sort(),
             activeSuppressions: activeTemporarySuppressionsV5(policy).map(item => item.comicId).sort(),
             identityBindingsVersion: ownership.identityBindingsVersion,
             explicitDistinctPairs: [...policy.explicitDistinctPairs].sort()
@@ -169,7 +179,7 @@ export class CycleCoordinatorV3 {
             filterCatalog,
             servingPolicy
         )
-        const eligibleRanked = serving.rows
+        const eligibleRanked = serving.rows.filter(row=>!subscribed.has(batchAuthorKey(row.comic)??''))
         const snapshot: FrozenCycleServingSnapshotV3 = {
             poolId: pool.id,
             ownershipKey,
@@ -201,10 +211,16 @@ export class CycleCoordinatorV3 {
     ) {
         try {
             const built = await this.buildCycle(cycleId)
+            const before=this.state()
+            if(before.buildingCycleId!==cycleId)return
             if (built.readiness === 'FAILED_INSUFFICIENT_POOL')
                 throw new Error(
                     'Recommendation generation did not produce a usable pool; previous recommendations were kept'
                 )
+            const currentPolicy=new RecommendationPolicyStoreV5(this.database).state()
+            const builtIntent=(built.telemetry.recommendationV5 as {portableBaseline?:{sessionIntent?:SessionIntentV5}}|undefined)?.portableBaseline?.sessionIntent
+            const policy=policyForReaderRound({...currentPolicy,sessionIntent:builtIntent??currentPolicy.sessionIntent},before.readerConsumedIntent)
+            const {plan,focus}=freezeReaderRound(this.database,built.ranked,(before.readerRoundOrdinal??0)+1,policy,before.readerFocusHistory??[])
             const identity = [
                 built.profile.favoriteFingerprint,
                 built.profile.registryVersion,
@@ -238,6 +254,7 @@ export class CycleCoordinatorV3 {
                         feedbackAdjustment: item.feedbackAdjustment,
                         visual: (item as { visual?: unknown }).visual
                     })),
+                    readerRound:plan,
                     readiness: built.readiness,
                     versions: built.versions,
                     completedAt: new Date().toISOString(),
@@ -260,7 +277,10 @@ export class CycleCoordinatorV3 {
                 activeBatchIndex: -1,
                 previousUsableCycleId: previousActive,
                 buildingRequestId: null,
-                versions: built.versions
+                versions: built.versions,
+                readerRoundOrdinal:plan.ordinal,
+                readerConsumedIntent:readerTargetToken(policy.sessionIntent)??before.readerConsumedIntent,
+                readerFocusHistory:focus?[...(before.readerFocusHistory??[]),focus].slice(-24):before.readerFocusHistory
             })
         } catch (error) {
             const current = this.state()
@@ -351,8 +371,9 @@ export class CycleCoordinatorV3 {
             const item = snapshot.eligibleById.get(id)
             return item ? [item] : []
         })
-        const exhausted =
-            recommendations.length === 0 || pool?.telemetry.state === 'EXHAUSTED'
+        const exhausted = pool?.telemetry.readerRound
+            ? pool.telemetry.state === 'EXHAUSTED'
+            : recommendations.length === 0 || pool?.telemetry.state === 'EXHAUSTED'
         return {
             ...this.status(),
             cycleId: batch.cycleId,
@@ -401,6 +422,28 @@ export class CycleCoordinatorV3 {
         const batches = this.database.listV3Batches(pool.id)
         const last = batches.at(-1)
         if (!next && last) return this.responseForBatch(last)
+        const plan=pool.telemetry.readerRound as ReaderRoundPlan|undefined
+        if(plan?.version===READER_ROUND_VERSION){
+            const index=last?last.batchIndex+1:0
+            if(last&&index>=plan.pages.length)return this.responseForBatch(last)
+            const snapshot=this.servingSnapshot(state.activeCycleId,pool)
+            const slots=plan.pages[index]??[]
+            const workByComic=readerWorkGroups(this.database.listAllWorkIdentityBindings(),this.database.listAllWorkIdentityDecisions(),
+                new RecommendationPolicyStoreV5(this.database).state().explicitDistinctPairs)
+            const late=this.database.readerReceiptHistory([...slots.map(s=>s.comicId),...workByComic.keys()],[])
+            const lateSeen=new Set(Array.from(late.shown,id=>readerWorkKey(id,workByComic)))
+            const items=slots.filter(s=>snapshot.eligibleById.has(s.comicId)&&!lateSeen.has(readerWorkKey(s.comicId,workByComic)))
+            const batch=this.database.saveV3BatchAndAllocate({
+                poolId:pool.id,cycleId:state.activeCycleId,batchIndex:index,contextId:randomUUID(),itemIds:items.map(s=>s.comicId),
+                evidence:{schemaVersion:2,allocatorVersion:READER_ROUND_VERSION,readerRoundOrdinal:plan.ordinal,requestId,
+                    readerMix:{familiar:items.filter(s=>s.group==='familiar').length,unfamiliar:items.filter(s=>s.group==='unfamiliar').length,
+                        matchedTarget:items.filter(s=>s.targetMatch).length,focus:plan.focus},
+                    freshness:{short:items.length<FINAL_BATCH_SIZE,authorCapRelaxedSlots:0},items}
+            })
+            if(index+1>=plan.pages.length)this.database.updateV3CandidatePoolState(state.activeCycleId,'EXHAUSTED')
+            this.saveState({...state,activeBatchIndex:index})
+            return this.responseForBatch(batch)
+        }
         if (
             next &&
             last &&
@@ -488,6 +531,9 @@ export class CycleCoordinatorV3 {
             policy
         )
         const bounded = Math.max(1, Math.min(120, Math.floor(limit)))
+        const plan=pool.telemetry.readerRound as ReaderRoundPlan|undefined
+        const allowed=plan?.version===READER_ROUND_VERSION?this.servingSnapshot(state.activeCycleId,pool).eligibleById:null
+        const readerPages=allowed&&plan?plan.pages.map(page=>page.map(s=>s.comicId).filter(id=>allowed.has(id))):undefined
         const buildTelemetry = pool.telemetry.telemetry as
             | {
                   recommendationV5?: {
@@ -498,7 +544,8 @@ export class CycleCoordinatorV3 {
         return {
             ...this.status(),
             cycleId: state.activeCycleId,
-            items: serving.rows.slice(0, bounded),
+            items:readerPages&&allowed?readerPages.flat().slice(0,bounded).map(id=>allowed.get(id)!):serving.rows.slice(0, bounded),
+            ...(readerPages?{readerPages,readerRoundOrdinal:plan!.ordinal}:{}),
             policyBaseline:
                 buildTelemetry?.recommendationV5?.portableBaseline ?? null,
             source: 'final-v3-portable-cache',

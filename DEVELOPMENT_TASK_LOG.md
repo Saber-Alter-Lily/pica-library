@@ -1,5 +1,7 @@
 # Pica Library Development Task Log
 
+v0.5.1 release gate: verify official Windows v0.5.0 → v0.5.1 incremental/full upgrade on synthetic profiles, signed Android v55 → v56 install-in-place and browser controls. Neither personal data nor the MuMu debug APK is used for publication.
+
 > **Purpose:** authoritative engineering task log for the architecture/runtime/multi-platform expansion.
 >
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.

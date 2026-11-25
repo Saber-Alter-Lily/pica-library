@@ -10,11 +10,11 @@ describe('account onboarding distribution candidate', () => {
         )
         expect(pkg.version).toBe('0.5.1')
         expect(gradle).toContain(
-            "System.getenv('PICA_ANDROID_VERSION_CODE') ?: '56'"
+            "System.getenv('PICA_ANDROID_VERSION_CODE') ?: '57'"
         )
         expect(gradle).toContain('versionCode buildVersionCode')
         expect(gradle).toContain(
-            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.5.1'"
+            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.5.1.1'"
         )
         expect(gradle).toContain('versionName buildVersionName')
     })

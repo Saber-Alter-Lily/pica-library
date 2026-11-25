@@ -41,7 +41,11 @@ android {
 
     testOptions {
         unitTests.includeAndroidResources = true
-        unitTests.all { testLogging { exceptionFormat 'full' } }
+        unitTests.all {
+            testLogging { exceptionFormat 'full' }
+            // Sandbox SDK downloads are separate from Gradle's mavenCentral() resolver.
+            systemProperty 'robolectric.dependency.repo.url', 'https://maven-central.storage-download.googleapis.com/maven2'
+        }
     }
 
     buildTypes {

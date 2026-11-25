@@ -48,7 +48,8 @@ public class DetailPagingUiTest {
         call(a,"accept",make.newInstance("phone","手机",0,chapters,false,false));call(a,"finishProbing");return a;
     }
     @Test public void libraryHasNoOverlayAtAnyDensityButInboxKeepsMenu(){
-        Activity a=Robolectric.buildActivity(Activity.class).setup().get();
+        // The adapter needs only the attached themed context, not a whole Activity launch.
+        Activity a=Robolectric.buildActivity(Activity.class).get();
         for(int mode:new int[]{0,2,3,5}){
             UnifiedComicCollectionAdapter adapter=new UnifiedComicCollectionAdapter(a,mode,Collections.emptyList(),null);
             assertNull(adapter.onCreateViewHolder(new LinearLayout(a),mode).play);

@@ -87,4 +87,4 @@ jobs:
           name: Pica-Android-v57-verified
           path: candidate/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1

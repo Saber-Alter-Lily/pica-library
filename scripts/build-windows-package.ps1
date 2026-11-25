@@ -24,8 +24,9 @@ $sourceSha = if ($env:PICA_LIBRARY_BUILD_PROVENANCE) { [string]$env:PICA_LIBRARY
 
 function Get-Sha256([string]$file) {
     $algorithm = [Security.Cryptography.SHA256]::Create()
-    try { return ([BitConverter]::ToString($algorithm.ComputeHash([IO.File]::OpenRead($file)))).Replace('-','').ToLowerInvariant() }
-    finally { $algorithm.Dispose() }
+    $stream = [IO.File]::OpenRead($file)
+    try { return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-','').ToLowerInvariant() }
+    finally { $stream.Dispose(); $algorithm.Dispose() }
 }
 
 if ($gitSourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve Git source commit SHA' }
@@ -35,7 +36,7 @@ if (Test-Path -LiteralPath $zip) { Remove-Item -Force -LiteralPath $zip }
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'app'),(Join-Path $stage 'runtime'),(Join-Path $stage 'licenses'),(Split-Path $runtimeCache -Parent) | Out-Null
 
 Push-Location $root
-try { pnpm build } finally { Pop-Location }
+try { pnpm build; if ($LASTEXITCODE -ne 0){throw "Application build failed ($LASTEXITCODE); refusing to package stale files"} } finally { Pop-Location }
 
 if (-not (Test-Path -LiteralPath $runtimeCache)) {
     Invoke-WebRequest -UseBasicParsing -Uri "https://nodejs.org/dist/v$nodeVersion/node-v$nodeVersion-win-x64.zip" -OutFile $runtimeCache
@@ -59,7 +60,7 @@ Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $stage -Recurse
 foreach($readerAsset in @('web/reader-ux-051.js','web/reader-ux-051.css')){
     $staged = Join-Path $stage $readerAsset
     if(-not (Test-Path -LiteralPath $staged -PathType Leaf)){throw "Reader asset missing before compression: $readerAsset"}
-    if((Get-FileHash -LiteralPath $staged).Hash -ne (Get-FileHash -LiteralPath (Join-Path $root $readerAsset)).Hash){throw "Reader asset changed during staging: $readerAsset"}
+    if((Get-Sha256 $staged) -ne (Get-Sha256 (Join-Path $root $readerAsset))){throw "Reader asset changed during staging: $readerAsset"}
 }
 $registrySource = Join-Path $root 'src\data\registry-v3-final'
 $registryTarget = Join-Path $stage 'src\data\registry-v3-final'

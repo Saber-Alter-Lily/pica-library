@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
+import {randomUUID} from 'node:crypto'
 import {createHash} from 'node:crypto'
-import {spawn} from 'node:child_process'
+import {spawn,execFileSync} from 'node:child_process'
 import {fileURLToPath} from 'node:url'
 import AdmZip from 'adm-zip'
 import {createRequire} from 'node:module'
@@ -16,14 +16,17 @@ assert.equal(name,'Pica-Library-v0.5.1-update-from-v0.5.0.zip')
 assert.match(expectedSha,/^[a-f0-9]{40}$/)
 const hash=(file)=>createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 assert.equal(hash(baseFile),'14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf')
-const root=fs.mkdtempSync(path.join(os.tmpdir(),'pica-button-051-')),install=path.join(root,'install'),home=path.join(root,'profile')
+const root=path.join(fs.realpathSync.native(process.env.RUNNER_TEMP),'pica-button-051-'+randomUUID()),install=path.join(root,'install')
+fs.mkdirSync(root)
+const user=path.join(root,'User'),local=path.join(user,'AppData','Local'),home=path.join(local,'Pica Library')
 const extra=path.join(root,'feed'),info=path.join(home,'runtime-state','instance.json'),pause=ms=>new Promise(r=>setTimeout(r,ms))
-fs.mkdirSync(extra); fs.mkdirSync(home)
+fs.mkdirSync(extra); fs.mkdirSync(home,{recursive:true})
 new AdmZip(baseFile).extractAllTo(install,false)
 fs.copyFileSync(delta,path.join(extra,name));fs.writeFileSync(path.join(extra,'SHA256SUMS.txt'),hash(delta)+'  '+name+'\n')
 const fixture=fileURLToPath(new URL('./v051-public-feed-fixture.cjs',import.meta.url)).replaceAll('\\','/')
 const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!/^PICA_|^NODE_OPTIONS$|^GH_TOKEN$|^GITHUB_TOKEN$|PROXY$/i.test(k)))
-Object.assign(env,{LOCALAPPDATA:path.join(root,'local'),APPDATA:path.join(root,'roaming'),PICA_LIBRARY_DESKTOP_HOME:home,PICA_QA_051_ROOT:root,NODE_OPTIONS:'--require="'+fixture+'"'})
+Object.assign(env,{USERPROFILE:user,LOCALAPPDATA:local,APPDATA:path.join(user,'AppData','Roaming'),PICA_QA_051_ROOT:root,NODE_OPTIONS:'--require="'+fixture+'"'})
+const checkRows=mode=>execFileSync(process.execPath,['--import','tsx','scripts/verify-v051-preservation.ts',mode,path.join(home,'data','library.db')],{stdio:'inherit'})
 const marker=path.join(home,'config','qa-preservation.txt');fs.mkdirSync(path.dirname(marker),{recursive:true});fs.writeFileSync(marker,'button-qa')
 const old=spawn(path.join(install,'Pica Library.exe'),['--no-open'],{cwd:install,windowsHide:true,env,stdio:'ignore'})
 await new Promise((resolve,reject)=>{old.on('error',reject);old.on('exit',c=>c===0?resolve():reject(Error('launcher exit '+c)))})
@@ -38,6 +41,7 @@ async function instance(ver,oldPid){
 }
 try {
     const first=await instance('0.5.0')
+    checkRows('seed')
     browser=await chromium.launch({channel:'msedge',headless:true})
     const p=await browser.newPage();p.setDefaultTimeout(20000)
     await p.addInitScript(()=>{localStorage.setItem('pica-onboarding-state-v1',JSON.stringify({completedVersion:2,autoShow:false}));localStorage.setItem('pica-auto-update-prompt-v1',JSON.stringify({checkedAt:Date.now()}))})
@@ -51,13 +55,21 @@ try {
     await p.locator('#app-confirm-submit').click()
     let second
     try{second=await instance('0.5.1',first.pid)}
-    catch(error){console.error('Button request results:',network);console.error('Updater message:',await p.locator('#update-message').textContent({timeout:2000}).catch(()=>'<page closed>'));throw error}
+    catch(error){
+        console.error('Button request results:',network)
+        const progress=path.join(home,'runtime-state','updates','update-progress.json')
+        if(fs.existsSync(progress)){const {phase,message}=JSON.parse(fs.readFileSync(progress));console.error('Isolated updater:',phase,message||'')}
+        console.error('Installed build:',fs.readFileSync(path.join(install,'SOURCE_SHA.txt'),'utf8').trim())
+        console.error('Updater message:',await p.locator('#update-message').textContent({timeout:2000}).catch(()=>'<page closed>'))
+        throw error
+    }
     for(const [route,method] of [['check','GET'],['prepare-latest','POST'],['apply','POST']])
         assert.ok(network.some(([p,m,s])=>p==='/api/v1/update/'+route&&m===method&&s===200), 'Missing successful UI '+route+'; '+JSON.stringify(network))
     // No test-driven reload/navigation here: v0.5.0 must reconnect and load the new Web bundle itself.
     await p.waitForFunction(()=>performance.getEntriesByType('resource').some(e=>new URL(e.name).pathname.endsWith('/reader-ux-051.js')),null,{timeout:95000})
     assert.equal(fs.readFileSync(path.join(install,'SOURCE_SHA.txt'),'utf8').trim(),expectedSha)
     assert.equal(fs.readFileSync(marker,'utf8'),'button-qa')
+    checkRows('verify')
     assert.ok(fs.readFileSync(path.join(root,'feed-log.txt'),'utf8').includes('/releases/download/v0.5.1/'+name))
     console.log('OFFICIAL_V050_UI_ONE_CLICK_TO_V051=PASS (discovery -> confirmed button -> downloaded incremental -> staged -> applied -> new healthy process)')
     console.log('Verified at '+second.url)

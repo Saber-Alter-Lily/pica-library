@@ -1,9 +1,14 @@
 // Used only in an isolated v0.5.0 end-to-end test. No sockets, tokens or real provider data.
-const fs = require('node:fs'), path = require('node:path'), os = require('node:os')
+const fs = require('node:fs'), path = require('node:path')
 const root=process.env.PICA_QA_051_ROOT, official='https://github.com/Saber-Alter-Lily/pica-library'
-if(!root || path.dirname(root)!==os.tmpdir() || !/^pica-button-051-[\w-]+$/.test(path.basename(root))
-    || process.env.PICA_LIBRARY_DESKTOP_HOME!==path.join(root,'profile')
-    || !path.resolve(process.execPath).toLowerCase().startsWith((path.join(root,'install')+path.sep).toLowerCase()))throw Error('Not an isolated packaged QA process')
+if(!root || fs.realpathSync.native(path.dirname(root))!==fs.realpathSync.native(process.env.RUNNER_TEMP) || !/^pica-button-051-[a-f0-9-]{36}$/i.test(path.basename(root))
+    || process.env.LOCALAPPDATA!==path.join(root,'User','AppData','Local') || process.env.PICA_LIBRARY_DESKTOP_HOME
+    || path.resolve(process.execPath).toLowerCase()!==path.join(root,'install','runtime','node.exe').toLowerCase()
+    || path.resolve(process.argv[1]).toLowerCase()!==path.join(root,'install','app','desktop.js').toLowerCase())throw Error('Not the isolated v0.5.0 desktop process')
+// Only the running old process sees the unpublished release. Its updater and the new
+// desktop must execute normally, even though the real updater sanitizes PICA_*.
+delete process.env.NODE_OPTIONS
+delete process.env.PICA_QA_051_ROOT
 const inc='Pica-Library-v0.5.1-update-from-v0.5.0.zip',base=official+'/releases/download/v0.5.1/'
 const native=globalThis.fetch.bind(globalThis)
 globalThis.fetch=async(input,init)=>{

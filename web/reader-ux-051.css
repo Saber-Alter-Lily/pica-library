@@ -1,6 +1,10 @@
 #reader-inbox-dialog{color:var(--text,CanvasText);background:var(--panel,Canvas);width:min(900px,90vw);max-height:85vh;overflow:auto;border:1px solid var(--line,GrayText);border-radius:16px;padding:clamp(1rem,3vw,2rem)}
 #reader-inbox-dialog h2{margin:0;margin-inline-end:auto}
 .reader-actions,.reader-inbox-grid{gap:.6rem}.reader-actions{align-items:flex-start;flex-wrap:wrap}
+.reader-actions #ux-library-filters[open]{flex:1 1 100%;min-width:0}
+.reader-actions #ux-library-filters .ux-more-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(15rem,100%),1fr))}
+.reader-actions #ux-library-filters .facet-control{display:grid;grid-template-columns:minmax(0,1fr);min-width:0}
+.reader-actions #ux-library-filters input,.reader-actions #ux-library-filters select{box-sizing:border-box;width:100%;min-width:0;max-width:100%}
 .reader-inbox-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(145px,100%),1fr));margin:1rem 0}
 .reader-inbox-grid article{display:flex;flex-direction:column;align-items:stretch;gap:.4rem;min-width:0}.reader-inbox-grid article>button{white-space:normal;overflow-wrap:anywhere}
 .reader-inbox-grid img{width:100%;aspect-ratio:2/3;object-fit:cover;display:block;margin-bottom:.4rem}.reader-inbox-grid img[hidden]{display:none}

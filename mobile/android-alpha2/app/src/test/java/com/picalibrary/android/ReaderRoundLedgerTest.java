@@ -25,9 +25,12 @@ public class ReaderRoundLedgerTest {
     private static void draw(FrameLayout v)throws Exception{
         android.view.ViewTreeObserver.class.getDeclaredMethod("dispatchOnDraw").invoke(v.getViewTreeObserver());
     }
-    @Test public void backgroundAndReplacedPagesDoNotCountButTheForegroundPageDoes() throws Exception{
+    @Test @Config(sdk=35) public void backgroundAndReplacedPagesDoNotCountButTheForegroundPageDoes() throws Exception{
         ActivityController<ReceiptActivity> ctl=Robolectric.buildActivity(ReceiptActivity.class).setup().visible();
         ReceiptActivity a=ctl.get();FrameLayout container=new FrameLayout(a);a.setContentView(container);
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+        assertTrue("content is attached",container.isAttachedToWindow());assertTrue("content is shown",container.isShown());
+        assertEquals("window is visible",android.view.View.VISIBLE,container.getWindowVisibility());
         NativeRecommendationStore.Snapshot snapshot=new NativeRecommendationStore.Snapshot();
         snapshot.cycleId="test-draw";snapshot.readerOrdinal=1;
         snapshot.batches.add(Collections.singletonList(new NativeRecommendationStore.Item("draw-book","synthetic","test","","","",0)));

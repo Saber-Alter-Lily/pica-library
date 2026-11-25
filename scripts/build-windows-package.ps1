@@ -48,7 +48,8 @@ $actualHash = Get-Sha256 $runtimeCache
 if ($actualHash -ne $expectedHash) { throw 'Official Node.js runtime checksum mismatch' }
 $runtimeExtract = Join-Path $buildRoot 'runtime-extract'
 if (Test-Path -LiteralPath $runtimeExtract) { Remove-Item -Recurse -Force -LiteralPath $runtimeExtract }
-Expand-Archive -LiteralPath $runtimeCache -DestinationPath $runtimeExtract
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[IO.Compression.ZipFile]::ExtractToDirectory($runtimeCache,$runtimeExtract)
 Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\node.exe") -Destination (Join-Path $stage 'runtime\node.exe')
 Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\LICENSE") -Destination (Join-Path $stage 'licenses\Node.js-LICENSE.txt')
 
@@ -266,7 +267,7 @@ foreach ($file in $textFiles) {
         throw "Sensitive or developer-specific content detected in $($file.Name)"
     }
 }
-Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+[IO.Compression.ZipFile]::CreateFromDirectory($stage,$zip,[IO.Compression.CompressionLevel]::Optimal,$false)
 $hash = Get-Sha256 $zip
 [IO.File]::WriteAllText((Join-Path $root 'artifacts\SHA256SUMS.txt'),"$hash  $name.zip`n",(New-Object Text.UTF8Encoding($false)))
 $launcherBaseReport = if ($reuseAcceptedLauncher) {

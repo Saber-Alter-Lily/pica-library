@@ -18,7 +18,7 @@ import static org.junit.Assert.*;
 
 /** Blank Android activity and private synthetic preferences; never starts Home, providers or sync. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=32)
+@Config(sdk=35)
 public class LibrarySortMenuTest {
     @Test public void searchAcceptsImeAndHardwareEnterOnlyOnce(){
         int[] calls={0};Runnable submit=()->calls[0]++;

@@ -15,7 +15,7 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 - **书库**：在搜索下方打开筛选、排序或订阅更新；再次点「随机重排」才改变顺序。
 - **订阅**：从详情订阅作者，用封面浏览待看作品。阅读相应章节或手动标记才消除这条提醒。
 - **推荐与阅读**：同一轮分六页浏览，优先混合熟悉和陌生作者；Android 优化多章节目录、窄屏操作和深浅色布局。
-- [完整更新说明与限制](docs/V051_RELEASE_NOTES.md) · [Windows x64](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-v0.5.1-windows-x64.zip) · [Android v56 正式 APK](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-Android-v56.apk)
+- [Windows v0.5.1 更新说明](docs/V051_RELEASE_NOTES.md) · [Windows x64](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-v0.5.1-windows-x64.zip) · [Android v57 正式 APK](https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-v57.apk)
 
 ## 主要功能
 
@@ -76,7 +76,7 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 
 ### Android
 
-正式包为 **v56 / 0.5.1**，使用与 v55 相同的签名。通过应用内更新覆盖原正式版，不要先卸载。独立 Dev 包不是正式版的升级起点。
+正式包为 **v57 / 0.5.1.1**。在「设置 → 软件更新」检查更新，可保留数据覆盖 v56，不要卸载。书库封面不再遮挡，打开详情即可开始或继续阅读；在线书单成功翻页回到顶部，返回详情之前的书单时保留位置。[Android 更新说明](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)。独立 Dev 包不是正式版的升级起点。
 
 Android APK 不通过应用商店分发，请只从本仓库正式 Release 下载。
 

@@ -2,7 +2,7 @@
 
 # Pica Library
 
-**v0.5.1** · [Windows x64](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-v0.5.1-windows-x64.zip) · [Android v56](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-Android-v56.apk) · [Release notes](docs/V051_RELEASE_NOTES.md)
+**Windows v0.5.1** · [Windows x64](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-v0.5.1-windows-x64.zip) · [Android v57](https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-v57.apk) · [Desktop release notes](docs/V051_RELEASE_NOTES.md)
 
 **Local-first manga library, reader, and download manager for Windows & Android.**
 
@@ -73,7 +73,7 @@ Use the complete Windows x64 package for a new installation. From v0.5.0 use the
 
 ### Android
 
-Use the in-app update or install the official v56 APK over v55 without uninstalling. The separate Dev app is not a production update target.
+Use the in-app update to install **Android v57 / 0.5.1.1** over v56 without uninstalling. Start or resume from the detail page; online lists return to the top on successful page changes and preserve position when returning from details. [Android release notes](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview). The separate Dev app is not a production update target.
 
 ## Local-first and security
 

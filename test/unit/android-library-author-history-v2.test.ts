@@ -508,20 +508,20 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(browse).toContain('EhSemanticStore.load(this)')
     expect(browse).toContain('EhTagTranslationStore.load(this)')
     expect(browse).toContain(
-      'private void showIds(BrowseRenderState state)'
+      'private void showIds(BrowseRenderState state,boolean top)'
     )
     expect(browse).toContain(
       'EhTagTranslationStore.scheduleUpdate(this,this::refreshLastRenderedIds)'
     )
     expect(browse).toContain(
-      'worker.submit(()->publishIds(ids,label,1))'
+      'worker.submit(()->publishIds(token,ids,label,1))'
     )
     expect(browse).not.toContain(
       'private void showIds(List<String> ids,String label,int pages)'
     )
 
     const showStart = browse.indexOf(
-      'private void showIds(BrowseRenderState state)'
+      'private void showIds(BrowseRenderState state,boolean top)'
     )
     const showEnd = browse.indexOf(
       'private void showStatus(',

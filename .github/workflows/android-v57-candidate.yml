@@ -1,0 +1,90 @@
+name: Android v57 signed candidate and in-place gate
+on:
+  push:
+    branches: [codex/android-v57-detail-paging]
+permissions:
+  contents: read
+jobs:
+  candidate:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/android-v57-detail-paging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Fetch and verify public production v56
+        env:
+          EXPECTED_CERT: 64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d
+        run: |
+          set -euo pipefail
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          curl -fL --retry 3 https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.1/Pica-Library-Android-v56.apk -o "$RUNNER_TEMP/v56.apk"
+          echo "cdf64ecf06802a592332b6aacd7fdf555fa977fd7f0d148dc99abe609b3e07ce  $RUNNER_TEMP/v56.apk" | sha256sum -c -
+          bt="$ANDROID_HOME/build-tools/35.0.0"
+          "$bt/apksigner" verify --print-certs "$RUNNER_TEMP/v56.apk" > "$RUNNER_TEMP/old-cert"
+          grep -Fx "Signer #1 certificate SHA-256 digest: $EXPECTED_CERT" "$RUNNER_TEMP/old-cert"
+      - name: Build production v57 without exporting signing material
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$ANDROID_PREVIEW_KEYSTORE_B64" && test -n "$ANDROID_PREVIEW_KEYSTORE_PASSWORD"
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$(mktemp "$RUNNER_TEMP/v57-keystore.XXXXXXXX")"
+          trap 'rm -f -- "$ANDROID_PREVIEW_KEYSTORE_PATH"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+          gradle :app:assembleRelease --no-daemon
+      - name: Match package, certificate and version
+        run: |
+          set -euo pipefail
+          mkdir candidate
+          apk=candidate/Pica-Library-Android-v57.apk
+          cp mobile/android-alpha2/app/build/outputs/apk/release/app-release.apk "$apk"
+          bt="$ANDROID_HOME/build-tools/35.0.0"
+          "$bt/aapt" dump badging "$apk" > "$RUNNER_TEMP/v57-badging"
+          grep -F "package: name='com.picalibrary.android' versionCode='57' versionName='0.5.1.1'" "$RUNNER_TEMP/v57-badging"
+          "$bt/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/new-cert"
+          grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/new-cert"
+          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/new-cert")
+          test "$cert" = 64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d
+          printf '%s\n' "$cert" > candidate/Pica-Library-Android-Preview.cert-sha256
+      - name: Allow KVM for disposable emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Upgrade actual v56 to v57 and verify synthetic persisted bookmark
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: bash scripts/test-android-v56-v57-data.sh
+      - name: Generate manifest only after upgrade gate
+        run: |
+          cd candidate
+          sha=$(sha256sum Pica-Library-Android-v57.apk | cut -d' ' -f1)
+          jq -n --arg sha "$sha" '{versionCode:57,versionName:"0.5.1.1",apkUrl:"https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-v57.apk",sha256:$sha,minimumSupportedVersionCode:42,releaseNotes:"书库封面不再遮挡；进详情开始或按原章原页续读。在线作品列表翻页成功回到顶部，失败保留原位。"}' > android-update.json
+          jq -n --arg sha "$sha" --arg src "$GITHUB_SHA" --arg cert "$(cat Pica-Library-Android-Preview.cert-sha256)" --arg run "$GITHUB_RUN_ID" '{versionCode:57,versionName:"0.5.1.1",packageName:"com.picalibrary.android",sourceSha:$src,apkSha256:$sha,signerCertificateSha256:$cert,actionsRunId:$run,upgradeFromVersionCode:56,syntheticBookmarkPreserved:true}' > BUILD_TRANSPARENCY.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Android-v57-verified
+          path: candidate/
+          if-no-files-found: error
+          retention-days: 1

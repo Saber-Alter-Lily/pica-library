@@ -56,6 +56,11 @@ Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\LI
 Copy-Item -Path (Join-Path $root 'dist\*.js') -Destination (Join-Path $stage 'app')
 Copy-Item -LiteralPath (Join-Path $root 'dist\licenses\THIRD_PARTY_LICENSES.txt') -Destination (Join-Path $stage 'licenses\THIRD_PARTY_LICENSES.txt')
 Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $stage -Recurse
+foreach($readerAsset in @('web/reader-ux-051.js','web/reader-ux-051.css')){
+    $staged = Join-Path $stage $readerAsset
+    if(-not (Test-Path -LiteralPath $staged -PathType Leaf)){throw "Reader asset missing before compression: $readerAsset"}
+    if((Get-FileHash -LiteralPath $staged).Hash -ne (Get-FileHash -LiteralPath (Join-Path $root $readerAsset)).Hash){throw "Reader asset changed during staging: $readerAsset"}
+}
 $registrySource = Join-Path $root 'src\data\registry-v3-final'
 $registryTarget = Join-Path $stage 'src\data\registry-v3-final'
 $registryMirror = Join-Path $stage 'app\runtime-assets\registry-v3-final'
@@ -267,7 +272,7 @@ foreach ($file in $textFiles) {
         throw "Sensitive or developer-specific content detected in $($file.Name)"
     }
 }
-[IO.Compression.ZipFile]::CreateFromDirectory($stage,$zip,[IO.Compression.CompressionLevel]::Optimal,$false)
+& (Join-Path $PSScriptRoot 'write-windows-package-zip.ps1') -Stage $stage -Zip $zip
 $hash = Get-Sha256 $zip
 [IO.File]::WriteAllText((Join-Path $root 'artifacts\SHA256SUMS.txt'),"$hash  $name.zip`n",(New-Object Text.UTF8Encoding($false)))
 $launcherBaseReport = if ($reuseAcceptedLauncher) {
